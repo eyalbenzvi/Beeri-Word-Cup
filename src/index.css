@@ -41,6 +41,15 @@ body {
 .toast-enter { animation: slideUp 0.25s ease-out; }
 .toast-exit { animation: slideOut 0.25s ease-in forwards; }
 
+/* Hamburger menu slide-in */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slideInRight 0.25s ease-out;
+}
+
 /* Better number inputs */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
