@@ -18,18 +18,22 @@ function MatchRow({ match, prediction }) {
   const awayName = away?.name || 'טרם נקבע';
   const hasScore = prediction?.homeScore !== undefined && prediction?.homeScore !== null;
 
+  const isTie = match.stage !== 'group' && hasScore &&
+    prediction.homeScore === prediction.awayScore && prediction.advancingTeam;
+
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-xs">
-      <span className="flex-1 text-right truncate">{homeName}</span>
-      <span className="w-16 text-center font-bold text-gray-700">
-        {hasScore ? `${prediction.homeScore} - ${prediction.awayScore}` : '-'}
-      </span>
-      <span className="flex-1 text-left truncate">{awayName}</span>
-      {match.stage !== 'group' && hasScore &&
-        prediction.homeScore === prediction.awayScore && prediction.advancingTeam && (
-        <span className="text-[10px] text-gray-400 mr-1">
-          (פנ: {getTeamByCode(prediction.advancingTeam)?.name})
+    <div className="py-1.5 border-b border-gray-50 last:border-0 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="flex-1 text-right truncate">{homeName}</span>
+        <span className="w-16 text-center font-bold text-gray-700">
+          {hasScore ? `${prediction.homeScore} – ${prediction.awayScore}` : '–'}
         </span>
+        <span className="flex-1 text-left truncate">{awayName}</span>
+      </div>
+      {isTie && (
+        <div className="text-[10px] text-gray-400 text-center mt-0.5">
+          פנדלים: {getTeamByCode(prediction.advancingTeam)?.name}
+        </div>
       )}
     </div>
   );
