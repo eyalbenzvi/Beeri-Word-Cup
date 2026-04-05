@@ -212,7 +212,7 @@ export default function Predict() {
         )}
 
         {/* Existing forms */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="space-y-2.5 mb-4">
           {forms.map((form) => {
             const formStatus = normalizeStatus(form.status);
             return (
@@ -406,7 +406,7 @@ export default function Predict() {
       {selectedStage === 'group' && (
         <GroupTable matchData={matchPredictions} group={selectedGroup} />
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="space-y-2">
         {filteredMatches.map((match) => {
           const derivedMatch = match.stage !== 'group' && bracketTeams[match.id]
             ? { ...match, homeTeam: bracketTeams[match.id].home, awayTeam: bracketTeams[match.id].away }
@@ -509,7 +509,7 @@ export default function Predict() {
 
       {/* Action Buttons — only show when draft */}
       {status === 'draft' && !settings.predictionsLocked && (
-        <div className="sticky bottom-16 mt-6 pb-2 space-y-2">
+        <div className="sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto">
           <button
             onClick={handleRandomize}
             className="w-full bg-white text-primary font-bold py-3 rounded-2xl border-2 border-primary/20 shadow-sm hover:bg-gray-50 transition text-sm border-none cursor-pointer"

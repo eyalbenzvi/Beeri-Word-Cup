@@ -45,7 +45,7 @@ export default function Results() {
         <GroupTable matchData={results} group={selectedGroup} />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="space-y-2">
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== 'group';
           const result = results[match.id];

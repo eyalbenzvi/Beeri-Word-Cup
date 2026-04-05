@@ -4,7 +4,7 @@ export default function StageSelector({ selectedStage, onSelect }) {
   const stages = Object.entries(STAGES);
 
   return (
-    <div className="flex overflow-x-auto gap-2 mb-4 pb-1 -mx-4 px-4 scrollbar-hide">
+    <div className="flex overflow-x-auto md:overflow-visible md:flex-wrap md:justify-center gap-2 mb-4 pb-1 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
       {stages.map(([key, label]) => (
         <button
           key={key}

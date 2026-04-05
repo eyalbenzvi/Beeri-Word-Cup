@@ -30,7 +30,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={showToast}>
       {children}
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 z-[100] px-5 py-3 rounded-2xl text-white text-sm font-medium shadow-xl max-w-[85%] text-center ${colors[toast.type] || colors.success} ${exiting ? 'toast-exit' : 'toast-enter'}`}>
+        <div className={`fixed bottom-20 md:bottom-8 left-1/2 z-[100] px-5 py-3 rounded-2xl text-white text-sm font-medium shadow-xl max-w-[85%] md:max-w-sm text-center ${colors[toast.type] || colors.success} ${exiting ? 'toast-exit' : 'toast-enter'}`}>
           {toast.message}
         </div>
       )}
