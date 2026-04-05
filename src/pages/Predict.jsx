@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser, useFullUserPredictions, useSettings } from '../hooks/useStore';
 import { savePrediction, saveAdvancingPrediction, saveBonusPrediction, submitPredictions } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS, ALL_TEAMS } from '../data/teams';
+import { calcBracketTeams } from '../utils/bracket';
 import MatchCard from '../components/MatchCard';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
@@ -121,6 +122,9 @@ export default function Predict() {
 
   const matchPredictions = predictions.matches || {};
 
+  // Calculate knockout bracket teams from group stage predictions
+  const bracketTeams = useMemo(() => calcBracketTeams(matchPredictions), [matchPredictions]);
+
   // Count progress
   const predictedGroupMatches = groupMatches.filter(
     (m) => matchPredictions[m.id]?.homeScore !== undefined && matchPredictions[m.id]?.homeScore !== null
@@ -212,15 +216,21 @@ export default function Predict() {
         <GroupSelector groups={Object.keys(GROUPS)} selectedGroup={selectedGroup} onSelect={setSelectedGroup} />
       )}
       <div className="space-y-2">
-        {filteredMatches.map((match) => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            prediction={matchPredictions[match.id]}
-            editable={canEdit}
-            onPredictionChange={(pred) => handlePredictionChange(match.id, pred)}
-          />
-        ))}
+        {filteredMatches.map((match) => {
+          // For knockout matches, override homeTeam/awayTeam with bracket-derived teams
+          const derivedMatch = match.stage !== 'group' && bracketTeams[match.id]
+            ? { ...match, homeTeam: bracketTeams[match.id].home, awayTeam: bracketTeams[match.id].away }
+            : match;
+          return (
+            <MatchCard
+              key={match.id}
+              match={derivedMatch}
+              prediction={matchPredictions[match.id]}
+              editable={canEdit}
+              onPredictionChange={(pred) => handlePredictionChange(match.id, pred)}
+            />
+          );
+        })}
         {filteredMatches.length === 0 && (
           <div className="text-center py-8 text-gray-400"><p>No matches in this stage yet</p></div>
         )}
