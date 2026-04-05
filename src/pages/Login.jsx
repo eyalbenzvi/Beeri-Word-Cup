@@ -91,13 +91,15 @@ export default function Login() {
       setConfirmationResult(result);
       setStep('otp');
     } catch (err) {
-      console.error('SMS error:', err);
+      console.error('SMS error:', err.code, err.message);
       if (err.code === 'auth/too-many-requests') {
         setError('יותר מדי ניסיונות. נסה שוב מאוחר יותר');
       } else if (err.code === 'auth/invalid-phone-number') {
         setError('מספר טלפון לא תקין');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('הדומיין לא מורשה. הוסף אותו ב-Firebase Authentication → Settings → Authorized domains');
       } else {
-        setError('שגיאה בשליחת SMS. נסה שוב');
+        setError(`שגיאה בשליחת SMS: ${err.code || err.message}`);
       }
     } finally {
       setLoading(false);
