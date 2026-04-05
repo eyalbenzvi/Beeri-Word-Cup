@@ -74,13 +74,9 @@ function getBestThirdPlaceTeams(standings) {
   return thirdPlace.slice(0, 8);
 }
 
-// Assign qualifying 3rd-place teams to R32 match slots
+// Assign qualifying 3rd-place teams to R32 match slots using backtracking
 // Each R32 match with a 3rd-place slot has constraints on which groups' 3rd-place teams can play there
 function assignThirdPlaceTeams(qualifyingThird) {
-  const qualGroups = qualifyingThird.map((t) => t.group).sort();
-  const assignments = {}; // matchId -> teamCode
-
-  // R32 matches that need 3rd-place teams, with their group constraints
   const slots = [
     { matchId: 'R32-2',  thirdFrom: ['A','B','C','D','F'] },
     { matchId: 'R32-5',  thirdFrom: ['C','D','F','G','H'] },
@@ -92,40 +88,32 @@ function assignThirdPlaceTeams(qualifyingThird) {
     { matchId: 'R32-15', thirdFrom: ['D','E','I','J','L'] },
   ];
 
-  // Greedy assignment: assign teams to slots respecting constraints
-  const assigned = new Set();
-  // Sort slots by fewest available options first (most constrained first)
-  const sortedSlots = [...slots].sort((a, b) => {
-    const aAvail = a.thirdFrom.filter((g) => qualGroups.includes(g) && !assigned.has(g)).length;
-    const bAvail = b.thirdFrom.filter((g) => qualGroups.includes(g) && !assigned.has(g)).length;
-    return aAvail - bAvail;
-  });
-
-  // Try each permutation attempt with greedy approach
-  for (const slot of sortedSlots) {
-    const eligible = qualifyingThird.filter(
-      (t) => slot.thirdFrom.includes(t.group) && !assigned.has(t.group)
-    );
-    if (eligible.length > 0) {
-      assignments[slot.matchId] = eligible[0].code;
-      assigned.add(eligible[0].group);
-    }
+  // Map qualifying groups to team codes
+  const qualTeamsByGroup = {};
+  for (const t of qualifyingThird) {
+    qualTeamsByGroup[t.group] = t.code;
   }
 
-  // If greedy failed for some slots, do a second pass
-  if (Object.keys(assignments).length < 8) {
-    const unassignedTeams = qualifyingThird.filter((t) => !assigned.has(t.group));
-    const unassignedSlots = slots.filter((s) => !assignments[s.matchId]);
-    for (const slot of unassignedSlots) {
-      const eligible = unassignedTeams.filter((t) => slot.thirdFrom.includes(t.group));
-      if (eligible.length > 0) {
-        assignments[slot.matchId] = eligible[0].code;
-        assigned.add(eligible[0].group);
-        unassignedTeams.splice(unassignedTeams.indexOf(eligible[0]), 1);
+  const assignments = {};
+
+  // Backtracking solver — guarantees finding a valid assignment
+  function solve(slotIndex, assigned) {
+    if (slotIndex === slots.length) return true;
+
+    const slot = slots[slotIndex];
+    for (const group of slot.thirdFrom) {
+      if (qualTeamsByGroup[group] && !assigned.has(group)) {
+        assigned.add(group);
+        assignments[slot.matchId] = qualTeamsByGroup[group];
+        if (solve(slotIndex + 1, assigned)) return true;
+        assigned.delete(group);
+        delete assignments[slot.matchId];
       }
     }
+    return false;
   }
 
+  solve(0, new Set());
   return assignments;
 }
 
@@ -147,8 +135,11 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
       pred.awayScore === null || pred.awayScore === undefined) return null;
 
-  // In knockout: if draw, home team advances (arbitrary for predictions)
-  return pred.homeScore >= pred.awayScore ? teams.home : teams.away;
+  // In knockout: if draw, use advancingTeam choice; default to home
+  if (pred.homeScore === pred.awayScore) {
+    return pred.advancingTeam || teams.home;
+  }
+  return pred.homeScore > pred.awayScore ? teams.home : teams.away;
 }
 
 // Calculate the full bracket from match predictions
@@ -218,10 +209,20 @@ export function calcBracketTeams(matchPredictions) {
 
       let home = null, away = null;
       if (sf1Teams?.home && sf1Teams?.away && sf1Pred?.homeScore !== null && sf1Pred?.homeScore !== undefined) {
-        home = sf1Pred.homeScore >= sf1Pred.awayScore ? sf1Teams.away : sf1Teams.home;
+        if (sf1Pred.homeScore === sf1Pred.awayScore) {
+          const winner = sf1Pred.advancingTeam || sf1Teams.home;
+          home = winner === sf1Teams.home ? sf1Teams.away : sf1Teams.home;
+        } else {
+          home = sf1Pred.homeScore > sf1Pred.awayScore ? sf1Teams.away : sf1Teams.home;
+        }
       }
       if (sf2Teams?.home && sf2Teams?.away && sf2Pred?.homeScore !== null && sf2Pred?.homeScore !== undefined) {
-        away = sf2Pred.homeScore >= sf2Pred.awayScore ? sf2Teams.away : sf2Teams.home;
+        if (sf2Pred.homeScore === sf2Pred.awayScore) {
+          const winner = sf2Pred.advancingTeam || sf2Teams.home;
+          away = winner === sf2Teams.home ? sf2Teams.away : sf2Teams.home;
+        } else {
+          away = sf2Pred.homeScore > sf2Pred.awayScore ? sf2Teams.away : sf2Teams.home;
+        }
       }
       bracket[match.id] = { home, away };
     } else {
@@ -233,4 +234,39 @@ export function calcBracketTeams(matchPredictions) {
   }
 
   return bracket;
+}
+
+// Derive which teams advance to each round from bracket
+export function deriveAdvancingTeams(bracketTeams) {
+  const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
+
+  for (const [matchId, teams] of Object.entries(bracketTeams)) {
+    const addTeams = (round) => {
+      if (teams.home && !advancing[round].includes(teams.home)) advancing[round].push(teams.home);
+      if (teams.away && !advancing[round].includes(teams.away)) advancing[round].push(teams.away);
+    };
+
+    if (matchId.startsWith('R32-')) addTeams('R32');
+    else if (matchId.startsWith('R16-')) addTeams('R16');
+    else if (matchId.startsWith('QF-')) addTeams('QF');
+    else if (matchId.startsWith('SF-')) addTeams('SF');
+    else if (matchId === 'FINAL-1') addTeams('F');
+  }
+
+  return advancing;
+}
+
+// Derive champion from final match prediction
+export function deriveChampion(matchPredictions, bracketTeams) {
+  const finalTeams = bracketTeams['FINAL-1'];
+  if (!finalTeams?.home || !finalTeams?.away) return null;
+
+  const pred = matchPredictions['FINAL-1'];
+  if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
+      pred.awayScore === null || pred.awayScore === undefined) return null;
+
+  if (pred.homeScore === pred.awayScore) {
+    return pred.advancingTeam || finalTeams.home;
+  }
+  return pred.homeScore > pred.awayScore ? finalTeams.home : finalTeams.away;
 }

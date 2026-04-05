@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser, useFullUserPredictions, useSettings } from '../hooks/useStore';
-import { savePrediction, saveAdvancingPrediction, saveBonusPrediction, submitPredictions } from '../store';
+import { savePrediction, saveBonusPrediction, submitPredictions } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
-import { GROUPS, ALL_TEAMS } from '../data/teams';
+import { GROUPS } from '../data/teams';
 import { calcBracketTeams } from '../utils/bracket';
 import MatchCard from '../components/MatchCard';
 import GroupSelector from '../components/GroupSelector';
@@ -16,11 +16,6 @@ const knockoutMatches = generateKnockoutMatches();
 function randomScore() {
   const weights = [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 5];
   return weights[Math.floor(Math.random() * weights.length)];
-}
-
-function shuffleAndPick(arr, count) {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
 }
 
 export default function Predict() {
@@ -53,51 +48,28 @@ export default function Predict() {
   const handleRandomize = () => {
     if (!user || !canEdit) return;
 
-    // 1. Randomize all match scores
-    [...groupMatches, ...knockoutMatches].forEach((match) => {
+    // 1. Randomize group match scores
+    groupMatches.forEach((match) => {
       savePrediction(user.id, match.id, {
         homeScore: randomScore(),
         awayScore: randomScore(),
       });
     });
 
-    // 2. Randomize advancing teams
-    // R32: pick ~2-3 teams from each group (top 2 always + sometimes 3rd)
-    const r32Teams = [];
-    for (const [, teams] of Object.entries(GROUPS)) {
-      const shuffled = shuffleAndPick(teams, Math.random() < 0.67 ? 3 : 2);
-      shuffled.forEach((t) => r32Teams.push(t.code));
-    }
-    // Trim to 32 if needed (remove random extras)
-    while (r32Teams.length > 32) r32Teams.splice(Math.floor(Math.random() * r32Teams.length), 1);
-    // Pad to 32 if needed
-    const remaining = ALL_TEAMS.filter((t) => !r32Teams.includes(t.code));
-    while (r32Teams.length < 32) {
-      const pick = remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
-      if (pick) r32Teams.push(pick.code);
-    }
-    saveAdvancingPrediction(user.id, 'R32', r32Teams);
+    // 2. Randomize knockout match scores (with advancing team for ties)
+    knockoutMatches.forEach((match) => {
+      const home = randomScore();
+      const away = randomScore();
+      const pred = { homeScore: home, awayScore: away };
+      if (home === away) {
+        // Random team advances on penalties
+        pred.advancingTeam = Math.random() < 0.5 ? 'home' : 'away';
+        // Will be resolved to actual team code when bracket is computed
+      }
+      savePrediction(user.id, match.id, pred);
+    });
 
-    // R16: pick 16 from R32
-    const r16Teams = shuffleAndPick(r32Teams, 16);
-    saveAdvancingPrediction(user.id, 'R16', r16Teams);
-
-    // QF: pick 8 from R16
-    const qfTeams = shuffleAndPick(r16Teams, 8);
-    saveAdvancingPrediction(user.id, 'QF', qfTeams);
-
-    // SF: pick 4 from QF
-    const sfTeams = shuffleAndPick(qfTeams, 4);
-    saveAdvancingPrediction(user.id, 'SF', sfTeams);
-
-    // F: pick 2 from SF
-    const fTeams = shuffleAndPick(sfTeams, 2);
-    saveAdvancingPrediction(user.id, 'F', fTeams);
-
-    // 3. Random champion (one of the finalists)
-    saveBonusPrediction(user.id, 'champion', fTeams[Math.floor(Math.random() * fTeams.length)]);
-
-    // 4. Random top scorer from a list of well-known players
+    // 3. Random top scorer from a list of well-known players
     const topScorers = [
       'Mbappé', 'Haaland', 'Vinicius Jr', 'Messi', 'Kane',
       'Salah', 'Lewandowski', 'Rashford', 'Morata', 'Lautaro Martínez',
@@ -187,7 +159,6 @@ export default function Predict() {
           </p>
           <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
             <div>Matches predicted: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
-            <div>Champion: {predictions.champion ? ALL_TEAMS.find(t => t.code === predictions.champion)?.name : 'Not selected'}</div>
             <div>Top Scorer: {predictions.topScorer || 'Not entered'}</div>
           </div>
           <div className="flex gap-2">
@@ -227,6 +198,7 @@ export default function Predict() {
               match={derivedMatch}
               prediction={matchPredictions[match.id]}
               editable={canEdit}
+              isKnockout={match.stage !== 'group'}
               onPredictionChange={(pred) => handlePredictionChange(match.id, pred)}
             />
           );
@@ -238,142 +210,15 @@ export default function Predict() {
     </>
   );
 
-  const renderAdvancingTab = () => {
-    const advancing = predictions.advancing || {};
-    const rounds = [
-      { id: 'R32', label: 'Advancing to Round of 32', count: 32, description: 'Top 2 from each group + 8 best 3rd place', source: 'groups' },
-      { id: 'R16', label: 'Advancing to Round of 16', count: 16, description: 'Winners of Round of 32' },
-      { id: 'QF', label: 'Advancing to Quarter-Finals', count: 8, description: 'Winners of Round of 16' },
-      { id: 'SF', label: 'Advancing to Semi-Finals', count: 4, description: 'Winners of Quarter-Finals' },
-      { id: 'F', label: 'Advancing to Final', count: 2, description: 'Winners of Semi-Finals' },
-    ];
-
-    return (
-      <div className="space-y-4">
-        {rounds.map((round) => {
-          const selected = advancing[round.id] || [];
-
-          if (round.source === 'groups') {
-            return (
-              <div key={round.id} className="bg-white rounded-xl p-4 border border-gray-100">
-                <h3 className="font-bold text-sm text-primary mb-1">{round.label}</h3>
-                <p className="text-xs text-gray-400 mb-3">{round.description}</p>
-                {Object.entries(GROUPS).map(([groupName, teams]) => (
-                  <div key={groupName} className="mb-3">
-                    <div className="text-xs font-semibold text-gray-500 mb-1">Group {groupName}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {teams.map((team) => {
-                        const isSelected = selected.includes(team.code);
-                        return (
-                          <button key={team.code} disabled={!canEdit}
-                            onClick={() => {
-                              const newSelected = isSelected
-                                ? selected.filter(t => t !== team.code)
-                                : [...selected, team.code];
-                              saveAdvancingPrediction(user.id, round.id, newSelected);
-                            }}
-                            className={`px-2 py-1 rounded-lg text-xs font-medium transition ${
-                              isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            } ${!canEdit ? 'opacity-60' : ''}`}>
-                            {team.flag} {team.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-                <div className="text-xs text-gray-400 mt-1">Selected: {selected.length}/{round.count}</div>
-              </div>
-            );
-          }
-
-          return (
-            <div key={round.id} className="bg-white rounded-xl p-4 border border-gray-100">
-              <h3 className="font-bold text-sm text-primary mb-1">{round.label}</h3>
-              <p className="text-xs text-gray-400 mb-2">{round.description}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_TEAMS.map((team) => {
-                  const isSelected = selected.includes(team.code);
-                  return (
-                    <button key={team.code} disabled={!canEdit}
-                      onClick={() => {
-                        const newSelected = isSelected
-                          ? selected.filter(t => t !== team.code)
-                          : selected.length < round.count ? [...selected, team.code] : selected;
-                        saveAdvancingPrediction(user.id, round.id, newSelected);
-                      }}
-                      className={`px-2 py-1 rounded-lg text-xs font-medium transition ${
-                        isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      } ${!canEdit ? 'opacity-60' : ''}`}>
-                      {team.flag} {team.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="text-xs text-gray-400 mt-2">Selected: {selected.length}/{round.count}</div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderBonusesTab = () => (
+  const renderTopScorerTab = () => (
     <div className="space-y-4">
       <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-1">🏆 Champion (9 pts)</h3>
-        <p className="text-xs text-gray-400 mb-3">Which team will win the World Cup?</p>
-        <div className="flex flex-wrap gap-1.5">
-          {ALL_TEAMS.map((team) => (
-            <button key={team.code} disabled={!canEdit}
-              onClick={() => saveBonusPrediction(user.id, 'champion', team.code)}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition ${
-                predictions.champion === team.code ? 'bg-yellow-400 text-yellow-900 font-bold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              } ${!canEdit ? 'opacity-60' : ''}`}>
-              {team.flag} {team.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-1">⚽ Top Scorer (8 pts)</h3>
-        <p className="text-xs text-gray-400 mb-3">Who will be the Golden Boot winner? Penalty shootout goals don't count.</p>
+        <h3 className="font-bold text-sm text-primary mb-1">⚽ מלך השערים (8 נק׳)</h3>
+        <p className="text-xs text-gray-400 mb-3">מי יהיה מלך השערים? שערי פנדלים בפנדלטים לא נספרים.</p>
         <input type="text" value={predictions.topScorer || ''} disabled={!canEdit}
           onChange={(e) => saveBonusPrediction(user.id, 'topScorer', e.target.value)}
-          placeholder="Enter player name..."
+          placeholder="הכנס שם שחקן..."
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
-      </div>
-
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">Scoring Rules</h3>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-gray-500 border-b border-gray-100">
-              <th className="text-left py-1.5">Stage</th>
-              <th className="text-center py-1.5">Outcome</th>
-              <th className="text-center py-1.5">+Exact</th>
-              <th className="text-center py-1.5">Advance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              ['Group', 1, 3, 2], ['Round of 32', 3, 3, 4], ['Round of 16', 3, 3, 4],
-              ['Quarter-Final', 5, 3, 6], ['Semi-Final', 7, 3, 8],
-              ['3rd Place', 7, 3, '-'], ['Final', 9, 3, '-'],
-            ].map(([stage, o, e, a]) => (
-              <tr key={stage} className="border-b border-gray-50">
-                <td className="py-1.5">{stage}</td>
-                <td className="text-center">{o}</td>
-                <td className="text-center">+{e}</td>
-                <td className="text-center">{a}</td>
-              </tr>
-            ))}
-            <tr className="border-b border-gray-50"><td className="py-1.5 font-semibold">Champion</td><td colSpan="3" className="text-center">9</td></tr>
-            <tr><td className="py-1.5 font-semibold">Top Scorer</td><td colSpan="3" className="text-center">8</td></tr>
-          </tbody>
-        </table>
-        <p className="text-xs text-gray-400 mt-2">Knockout scores based on 90-minute result only.</p>
       </div>
     </div>
   );
@@ -411,8 +256,7 @@ export default function Predict() {
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
         {[
           { id: 'matches', label: 'Matches' },
-          { id: 'advancing', label: 'Advancing' },
-          { id: 'bonuses', label: 'Bonuses' },
+          { id: 'topscorer', label: 'מלך השערים' },
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
@@ -424,8 +268,7 @@ export default function Predict() {
       </div>
 
       {activeTab === 'matches' && renderMatchesTab()}
-      {activeTab === 'advancing' && renderAdvancingTab()}
-      {activeTab === 'bonuses' && renderBonusesTab()}
+      {activeTab === 'topscorer' && renderTopScorerTab()}
 
       {/* Action Buttons — only show when draft */}
       {status === 'draft' && !settings.predictionsLocked && (

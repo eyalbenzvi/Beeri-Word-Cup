@@ -6,6 +6,7 @@ import {
 import { calculateFullScore, compareTiebreaker, calculateMatchPoints } from '../utils/scoring';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
 import { getTeamByCode } from '../data/teams';
+import { calcBracketTeams, deriveAdvancingTeams, deriveChampion } from '../utils/bracket';
 import MatchCard from '../components/MatchCard';
 
 const groupMatches = generateGroupMatches();
@@ -23,10 +24,19 @@ export default function Leaderboard() {
   const actualBonuses = useActualBonuses();
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // Calculate scores for all users
+  // Calculate scores for all users (derive advancing & champion from bracket)
   const leaderboard = Object.entries(allPredictions)
     .map(([userId, predData]) => {
-      const score = calculateFullScore(predData, results, actualAdvancing, actualBonuses);
+      const matchPreds = predData.matches || {};
+      const bracket = calcBracketTeams(matchPreds);
+      const derivedAdvancing = deriveAdvancingTeams(bracket);
+      const derivedChampion = deriveChampion(matchPreds, bracket);
+      const enrichedPredData = {
+        ...predData,
+        advancing: derivedAdvancing,
+        champion: derivedChampion,
+      };
+      const score = calculateFullScore(enrichedPredData, results, actualAdvancing, actualBonuses);
       const userInfo = users[userId] || {};
       return {
         userId,
@@ -45,7 +55,12 @@ export default function Leaderboard() {
     if (!selectedUser) return null;
 
     const predData = allPredictions[selectedUser] || {};
-    const score = calculateFullScore(predData, results, actualAdvancing, actualBonuses);
+    const matchPreds = predData.matches || {};
+    const bracket = calcBracketTeams(matchPreds);
+    const derivedAdvancing = deriveAdvancingTeams(bracket);
+    const derivedChampion = deriveChampion(matchPreds, bracket);
+    const enrichedPredData = { ...predData, advancing: derivedAdvancing, champion: derivedChampion };
+    const score = calculateFullScore(enrichedPredData, results, actualAdvancing, actualBonuses);
     const playedMatches = Object.keys(results);
 
     const matchesByStage = {};

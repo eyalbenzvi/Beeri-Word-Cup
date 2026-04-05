@@ -8,6 +8,7 @@ export default function MatchCard({
   editable = false,
   showPoints = false,
   points = null,
+  isKnockout = false,
 }) {
   const homeTeam = getTeamByCode(match.homeTeam);
   const awayTeam = getTeamByCode(match.awayTeam);
@@ -119,6 +120,38 @@ export default function MatchCard({
           <div className="text-xl">{awayFlag}</div>
         </div>
       </div>
+
+      {/* Knockout tie — choose who advances */}
+      {isKnockout && predHome !== '' && predAway !== '' &&
+       parseInt(predHome) === parseInt(predAway) && (
+        editable ? (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="text-xs text-gray-500 text-center mb-1.5">מי עולה? (פנדלים)</div>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => onPredictionChange?.({ ...prediction, advancingTeam: match.homeTeam })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  prediction?.advancingTeam === match.homeTeam
+                    ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                {homeFlag} {homeName}
+              </button>
+              <button
+                onClick={() => onPredictionChange?.({ ...prediction, advancingTeam: match.awayTeam })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  prediction?.advancingTeam === match.awayTeam
+                    ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                {awayFlag} {awayName}
+              </button>
+            </div>
+          </div>
+        ) : prediction?.advancingTeam ? (
+          <div className="mt-1 text-xs text-gray-400 text-center">
+            עולה: {prediction.advancingTeam === match.homeTeam ? `${homeFlag} ${homeName}` : `${awayFlag} ${awayName}`}
+          </div>
+        ) : null
+      )}
     </div>
   );
 }
