@@ -43,16 +43,24 @@ export function useUsers() {
   return store.getUsers();
 }
 
-export function useUserPredictions(userId) {
+// Get all forms for a specific user
+export function useUserForms(userId) {
   useStoreUpdates();
-  if (!userId) return {};
-  return store.getUserPredictions(userId);
+  if (!userId) return [];
+  return store.getFormsForUser(userId);
 }
 
-export function useFullUserPredictions(userId) {
+// Get the currently active form ID (from localStorage)
+export function useActiveFormId() {
   useStoreUpdates();
-  if (!userId) return { matches: {}, advancing: {}, champion: null, topScorer: '' };
-  return store.getFullUserPredictions(userId);
+  return store.getActiveFormId();
+}
+
+// Get a specific form's full data
+export function useFormData(formId) {
+  useStoreUpdates();
+  if (!formId) return { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
+  return store.getForm(formId) || { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
 }
 
 export function useAllPredictions() {

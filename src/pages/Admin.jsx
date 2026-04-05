@@ -110,7 +110,6 @@ export default function Admin() {
 
     const allResults = {};
 
-    // Group matches
     groupMatches.forEach((match) => {
       const r = {
         homeTeam: match.homeTeam, awayTeam: match.awayTeam,
@@ -121,7 +120,6 @@ export default function Admin() {
       saveMatchResult(match.id, r);
     });
 
-    // Knockout matches
     knockoutMatches.forEach((match) => {
       const r = {
         homeTeam: match.homeTeam, awayTeam: match.awayTeam,
@@ -132,7 +130,6 @@ export default function Admin() {
       saveMatchResult(match.id, r);
     });
 
-    // Resolve ties stage-by-stage with real team codes
     const knockoutStageOrder = ['R32', 'R16', 'QF', 'SF', '3RD', 'F'];
     for (const stage of knockoutStageOrder) {
       const bracket = calcBracketTeams(allResults);
@@ -166,7 +163,6 @@ export default function Admin() {
       )}
       <div className="space-y-2">
         {filteredMatches.map((match) => {
-          // For knockout, derive teams from bracket
           const derived = match.stage !== 'group' && bracketTeams[match.id]
             ? { home: bracketTeams[match.id].home, away: bracketTeams[match.id].away }
             : { home: match.homeTeam, away: match.awayTeam };
@@ -178,7 +174,6 @@ export default function Admin() {
           const isTie = result && result.homeScore === result.awayScore;
           return (
             <div key={match.id} className={`bg-white rounded-xl p-3 border ${result ? 'border-green-200 bg-green-50/30' : 'border-gray-100'}`}>
-              {/* Bracket label for knockout */}
               {isKnockout && match.label && (
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-xs text-gray-400 font-medium">{match.label}</span>
@@ -187,12 +182,8 @@ export default function Admin() {
               )}
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="text-sm">
-                    <span className="font-medium">{homeTeam?.name || 'טרם נקבע'}</span>
-                  </div>
-                  <div className="text-sm mt-1">
-                    <span className="font-medium">{awayTeam?.name || 'טרם נקבע'}</span>
-                  </div>
+                  <div className="text-sm"><span className="font-medium">{homeTeam?.name || 'טרם נקבע'}</span></div>
+                  <div className="text-sm mt-1"><span className="font-medium">{awayTeam?.name || 'טרם נקבע'}</span></div>
                 </div>
                 {isEditing ? (
                   <div className="flex items-center gap-2">
@@ -223,7 +214,6 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {/* Knockout tie — who advances */}
               {isKnockout && isTie && derived.home && derived.away && (
                 <div className="mt-2 pt-2 border-t border-gray-100">
                   <div className="text-xs text-gray-500 text-center mb-1.5">מי עולה? (פנדלים)</div>
@@ -309,10 +299,14 @@ export default function Admin() {
 
       <div className="bg-white rounded-xl p-4 border border-gray-100">
         <h3 className="font-semibold text-sm mb-2">סטטיסטיקות</h3>
-        <div className="grid grid-cols-2 gap-3 text-center">
+        <div className="grid grid-cols-3 gap-3 text-center">
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-primary">{Object.keys(users).length}</div>
             <div className="text-xs text-gray-500">שחקנים</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-2xl font-bold text-primary">{Object.keys(allPredictions).length}</div>
+            <div className="text-xs text-gray-500">טפסים</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-primary">{Object.keys(results).length}</div>
@@ -358,21 +352,27 @@ export default function Admin() {
     </div>
   );
 
-  // Count pending approvals
-  const pendingUsers = Object.entries(allPredictions).filter(([, p]) => p.status === 'pending');
-  const pendingCount = pendingUsers.length;
+  // Count pending forms
+  const pendingForms = Object.entries(allPredictions).filter(([, p]) => p.status === 'pending');
+  const pendingCount = pendingForms.length;
 
   const renderApprovalsTab = () => {
     const allEntries = Object.entries(allPredictions)
-      .map(([userId, pred]) => ({
-        userId,
-        displayName: users[userId]?.formName || users[userId]?.displayName || userId,
-        status: pred.status || 'draft',
-        matchCount: Object.keys(pred.matches || {}).length,
-        topScorer: pred.topScorer || '',
-        submittedAt: pred.submittedAt,
-        approvedAt: pred.approvedAt,
-      }))
+      .map(([formId, pred]) => {
+        const userInfo = users[pred.userId] || {};
+        return {
+          formId,
+          userId: pred.userId,
+          formName: pred.formName || 'טופס ללא שם',
+          userName: userInfo.displayName || pred.userId,
+          status: pred.status || 'draft',
+          matchCount: Object.keys(pred.matches || {}).length,
+          topScorer: pred.topScorer || '',
+          budgetNumber: pred.budgetNumber || '',
+          submittedAt: pred.submittedAt,
+          approvedAt: pred.approvedAt,
+        };
+      })
       .sort((a, b) => {
         const order = { pending: 0, draft: 1, approved: 2 };
         return (order[a.status] ?? 1) - (order[b.status] ?? 1);
@@ -384,20 +384,21 @@ export default function Admin() {
           <div className="text-center py-8 text-gray-400">עדיין לא הוגשו ניחושים</div>
         )}
         {allEntries.map((entry) => (
-          <div key={entry.userId} className={`bg-white rounded-xl p-4 border ${
+          <div key={entry.formId} className={`bg-white rounded-xl p-4 border ${
             entry.status === 'pending' ? 'border-yellow-300 bg-yellow-50/30' :
             entry.status === 'approved' ? 'border-green-200 bg-green-50/30' :
             'border-gray-100'
           }`}>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                {entry.displayName.charAt(0).toUpperCase()}
+                {entry.formName.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{entry.displayName}</div>
+                <div className="text-sm font-semibold truncate">{entry.formName}</div>
                 <div className="text-xs text-gray-400">
-                  {entry.matchCount} משחקים •
-                  {entry.topScorer ? ` מלך: ${entry.topScorer}` : ' ללא מלך שערים'}
+                  {entry.userName} • {entry.matchCount} משחקים
+                  {entry.topScorer ? ` • מלך: ${entry.topScorer}` : ''}
+                  {entry.budgetNumber ? ` • תקציב: ${entry.budgetNumber}` : ''}
                 </div>
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -412,11 +413,11 @@ export default function Admin() {
 
             {entry.status === 'pending' && (
               <div className="flex gap-2 mt-2">
-                <button onClick={() => approvePredictions(entry.userId)}
+                <button onClick={() => approvePredictions(entry.formId)}
                   className="flex-1 bg-green-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-600 transition">
                   ✓ אשר
                 </button>
-                <button onClick={() => rejectPredictions(entry.userId)}
+                <button onClick={() => rejectPredictions(entry.formId)}
                   className="flex-1 bg-red-100 text-red-600 text-sm font-semibold py-2 rounded-lg hover:bg-red-200 transition">
                   ✕ החזר
                 </button>
@@ -425,7 +426,7 @@ export default function Admin() {
 
             {entry.status === 'approved' && (
               <div className="flex gap-2 mt-2">
-                <button onClick={() => rejectPredictions(entry.userId)}
+                <button onClick={() => rejectPredictions(entry.formId)}
                   className="w-full bg-gray-100 text-gray-500 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition">
                   בטל אישור (אפשר עריכה)
                 </button>
@@ -440,8 +441,11 @@ export default function Admin() {
   const renderUsersTab = () => (
     <div className="space-y-2">
       {Object.entries(users).map(([uid, u]) => {
-        const predCount = Object.keys(allPredictions[uid]?.matches || {}).length;
-        const predStatus = allPredictions[uid]?.status || 'draft';
+        // Count forms for this user
+        const userForms = Object.entries(allPredictions).filter(([, p]) => p.userId === uid);
+        const approvedCount = userForms.filter(([, p]) => p.status === 'approved').length;
+        const pendingCount = userForms.filter(([, p]) => p.status === 'pending').length;
+        const draftCount = userForms.filter(([, p]) => p.status === 'draft').length;
         return (
           <div key={uid} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
@@ -450,12 +454,15 @@ export default function Admin() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{u.displayName}</div>
               <div className="text-xs text-gray-400">
-                {u.formName ? `טופס: ${u.formName}` : ''}{u.budgetNumber ? ` • תקציב: ${u.budgetNumber}` : ''}{!u.formName && !u.budgetNumber ? (predStatus === 'approved' ? 'אושר' : predStatus === 'pending' ? 'ממתין' : 'טיוטה') : ` • ${predStatus === 'approved' ? 'אושר' : predStatus === 'pending' ? 'ממתין' : 'טיוטה'}`}
+                {userForms.length} טפסים
+                {approvedCount > 0 && ` • ${approvedCount} אושרו`}
+                {pendingCount > 0 && ` • ${pendingCount} ממתינים`}
+                {draftCount > 0 && ` • ${draftCount} טיוטות`}
               </div>
             </div>
             <div className="text-left">
-              <div className="text-sm font-bold text-primary">{predCount}</div>
-              <div className="text-xs text-gray-400">ניחושים</div>
+              <div className="text-sm font-bold text-primary">{userForms.length}</div>
+              <div className="text-xs text-gray-400">טפסים</div>
             </div>
             {u.isAdmin && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">מנהל</span>}
           </div>

@@ -1,8 +1,12 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useCurrentUser, useFullUserPredictions, useSettings } from '../hooks/useStore';
-import { savePrediction, saveBonusPrediction, submitPredictions, updateUser } from '../store';
-import { useUsers } from '../hooks/useStore';
+import {
+  useCurrentUser, useUserForms, useActiveFormId, useFormData, useSettings,
+} from '../hooks/useStore';
+import {
+  savePrediction, saveBonusPrediction, submitPredictions,
+  createForm, deleteForm, setActiveFormId, updateFormDetails,
+} from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS } from '../data/teams';
 import { calcBracketTeams } from '../utils/bracket';
@@ -23,42 +27,43 @@ function randomScore() {
 
 export default function Predict() {
   const { user } = useCurrentUser();
-  const predictions = useFullUserPredictions(user?.id);
+  const forms = useUserForms(user?.id);
+  const activeFormId = useActiveFormId();
+  const formData = useFormData(activeFormId);
   const settings = useSettings();
-  const users = useUsers();
-  const currentUserData = user ? users[user.id] : null;
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
   const [activeTab, setActiveTab] = useState('matches');
   const [showConfirm, setShowConfirm] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newFormName, setNewFormName] = useState('');
 
-  const status = predictions.status || 'draft';
-  // User can edit only when status is 'draft' and predictions aren't globally locked
+  // Make sure active form belongs to current user
+  const activeForm = activeFormId && formData?.userId === user?.id ? formData : null;
+  const status = activeForm?.status || 'draft';
   const canEdit = status === 'draft' && !settings.predictionsLocked;
 
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
-      if (!user || !canEdit) return;
-      savePrediction(user.id, matchId, prediction);
+      if (!activeFormId || !canEdit) return;
+      savePrediction(activeFormId, matchId, prediction);
     },
-    [user, canEdit]
+    [activeFormId, canEdit]
   );
 
   const handleSubmit = () => {
-    if (!user) return;
-    submitPredictions(user.id);
+    if (!activeFormId) return;
+    submitPredictions(activeFormId);
     setShowConfirm(false);
     setValidationErrors([]);
   };
 
-  // Validate predictions before showing submit dialog
   const handleTrySubmit = () => {
-    if (!user) return;
-    const preds = predictions.matches || {};
+    if (!activeFormId || !activeForm) return;
+    const preds = activeForm.matches || {};
     const errors = [];
 
-    // Check group matches
     const missingGroup = groupMatches.filter(
       (m) => preds[m.id]?.homeScore === undefined || preds[m.id]?.homeScore === null ||
              preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
@@ -67,7 +72,6 @@ export default function Predict() {
       errors.push(`${missingGroup} משחקי בתים חסרים`);
     }
 
-    // Check knockout matches
     const missingKnockout = knockoutMatches.filter(
       (m) => preds[m.id]?.homeScore === undefined || preds[m.id]?.homeScore === null ||
              preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
@@ -76,13 +80,11 @@ export default function Predict() {
       errors.push(`${missingKnockout} משחקי נוקאאוט חסרים`);
     }
 
-    // Check knockout ties have advancingTeam chosen
     const bracket = calcBracketTeams(preds);
     const unresolvedTies = knockoutMatches.filter((m) => {
       const pred = preds[m.id];
       if (!pred || pred.homeScore === null || pred.awayScore === null) return false;
       if (pred.homeScore !== pred.awayScore) return false;
-      // It's a tie — check that advancingTeam is a valid team code
       const teams = bracket[m.id];
       return !pred.advancingTeam || (teams && pred.advancingTeam !== teams.home && pred.advancingTeam !== teams.away);
     }).length;
@@ -90,16 +92,14 @@ export default function Predict() {
       errors.push(`${unresolvedTies} תיקו בנוקאאוט בלי בחירת מי עולה`);
     }
 
-    // Check top scorer
-    if (!predictions.topScorer?.trim()) {
+    if (!activeForm.topScorer?.trim()) {
       errors.push('לא הוכנס מלך שערים');
     }
 
-    // Check form details
-    if (!currentUserData?.formName?.trim()) {
+    if (!activeForm.formName?.trim()) {
       errors.push('לא הוכנס שם טופס');
     }
-    if (!currentUserData?.budgetNumber?.trim()) {
+    if (!activeForm.budgetNumber?.trim()) {
       errors.push('לא הוכנס מספר תקציב');
     }
 
@@ -108,25 +108,22 @@ export default function Predict() {
   };
 
   const handleRandomize = () => {
-    if (!user || !canEdit) return;
+    if (!activeFormId || !canEdit) return;
 
     const allPreds = {};
 
-    // 1. Randomize group match scores
     groupMatches.forEach((match) => {
       const pred = { homeScore: randomScore(), awayScore: randomScore() };
       allPreds[match.id] = pred;
-      savePrediction(user.id, match.id, pred);
+      savePrediction(activeFormId, match.id, pred);
     });
 
-    // 2. Randomize knockout match scores (no advancingTeam yet)
     knockoutMatches.forEach((match) => {
       const pred = { homeScore: randomScore(), awayScore: randomScore() };
       allPreds[match.id] = pred;
-      savePrediction(user.id, match.id, pred);
+      savePrediction(activeFormId, match.id, pred);
     });
 
-    // 3. Resolve ties stage-by-stage using computed bracket
     for (const stage of knockoutStageOrder) {
       const bracket = calcBracketTeams(allPreds);
       for (const match of knockoutMatches.filter((m) => m.stage === stage)) {
@@ -135,20 +132,31 @@ export default function Predict() {
           const teams = bracket[match.id];
           if (teams?.home && teams?.away) {
             pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-            savePrediction(user.id, match.id, pred);
+            savePrediction(activeFormId, match.id, pred);
           }
         }
       }
     }
 
-    // 4. Random top scorer
     const topScorers = [
       'Mbappé', 'Haaland', 'Vinicius Jr', 'Messi', 'Kane',
       'Salah', 'Lewandowski', 'Rashford', 'Morata', 'Lautaro Martínez',
       'Osimhen', 'Álvarez', 'Isak', 'Saka', 'Yamal',
       'Gyökeres', 'Son', 'Retegui', 'Pulisic', 'David',
     ];
-    saveBonusPrediction(user.id, 'topScorer', topScorers[Math.floor(Math.random() * topScorers.length)]);
+    saveBonusPrediction(activeFormId, 'topScorer', topScorers[Math.floor(Math.random() * topScorers.length)]);
+  };
+
+  const handleCreateForm = () => {
+    if (!user) return;
+    const name = newFormName.trim() || `טופס ${forms.length + 1}`;
+    createForm(user.id, name);
+    setNewFormName('');
+    setShowNewForm(false);
+  };
+
+  const handleDeleteForm = (formId) => {
+    deleteForm(formId);
   };
 
   if (!user) {
@@ -164,12 +172,105 @@ export default function Predict() {
     );
   }
 
-  const matchPredictions = predictions.matches || {};
+  // === FORM LIST VIEW (no active form or choosing form) ===
+  if (!activeForm) {
+    return (
+      <div>
+        <h1 className="text-xl font-bold text-primary mb-4">הניחושים שלך</h1>
 
-  // Calculate knockout bracket teams from group stage predictions
+        {forms.length === 0 && !showNewForm && (
+          <div className="text-center py-8">
+            <div className="text-5xl mb-3">📋</div>
+            <p className="text-gray-500 mb-4">עדיין לא יצרת טפסים</p>
+          </div>
+        )}
+
+        {/* Existing forms */}
+        <div className="space-y-2 mb-4">
+          {forms.map((form) => (
+            <div key={form.formId} className={`bg-white rounded-xl p-4 border ${
+              form.status === 'pending' ? 'border-yellow-300 bg-yellow-50/30' :
+              form.status === 'approved' ? 'border-green-200 bg-green-50/30' :
+              'border-gray-100'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm truncate">{form.formName || 'טופס ללא שם'}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {Object.keys(form.matches || {}).length} משחקים מלאו
+                    {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ''}
+                  </div>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  form.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                  form.status === 'approved' ? 'bg-green-100 text-green-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {form.status === 'pending' ? '⏳ ממתין' :
+                   form.status === 'approved' ? '✅ אושר' : 'טיוטה'}
+                </span>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setActiveFormId(form.formId)}
+                  className="flex-1 bg-primary text-white text-sm font-semibold py-2 rounded-lg hover:bg-primary-light transition"
+                >
+                  {form.status === 'draft' ? 'ערוך' : 'צפה'}
+                </button>
+                {form.status === 'draft' && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`למחוק את "${form.formName}"?`)) handleDeleteForm(form.formId);
+                    }}
+                    className="px-3 py-2 bg-red-50 text-red-500 text-sm rounded-lg hover:bg-red-100 transition"
+                  >
+                    מחק
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* New form */}
+        {showNewForm ? (
+          <div className="bg-white rounded-xl p-4 border border-primary">
+            <h3 className="font-semibold text-sm text-primary mb-3">טופס חדש</h3>
+            <input
+              type="text"
+              value={newFormName}
+              onChange={(e) => setNewFormName(e.target.value)}
+              placeholder={`טופס ${forms.length + 1}`}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={handleCreateForm}
+                className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-xl hover:bg-primary-light transition text-sm">
+                צור טופס
+              </button>
+              <button onClick={() => { setShowNewForm(false); setNewFormName(''); }}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition">
+                ביטול
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowNewForm(true)}
+            className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base"
+          >
+            + טופס חדש
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // === FORM EDITING VIEW ===
+  const matchPredictions = activeForm.matches || {};
   const bracketTeams = useMemo(() => calcBracketTeams(matchPredictions), [matchPredictions]);
 
-  // Count progress
   const predictedGroupMatches = groupMatches.filter(
     (m) => matchPredictions[m.id]?.homeScore !== undefined && matchPredictions[m.id]?.homeScore !== null
   ).length;
@@ -182,16 +283,13 @@ export default function Predict() {
       ? groupMatches.filter((m) => m.group === selectedGroup)
       : knockoutMatches.filter((m) => m.stage === selectedStage);
 
-  // Status banner
   const renderStatusBanner = () => {
     if (status === 'pending') {
       return (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 text-center">
           <div className="text-2xl mb-1">⏳</div>
           <div className="text-sm font-semibold text-yellow-700">הוגש — ממתין לאישור מנהל</div>
-          <div className="text-xs text-yellow-600 mt-1">
-            הניחושים שלך נעולים עד שהמנהל יבדוק אותם.
-          </div>
+          <div className="text-xs text-yellow-600 mt-1">הניחושים נעולים עד שהמנהל יבדוק אותם.</div>
         </div>
       );
     }
@@ -200,25 +298,20 @@ export default function Predict() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 text-center">
           <div className="text-2xl mb-1">✅</div>
           <div className="text-sm font-semibold text-green-700">אושר על ידי המנהל</div>
-          <div className="text-xs text-green-600 mt-1">
-            הניחושים שלך נעולים ויחושבו כאשר משחקים יתקיימו.
-          </div>
+          <div className="text-xs text-green-600 mt-1">הניחושים נעולים ויחושבו כאשר משחקים יתקיימו.</div>
         </div>
       );
     }
-    if (predictions.rejectedAt) {
+    if (activeForm.rejectedAt) {
       return (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-center">
-          <div className="text-xs text-red-600">
-            ההגשה הקודמת הוחזרה על ידי המנהל. אנא בדוק ושלח מחדש.
-          </div>
+          <div className="text-xs text-red-600">ההגשה הקודמת הוחזרה על ידי המנהל. אנא בדוק ושלח מחדש.</div>
         </div>
       );
     }
     return null;
   };
 
-  // Submit confirmation dialog
   const renderConfirmDialog = () => {
     if (!showConfirm) return null;
     const hasErrors = validationErrors.length > 0;
@@ -241,11 +334,12 @@ export default function Predict() {
           ) : (
             <>
               <p className="text-sm text-gray-600 text-center mb-4">
-                לאחר ההגשה לא תוכל לשנות עד שהמנהל יבדוק את הניחושים שלך.
+                לאחר ההגשה לא תוכל לשנות עד שהמנהל יבדוק.
               </p>
               <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
+                <div>טופס: {activeForm.formName}</div>
                 <div>משחקים: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
-                <div>מלך שערים: {predictions.topScorer || 'לא הוכנס'}</div>
+                <div>מלך שערים: {activeForm.topScorer || 'לא הוכנס'}</div>
               </div>
             </>
           )}
@@ -281,7 +375,6 @@ export default function Predict() {
       )}
       <div className="space-y-2">
         {filteredMatches.map((match) => {
-          // For knockout matches, override homeTeam/awayTeam with bracket-derived teams
           const derivedMatch = match.stage !== 'group' && bracketTeams[match.id]
             ? { ...match, homeTeam: bracketTeams[match.id].home, awayTeam: bracketTeams[match.id].away }
             : match;
@@ -308,12 +401,12 @@ export default function Predict() {
       <div className="bg-white rounded-xl p-4 border border-gray-100">
         <h3 className="font-bold text-sm text-primary mb-1">📝 פרטי הטופס</h3>
         <p className="text-xs text-gray-400 mb-3">שם הטופס הוא מה שיוצג בטבלת התוצאות</p>
-        <input type="text" value={currentUserData?.formName || ''} disabled={!canEdit}
-          onChange={(e) => updateUser(user.id, { formName: e.target.value })}
+        <input type="text" value={activeForm.formName || ''} disabled={!canEdit}
+          onChange={(e) => updateFormDetails(activeFormId, { formName: e.target.value })}
           placeholder="שם הטופס..."
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3 ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
-        <input type="text" value={currentUserData?.budgetNumber || ''} disabled={!canEdit}
-          onChange={(e) => updateUser(user.id, { budgetNumber: e.target.value })}
+        <input type="text" value={activeForm.budgetNumber || ''} disabled={!canEdit}
+          onChange={(e) => updateFormDetails(activeFormId, { budgetNumber: e.target.value })}
           placeholder="מספר תקציב לחיוב..."
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
       </div>
@@ -321,8 +414,8 @@ export default function Predict() {
       <div className="bg-white rounded-xl p-4 border border-gray-100">
         <h3 className="font-bold text-sm text-primary mb-1">⚽ מלך השערים (8 נק׳)</h3>
         <p className="text-xs text-gray-400 mb-3">מי יהיה מלך השערים? שערי פנדלים בפנדלטים לא נספרים.</p>
-        <input type="text" value={predictions.topScorer || ''} disabled={!canEdit}
-          onChange={(e) => saveBonusPrediction(user.id, 'topScorer', e.target.value)}
+        <input type="text" value={activeForm.topScorer || ''} disabled={!canEdit}
+          onChange={(e) => saveBonusPrediction(activeFormId, 'topScorer', e.target.value)}
           placeholder="הכנס שם שחקן..."
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
       </div>
@@ -331,8 +424,16 @@ export default function Predict() {
 
   return (
     <div>
+      {/* Header with back button and form name */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-primary">הניחושים שלך</h1>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setActiveFormId(null)}
+            className="text-sm text-primary font-medium">
+            הטפסים שלי →
+          </button>
+          <span className="text-gray-300">|</span>
+          <h1 className="text-lg font-bold text-primary truncate">{activeForm.formName}</h1>
+        </div>
         {status === 'pending' && (
           <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">⏳ ממתין</span>
         )}

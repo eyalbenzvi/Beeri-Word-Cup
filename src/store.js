@@ -15,6 +15,8 @@ const DOCS = {
 
 // Current user is local-only (each browser has its own login)
 const CURRENT_USER_KEY = 'wc2026_currentUser';
+// Currently active form for editing
+const ACTIVE_FORM_KEY = 'wc2026_activeForm';
 
 // ============ IN-MEMORY CACHE ============
 // Firestore snapshots update this cache in real-time via listeners
@@ -82,8 +84,6 @@ export function addUser(name, password) {
     id,
     displayName: name,
     password: password,
-    formName: '',
-    budgetNumber: '',
     isAdmin: Object.keys(users).length === 0,
     createdAt: new Date().toISOString(),
   };
@@ -126,93 +126,136 @@ export function setCurrentUser(userId) {
 
 export function logoutUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
+  localStorage.removeItem(ACTIVE_FORM_KEY);
   window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'currentUser' } }));
 }
 
-// ============ PREDICTIONS ============
+// ============ ACTIVE FORM (local per-browser) ============
+
+export function getActiveFormId() {
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_FORM_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveFormId(formId) {
+  localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
+  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'activeForm' } }));
+}
+
+// ============ PREDICTIONS (MULTI-FORM) ============
+// predictions[formId] = { userId, formName, budgetNumber, matches, advancing, champion, topScorer, status, ... }
+// formId format: "userId__1", "userId__2", etc.
 
 export function getAllPredictions() {
   return cache.predictions || {};
 }
 
-const DEFAULT_PREDICTIONS = { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
+const DEFAULT_FORM = { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
 
-export function getFullUserPredictions(userId) {
+export function getFormsForUser(userId) {
   const all = getAllPredictions();
-  return all[userId] || { userId, ...DEFAULT_PREDICTIONS };
-}
-
-export function getUserPredictions(userId) {
-  const all = getAllPredictions();
-  return all[userId]?.matches || {};
-}
-
-export function getUserPredictionStatus(userId) {
-  const all = getAllPredictions();
-  return all[userId]?.status || 'draft';
-}
-
-function ensureUser(all, userId) {
-  if (!all[userId]) {
-    all[userId] = { userId, ...DEFAULT_PREDICTIONS };
+  const forms = [];
+  for (const [formId, data] of Object.entries(all)) {
+    if (data.userId === userId) {
+      forms.push({ formId, ...data });
+    }
   }
-  return all;
+  // Sort by creation time
+  forms.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  return forms;
 }
 
-export function savePrediction(userId, matchId, prediction) {
-  let all = { ...getAllPredictions() };
-  all = ensureUser(all, userId);
-  all[userId] = { ...all[userId], matches: { ...all[userId].matches } };
-  if (all[userId].status !== 'draft') return;
-  all[userId].matches[matchId] = prediction;
-  all[userId].updatedAt = new Date().toISOString();
-  writeDoc('predictions', all);
+export function getForm(formId) {
+  const all = getAllPredictions();
+  return all[formId] || null;
 }
 
-export function saveAdvancingPrediction(userId, round, teams) {
-  let all = { ...getAllPredictions() };
-  all = ensureUser(all, userId);
-  all[userId] = { ...all[userId], advancing: { ...(all[userId].advancing || {}) } };
-  if (all[userId].status !== 'draft') return;
-  all[userId].advancing[round] = teams;
-  all[userId].updatedAt = new Date().toISOString();
-  writeDoc('predictions', all);
-}
-
-export function saveBonusPrediction(userId, field, value) {
-  let all = { ...getAllPredictions() };
-  all = ensureUser(all, userId);
-  all[userId] = { ...all[userId] };
-  if (all[userId].status !== 'draft') return;
-  all[userId][field] = value;
-  all[userId].updatedAt = new Date().toISOString();
-  writeDoc('predictions', all);
-}
-
-export function submitPredictions(userId) {
-  let all = { ...getAllPredictions() };
-  all = ensureUser(all, userId);
-  all[userId] = { ...all[userId] };
-  all[userId].status = 'pending';
-  all[userId].submittedAt = new Date().toISOString();
-  writeDoc('predictions', all);
-}
-
-export function approvePredictions(userId) {
+export function createForm(userId, formName) {
   const all = { ...getAllPredictions() };
-  if (!all[userId]) return;
-  all[userId] = { ...all[userId] };
-  all[userId].status = 'approved';
-  all[userId].approvedAt = new Date().toISOString();
+  // Find next index for this user
+  const userForms = getFormsForUser(userId);
+  const nextIndex = userForms.length + 1;
+  const formId = `${userId}__${nextIndex}`;
+
+  all[formId] = {
+    userId,
+    formName: formName || `טופס ${nextIndex}`,
+    budgetNumber: '',
+    ...DEFAULT_FORM,
+    createdAt: new Date().toISOString(),
+  };
+  writeDoc('predictions', all);
+  setActiveFormId(formId);
+  return formId;
+}
+
+export function deleteForm(formId) {
+  const all = { ...getAllPredictions() };
+  const form = all[formId];
+  if (!form || form.status !== 'draft') return; // can only delete drafts
+  delete all[formId];
+  writeDoc('predictions', all);
+  // If this was the active form, clear it
+  if (getActiveFormId() === formId) {
+    localStorage.removeItem(ACTIVE_FORM_KEY);
+    window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'activeForm' } }));
+  }
+}
+
+export function updateFormDetails(formId, fields) {
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId], ...fields };
   writeDoc('predictions', all);
 }
 
-export function rejectPredictions(userId) {
+export function savePrediction(formId, matchId, prediction) {
   const all = { ...getAllPredictions() };
-  if (!all[userId]) return;
-  all[userId] = { ...all[userId] };
-  all[userId].status = 'draft';
-  all[userId].rejectedAt = new Date().toISOString();
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId], matches: { ...all[formId].matches } };
+  if (all[formId].status !== 'draft') return;
+  all[formId].matches[matchId] = prediction;
+  all[formId].updatedAt = new Date().toISOString();
+  writeDoc('predictions', all);
+}
+
+export function saveBonusPrediction(formId, field, value) {
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  if (all[formId].status !== 'draft') return;
+  all[formId][field] = value;
+  all[formId].updatedAt = new Date().toISOString();
+  writeDoc('predictions', all);
+}
+
+export function submitPredictions(formId) {
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  all[formId].status = 'pending';
+  all[formId].submittedAt = new Date().toISOString();
+  writeDoc('predictions', all);
+}
+
+export function approvePredictions(formId) {
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  all[formId].status = 'approved';
+  all[formId].approvedAt = new Date().toISOString();
+  writeDoc('predictions', all);
+}
+
+export function rejectPredictions(formId) {
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  all[formId].status = 'draft';
+  all[formId].rejectedAt = new Date().toISOString();
   writeDoc('predictions', all);
 }
 
@@ -290,6 +333,7 @@ export function clearAllData() {
   writeDoc('actualBonuses', { champion: null, topScorers: [] });
   writeDoc('settings', { predictionsLocked: false, adminPin: '1234' });
   localStorage.removeItem(CURRENT_USER_KEY);
+  localStorage.removeItem(ACTIVE_FORM_KEY);
   window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'all' } }));
 }
 
