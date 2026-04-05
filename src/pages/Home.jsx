@@ -11,26 +11,26 @@ export default function Home() {
   return (
     <div className="text-center">
       {/* Hero */}
-      <div className="py-8">
-        <div className="text-6xl mb-4">⚽🏆</div>
-        <h1 className="text-2xl font-bold text-primary mb-2">
+      <div className="py-6">
+        <div className="text-5xl mb-3">⚽🏆</div>
+        <h1 className="text-2xl font-extrabold text-primary mb-1.5 tracking-tight">
           טורניר הניחושים של בארי
         </h1>
-        <p className="text-gray-600 mb-1">מונדיאל 2026</p>
-        <p className="text-sm text-gray-400">
+        <p className="text-gray-500 text-sm font-medium">מונדיאל 2026</p>
+        <p className="text-xs text-gray-400 mt-1">
           ארה״ב • מקסיקו • קנדה
         </p>
       </div>
 
       {/* Status Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <span className={`w-2.5 h-2.5 rounded-full ${
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-3">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <span className={`w-2 h-2 rounded-full ${
             settings.predictionsLocked ? 'bg-red-400' : 'bg-green-400'
           } animate-pulse`} />
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-semibold text-gray-600">
             {settings.predictionsLocked
-              ? 'הגשת טפסים נעולה!'
+              ? 'הגשת טפסים נעולה'
               : 'הגשת טפסים פתוחה'}
           </span>
         </div>
@@ -38,21 +38,21 @@ export default function Home() {
         {!user ? (
           <button
             onClick={() => navigate('login')}
-            className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base border-none cursor-pointer"
+            className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
           >
-            הצטרף למשחק
+            התחבר למשחק
           </button>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <button
               onClick={() => navigate('predict')}
-              className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base border-none cursor-pointer"
+              className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
             >
               📋 הטפסים שלי
             </button>
             <button
               onClick={() => navigate('leaderboard')}
-              className="block w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base cursor-pointer"
+              className="w-full bg-white text-primary font-bold py-3.5 rounded-2xl border-2 border-primary/20 hover:border-primary/40 hover:bg-gray-50 transition text-base cursor-pointer"
             >
               🏆 טבלת דירוג
             </button>
@@ -64,75 +64,54 @@ export default function Home() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-right">
         <button
           onClick={() => setShowScoring(!showScoring)}
-          className="w-full flex items-center justify-between text-base font-bold text-primary bg-transparent border-none cursor-pointer p-0"
+          className="w-full flex items-center justify-between text-sm font-bold text-primary bg-transparent border-none cursor-pointer p-0"
         >
-          <span>{showScoring ? '▾' : '▸'}</span>
-          <span>שיטת הניקוד</span>
+          <span className="text-gray-400 text-xs">{showScoring ? '▲' : '▼'}</span>
+          <span>📊 שיטת הניקוד</span>
         </button>
         {showScoring && (
-          <>
-            <table className="w-full text-xs mt-3">
+          <div className="mt-4">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500 border-b border-gray-200">
-                  <th className="text-right py-1.5">שלב</th>
-                  <th className="text-center py-1.5">הכרעה</th>
-                  <th className="text-center py-1.5">+מדויק</th>
-                  <th className="text-center py-1.5">עליה</th>
+                <tr className="text-gray-400 border-b-2 border-gray-100">
+                  <th className="text-right py-2 font-semibold">שלב</th>
+                  <th className="text-center py-2 font-semibold">הכרעה</th>
+                  <th className="text-center py-2 font-semibold">+מדויק</th>
+                  <th className="text-center py-2 font-semibold">עליה</th>
                 </tr>
               </thead>
               <tbody className="text-gray-700">
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">בתים</td>
-                  <td className="text-center font-semibold">1</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center font-semibold text-purple-600">2</td>
-                </tr>
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">שלב ה-32</td>
-                  <td className="text-center font-semibold">3</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center font-semibold text-purple-600">4</td>
-                </tr>
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">רבע גמר</td>
-                  <td className="text-center font-semibold">5</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center font-semibold text-purple-600">6</td>
-                </tr>
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">חצי גמר</td>
-                  <td className="text-center font-semibold">7</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center font-semibold text-purple-600">8</td>
-                </tr>
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">מקום שלישי</td>
-                  <td className="text-center font-semibold">7</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center">-</td>
-                </tr>
-                <tr className="border-b border-gray-50">
-                  <td className="py-1.5">גמר</td>
-                  <td className="text-center font-semibold">9</td>
-                  <td className="text-center font-semibold text-green-600">+3</td>
-                  <td className="text-center">-</td>
-                </tr>
+                {[
+                  ['בתים', 1, 3, 2],
+                  ['שלב ה-32', 3, 3, 4],
+                  ['רבע גמר', 5, 3, 6],
+                  ['חצי גמר', 7, 3, 8],
+                  ['מקום שלישי', 7, 3, null],
+                  ['גמר', 9, 3, null],
+                ].map(([stage, outcome, exact, advance], i) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="py-2 font-medium">{stage}</td>
+                    <td className="text-center font-bold">{outcome}</td>
+                    <td className="text-center font-bold text-green-600">+{exact}</td>
+                    <td className="text-center font-bold text-purple-600">{advance ?? '–'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-            <div className="mt-3 space-y-1 text-xs text-gray-600">
-              <div className="flex justify-between">
-                <span>🏆 ניחוש אלופה</span>
+            <div className="mt-4 space-y-2 text-xs">
+              <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
+                <span className="text-gray-600">🏆 ניחוש אלופה</span>
                 <span className="font-bold text-yellow-600">9 נק׳</span>
               </div>
-              <div className="flex justify-between">
-                <span>⚽ מלך שערים</span>
+              <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
+                <span className="text-gray-600">⚽ מלך שערים</span>
                 <span className="font-bold text-yellow-600">8 נק׳</span>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-3">
+            <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
               ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בפנדלטים לא נספרים למלך השערים.
             </p>
-          </>
+          </div>
         )}
       </div>
     </div>

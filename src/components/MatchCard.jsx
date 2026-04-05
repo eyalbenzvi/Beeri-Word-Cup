@@ -22,26 +22,26 @@ export default function MatchCard({
   const hasResult = actualResult && actualResult.homeScore !== null;
   const hasPrediction = predHome !== '' && predAway !== '';
 
-  // Show bracket label for knockout matches
   const showLabel = match.label && match.stage !== 'group';
 
   return (
-    <div className={`bg-card rounded-xl shadow-sm border border-gray-100 p-3 mb-2 transition-all ${
-      hasResult ? 'border-l-4 border-l-primary' : ''
-    } ${hasPrediction && !hasResult && !editable ? 'border-l-4 border-l-green-300' : ''}`}>
+    <div className={`bg-white rounded-2xl border p-3.5 mb-2 transition-all ${
+      hasResult ? 'border-primary/30 shadow-sm' :
+      hasPrediction && !editable ? 'border-green-200' : 'border-gray-100'
+    }`}>
       {/* Bracket label & date */}
       {showLabel && (
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-xs text-gray-400 font-medium">{match.label}</span>
-          {match.date && <span className="text-xs text-gray-300">{match.date}</span>}
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[11px] text-gray-400 font-medium">{match.label}</span>
+          {match.date && <span className="text-[11px] text-gray-300">{match.date}</span>}
         </div>
       )}
 
       {/* Points badge */}
       {showPoints && points !== null && (
-        <div className="flex justify-end mb-1">
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-            points.points > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        <div className="flex justify-end mb-1.5">
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+            points.points > 0 ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'
           }`}>
             {points.points > 0 ? `+${points.points}` : '0'} נק׳ — {points.breakdown}
           </span>
@@ -51,21 +51,19 @@ export default function MatchCard({
       <div className="flex items-center justify-between gap-2">
         {/* Home Team */}
         <div className="flex-1 text-center">
-          <div className="text-sm font-medium">{homeName}</div>
+          <div className={`text-sm font-semibold ${homeTeam ? 'text-gray-800' : 'text-gray-300'}`}>{homeName}</div>
         </div>
 
         {/* Score / Prediction Input */}
         <div className="flex flex-col items-center gap-1 min-w-[110px]">
-          {/* Actual result */}
           {hasResult && (
-            <div className="text-lg font-bold text-primary">
-              {actualResult.homeScore} - {actualResult.awayScore}
+            <div className="text-xl font-extrabold text-primary tracking-wider">
+              {actualResult.homeScore} – {actualResult.awayScore}
             </div>
           )}
 
-          {/* Prediction input */}
           {editable ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <input
                 type="number"
                 min="0"
@@ -78,10 +76,10 @@ export default function MatchCard({
                   if (isKnockout) delete newPred.advancingTeam;
                   onPredictionChange?.(newPred);
                 }}
-                className="w-12 h-11 text-center border-2 border-gray-200 rounded-xl text-lg font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="-"
+                className="w-12 h-12 text-center border-2 border-gray-200 rounded-2xl text-lg font-bold focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all bg-gray-50/50"
+                placeholder="–"
               />
-              <span className="text-gray-300 font-bold text-lg">:</span>
+              <span className="text-gray-300 font-bold text-base">:</span>
               <input
                 type="number"
                 min="0"
@@ -94,29 +92,28 @@ export default function MatchCard({
                   if (isKnockout) delete newPred.advancingTeam;
                   onPredictionChange?.(newPred);
                 }}
-                className="w-12 h-11 text-center border-2 border-gray-200 rounded-xl text-lg font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="-"
+                className="w-12 h-12 text-center border-2 border-gray-200 rounded-2xl text-lg font-bold focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all bg-gray-50/50"
+                placeholder="–"
               />
             </div>
           ) : (
             !hasResult && (
-              <div className={`text-sm ${hasPrediction ? 'text-gray-600 font-medium' : 'text-gray-300'}`}>
-                {hasPrediction ? `${predHome} - ${predAway}` : '- : -'}
+              <div className={`text-sm tracking-wider ${hasPrediction ? 'font-bold text-gray-600' : 'text-gray-300'}`}>
+                {hasPrediction ? `${predHome} – ${predAway}` : '– : –'}
               </div>
             )
           )}
 
-          {/* Show user prediction under actual result */}
           {hasResult && !editable && predHome !== '' && (
-            <div className="text-xs text-gray-500">
-              הניחוש שלך: {predHome} - {predAway}
+            <div className="text-[11px] text-gray-400 font-medium">
+              ניחוש: {predHome} – {predAway}
             </div>
           )}
         </div>
 
         {/* Away Team */}
         <div className="flex-1 text-center">
-          <div className="text-sm font-medium">{awayName}</div>
+          <div className={`text-sm font-semibold ${awayTeam ? 'text-gray-800' : 'text-gray-300'}`}>{awayName}</div>
         </div>
       </div>
 
@@ -124,12 +121,12 @@ export default function MatchCard({
       {isKnockout && predHome !== '' && predAway !== '' &&
        parseInt(predHome) === parseInt(predAway) && (
         editable ? (
-          <div className="mt-2.5 pt-2.5 border-t border-gray-100">
-            <div className="text-xs text-gray-500 text-center mb-2">מי עולה? (פנדלים)</div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="text-[11px] text-gray-400 text-center mb-2 font-medium">מי עולה? (פנדלים)</div>
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => onPredictionChange?.({ ...prediction, advancingTeam: match.homeTeam })}
-                className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
                   prediction?.advancingTeam === match.homeTeam
                     ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}>
@@ -137,7 +134,7 @@ export default function MatchCard({
               </button>
               <button
                 onClick={() => onPredictionChange?.({ ...prediction, advancingTeam: match.awayTeam })}
-                className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
                   prediction?.advancingTeam === match.awayTeam
                     ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}>
@@ -146,7 +143,7 @@ export default function MatchCard({
             </div>
           </div>
         ) : prediction?.advancingTeam ? (
-          <div className="mt-1.5 text-xs text-gray-400 text-center">
+          <div className="mt-1.5 text-[11px] text-gray-400 text-center font-medium">
             עולה: {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
           </div>
         ) : null

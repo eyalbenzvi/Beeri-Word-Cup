@@ -23,10 +23,10 @@ export default function Results() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-primary mb-4">⚽ תוצאות אמת</h1>
+      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">⚽ תוצאות אמת</h1>
 
-      <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
-        <div className="text-xs text-gray-500 text-center">
+      <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm">
+        <div className="text-xs text-gray-400 text-center font-medium">
           {playedCount} / {totalMatches} משחקים שוחקו
         </div>
         <div className="w-full bg-gray-100 rounded-full h-2 mt-1.5">
@@ -59,8 +59,8 @@ export default function Results() {
           const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
 
           return (
-            <div key={match.id} className={`bg-white rounded-xl p-3 border ${
-              result ? 'border-green-200 bg-green-50/30' : 'border-gray-100'
+            <div key={match.id} className={`bg-white rounded-2xl p-3.5 border ${
+              result ? 'border-primary/20 shadow-sm' : 'border-gray-100'
             }`}>
               {isKnockout && match.label && (
                 <div className="flex justify-between items-center mb-1.5">
@@ -70,12 +70,12 @@ export default function Results() {
               )}
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{homeTeam?.name || 'טרם נקבע'}</div>
-                  <div className="text-sm font-medium mt-1">{awayTeam?.name || 'טרם נקבע'}</div>
+                  <div className={`text-sm font-semibold ${homeTeam ? 'text-gray-800' : 'text-gray-300'}`}>{homeTeam?.name || 'טרם נקבע'}</div>
+                  <div className={`text-sm font-semibold mt-1.5 ${awayTeam ? 'text-gray-800' : 'text-gray-300'}`}>{awayTeam?.name || 'טרם נקבע'}</div>
                 </div>
                 {result ? (
                   <div className="text-center">
-                    <span className="font-bold text-primary text-lg">{result.homeScore} - {result.awayScore}</span>
+                    <span className="font-extrabold text-primary text-xl tracking-wider">{result.homeScore} – {result.awayScore}</span>
                     {isKnockout && result.homeScore === result.awayScore && result.advancingTeam && (
                       <div className="text-xs text-gray-400 mt-0.5">
                         פנדלים: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam}

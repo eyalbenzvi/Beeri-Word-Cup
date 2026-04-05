@@ -46,7 +46,7 @@ function FormCard({ form, userName, championDisplay }) {
   const totalCount = groupMatches.length + knockoutMatches.length;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-3 p-4 text-right bg-transparent border-none cursor-pointer"
@@ -147,12 +147,12 @@ export default function AllFormsView({ onBack }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-primary">כל הטפסים</h1>
+        <h1 className="text-xl font-extrabold text-primary tracking-tight">כל הטפסים</h1>
         <button
           onClick={onBack}
-          className="text-sm text-primary font-medium bg-transparent border-none cursor-pointer"
+          className="text-xs text-primary font-bold bg-primary/10 px-3 py-1.5 rounded-xl border-none cursor-pointer"
         >
-          חזרה לטפסים שלי →
+          חזרה →
         </button>
       </div>
 
@@ -164,8 +164,8 @@ export default function AllFormsView({ onBack }) {
       ) : (
         <>
           {/* Filter controls */}
-          <div className="bg-white rounded-xl border border-gray-100 p-3 mb-3">
-            <div className="flex gap-1 mb-2 bg-gray-100 rounded-lg p-1">
+          <div className="bg-white rounded-2xl border border-gray-100 p-3.5 mb-3 shadow-sm">
+            <div className="flex gap-1 mb-2.5 bg-gray-100 rounded-xl p-1">
               {[
                 { id: 'form', label: 'לפי טופס' },
                 { id: 'user', label: 'לפי משתמש' },
@@ -174,8 +174,8 @@ export default function AllFormsView({ onBack }) {
                 <button
                   key={tab.id}
                   onClick={() => { setFilterBy(tab.id); setFilterText(''); }}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
-                    filterBy === tab.id ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition border-none cursor-pointer ${
+                    filterBy === tab.id ? 'bg-white text-primary shadow-sm' : 'text-gray-400'
                   }`}
                 >
                   {tab.label}
@@ -191,7 +191,7 @@ export default function AllFormsView({ onBack }) {
                 filterBy === 'user' ? 'חפש לפי שם משתמש...' :
                 'חפש לפי שם אלופה...'
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-primary focus:outline-none"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
             />
           </div>
 
