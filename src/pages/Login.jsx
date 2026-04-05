@@ -76,7 +76,7 @@ export default function Login() {
             onClick={() => setLoginUserId(null)}
             className="mt-2 text-sm text-gray-500 hover:text-primary"
           >
-            ← חזרה
+            חזרה →
           </button>
         </form>
       </div>
@@ -94,7 +94,7 @@ export default function Login() {
       {/* Existing users */}
       {userList.length > 0 && !showNew && (
         <div className="mb-4">
-          <h2 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-gray-600 mb-2">
             בחר את השם שלך
           </h2>
           <div className="space-y-2">
@@ -102,7 +102,7 @@ export default function Login() {
               <button
                 key={u.id}
                 onClick={() => handleSelectUser(u.id)}
-                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition text-left"
+                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition text-right"
               >
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold">
                   {u.displayName.charAt(0).toUpperCase()}
@@ -110,7 +110,7 @@ export default function Login() {
                 <div className="flex-1">
                   <div className="font-semibold text-gray-800">{u.displayName}</div>
                   {u.isAdmin && (
-                    <span className="text-xs text-primary">Admin</span>
+                    <span className="text-xs text-primary">מנהל</span>
                   )}
                 </div>
               </button>
@@ -122,7 +122,7 @@ export default function Login() {
       {/* Add new user */}
       {showNew || userList.length === 0 ? (
         <form onSubmit={handleCreateUser} className="bg-white rounded-xl p-4 border border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-gray-600 mb-3">
             {userList.length === 0 ? 'יצירת שחקן ראשון (מנהל)' : 'שחקן חדש'}
           </h2>
           {userList.length === 0 && (
@@ -158,7 +158,7 @@ export default function Login() {
               onClick={() => setShowNew(false)}
               className="mt-2 text-sm text-gray-500 hover:text-primary"
             >
-              ← חזרה לרשימת השחקנים
+              חזרה לרשימת השחקנים →
             </button>
           )}
         </form>

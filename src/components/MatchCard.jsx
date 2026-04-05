@@ -13,8 +13,8 @@ export default function MatchCard({
   const homeTeam = getTeamByCode(match.homeTeam);
   const awayTeam = getTeamByCode(match.awayTeam);
 
-  const homeName = homeTeam?.name || match.homeTeam || 'TBD';
-  const awayName = awayTeam?.name || match.awayTeam || 'TBD';
+  const homeName = homeTeam?.name || match.homeTeam || 'טרם נקבע';
+  const awayName = awayTeam?.name || match.awayTeam || 'טרם נקבע';
   const homeFlag = homeTeam?.flag || '🏳️';
   const awayFlag = awayTeam?.flag || '🏳️';
 
@@ -44,14 +44,14 @@ export default function MatchCard({
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
             points.points > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
           }`}>
-            {points.points > 0 ? `+${points.points}` : '0'} pts — {points.breakdown}
+            {points.points > 0 ? `+${points.points}` : '0'} נק׳ — {points.breakdown}
           </span>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-2">
         {/* Home Team */}
-        <div className="flex-1 text-right">
+        <div className="flex-1 text-center">
           <div className="text-sm font-medium">{homeName}</div>
           <div className="text-xl">{homeFlag}</div>
         </div>
@@ -117,7 +117,7 @@ export default function MatchCard({
         </div>
 
         {/* Away Team */}
-        <div className="flex-1 text-left">
+        <div className="flex-1 text-center">
           <div className="text-sm font-medium">{awayName}</div>
           <div className="text-xl">{awayFlag}</div>
         </div>

@@ -60,11 +60,11 @@ function getOutcome(homeScore, awayScore) {
 // Returns { points, outcomePoints, exactPoints, breakdown, wrongMatchup }
 export function calculateMatchPoints(prediction, actual, stage, predTeams, actualTeams) {
   if (!prediction || !actual || actual.homeScore === null || actual.awayScore === null) {
-    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'Not played yet', wrongMatchup: false };
+    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'טרם שוחק', wrongMatchup: false };
   }
   if (prediction.homeScore === null || prediction.homeScore === undefined ||
       prediction.awayScore === null || prediction.awayScore === undefined) {
-    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'No prediction', wrongMatchup: false };
+    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'אין ניחוש', wrongMatchup: false };
   }
 
   // For knockout: check if the user predicted the same teams playing
@@ -74,7 +74,7 @@ export function calculateMatchPoints(prediction, actual, stage, predTeams, actua
     const sameMatchup = predSet.size === 2 && actSet.size === 2 &&
       [...predSet].every(t => actSet.has(t));
     if (!sameMatchup) {
-      return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'Different matchup', wrongMatchup: true };
+      return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'משחק שונה', wrongMatchup: true };
     }
   }
 
@@ -94,17 +94,17 @@ export function calculateMatchPoints(prediction, actual, stage, predTeams, actua
   if (getOutcome(predHome, predAway) === getOutcome(actHome, actAway)) {
     outcomePoints = stagePoints.outcome;
     points += outcomePoints;
-    parts.push(`Outcome: +${outcomePoints}`);
+    parts.push(`הכרעה: +${outcomePoints}`);
 
     // Check exact score (תוצאה) — ADDITIONAL points, only if outcome is correct
     if (predHome === actHome && predAway === actAway) {
       exactPoints = stagePoints.exactScore;
       points += exactPoints;
-      parts.push(`Exact: +${exactPoints}`);
+      parts.push(`מדויק: +${exactPoints}`);
     }
   }
 
-  const breakdown = parts.length > 0 ? parts.join(', ') : 'No points';
+  const breakdown = parts.length > 0 ? parts.join(', ') : 'ללא ניקוד';
   return { points, outcomePoints, exactPoints, breakdown, wrongMatchup: false };
 }
 

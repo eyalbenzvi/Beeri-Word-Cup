@@ -65,7 +65,7 @@ export default function Admin() {
           <br />
           <button type="submit" className="bg-primary text-white font-semibold px-6 py-2 rounded-xl hover:bg-primary-light transition">אימות</button>
         </form>
-        <button onClick={() => setActiveTab('results')} className="mt-3 text-sm text-gray-400 hover:text-primary">← חזרה</button>
+        <button onClick={() => setActiveTab('results')} className="mt-3 text-sm text-gray-400 hover:text-primary">חזרה →</button>
       </div>
     );
   }
@@ -189,11 +189,11 @@ export default function Admin() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 text-sm">
                     <span>{homeTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{homeTeam?.name || derived.home || 'TBD'}</span>
+                    <span className="font-medium">{homeTeam?.name || derived.home || 'טרם נקבע'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <span>{awayTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{awayTeam?.name || derived.away || 'TBD'}</span>
+                    <span className="font-medium">{awayTeam?.name || derived.away || 'טרם נקבע'}</span>
                   </div>
                 </div>
                 {isEditing ? (
@@ -269,7 +269,7 @@ export default function Admin() {
             const current = actualBonuses.topScorers || [];
             saveActualBonuses({ ...actualBonuses, topScorers: [...current, topScorerInput.trim()] });
             setTopScorerInput('');
-          }} className="bg-primary text-white px-3 py-2 rounded-lg text-sm">Add</button>
+          }} className="bg-primary text-white px-3 py-2 rounded-lg text-sm">הוסף</button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {(actualBonuses.topScorers || []).map((name, i) => (
@@ -442,14 +442,14 @@ export default function Admin() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{u.displayName}</div>
               <div className="text-xs text-gray-400">
-                {u.formName ? `טופס: ${u.formName}` : ''}{u.budgetNumber ? ` • תקציב: ${u.budgetNumber}` : ''}{!u.formName && !u.budgetNumber ? predStatus : ` • ${predStatus}`}
+                {u.formName ? `טופס: ${u.formName}` : ''}{u.budgetNumber ? ` • תקציב: ${u.budgetNumber}` : ''}{!u.formName && !u.budgetNumber ? (predStatus === 'approved' ? 'אושר' : predStatus === 'pending' ? 'ממתין' : 'טיוטה') : ` • ${predStatus === 'approved' ? 'אושר' : predStatus === 'pending' ? 'ממתין' : 'טיוטה'}`}
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-left">
               <div className="text-sm font-bold text-primary">{predCount}</div>
               <div className="text-xs text-gray-400">ניחושים</div>
             </div>
-            {u.isAdmin && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Admin</span>}
+            {u.isAdmin && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">מנהל</span>}
           </div>
         );
       })}

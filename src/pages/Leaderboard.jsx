@@ -90,7 +90,7 @@ export default function Leaderboard() {
           onClick={() => setSelectedUser(null)}
           className="text-sm text-primary mb-3 flex items-center gap-1"
         >
-          ← חזרה לטבלת הדירוג
+          חזרה לטבלת הדירוג →
         </button>
 
         <h2 className="text-lg font-bold text-primary mb-1">
@@ -152,7 +152,7 @@ export default function Leaderboard() {
         {/* Match-by-match results */}
         {Object.entries(matchesByStage).map(([stage, matches]) => (
           <div key={stage} className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">
               {STAGES[stage] || stage}
             </h3>
             {matches.map(({ matchId, match, result }) => {
@@ -181,7 +181,7 @@ export default function Leaderboard() {
                     <div className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl ${
                       pts.wrongMatchup ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
                     }`}>
-                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || predTeams.home} vs {predMatchup.away?.flag} {predMatchup.away?.name || predTeams.away}
+                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || predTeams.home} נגד {predMatchup.away?.flag} {predMatchup.away?.name || predTeams.away}
                       {prediction ? ` (${prediction.homeScore}-${prediction.awayScore})` : ''}
                     </div>
                   )}
@@ -220,7 +220,7 @@ export default function Leaderboard() {
               <button
                 key={entry.userId}
                 onClick={() => setSelectedUser(entry.userId)}
-                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition text-left"
+                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition text-right"
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -252,7 +252,7 @@ export default function Leaderboard() {
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-left">
                   <div className="text-lg font-bold text-primary">
                     {entry.totalPoints}
                   </div>

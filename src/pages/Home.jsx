@@ -58,7 +58,7 @@ export default function Home() {
       </div>
 
       {/* Scoring Info */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-left">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-right">
         <h2 className="text-base font-bold text-primary mb-3">שיטת הניקוד</h2>
         <table className="w-full text-xs">
           <thead>

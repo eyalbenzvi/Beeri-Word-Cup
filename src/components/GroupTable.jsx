@@ -15,8 +15,8 @@ export default function GroupTable({ matchData, group }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-400 border-b border-gray-100">
-            <th className="text-left py-1 pr-1 w-5">#</th>
-            <th className="text-left py-1">קבוצה</th>
+            <th className="text-right py-1 pr-1 w-5">#</th>
+            <th className="text-right py-1">קבוצה</th>
             <th className="text-center py-1 w-6">מש׳</th>
             <th className="text-center py-1 w-6">נ</th>
             <th className="text-center py-1 w-6">ת</th>
