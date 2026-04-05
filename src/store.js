@@ -73,7 +73,7 @@ export function getUsers() {
   return cache.users || {};
 }
 
-export function addUser(name, phone) {
+export function addUser(name, password) {
   const users = getUsers();
   const id = name.toLowerCase().replace(/\s+/g, '-');
   if (users[id]) return id; // already exists
@@ -81,7 +81,7 @@ export function addUser(name, phone) {
   updated[id] = {
     id,
     displayName: name,
-    phone: phone,
+    password: password,
     formName: '',
     budgetNumber: '',
     isAdmin: Object.keys(users).length === 0,
@@ -91,13 +91,10 @@ export function addUser(name, phone) {
   return id;
 }
 
-export function findUserByPhone(phone) {
-  const users = getUsers();
-  const normalized = phone.replace(/\D/g, '').slice(-9); // last 9 digits
-  return Object.values(users).find((u) => {
-    const uNorm = (u.phone || '').replace(/\D/g, '').slice(-9);
-    return uNorm === normalized && normalized.length >= 9;
-  }) || null;
+export function verifyPassword(userId, password) {
+  const user = getUser(userId);
+  if (!user) return false;
+  return user.password === password;
 }
 
 export function updateUser(userId, fields) {

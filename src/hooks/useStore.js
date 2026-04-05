@@ -31,8 +31,8 @@ export function useCurrentUser() {
     store.logoutUser();
   }, []);
 
-  const addUser = useCallback((name, phone) => {
-    return store.addUser(name, phone);
+  const addUser = useCallback((name, password) => {
+    return store.addUser(name, password);
   }, []);
 
   return { user, login, logout, addUser };
