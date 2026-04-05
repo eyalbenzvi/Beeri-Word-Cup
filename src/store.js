@@ -1,51 +1,93 @@
-// Simple localStorage-based data store
-// All data lives in the browser - no server needed
+// Firestore-based data store
+// All data is shared between all users via Firebase
+import { db } from './firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
-const KEYS = {
-  users: 'wc2026_users',
-  currentUser: 'wc2026_currentUser',
-  predictions: 'wc2026_predictions',
-  matchResults: 'wc2026_matchResults',
-  actualAdvancing: 'wc2026_actualAdvancing',
-  actualBonuses: 'wc2026_actualBonuses',
-  settings: 'wc2026_settings',
+// Each data type is a single document in the "gameData" collection
+const DOCS = {
+  users: 'users',
+  predictions: 'predictions',
+  matchResults: 'matchResults',
+  actualAdvancing: 'actualAdvancing',
+  actualBonuses: 'actualBonuses',
+  settings: 'settings',
 };
 
-function read(key) {
+// Current user is local-only (each browser has its own login)
+const CURRENT_USER_KEY = 'wc2026_currentUser';
+
+// ============ IN-MEMORY CACHE ============
+// Firestore snapshots update this cache in real-time via listeners
+const cache = {
+  users: {},
+  predictions: {},
+  matchResults: {},
+  actualAdvancing: {},
+  actualBonuses: { champion: null, topScorers: [] },
+  settings: { predictionsLocked: false, adminPin: '1234' },
+  _ready: {},
+};
+
+// ============ FIRESTORE HELPERS ============
+
+function docRef(docName) {
+  return doc(db, 'gameData', docName);
+}
+
+async function writeDoc(docName, data) {
+  cache[docName] = data;
+  // Notify UI immediately from cache
+  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: docName } }));
+  // Persist to Firestore
   try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
-  } catch {
-    return null;
+    await setDoc(docRef(docName), { data: JSON.parse(JSON.stringify(data)) });
+  } catch (err) {
+    console.error(`Failed to write ${docName}:`, err);
   }
 }
 
-function write(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-  // Dispatch event so other components can react
-  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key } }));
+// Subscribe to real-time updates from Firestore
+// Called once at app startup
+export function initRealtimeListeners() {
+  for (const [key, docName] of Object.entries(DOCS)) {
+    onSnapshot(docRef(docName), (snap) => {
+      if (snap.exists()) {
+        cache[key] = snap.data().data;
+      }
+      cache._ready[key] = true;
+      window.dispatchEvent(new CustomEvent('store-updated', { detail: { key } }));
+    }, (err) => {
+      console.error(`Listener error for ${docName}:`, err);
+      cache._ready[key] = true;
+    });
+  }
+}
+
+export function isStoreReady() {
+  return Object.keys(DOCS).every((k) => cache._ready[k]);
 }
 
 // ============ USERS ============
 
 export function getUsers() {
-  return read(KEYS.users) || {};
+  return cache.users || {};
 }
 
 export function addUser(name, password) {
   const users = getUsers();
   const id = name.toLowerCase().replace(/\s+/g, '-');
   if (users[id]) return id; // already exists
-  users[id] = {
+  const updated = { ...users };
+  updated[id] = {
     id,
     displayName: name,
     password: password,
     formName: '',
     budgetNumber: '',
-    isAdmin: Object.keys(users).length === 0, // first user is admin
+    isAdmin: Object.keys(users).length === 0,
     createdAt: new Date().toISOString(),
   };
-  write(KEYS.users, users);
+  writeDoc('users', updated);
   return id;
 }
 
@@ -56,10 +98,10 @@ export function verifyPassword(userId, password) {
 }
 
 export function updateUser(userId, fields) {
-  const users = getUsers();
+  const users = { ...getUsers() };
   if (!users[userId]) return;
-  Object.assign(users[userId], fields);
-  write(KEYS.users, users);
+  users[userId] = { ...users[userId], ...fields };
+  writeDoc('users', users);
 }
 
 export function getUser(userId) {
@@ -68,36 +110,32 @@ export function getUser(userId) {
 }
 
 export function getCurrentUser() {
-  const userId = read(KEYS.currentUser);
-  if (!userId) return null;
-  return getUser(userId);
+  try {
+    const userId = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+    if (!userId) return null;
+    return getUser(userId);
+  } catch {
+    return null;
+  }
 }
 
 export function setCurrentUser(userId) {
-  write(KEYS.currentUser, userId);
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userId));
+  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'currentUser' } }));
 }
 
 export function logoutUser() {
-  localStorage.removeItem(KEYS.currentUser);
-  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: KEYS.currentUser } }));
+  localStorage.removeItem(CURRENT_USER_KEY);
+  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'currentUser' } }));
 }
 
 // ============ PREDICTIONS ============
-// Each user's predictions include:
-//   matches: { matchId: { homeScore, awayScore } }
-//   advancing: { R32: [teamCodes], R16: [...], QF: [...], SF: [...], F: [...] }
-//   champion: teamCode
-//   topScorer: "player name"
 
 export function getAllPredictions() {
-  return read(KEYS.predictions) || {};
+  return cache.predictions || {};
 }
 
 const DEFAULT_PREDICTIONS = { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
-// status: 'draft' | 'pending' | 'approved'
-// draft = user is still editing
-// pending = user submitted, waiting for admin approval
-// approved = admin approved, locked permanently
 
 export function getFullUserPredictions(userId) {
   const all = getAllPredictions();
@@ -122,113 +160,108 @@ function ensureUser(all, userId) {
 }
 
 export function savePrediction(userId, matchId, prediction) {
-  let all = getAllPredictions();
+  let all = { ...getAllPredictions() };
   all = ensureUser(all, userId);
-  // Can only edit if draft
+  all[userId] = { ...all[userId], matches: { ...all[userId].matches } };
   if (all[userId].status !== 'draft') return;
   all[userId].matches[matchId] = prediction;
   all[userId].updatedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
 export function saveAdvancingPrediction(userId, round, teams) {
-  let all = getAllPredictions();
+  let all = { ...getAllPredictions() };
   all = ensureUser(all, userId);
+  all[userId] = { ...all[userId], advancing: { ...(all[userId].advancing || {}) } };
   if (all[userId].status !== 'draft') return;
-  if (!all[userId].advancing) all[userId].advancing = {};
   all[userId].advancing[round] = teams;
   all[userId].updatedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
 export function saveBonusPrediction(userId, field, value) {
-  let all = getAllPredictions();
+  let all = { ...getAllPredictions() };
   all = ensureUser(all, userId);
+  all[userId] = { ...all[userId] };
   if (all[userId].status !== 'draft') return;
   all[userId][field] = value;
   all[userId].updatedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
-// User submits predictions for admin approval
 export function submitPredictions(userId) {
-  let all = getAllPredictions();
+  let all = { ...getAllPredictions() };
   all = ensureUser(all, userId);
+  all[userId] = { ...all[userId] };
   all[userId].status = 'pending';
   all[userId].submittedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
-// Admin approves user's predictions
 export function approvePredictions(userId) {
-  const all = getAllPredictions();
+  const all = { ...getAllPredictions() };
   if (!all[userId]) return;
+  all[userId] = { ...all[userId] };
   all[userId].status = 'approved';
   all[userId].approvedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
-// Admin rejects user's predictions (sends back to draft)
 export function rejectPredictions(userId) {
-  const all = getAllPredictions();
+  const all = { ...getAllPredictions() };
   if (!all[userId]) return;
+  all[userId] = { ...all[userId] };
   all[userId].status = 'draft';
   all[userId].rejectedAt = new Date().toISOString();
-  write(KEYS.predictions, all);
+  writeDoc('predictions', all);
 }
 
 // ============ MATCH RESULTS (admin) ============
 
 export function getMatchResults() {
-  return read(KEYS.matchResults) || {};
+  return cache.matchResults || {};
 }
 
 export function saveMatchResult(matchId, result) {
-  const results = getMatchResults();
+  const results = { ...getMatchResults() };
   results[matchId] = {
     ...result,
     updatedAt: new Date().toISOString(),
   };
-  write(KEYS.matchResults, results);
+  writeDoc('matchResults', results);
 }
 
 // ============ ACTUAL ADVANCING TEAMS (admin) ============
-// Which teams actually advanced to each round
-// { R32: [teamCodes], R16: [...], QF: [...], SF: [...], F: [...] }
 
 export function getActualAdvancing() {
-  return read(KEYS.actualAdvancing) || {};
+  return cache.actualAdvancing || {};
 }
 
 export function saveActualAdvancing(round, teams) {
-  const advancing = getActualAdvancing();
+  const advancing = { ...getActualAdvancing() };
   advancing[round] = teams;
-  write(KEYS.actualAdvancing, advancing);
+  writeDoc('actualAdvancing', advancing);
 }
 
 // ============ ACTUAL BONUSES (admin) ============
-// { champion: teamCode, topScorers: ["player1", "player2"] }
 
 export function getActualBonuses() {
-  return read(KEYS.actualBonuses) || { champion: null, topScorers: [] };
+  return cache.actualBonuses || { champion: null, topScorers: [] };
 }
 
 export function saveActualBonuses(bonuses) {
-  write(KEYS.actualBonuses, bonuses);
+  writeDoc('actualBonuses', bonuses);
 }
 
 // ============ SETTINGS ============
 
 export function getSettings() {
-  return read(KEYS.settings) || {
-    predictionsLocked: false,
-    adminPin: '1234', // default admin PIN
-  };
+  return cache.settings || { predictionsLocked: false, adminPin: '1234' };
 }
 
 export function updateSettings(newSettings) {
-  const settings = getSettings();
-  write(KEYS.settings, { ...settings, ...newSettings });
+  const settings = { ...getSettings(), ...newSettings };
+  writeDoc('settings', settings);
 }
 
 // ============ DATA EXPORT/IMPORT ============
@@ -246,17 +279,21 @@ export function exportAllData() {
 }
 
 export function clearAllData() {
-  for (const key of Object.values(KEYS)) {
-    localStorage.removeItem(key);
-  }
+  writeDoc('users', {});
+  writeDoc('predictions', {});
+  writeDoc('matchResults', {});
+  writeDoc('actualAdvancing', {});
+  writeDoc('actualBonuses', { champion: null, topScorers: [] });
+  writeDoc('settings', { predictionsLocked: false, adminPin: '1234' });
+  localStorage.removeItem(CURRENT_USER_KEY);
   window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'all' } }));
 }
 
 export function importAllData(data) {
-  if (data.users) write(KEYS.users, data.users);
-  if (data.predictions) write(KEYS.predictions, data.predictions);
-  if (data.matchResults) write(KEYS.matchResults, data.matchResults);
-  if (data.actualAdvancing) write(KEYS.actualAdvancing, data.actualAdvancing);
-  if (data.actualBonuses) write(KEYS.actualBonuses, data.actualBonuses);
-  if (data.settings) write(KEYS.settings, data.settings);
+  if (data.users) writeDoc('users', data.users);
+  if (data.predictions) writeDoc('predictions', data.predictions);
+  if (data.matchResults) writeDoc('matchResults', data.matchResults);
+  if (data.actualAdvancing) writeDoc('actualAdvancing', data.actualAdvancing);
+  if (data.actualBonuses) writeDoc('actualBonuses', data.actualBonuses);
+  if (data.settings) writeDoc('settings', data.settings);
 }

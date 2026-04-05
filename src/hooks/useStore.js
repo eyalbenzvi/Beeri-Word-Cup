@@ -1,19 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as store from '../store';
 
-// Hook that re-renders when localStorage changes
+// Hook that re-renders when Firestore data changes (via store-updated events)
 function useStoreUpdates() {
   const [, setTick] = useState(0);
 
   useEffect(() => {
     const handler = () => setTick((t) => t + 1);
     window.addEventListener('store-updated', handler);
-    window.addEventListener('storage', handler);
     return () => {
       window.removeEventListener('store-updated', handler);
-      window.removeEventListener('storage', handler);
     };
   }, []);
+}
+
+export function useStoreReady() {
+  useStoreUpdates();
+  return store.isStoreReady();
 }
 
 export function useCurrentUser() {
