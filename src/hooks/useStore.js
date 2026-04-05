@@ -8,7 +8,6 @@ function useStoreUpdates() {
   useEffect(() => {
     const handler = () => setTick((t) => t + 1);
     window.addEventListener('store-updated', handler);
-    // Also listen for changes from other tabs
     window.addEventListener('storage', handler);
     return () => {
       window.removeEventListener('store-updated', handler);
@@ -47,6 +46,12 @@ export function useUserPredictions(userId) {
   return store.getUserPredictions(userId);
 }
 
+export function useFullUserPredictions(userId) {
+  useStoreUpdates();
+  if (!userId) return { matches: {}, advancing: {}, champion: null, topScorer: '' };
+  return store.getFullUserPredictions(userId);
+}
+
 export function useAllPredictions() {
   useStoreUpdates();
   return store.getAllPredictions();
@@ -55,6 +60,16 @@ export function useAllPredictions() {
 export function useMatchResults() {
   useStoreUpdates();
   return store.getMatchResults();
+}
+
+export function useActualAdvancing() {
+  useStoreUpdates();
+  return store.getActualAdvancing();
+}
+
+export function useActualBonuses() {
+  useStoreUpdates();
+  return store.getActualBonuses();
 }
 
 export function useSettings() {

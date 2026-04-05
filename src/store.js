@@ -6,6 +6,8 @@ const KEYS = {
   currentUser: 'wc2026_currentUser',
   predictions: 'wc2026_predictions',
   matchResults: 'wc2026_matchResults',
+  actualAdvancing: 'wc2026_actualAdvancing',
+  actualBonuses: 'wc2026_actualBonuses',
   settings: 'wc2026_settings',
 };
 
@@ -65,9 +67,19 @@ export function logoutUser() {
 }
 
 // ============ PREDICTIONS ============
+// Each user's predictions include:
+//   matches: { matchId: { homeScore, awayScore } }
+//   advancing: { R32: [teamCodes], R16: [...], QF: [...], SF: [...], F: [...] }
+//   champion: teamCode
+//   topScorer: "player name"
 
 export function getAllPredictions() {
   return read(KEYS.predictions) || {};
+}
+
+export function getFullUserPredictions(userId) {
+  const all = getAllPredictions();
+  return all[userId] || { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
 }
 
 export function getUserPredictions(userId) {
@@ -78,9 +90,30 @@ export function getUserPredictions(userId) {
 export function savePrediction(userId, matchId, prediction) {
   const all = getAllPredictions();
   if (!all[userId]) {
-    all[userId] = { userId, matches: {} };
+    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
   }
   all[userId].matches[matchId] = prediction;
+  all[userId].updatedAt = new Date().toISOString();
+  write(KEYS.predictions, all);
+}
+
+export function saveAdvancingPrediction(userId, round, teams) {
+  const all = getAllPredictions();
+  if (!all[userId]) {
+    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
+  }
+  if (!all[userId].advancing) all[userId].advancing = {};
+  all[userId].advancing[round] = teams;
+  all[userId].updatedAt = new Date().toISOString();
+  write(KEYS.predictions, all);
+}
+
+export function saveBonusPrediction(userId, field, value) {
+  const all = getAllPredictions();
+  if (!all[userId]) {
+    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
+  }
+  all[userId][field] = value;
   all[userId].updatedAt = new Date().toISOString();
   write(KEYS.predictions, all);
 }
@@ -100,6 +133,31 @@ export function saveMatchResult(matchId, result) {
   write(KEYS.matchResults, results);
 }
 
+// ============ ACTUAL ADVANCING TEAMS (admin) ============
+// Which teams actually advanced to each round
+// { R32: [teamCodes], R16: [...], QF: [...], SF: [...], F: [...] }
+
+export function getActualAdvancing() {
+  return read(KEYS.actualAdvancing) || {};
+}
+
+export function saveActualAdvancing(round, teams) {
+  const advancing = getActualAdvancing();
+  advancing[round] = teams;
+  write(KEYS.actualAdvancing, advancing);
+}
+
+// ============ ACTUAL BONUSES (admin) ============
+// { champion: teamCode, topScorers: ["player1", "player2"] }
+
+export function getActualBonuses() {
+  return read(KEYS.actualBonuses) || { champion: null, topScorers: [] };
+}
+
+export function saveActualBonuses(bonuses) {
+  write(KEYS.actualBonuses, bonuses);
+}
+
 // ============ SETTINGS ============
 
 export function getSettings() {
@@ -115,13 +173,14 @@ export function updateSettings(newSettings) {
 }
 
 // ============ DATA EXPORT/IMPORT ============
-// So the admin can back up data or share it
 
 export function exportAllData() {
   return {
     users: getUsers(),
     predictions: getAllPredictions(),
     matchResults: getMatchResults(),
+    actualAdvancing: getActualAdvancing(),
+    actualBonuses: getActualBonuses(),
     settings: getSettings(),
     exportedAt: new Date().toISOString(),
   };
@@ -131,5 +190,7 @@ export function importAllData(data) {
   if (data.users) write(KEYS.users, data.users);
   if (data.predictions) write(KEYS.predictions, data.predictions);
   if (data.matchResults) write(KEYS.matchResults, data.matchResults);
+  if (data.actualAdvancing) write(KEYS.actualAdvancing, data.actualAdvancing);
+  if (data.actualBonuses) write(KEYS.actualBonuses, data.actualBonuses);
   if (data.settings) write(KEYS.settings, data.settings);
 }

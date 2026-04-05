@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { useCurrentUser, useMatchResults, useAllPredictions, useUsers } from '../hooks/useStore';
-import { calculateMatchPoints } from '../utils/scoring';
+import {
+  useCurrentUser, useMatchResults, useAllPredictions,
+  useUsers, useActualAdvancing, useActualBonuses,
+} from '../hooks/useStore';
+import { calculateFullScore, compareTiebreaker, calculateMatchPoints } from '../utils/scoring';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
+import { getTeamByCode } from '../data/teams';
 import MatchCard from '../components/MatchCard';
 
 const groupMatches = generateGroupMatches();
@@ -15,43 +19,33 @@ export default function Leaderboard() {
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
   const users = useUsers();
+  const actualAdvancing = useActualAdvancing();
+  const actualBonuses = useActualBonuses();
   const [selectedUser, setSelectedUser] = useState(null);
 
   // Calculate scores for all users
   const leaderboard = Object.entries(allPredictions)
     .map(([userId, predData]) => {
-      const userPredictions = predData.matches || {};
-      let totalPoints = 0;
-      let exactScores = 0;
-      let correctOutcomes = 0;
-
-      for (const [matchId, result] of Object.entries(results)) {
-        const prediction = userPredictions[matchId];
-        const match = allMatchesMap[matchId];
-        const stage = result.stage || match?.stage || 'group';
-        const pts = calculateMatchPoints(prediction, result, stage);
-
-        totalPoints += pts.points;
-        if (pts.breakdown === 'Exact score!') exactScores++;
-        if (pts.points > 0) correctOutcomes++;
-      }
-
+      const score = calculateFullScore(predData, results, actualAdvancing, actualBonuses);
       const userInfo = users[userId] || {};
       return {
         userId,
         displayName: userInfo.displayName || userId,
-        totalPoints,
-        exactScores,
-        correctOutcomes,
+        ...score,
       };
     })
-    .sort((a, b) => b.totalPoints - a.totalPoints);
+    .sort((a, b) => {
+      // Sort by total points first, then tiebreaker
+      if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
+      return compareTiebreaker(a, b);
+    });
 
   // Detailed view for selected user
   const renderUserDetail = () => {
     if (!selectedUser) return null;
 
-    const userPredictions = allPredictions[selectedUser]?.matches || {};
+    const predData = allPredictions[selectedUser] || {};
+    const score = calculateFullScore(predData, results, actualAdvancing, actualBonuses);
     const playedMatches = Object.keys(results);
 
     const matchesByStage = {};
@@ -72,17 +66,54 @@ export default function Leaderboard() {
           ← Back to leaderboard
         </button>
 
-        <h2 className="text-lg font-bold text-primary mb-3">
-          {users[selectedUser]?.displayName || selectedUser}'s Results
+        <h2 className="text-lg font-bold text-primary mb-1">
+          {users[selectedUser]?.displayName || selectedUser}
         </h2>
 
+        {/* Score breakdown */}
+        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 grid grid-cols-2 gap-2 text-center text-xs">
+          <div className="bg-gray-50 rounded-lg p-2">
+            <div className="text-lg font-bold text-primary">{score.totalPoints}</div>
+            <div className="text-gray-500">Total Points</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-2">
+            <div className="text-lg font-bold text-green-600">{score.exactScoreCount}</div>
+            <div className="text-gray-500">Exact Scores</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-2">
+            <div className="text-lg font-bold text-blue-600">{score.outcomeCount}</div>
+            <div className="text-gray-500">Correct Outcomes</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-2">
+            <div className="text-lg font-bold">
+              {score.correctChampion ? '✅' : '❌'}
+            </div>
+            <div className="text-gray-500">Champion</div>
+          </div>
+        </div>
+
+        {/* Bonus predictions */}
+        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 text-sm">
+          <div className="flex justify-between py-1 border-b border-gray-50">
+            <span className="text-gray-600">Champion pick:</span>
+            <span className="font-medium">
+              {predData.champion ? (getTeamByCode(predData.champion)?.flag + ' ' + getTeamByCode(predData.champion)?.name) : 'None'}
+            </span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-gray-600">Top scorer pick:</span>
+            <span className="font-medium">{predData.topScorer || 'None'}</span>
+          </div>
+        </div>
+
+        {/* Match-by-match results */}
         {Object.entries(matchesByStage).map(([stage, matches]) => (
           <div key={stage} className="mb-4">
             <h3 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
               {STAGES[stage] || stage}
             </h3>
             {matches.map(({ matchId, match, result }) => {
-              const prediction = userPredictions[matchId];
+              const prediction = predData.matches?.[matchId];
               const pts = calculateMatchPoints(prediction, result, stage);
               return (
                 <MatchCard
@@ -115,7 +146,6 @@ export default function Leaderboard() {
         renderUserDetail()
       ) : (
         <>
-          {/* Stats summary */}
           <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
             <div className="text-xs text-gray-500 text-center">
               {Object.keys(results).length} matches played •{' '}
@@ -123,7 +153,6 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          {/* Leaderboard Table */}
           <div className="space-y-2">
             {leaderboard.map((entry, index) => (
               <button
@@ -131,7 +160,6 @@ export default function Leaderboard() {
                 onClick={() => setSelectedUser(entry.userId)}
                 className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition text-left"
               >
-                {/* Rank */}
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                     index === 0
@@ -146,12 +174,10 @@ export default function Leaderboard() {
                   {index + 1}
                 </div>
 
-                {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                   {entry.displayName.charAt(0).toUpperCase()}
                 </div>
 
-                {/* Name & Stats */}
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-gray-800 truncate">
                     {entry.displayName}
@@ -160,11 +186,10 @@ export default function Leaderboard() {
                     )}
                   </div>
                   <div className="text-xs text-gray-400">
-                    {entry.exactScores} exact • {entry.correctOutcomes} correct
+                    {entry.exactScoreCount} exact • {entry.outcomeCount} correct
                   </div>
                 </div>
 
-                {/* Points */}
                 <div className="text-right">
                   <div className="text-lg font-bold text-primary">
                     {entry.totalPoints}
