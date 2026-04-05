@@ -6,6 +6,7 @@ import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS } from '../data/teams';
 import { calcBracketTeams } from '../utils/bracket';
 import MatchCard from '../components/MatchCard';
+import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
 
@@ -263,6 +264,9 @@ export default function Predict() {
       <StageSelector selectedStage={selectedStage} onSelect={setSelectedStage} />
       {selectedStage === 'group' && (
         <GroupSelector groups={Object.keys(GROUPS)} selectedGroup={selectedGroup} onSelect={setSelectedGroup} />
+      )}
+      {selectedStage === 'group' && (
+        <GroupTable matchData={matchPredictions} group={selectedGroup} />
       )}
       <div className="space-y-2">
         {filteredMatches.map((match) => {
