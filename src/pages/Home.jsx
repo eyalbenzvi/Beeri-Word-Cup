@@ -71,8 +71,8 @@ export default function Home() {
       </div>
 
       {/* Status Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-3">
-        <div className="flex items-center justify-center gap-2 mb-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-center gap-2">
           <span className={`w-2 h-2 rounded-full ${
             settings.predictionsLocked ? 'bg-red-400' : 'bg-green-400'
           } animate-pulse`} />
