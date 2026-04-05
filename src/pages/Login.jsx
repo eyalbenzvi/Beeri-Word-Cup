@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useCurrentUser, useUsers } from '../hooks/useStore';
 import { verifyPassword } from '../store';
+import { useNavigation } from '../hooks/useNavigation';
 
 export default function Login() {
   const { login, addUser } = useCurrentUser();
   const users = useUsers();
-  const navigate = useNavigate();
+  const { navigate } = useNavigation();
   const [mode, setMode] = useState(null); // null | 'login' | 'register'
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +31,7 @@ export default function Login() {
       return;
     }
     login(found.id);
-    navigate('/');
+    navigate('home');
   };
 
   const handleRegister = (e) => {
@@ -49,7 +49,7 @@ export default function Login() {
 
     const userId = addUser(trimmed, password);
     login(userId);
-    navigate('/');
+    navigate('home');
   };
 
   const resetAll = () => {

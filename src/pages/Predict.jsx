@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import {
   useCurrentUser, useUserForms, useActiveFormId, useFormData, useSettings,
 } from '../hooks/useStore';
+import { useNavigation } from '../hooks/useNavigation';
 import {
   savePrediction, saveBonusPrediction, submitPredictions, reopenForm,
   createForm, deleteForm, setActiveFormId, updateFormDetails,
@@ -33,6 +33,7 @@ function randomScore() {
 
 export default function Predict() {
   const { user } = useCurrentUser();
+  const { navigate } = useNavigation();
   const forms = useUserForms(user?.id);
   const activeFormId = useActiveFormId();
   const formData = useFormData(activeFormId);
@@ -176,9 +177,12 @@ export default function Predict() {
         <div className="text-5xl mb-4">🔒</div>
         <h2 className="text-lg font-bold text-gray-700 mb-2">הצטרף למשחק קודם</h2>
         <p className="text-gray-500 mb-4">צריך לבחור שם כדי למלא ניחושים</p>
-        <Link to="/login" className="inline-block bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-light transition no-underline">
+        <button
+          onClick={() => navigate('login')}
+          className="inline-block bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-light transition border-none cursor-pointer"
+        >
           הצטרף למשחק
-        </Link>
+        </button>
       </div>
     );
   }

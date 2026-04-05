@@ -1,19 +1,19 @@
-import { Link, useLocation } from 'react-router-dom';
 import { useCurrentUser } from '../hooks/useStore';
+import { useNavigation } from '../hooks/useNavigation';
 
 export default function Layout({ children }) {
   const { user, logout } = useCurrentUser();
-  const location = useLocation();
+  const { page, navigate } = useNavigation();
 
   const navItems = [
-    { path: '/', label: 'בית', icon: '🏠' },
-    { path: '/predict', label: 'טפסים', icon: '📋' },
-    { path: '/leaderboard', label: 'דירוג', icon: '🏆' },
-    { path: '/results', label: 'תוצאות', icon: '⚽' },
+    { id: 'home', label: 'בית', icon: '🏠' },
+    { id: 'predict', label: 'טפסים', icon: '📋' },
+    { id: 'leaderboard', label: 'דירוג', icon: '🏆' },
+    { id: 'results', label: 'תוצאות', icon: '⚽' },
   ];
 
   if (user?.isAdmin) {
-    navItems.push({ path: '/admin', label: 'ניהול', icon: '⚙️' });
+    navItems.push({ id: 'admin', label: 'ניהול', icon: '⚙️' });
   }
 
   return (
@@ -21,9 +21,12 @@ export default function Layout({ children }) {
       {/* Header */}
       <header className="bg-primary text-white shadow-lg sticky top-0 z-50">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-lg font-bold no-underline text-white flex items-center gap-2">
+          <button
+            onClick={() => navigate('home')}
+            className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer"
+          >
             ⚽ בארי מונדיאל
-          </Link>
+          </button>
           {user ? (
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
@@ -40,12 +43,12 @@ export default function Layout({ children }) {
               </button>
             </div>
           ) : (
-            <Link
-              to="/login"
-              className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition no-underline"
+            <button
+              onClick={() => navigate('login')}
+              className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition cursor-pointer border-none"
             >
               התחבר
-            </Link>
+            </button>
           )}
         </div>
       </header>
@@ -59,18 +62,18 @@ export default function Layout({ children }) {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
         <div className="max-w-lg mx-auto flex">
           {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex-1 flex flex-col items-center py-2 text-xs no-underline transition-colors ${
-                location.pathname === item.path
+            <button
+              key={item.id}
+              onClick={() => navigate(item.id)}
+              className={`flex-1 flex flex-col items-center py-2 text-xs bg-transparent border-none cursor-pointer transition-colors ${
+                page === item.id
                   ? 'text-primary font-semibold'
                   : 'text-gray-500 hover:text-primary'
               }`}
             >
               <span className="text-lg mb-0.5">{item.icon}</span>
               {item.label}
-            </Link>
+            </button>
           ))}
         </div>
       </nav>
