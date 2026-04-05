@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   useCurrentUser, useMatchResults, useAllPredictions, useUsers,
   useSettings, useActualBonuses,
@@ -9,6 +9,7 @@ import {
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
+import { calcBracketTeams } from '../utils/bracket';
 import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
@@ -37,6 +38,9 @@ export default function Admin() {
   const [pinVerified, setPinVerified] = useState(false);
   const [topScorerInput, setTopScorerInput] = useState('');
   const fileInputRef = useRef(null);
+
+  // Compute bracket from actual results (same as Predict does for predictions)
+  const bracketTeams = useMemo(() => calcBracketTeams(results), [results]);
 
   if (!user?.isAdmin) {
     return (
@@ -103,13 +107,46 @@ export default function Admin() {
 
   const handleRandomizeResults = () => {
     if (!window.confirm('This will overwrite ALL actual results with random scores. Continue?')) return;
-    [...groupMatches, ...knockoutMatches].forEach((match) => {
-      saveMatchResult(match.id, {
+
+    const allResults = {};
+
+    // Group matches
+    groupMatches.forEach((match) => {
+      const r = {
         homeTeam: match.homeTeam, awayTeam: match.awayTeam,
         homeScore: randomScore(), awayScore: randomScore(),
-        stage: match.stage || 'group', group: match.group || null, played: true,
-      });
+        stage: 'group', group: match.group, played: true,
+      };
+      allResults[match.id] = r;
+      saveMatchResult(match.id, r);
     });
+
+    // Knockout matches
+    knockoutMatches.forEach((match) => {
+      const r = {
+        homeTeam: match.homeTeam, awayTeam: match.awayTeam,
+        homeScore: randomScore(), awayScore: randomScore(),
+        stage: match.stage || 'group', group: null, played: true,
+      };
+      allResults[match.id] = r;
+      saveMatchResult(match.id, r);
+    });
+
+    // Resolve ties stage-by-stage with real team codes
+    const knockoutStageOrder = ['R32', 'R16', 'QF', 'SF', '3RD', 'F'];
+    for (const stage of knockoutStageOrder) {
+      const bracket = calcBracketTeams(allResults);
+      for (const match of knockoutMatches.filter((m) => m.stage === stage)) {
+        const r = allResults[match.id];
+        if (r.homeScore === r.awayScore) {
+          const teams = bracket[match.id];
+          if (teams?.home && teams?.away) {
+            r.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+            saveMatchResult(match.id, r);
+          }
+        }
+      }
+    }
   };
 
   const renderResultsTab = () => (
@@ -129,21 +166,34 @@ export default function Admin() {
       )}
       <div className="space-y-2">
         {filteredMatches.map((match) => {
-          const homeTeam = getTeamByCode(match.homeTeam);
-          const awayTeam = getTeamByCode(match.awayTeam);
+          // For knockout, derive teams from bracket
+          const derived = match.stage !== 'group' && bracketTeams[match.id]
+            ? { home: bracketTeams[match.id].home, away: bracketTeams[match.id].away }
+            : { home: match.homeTeam, away: match.awayTeam };
+          const homeTeam = getTeamByCode(derived.home);
+          const awayTeam = getTeamByCode(derived.away);
           const result = results[match.id];
           const isEditing = editingMatch === match.id;
+          const isKnockout = match.stage !== 'group';
+          const isTie = result && result.homeScore === result.awayScore;
           return (
             <div key={match.id} className={`bg-white rounded-xl p-3 border ${result ? 'border-green-200 bg-green-50/30' : 'border-gray-100'}`}>
+              {/* Bracket label for knockout */}
+              {isKnockout && match.label && (
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs text-gray-400 font-medium">{match.label}</span>
+                  {match.date && <span className="text-xs text-gray-300">{match.date}</span>}
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 text-sm">
                     <span>{homeTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{homeTeam?.name || match.homeTeam || 'TBD'}</span>
+                    <span className="font-medium">{homeTeam?.name || derived.home || 'TBD'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <span>{awayTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{awayTeam?.name || match.awayTeam || 'TBD'}</span>
+                    <span className="font-medium">{awayTeam?.name || derived.away || 'TBD'}</span>
                   </div>
                 </div>
                 {isEditing ? (
@@ -175,6 +225,30 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+              {/* Knockout tie — who advances */}
+              {isKnockout && isTie && derived.home && derived.away && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <div className="text-xs text-gray-500 text-center mb-1.5">מי עולה? (פנדלים)</div>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={() => saveMatchResult(match.id, { ...result, advancingTeam: derived.home })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        result?.advancingTeam === derived.home
+                          ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}>
+                      {homeTeam?.flag || '🏳️'} {homeTeam?.name || derived.home}
+                    </button>
+                    <button
+                      onClick={() => saveMatchResult(match.id, { ...result, advancingTeam: derived.away })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        result?.advancingTeam === derived.away
+                          ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}>
+                      {awayTeam?.flag || '🏳️'} {awayTeam?.name || derived.away}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
