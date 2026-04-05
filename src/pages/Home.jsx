@@ -83,28 +83,13 @@ export default function Home() {
           </span>
         </div>
 
-        {!user ? (
+        {!user && (
           <button
             onClick={() => navigate('login')}
-            className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
+            className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm mt-4"
           >
             התחבר למשחק
           </button>
-        ) : (
-          <div className="space-y-2.5">
-            <button
-              onClick={() => navigate('predict')}
-              className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
-            >
-              📋 הטפסים שלי
-            </button>
-            <button
-              onClick={() => navigate('leaderboard')}
-              className="w-full bg-white text-primary font-bold py-3.5 rounded-2xl border-2 border-primary/20 hover:border-primary/40 hover:bg-gray-50 transition text-base cursor-pointer"
-            >
-              🏆 טבלת דירוג
-            </button>
-          </div>
         )}
       </div>
 
