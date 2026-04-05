@@ -189,11 +189,11 @@ export default function Admin() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 text-sm">
                     <span>{homeTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{homeTeam?.name || derived.home || 'טרם נקבע'}</span>
+                    <span className="font-medium">{homeTeam?.name || 'טרם נקבע'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <span>{awayTeam?.flag || '🏳️'}</span>
-                    <span className="font-medium">{awayTeam?.name || derived.away || 'טרם נקבע'}</span>
+                    <span className="font-medium">{awayTeam?.name || 'טרם נקבע'}</span>
                   </div>
                 </div>
                 {isEditing ? (
@@ -236,7 +236,7 @@ export default function Admin() {
                         result?.advancingTeam === derived.home
                           ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}>
-                      {homeTeam?.flag || '🏳️'} {homeTeam?.name || derived.home}
+                      {homeTeam?.flag || '🏳️'} {homeTeam?.name || 'טרם נקבע'}
                     </button>
                     <button
                       onClick={() => saveMatchResult(match.id, { ...result, advancingTeam: derived.away })}
@@ -244,7 +244,7 @@ export default function Admin() {
                         result?.advancingTeam === derived.away
                           ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}>
-                      {awayTeam?.flag || '🏳️'} {awayTeam?.name || derived.away}
+                      {awayTeam?.flag || '🏳️'} {awayTeam?.name || 'טרם נקבע'}
                     </button>
                   </div>
                 </div>

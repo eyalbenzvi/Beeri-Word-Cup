@@ -13,8 +13,8 @@ export default function MatchCard({
   const homeTeam = getTeamByCode(match.homeTeam);
   const awayTeam = getTeamByCode(match.awayTeam);
 
-  const homeName = homeTeam?.name || match.homeTeam || 'טרם נקבע';
-  const awayName = awayTeam?.name || match.awayTeam || 'טרם נקבע';
+  const homeName = homeTeam?.name || 'טרם נקבע';
+  const awayName = awayTeam?.name || 'טרם נקבע';
   const homeFlag = homeTeam?.flag || '🏳️';
   const awayFlag = awayTeam?.flag || '🏳️';
 

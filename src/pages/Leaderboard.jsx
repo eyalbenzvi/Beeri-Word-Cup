@@ -181,7 +181,7 @@ export default function Leaderboard() {
                     <div className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl ${
                       pts.wrongMatchup ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
                     }`}>
-                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || predTeams.home} נגד {predMatchup.away?.flag} {predMatchup.away?.name || predTeams.away}
+                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || 'טרם נקבע'} נגד {predMatchup.away?.flag} {predMatchup.away?.name || 'טרם נקבע'}
                       {prediction ? ` (${prediction.homeScore}-${prediction.awayScore})` : ''}
                     </div>
                   )}
