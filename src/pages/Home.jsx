@@ -45,7 +45,7 @@ export default function Home() {
               to="/predict"
               className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base no-underline"
             >
-              🎯 מלא ניחושים
+              📋 הטפסים שלי
             </Link>
             <Link
               to="/leaderboard"

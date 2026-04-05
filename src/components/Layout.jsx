@@ -7,7 +7,7 @@ export default function Layout({ children }) {
 
   const navItems = [
     { path: '/', label: 'בית', icon: '🏠' },
-    { path: '/predict', label: 'ניחושים', icon: '🎯' },
+    { path: '/predict', label: 'טפסים', icon: '📋' },
     { path: '/leaderboard', label: 'תוצאות', icon: '🏆' },
   ];
 
