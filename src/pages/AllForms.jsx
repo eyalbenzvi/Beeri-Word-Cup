@@ -110,6 +110,8 @@ function FormCard({ form, userName }) {
 export default function AllForms() {
   const allPredictions = useAllPredictions();
   const users = useUsers();
+  const [filterText, setFilterText] = useState('');
+  const [filterBy, setFilterBy] = useState('form'); // 'form' or 'user'
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
@@ -117,6 +119,18 @@ export default function AllForms() {
       .map(([formId, form]) => ({ formId, ...form }))
       .sort((a, b) => (a.formName || '').localeCompare(b.formName || ''));
   }, [allPredictions]);
+
+  const filteredForms = useMemo(() => {
+    const query = filterText.trim().toLowerCase();
+    if (!query) return submittedForms;
+    return submittedForms.filter(form => {
+      if (filterBy === 'form') {
+        return (form.formName || '').toLowerCase().includes(query);
+      }
+      const userName = users[form.userId]?.displayName || form.userId;
+      return userName.toLowerCase().includes(query);
+    });
+  }, [submittedForms, filterText, filterBy, users]);
 
   return (
     <div>
@@ -134,15 +148,49 @@ export default function AllForms() {
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-400 mb-3">{submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה</p>
+          {/* Filter controls */}
+          <div className="bg-white rounded-xl border border-gray-100 p-3 mb-3">
+            <div className="flex gap-1 mb-2 bg-gray-100 rounded-lg p-1">
+              {[
+                { id: 'form', label: 'לפי טופס' },
+                { id: 'user', label: 'לפי משתמש' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setFilterBy(tab.id); setFilterText(''); }}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
+                    filterBy === tab.id ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder={filterBy === 'form' ? 'חפש לפי שם טופס...' : 'חפש לפי שם משתמש...'}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <p className="text-xs text-gray-400 mb-3">
+            {filteredForms.length === submittedForms.length
+              ? `${submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה`
+              : `מציג ${filteredForms.length} מתוך ${submittedForms.length} טפסים`}
+          </p>
           <div className="space-y-2">
-            {submittedForms.map(form => (
+            {filteredForms.map(form => (
               <FormCard
                 key={form.formId}
                 form={form}
                 userName={users[form.userId]?.displayName || form.userId}
               />
             ))}
+            {filteredForms.length === 0 && (
+              <div className="text-center py-6 text-gray-400 text-sm">לא נמצאו טפסים תואמים</div>
+            )}
           </div>
         </>
       )}
