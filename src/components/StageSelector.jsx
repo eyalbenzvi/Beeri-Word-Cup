@@ -9,9 +9,9 @@ export default function StageSelector({ selectedStage, onSelect }) {
         <button
           key={key}
           onClick={() => onSelect(key)}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+          className={`px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
             selectedStage === key
-              ? 'bg-primary text-white shadow-md'
+              ? 'bg-primary text-white shadow-md scale-105'
               : 'bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary'
           }`}
         >

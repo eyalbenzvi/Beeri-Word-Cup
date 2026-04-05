@@ -23,7 +23,7 @@ export default function Layout({ children }) {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate('home')}
-            className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer"
+            className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer p-0"
           >
             ⚽ בארי מונדיאל
           </button>
@@ -37,7 +37,7 @@ export default function Layout({ children }) {
               </span>
               <button
                 onClick={logout}
-                className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition"
+                className="text-xs bg-white/20 px-2.5 py-1.5 rounded-lg hover:bg-white/30 transition cursor-pointer border-none text-white"
               >
                 החלף
               </button>
@@ -54,24 +54,24 @@ export default function Layout({ children }) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4 pb-20">
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4 pb-24">
         {children}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-bottom">
         <div className="max-w-lg mx-auto flex">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => navigate(item.id)}
-              className={`flex-1 flex flex-col items-center py-2 text-xs bg-transparent border-none cursor-pointer transition-colors ${
+              className={`flex-1 flex flex-col items-center py-2.5 text-xs bg-transparent border-none cursor-pointer transition-all duration-200 ${
                 page === item.id
-                  ? 'text-primary font-semibold'
-                  : 'text-gray-500 hover:text-primary'
+                  ? 'text-primary font-bold scale-105'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              <span className="text-lg mb-0.5">{item.icon}</span>
+              <span className={`text-lg mb-0.5 transition-transform duration-200 ${page === item.id ? 'scale-110' : ''}`}>{item.icon}</span>
               {item.label}
             </button>
           ))}

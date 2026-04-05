@@ -15,6 +15,7 @@ import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
 import AllFormsView from './AllForms';
+import { useToast } from '../components/Toast';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -34,6 +35,7 @@ function randomScore() {
 export default function Predict() {
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
+  const showToast = useToast();
   const forms = useUserForms(user?.id);
   const activeFormId = useActiveFormId();
   const formData = useFormData(activeFormId);
@@ -69,6 +71,7 @@ export default function Predict() {
     submitPredictions(activeFormId);
     setShowConfirm(false);
     setValidationErrors([]);
+    showToast('הטופס הוגש בהצלחה! 🎉');
   };
 
   const handleTrySubmit = () => {
@@ -157,6 +160,7 @@ export default function Predict() {
       'Gyökeres', 'Son', 'Retegui', 'Pulisic', 'David',
     ];
     saveBonusPrediction(activeFormId, 'topScorer', topScorers[Math.floor(Math.random() * topScorers.length)]);
+    showToast('כל הניחושים הוגרלו! 🎲');
   };
 
   const handleCreateForm = () => {
@@ -165,10 +169,12 @@ export default function Predict() {
     createForm(user.id, name);
     setNewFormName('');
     setShowNewForm(false);
+    showToast(`"${name}" נוצר בהצלחה`);
   };
 
   const handleDeleteForm = (formId) => {
     deleteForm(formId);
+    showToast('הטופס נמחק');
   };
 
   if (!user) {
@@ -341,8 +347,8 @@ export default function Predict() {
     if (!showConfirm) return null;
     const hasErrors = validationErrors.length > 0;
     return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+      <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
           <div className="text-3xl text-center mb-3">{hasErrors ? '⚠️' : '📋'}</div>
           <h3 className="text-lg font-bold text-center text-primary mb-2">
             {hasErrors ? 'הטופס לא מלא' : 'להגיש את הטופס?'}
@@ -453,7 +459,7 @@ export default function Predict() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <button onClick={() => setActiveFormId(null)}
-            className="text-sm text-primary font-medium">
+            className="text-sm text-primary font-medium bg-transparent border-none cursor-pointer p-0">
             הטפסים שלי →
           </button>
           <span className="text-gray-300">|</span>
