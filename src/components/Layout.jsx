@@ -44,7 +44,7 @@ export default function Layout({ children }) {
               to="/login"
               className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition no-underline"
             >
-              הצטרף
+              התחבר
             </Link>
           )}
         </div>
