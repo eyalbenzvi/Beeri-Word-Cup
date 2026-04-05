@@ -136,7 +136,7 @@ export default function Leaderboard() {
           <div className="flex justify-between py-1 border-b border-gray-50">
             <span className="text-gray-600">ניחוש אלופה:</span>
             <span className="font-medium">
-              {derivedChampion ? (getTeamByCode(derivedChampion)?.flag + ' ' + getTeamByCode(derivedChampion)?.name) : 'אין'}
+              {derivedChampion ? (getTeamByCode(derivedChampion)?.name || 'טרם נקבע') : 'אין'}
               {score.correctChampion ? ' ✅' : ''}
             </span>
           </div>
@@ -181,7 +181,7 @@ export default function Leaderboard() {
                     <div className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl ${
                       pts.wrongMatchup ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
                     }`}>
-                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || 'טרם נקבע'} נגד {predMatchup.away?.flag} {predMatchup.away?.name || 'טרם נקבע'}
+                      ניחש: {predMatchup.home?.name || 'טרם נקבע'} נגד {predMatchup.away?.name || 'טרם נקבע'}
                       {prediction ? ` (${prediction.homeScore}-${prediction.awayScore})` : ''}
                     </div>
                   )}

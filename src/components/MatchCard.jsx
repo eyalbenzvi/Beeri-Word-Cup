@@ -15,8 +15,6 @@ export default function MatchCard({
 
   const homeName = homeTeam?.name || 'טרם נקבע';
   const awayName = awayTeam?.name || 'טרם נקבע';
-  const homeFlag = homeTeam?.flag || '🏳️';
-  const awayFlag = awayTeam?.flag || '🏳️';
 
   const predHome = prediction?.homeScore ?? '';
   const predAway = prediction?.awayScore ?? '';
@@ -53,7 +51,6 @@ export default function MatchCard({
         {/* Home Team */}
         <div className="flex-1 text-center">
           <div className="text-sm font-medium">{homeName}</div>
-          <div className="text-xl">{homeFlag}</div>
         </div>
 
         {/* Score / Prediction Input */}
@@ -119,7 +116,6 @@ export default function MatchCard({
         {/* Away Team */}
         <div className="flex-1 text-center">
           <div className="text-sm font-medium">{awayName}</div>
-          <div className="text-xl">{awayFlag}</div>
         </div>
       </div>
 
@@ -136,7 +132,7 @@ export default function MatchCard({
                   prediction?.advancingTeam === match.homeTeam
                     ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}>
-                {homeFlag} {homeName}
+                {homeName}
               </button>
               <button
                 onClick={() => onPredictionChange?.({ ...prediction, advancingTeam: match.awayTeam })}
@@ -144,13 +140,13 @@ export default function MatchCard({
                   prediction?.advancingTeam === match.awayTeam
                     ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}>
-                {awayFlag} {awayName}
+                {awayName}
               </button>
             </div>
           </div>
         ) : prediction?.advancingTeam ? (
           <div className="mt-1 text-xs text-gray-400 text-center">
-            עולה: {prediction.advancingTeam === match.homeTeam ? `${homeFlag} ${homeName}` : `${awayFlag} ${awayName}`}
+            עולה: {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
           </div>
         ) : null
       )}

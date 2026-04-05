@@ -41,7 +41,6 @@ export default function GroupTable({ matchData, group }) {
               >
                 <td className="py-1.5 pr-1 text-gray-400 font-medium">{i + 1}</td>
                 <td className="py-1.5">
-                  <span className="mr-1">{info?.flag || '🏳️'}</span>
                   <span className="font-medium">{info?.name || 'טרם נקבע'}</span>
                 </td>
                 <td className="text-center py-1.5">{team.played}</td>
