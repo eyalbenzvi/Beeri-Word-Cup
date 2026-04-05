@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useCurrentUser, useUsers } from '../hooks/useStore';
 import { verifyPassword } from '../store';
 import { useNavigation } from '../hooks/useNavigation';
+import { useToast } from '../components/Toast';
 
 export default function Login() {
   const { login, addUser } = useCurrentUser();
   const users = useUsers();
   const { navigate } = useNavigation();
+  const showToast = useToast();
   const [mode, setMode] = useState(null); // null | 'login' | 'register'
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +33,7 @@ export default function Login() {
       return;
     }
     login(found.id);
+    showToast(`ברוך הבא, ${found.displayName}!`);
     navigate('home');
   };
 
@@ -49,6 +52,7 @@ export default function Login() {
 
     const userId = addUser(trimmed, password);
     login(userId);
+    showToast(`ברוך הבא, ${trimmed}!`);
     navigate('home');
   };
 

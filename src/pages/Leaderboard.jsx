@@ -96,7 +96,7 @@ export default function Leaderboard() {
       <div className="mt-4">
         <button
           onClick={() => setSelectedForm(null)}
-          className="text-sm text-primary mb-3 flex items-center gap-1"
+          className="text-sm text-primary mb-3 flex items-center gap-1 bg-transparent border-none cursor-pointer font-medium p-0"
         >
           חזרה לטבלת הדירוג →
         </button>
@@ -269,9 +269,10 @@ export default function Leaderboard() {
             ))}
 
             {leaderboard.length === 0 && (
-              <div className="text-center py-8 text-gray-400">
-                <div className="text-4xl mb-2">🏟️</div>
-                <p>אין ניחושים עדיין. היה הראשון!</p>
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-5xl mb-3">🏟️</div>
+                <p className="text-base font-medium text-gray-500 mb-1">אין ניחושים עדיין</p>
+                <p className="text-sm">היה הראשון להגיש טופס!</p>
               </div>
             )}
           </div>

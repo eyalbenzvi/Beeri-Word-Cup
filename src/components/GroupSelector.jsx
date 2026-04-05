@@ -5,9 +5,9 @@ export default function GroupSelector({ groups, selectedGroup, onSelect }) {
         <button
           key={group}
           onClick={() => onSelect(group)}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+          className={`w-9 h-9 rounded-full text-sm font-semibold transition-all duration-200 ${
             selectedGroup === group
-              ? 'bg-primary text-white shadow-md'
+              ? 'bg-primary text-white shadow-md scale-110'
               : 'bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary'
           }`}
         >

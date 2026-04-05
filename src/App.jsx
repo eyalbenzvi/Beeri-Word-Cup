@@ -1,4 +1,5 @@
 import Layout from './components/Layout';
+import { ToastProvider } from './components/Toast';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Predict from './pages/Predict';
@@ -29,8 +30,8 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl mb-3">⚽</div>
-          <div className="text-gray-500 text-sm">טוען...</div>
+          <div className="text-4xl animate-bounce">⚽</div>
+          <div className="text-gray-500 text-sm mt-3">טוען...</div>
         </div>
       </div>
     );
@@ -40,7 +41,9 @@ function AppContent() {
 
   return (
     <Layout>
-      <Page />
+      <div key={page} className="animate-fade-in">
+        <Page />
+      </div>
     </Layout>
   );
 }
@@ -48,7 +51,9 @@ function AppContent() {
 function App() {
   return (
     <NavigationProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </NavigationProvider>
   );
 }
