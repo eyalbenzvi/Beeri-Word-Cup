@@ -1,0 +1,151 @@
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useAllPredictions, useUsers } from '../hooks/useStore';
+import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
+import { GROUPS, getTeamByCode } from '../data/teams';
+import { calcBracketTeams } from '../utils/bracket';
+
+const groupMatches = generateGroupMatches();
+const knockoutMatches = generateKnockoutMatches();
+
+function normalizeStatus(s) {
+  return (s === 'pending' || s === 'approved') ? 'submitted' : (s || 'draft');
+}
+
+function MatchRow({ match, prediction }) {
+  const home = getTeamByCode(match.homeTeam);
+  const away = getTeamByCode(match.awayTeam);
+  const homeName = home?.name || 'טרם נקבע';
+  const awayName = away?.name || 'טרם נקבע';
+  const hasScore = prediction?.homeScore !== undefined && prediction?.homeScore !== null;
+
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-xs">
+      <span className="flex-1 text-right truncate">{homeName}</span>
+      <span className="w-16 text-center font-bold text-gray-700">
+        {hasScore ? `${prediction.homeScore} - ${prediction.awayScore}` : '-'}
+      </span>
+      <span className="flex-1 text-left truncate">{awayName}</span>
+      {match.stage !== 'group' && hasScore &&
+        prediction.homeScore === prediction.awayScore && prediction.advancingTeam && (
+        <span className="text-[10px] text-gray-400 mr-1">
+          (פנ: {getTeamByCode(prediction.advancingTeam)?.name})
+        </span>
+      )}
+    </div>
+  );
+}
+
+function FormCard({ form, userName }) {
+  const [expanded, setExpanded] = useState(false);
+  const predictions = form.matches || {};
+  const bracketTeams = useMemo(() => calcBracketTeams(predictions), [predictions]);
+
+  const filledCount = Object.values(predictions).filter(
+    p => p?.homeScore !== undefined && p?.homeScore !== null
+  ).length;
+  const totalCount = groupMatches.length + knockoutMatches.length;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 p-4 text-right bg-transparent border-none cursor-pointer"
+      >
+        <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+          {(form.formName || '?')[0]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm truncate">{form.formName || 'טופס ללא שם'}</div>
+          <div className="text-xs text-gray-400">{userName} • {filledCount}/{totalCount} משחקים</div>
+        </div>
+        <span className="text-gray-400 text-sm">{expanded ? '▾' : '▸'}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3">
+          {/* Group stage */}
+          {Object.keys(GROUPS).map(group => {
+            const matches = groupMatches.filter(m => m.group === group);
+            return (
+              <div key={group}>
+                <div className="text-xs font-bold text-gray-500 mb-1">בית {group}</div>
+                {matches.map(m => (
+                  <MatchRow key={m.id} match={m} prediction={predictions[m.id]} />
+                ))}
+              </div>
+            );
+          })}
+
+          {/* Knockout stages */}
+          {['R32', 'R16', 'QF', 'SF', '3RD', 'F'].map(stage => {
+            const matches = knockoutMatches.filter(m => m.stage === stage);
+            if (matches.length === 0) return null;
+            return (
+              <div key={stage}>
+                <div className="text-xs font-bold text-gray-500 mb-1">{STAGES[stage]}</div>
+                {matches.map(m => {
+                  const derived = bracketTeams[m.id]
+                    ? { ...m, homeTeam: bracketTeams[m.id].home, awayTeam: bracketTeams[m.id].away }
+                    : m;
+                  return <MatchRow key={m.id} match={derived} prediction={predictions[m.id]} />;
+                })}
+              </div>
+            );
+          })}
+
+          {/* Top Scorer */}
+          <div className="pt-2 border-t border-gray-100">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-500">⚽ מלך שערים</span>
+              <span className="font-semibold">{form.topScorer || 'לא הוכנס'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AllForms() {
+  const allPredictions = useAllPredictions();
+  const users = useUsers();
+
+  const submittedForms = useMemo(() => {
+    return Object.entries(allPredictions)
+      .filter(([, form]) => normalizeStatus(form.status) === 'submitted')
+      .map(([formId, form]) => ({ formId, ...form }))
+      .sort((a, b) => (a.formName || '').localeCompare(b.formName || ''));
+  }, [allPredictions]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-primary">כל הטפסים</h1>
+        <Link to="/predict" className="text-sm text-primary font-medium no-underline">
+          חזרה לטפסים שלי →
+        </Link>
+      </div>
+
+      {submittedForms.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-5xl mb-3">📋</div>
+          <p className="text-gray-500">אין טפסים שהוגשו עדיין</p>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-gray-400 mb-3">{submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה</p>
+          <div className="space-y-2">
+            {submittedForms.map(form => (
+              <FormCard
+                key={form.formId}
+                form={form}
+                userName={users[form.userId]?.displayName || form.userId}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
