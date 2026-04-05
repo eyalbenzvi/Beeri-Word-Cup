@@ -231,6 +231,13 @@ export function exportAllData() {
   };
 }
 
+export function clearAllData() {
+  for (const key of Object.values(KEYS)) {
+    localStorage.removeItem(key);
+  }
+  window.dispatchEvent(new CustomEvent('store-updated', { detail: { key: 'all' } }));
+}
+
 export function importAllData(data) {
   if (data.users) write(KEYS.users, data.users);
   if (data.predictions) write(KEYS.predictions, data.predictions);

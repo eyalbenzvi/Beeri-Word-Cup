@@ -4,7 +4,7 @@ import {
   useSettings, useActualAdvancing, useActualBonuses,
 } from '../hooks/useStore';
 import {
-  saveMatchResult, updateSettings, exportAllData, importAllData,
+  saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
   saveActualAdvancing, saveActualBonuses, approvePredictions, rejectPredictions,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
@@ -293,6 +293,22 @@ export default function Admin() {
           <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition">Import</button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 border border-red-200">
+        <h3 className="font-semibold text-sm text-red-600 mb-2">Danger Zone</h3>
+        <p className="text-xs text-gray-400 mb-3">Delete all data: users, predictions, results. This cannot be undone.</p>
+        <button
+          onClick={() => {
+            if (window.confirm('Are you sure? This will delete ALL data — users, predictions, and results.')) {
+              clearAllData();
+              window.location.href = '/';
+            }
+          }}
+          className="w-full bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"
+        >
+          Clear All Data
+        </button>
       </div>
     </div>
   );
