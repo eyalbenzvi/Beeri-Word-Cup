@@ -1,9 +1,155 @@
+import { useState } from 'react';
 import { useCurrentUser } from '../hooks/useStore';
 import { useNavigation } from '../hooks/useNavigation';
+
+const SCORING_DATA = [
+  ['בתים', 1, 3, 2],
+  ['שלב ה-32', 3, 3, 4],
+  ['רבע גמר', 5, 3, 6],
+  ['חצי גמר', 7, 3, 8],
+  ['מקום שלישי', 7, 3, null],
+  ['גמר', 9, 3, null],
+];
+
+function MenuOverlay({ open, onClose }) {
+  const [activeSection, setActiveSection] = useState(null);
+
+  if (!open) return null;
+
+  const toggleSection = (id) => setActiveSection(activeSection === id ? null : id);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm" onClick={onClose} />
+
+      {/* Slide-in menu */}
+      <div className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[70] shadow-2xl overflow-y-auto animate-slide-in">
+        {/* Menu header */}
+        <div className="bg-primary text-white p-5 flex items-center justify-between">
+          <button onClick={onClose} className="text-white/80 text-2xl bg-transparent border-none cursor-pointer p-0 leading-none">✕</button>
+          <h2 className="text-lg font-extrabold tracking-tight">תפריט</h2>
+        </div>
+
+        <div className="p-4 space-y-2">
+          {/* שיטת הניקוד */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              onClick={() => toggleSection('scoring')}
+              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+            >
+              <span className="text-gray-400 text-xs">{activeSection === 'scoring' ? '▲' : '▼'}</span>
+              <span className="text-sm font-bold text-primary">📊 שיטת הניקוד</span>
+            </button>
+            {activeSection === 'scoring' && (
+              <div className="px-4 pb-4">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400 border-b-2 border-gray-100">
+                      <th className="text-right py-2 font-semibold">שלב</th>
+                      <th className="text-center py-2 font-semibold">הכרעה</th>
+                      <th className="text-center py-2 font-semibold">+מדויק</th>
+                      <th className="text-center py-2 font-semibold">עליה</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-700">
+                    {SCORING_DATA.map(([stage, outcome, exact, advance], i) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td className="py-2 font-medium">{stage}</td>
+                        <td className="text-center font-bold">{outcome}</td>
+                        <td className="text-center font-bold text-green-600">+{exact}</td>
+                        <td className="text-center font-bold text-purple-600">{advance ?? '–'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
+                    <span className="text-gray-600">🏆 ניחוש אלופה</span>
+                    <span className="font-bold text-yellow-600">9 נק׳</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
+                    <span className="text-gray-600">⚽ מלך שערים</span>
+                    <span className="font-bold text-yellow-600">8 נק׳</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+                  ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בפנדלטים לא נספרים למלך השערים.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* החוקים */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              onClick={() => toggleSection('rules')}
+              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+            >
+              <span className="text-gray-400 text-xs">{activeSection === 'rules' ? '▲' : '▼'}</span>
+              <span className="text-sm font-bold text-primary">📜 החוקים</span>
+            </button>
+            {activeSection === 'rules' && (
+              <div className="px-4 pb-4 text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+                <p>• כל משתתף ממלא טופס ניחושים לכל משחקי המונדיאל.</p>
+                <p>• ניתן להגיש יותר מטופס אחד.</p>
+                <p>• ניקוד מחושב אוטומטית לפי תוצאות בפועל.</p>
+                <p>• ניחוש הכרעה נכונה (ניצחון/תיקו) מזכה בנקודות בסיס.</p>
+                <p>• ניחוש תוצאה מדויקת מזכה בבונוס נוסף.</p>
+                <p>• ניחוש נכון של קבוצה עולה בנוקאאוט מזכה בנקודות עליה.</p>
+                <p>• בונוסים ניתנים על ניחוש אלופה ומלך שערים.</p>
+                <p>• שערי פנדלים בפנדלטים לא נספרים למלך השערים.</p>
+                <p>• הטפסים ננעלים לפני שריקת הפתיחה.</p>
+              </div>
+            )}
+          </div>
+
+          {/* אודות */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              onClick={() => toggleSection('about')}
+              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+            >
+              <span className="text-gray-400 text-xs">{activeSection === 'about' ? '▲' : '▼'}</span>
+              <span className="text-sm font-bold text-primary">ℹ️ אודות</span>
+            </button>
+            {activeSection === 'about' && (
+              <div className="px-4 pb-4 text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+                <p>טורניר הניחושים של קיבוץ בארי למונדיאל 2026.</p>
+                <p>ארה״ב 🇺🇸 • מקסיקו 🇲🇽 • קנדה 🇨🇦</p>
+                <p>11 ביוני – 19 ביולי 2026</p>
+                <p className="text-gray-400 mt-2">גרסה 1.0</p>
+              </div>
+            )}
+          </div>
+
+          {/* תמיכה טכנית */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              onClick={() => toggleSection('support')}
+              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+            >
+              <span className="text-gray-400 text-xs">{activeSection === 'support' ? '▲' : '▼'}</span>
+              <span className="text-sm font-bold text-primary">🛠 תמיכה טכנית</span>
+            </button>
+            {activeSection === 'support' && (
+              <div className="px-4 pb-4 text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+                <p>נתקלת בבעיה? יש לך שאלה?</p>
+                <p>פנה למנהל המשחק או שלח הודעה בקבוצת הווטסאפ.</p>
+                <p className="text-gray-400 mt-2">טיפ: נסה לרענן את הדף אם משהו לא נטען כמו שצריך.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export default function Layout({ children }) {
   const { user, logout } = useCurrentUser();
   const { page, navigate } = useNavigation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const navItems = [
     { id: 'home', label: 'בית', icon: '🏠' },
@@ -21,13 +167,22 @@ export default function Layout({ children }) {
       {/* Header */}
       <header className="bg-primary text-white sticky top-0 z-50 shadow-md">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-          <button
-            onClick={() => navigate('home')}
-            className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer p-0 tracking-tight"
-          >
-            <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
-            בארי מונדיאל
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="text-white text-xl bg-transparent border-none cursor-pointer p-1 leading-none"
+              aria-label="תפריט"
+            >
+              ☰
+            </button>
+            <button
+              onClick={() => navigate('home')}
+              className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer p-0 tracking-tight"
+            >
+              <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
+              בארי מונדיאל
+            </button>
+          </div>
           {user ? (
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
@@ -53,6 +208,9 @@ export default function Layout({ children }) {
           )}
         </div>
       </header>
+
+      {/* Hamburger Menu */}
+      <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       {/* Main Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-5 pb-24">
