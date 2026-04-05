@@ -14,6 +14,7 @@ import MatchCard from '../components/MatchCard';
 import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
+import AllFormsView from './AllForms';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -43,6 +44,7 @@ export default function Predict() {
   const [validationErrors, setValidationErrors] = useState([]);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState('');
+  const [showAllForms, setShowAllForms] = useState(false);
 
   // Make sure active form belongs to current user
   const activeForm = activeFormId && formData?.userId === user?.id ? formData : null;
@@ -181,6 +183,11 @@ export default function Predict() {
     );
   }
 
+  // === ALL FORMS VIEW ===
+  if (!activeForm && showAllForms) {
+    return <AllFormsView onBack={() => setShowAllForms(false)} />;
+  }
+
   // === FORM LIST VIEW (no active form or choosing form) ===
   if (!activeForm) {
     return (
@@ -250,12 +257,12 @@ export default function Predict() {
         </div>
 
         {/* View all forms */}
-        <Link
-          to="/all-forms"
-          className="block w-full text-center bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base no-underline mb-4"
+        <button
+          onClick={() => setShowAllForms(true)}
+          className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base mb-4"
         >
           👀 צפייה בטפסים של כולם
-        </Link>
+        </button>
 
         {/* New form */}
         {showNewForm ? (
