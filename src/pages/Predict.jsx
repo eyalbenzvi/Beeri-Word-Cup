@@ -11,6 +11,17 @@ import StageSelector from '../components/StageSelector';
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
 
+// Random score generator - weighted toward realistic football scores
+function randomScore() {
+  const weights = [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 5];
+  return weights[Math.floor(Math.random() * weights.length)];
+}
+
+function shuffleAndPick(arr, count) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 export default function Predict() {
   const { user } = useCurrentUser();
   const predictions = useFullUserPredictions(user?.id);
@@ -36,6 +47,63 @@ export default function Predict() {
     if (!user) return;
     submitPredictions(user.id);
     setShowConfirm(false);
+  };
+
+  const handleRandomize = () => {
+    if (!user || !canEdit) return;
+
+    // 1. Randomize all match scores
+    [...groupMatches, ...knockoutMatches].forEach((match) => {
+      savePrediction(user.id, match.id, {
+        homeScore: randomScore(),
+        awayScore: randomScore(),
+      });
+    });
+
+    // 2. Randomize advancing teams
+    // R32: pick ~2-3 teams from each group (top 2 always + sometimes 3rd)
+    const r32Teams = [];
+    for (const [, teams] of Object.entries(GROUPS)) {
+      const shuffled = shuffleAndPick(teams, Math.random() < 0.67 ? 3 : 2);
+      shuffled.forEach((t) => r32Teams.push(t.code));
+    }
+    // Trim to 32 if needed (remove random extras)
+    while (r32Teams.length > 32) r32Teams.splice(Math.floor(Math.random() * r32Teams.length), 1);
+    // Pad to 32 if needed
+    const remaining = ALL_TEAMS.filter((t) => !r32Teams.includes(t.code));
+    while (r32Teams.length < 32) {
+      const pick = remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
+      if (pick) r32Teams.push(pick.code);
+    }
+    saveAdvancingPrediction(user.id, 'R32', r32Teams);
+
+    // R16: pick 16 from R32
+    const r16Teams = shuffleAndPick(r32Teams, 16);
+    saveAdvancingPrediction(user.id, 'R16', r16Teams);
+
+    // QF: pick 8 from R16
+    const qfTeams = shuffleAndPick(r16Teams, 8);
+    saveAdvancingPrediction(user.id, 'QF', qfTeams);
+
+    // SF: pick 4 from QF
+    const sfTeams = shuffleAndPick(qfTeams, 4);
+    saveAdvancingPrediction(user.id, 'SF', sfTeams);
+
+    // F: pick 2 from SF
+    const fTeams = shuffleAndPick(sfTeams, 2);
+    saveAdvancingPrediction(user.id, 'F', fTeams);
+
+    // 3. Random champion (one of the finalists)
+    saveBonusPrediction(user.id, 'champion', fTeams[Math.floor(Math.random() * fTeams.length)]);
+
+    // 4. Random top scorer from a list of well-known players
+    const topScorers = [
+      'Mbappé', 'Haaland', 'Vinicius Jr', 'Messi', 'Kane',
+      'Salah', 'Lewandowski', 'Rashford', 'Morata', 'Lautaro Martínez',
+      'Osimhen', 'Álvarez', 'Isak', 'Saka', 'Yamal',
+      'Gyökeres', 'Son', 'Retegui', 'Pulisic', 'David',
+    ];
+    saveBonusPrediction(user.id, 'topScorer', topScorers[Math.floor(Math.random() * topScorers.length)]);
   };
 
   if (!user) {
@@ -349,9 +417,15 @@ export default function Predict() {
       {activeTab === 'advancing' && renderAdvancingTab()}
       {activeTab === 'bonuses' && renderBonusesTab()}
 
-      {/* Submit Button — only show when draft */}
+      {/* Action Buttons — only show when draft */}
       {status === 'draft' && !settings.predictionsLocked && (
-        <div className="sticky bottom-16 mt-6 pb-2">
+        <div className="sticky bottom-16 mt-6 pb-2 space-y-2">
+          <button
+            onClick={handleRandomize}
+            className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-base"
+          >
+            🎲 Randomize All Predictions
+          </button>
           <button
             onClick={() => setShowConfirm(true)}
             className="w-full bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-600 active:bg-green-700 transition text-base"
