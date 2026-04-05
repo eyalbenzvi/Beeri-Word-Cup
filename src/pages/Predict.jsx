@@ -216,17 +216,19 @@ export default function Predict() {
           {forms.map((form) => {
             const formStatus = normalizeStatus(form.status);
             return (
-            <div key={form.formId} className={`bg-white rounded-2xl p-4 border shadow-sm ${
+            <div key={form.formId} className={`bg-white rounded-2xl p-4 border shadow-sm card-hover ${
               formStatus === 'submitted' ? 'border-green-200' : 'border-gray-100'
             }`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
-                  {(form.formName || '?')[0]}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                  formStatus === 'submitted' ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'
+                }`}>
+                  {formStatus === 'submitted' ? '✓' : (form.formName || '?')[0]}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate text-gray-800">{form.formName || 'טופס ללא שם'}</div>
                   <div className="text-[11px] text-gray-400 mt-0.5">
-                    {Object.keys(form.matches || {}).length} משחקים מלאו
+                    {Object.keys(form.matches || {}).length}/{groupMatches.length + knockoutMatches.length} משחקים
                     {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ''}
                   </div>
                 </div>
@@ -478,16 +480,23 @@ export default function Predict() {
       {renderStatusBanner()}
 
       {/* Progress */}
-      <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm">
-        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-          <span>בתים: {predictedGroupMatches}/{groupMatches.length}</span>
-          <span>נוקאאוט: {predictedKnockout}/{knockoutMatches.length}</span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-2">
-          <div className="bg-primary rounded-full h-2 transition-all"
-            style={{ width: `${((predictedGroupMatches + predictedKnockout) / (groupMatches.length + knockoutMatches.length)) * 100}%` }} />
-        </div>
-      </div>
+      {(() => {
+        const total = groupMatches.length + knockoutMatches.length;
+        const filled = predictedGroupMatches + predictedKnockout;
+        const pct = Math.round((filled / total) * 100);
+        return (
+          <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
+              <span>בתים: {predictedGroupMatches}/{groupMatches.length} • נוקאאוט: {predictedKnockout}/{knockoutMatches.length}</span>
+              <span className="font-bold text-primary">{pct}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2.5">
+              <div className={`rounded-full h-2.5 transition-all ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Main Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">

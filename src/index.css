@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1e3a5f;
-  --color-primary-light: #2d5a8e;
+  --color-primary: #1a365d;
+  --color-primary-light: #2b4c7e;
   --color-secondary: #8b1538;
   --color-accent: #d4a843;
   --color-success: #16a34a;
-  --color-bg: #f5f7fa;
+  --color-bg: #f0f2f5;
   --color-card: #ffffff;
-  --color-card-hover: #f1f5f9;
+  --color-card-hover: #f8fafc;
 }
 
 body {
@@ -20,16 +20,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth page transitions */
+/* Page transitions */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in {
-  animation: fadeIn 0.18s ease-out;
-}
+.animate-fade-in { animation: fadeIn 0.18s ease-out; }
 
-/* Toast notification */
+/* Toast */
 @keyframes slideUp {
   from { opacity: 0; transform: translate(-50%, 16px); }
   to { opacity: 1; transform: translate(-50%, 0); }
@@ -41,47 +39,46 @@ body {
 .toast-enter { animation: slideUp 0.25s ease-out; }
 .toast-exit { animation: slideOut 0.25s ease-in forwards; }
 
-/* Hamburger menu slide-in */
+/* Menu slide */
 @keyframes slideInRight {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
-.animate-slide-in {
-  animation: slideInRight 0.25s ease-out;
-}
+.animate-slide-in { animation: slideInRight 0.25s ease-out; }
 
-/* Better number inputs */
+/* Number input cleanup */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-input[type="number"] {
-  -moz-appearance: textfield;
-}
+input[type="number"] { -moz-appearance: textfield; }
 
-/* Active button press effect */
+/* Press effect */
 button:active:not(:disabled) {
   transform: scale(0.97);
-  transition: transform 0.1s;
+  transition: transform 0.08s;
 }
 
-/* Consistent focus styling */
-input:focus, button:focus-visible {
-  outline: none;
-}
+/* Focus */
+input:focus, button:focus-visible { outline: none; }
 
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 2px;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
-/* Safe area for bottom nav on notched phones */
+/* Safe area */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+  .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* Card hover on desktop */
+@media (hover: hover) {
+  .card-hover { transition: transform 0.15s, box-shadow 0.15s; }
+  .card-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+}
+
+/* Gradient header */
+.header-gradient {
+  background: linear-gradient(135deg, #1a365d 0%, #2b4c7e 100%);
 }

@@ -59,7 +59,7 @@ export default function Results() {
           const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
 
           return (
-            <div key={match.id} className={`bg-white rounded-2xl p-3.5 border ${
+            <div key={match.id} className={`bg-white rounded-2xl p-3.5 border card-hover ${
               result ? 'border-primary/20 shadow-sm' : 'border-gray-100'
             }`}>
               {isKnockout && match.label && (
