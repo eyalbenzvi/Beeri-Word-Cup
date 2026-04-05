@@ -107,7 +107,7 @@ export default function Leaderboard() {
         <p className="text-xs text-gray-400 mb-3">{userInfo.displayName || predData.userId}</p>
 
         {/* Score breakdown */}
-        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-lg font-bold text-primary">{score.totalPoints}</div>
             <div className="text-gray-500">סה״כ</div>
@@ -124,7 +124,7 @@ export default function Leaderboard() {
 
         {/* Advancing points */}
         {Object.values(score.advancingPoints).some(v => v > 0) && (
-          <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 text-sm">
+          <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
             <div className="text-xs font-semibold text-gray-600 mb-1">נקודות עליה:</div>
             <div className="flex flex-wrap gap-2 text-xs">
               {[['R32','שמינית'],['R16','שמינית-16'],['QF','רבע'],['SF','חצי'],['F','גמר']].map(([round, label]) => {
@@ -141,7 +141,7 @@ export default function Leaderboard() {
         )}
 
         {/* Bonus predictions */}
-        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 text-sm">
+        <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
           <div className="flex justify-between py-1 border-b border-gray-50">
             <span className="text-gray-600">ניחוש אלופה:</span>
             <span className="font-medium">
@@ -209,14 +209,14 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-primary mb-4">🏆 טבלת דירוג</h1>
+      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">🏆 טבלת דירוג</h1>
 
       {selectedForm ? (
         renderFormDetail()
       ) : (
         <>
-          <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
-            <div className="text-xs text-gray-500 text-center">
+          <div className="bg-white rounded-2xl p-3 mb-4 border border-gray-100 shadow-sm">
+            <div className="text-xs text-gray-400 text-center font-medium">
               {Object.keys(results).length} משחקים שוחקו •{' '}
               {leaderboard.length} טפסים
             </div>
@@ -227,23 +227,23 @@ export default function Leaderboard() {
               <button
                 key={entry.formId}
                 onClick={() => setSelectedForm(entry.formId)}
-                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition text-right"
+                className="w-full bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm flex items-center gap-3 hover:bg-gray-50 transition text-right cursor-pointer"
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold ${
                     index === 0
-                      ? 'bg-yellow-100 text-yellow-700'
+                      ? 'bg-yellow-400 text-white'
                       : index === 1
-                      ? 'bg-gray-100 text-gray-600'
+                      ? 'bg-gray-400 text-white'
                       : index === 2
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-gray-50 text-gray-500'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-gray-100 text-gray-400'
                   }`}
                 >
                   {index + 1}
                 </div>
 
-                <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
                   {entry.formName.charAt(0)}
                 </div>
 

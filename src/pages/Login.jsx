@@ -77,7 +77,7 @@ export default function Login() {
             {isLogin ? 'הכנס את פרטי המשתמש שלך' : (userList.length === 0 ? 'השחקן הראשון הופך למנהל המשחק' : 'צור משתמש חדש')}
           </p>
         </div>
-        <form onSubmit={isLogin ? handleLogin : handleRegister} className="bg-white rounded-xl p-4 border border-gray-100">
+        <form onSubmit={isLogin ? handleLogin : handleRegister} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <input
             type="text"
             value={name}
@@ -99,7 +99,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={!name.trim() || !password}
-            className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
+            className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition disabled:opacity-40 border-none cursor-pointer shadow-sm text-base"
           >
             {isLogin ? 'התחבר' : (userList.length === 0 ? 'צור משחק והצטרף' : 'הרשם')}
           </button>
@@ -124,18 +124,18 @@ export default function Login() {
         <p className="text-gray-500 text-sm">טורניר הניחושים של בארי - מונדיאל 2026</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <button
           onClick={() => { setMode('login'); setError(''); setName(''); setPassword(''); }}
-          className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base"
+          className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
         >
-          התחברות
+          🔐 התחברות
         </button>
         <button
           onClick={() => { setMode('register'); setError(''); setName(''); setPassword(''); }}
-          className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base"
+          className="w-full bg-white text-primary font-bold py-3.5 rounded-2xl border-2 border-primary/20 hover:border-primary/40 hover:bg-gray-50 transition text-base cursor-pointer"
         >
-          הרשמה
+          ✏️ הרשמה
         </button>
       </div>
     </div>

@@ -15,13 +15,13 @@ export function ToastProvider({ children }) {
     if (!toast) return;
     const timer = setTimeout(() => {
       setExiting(true);
-      setTimeout(() => { setToast(null); setExiting(false); }, 300);
-    }, 2500);
+      setTimeout(() => { setToast(null); setExiting(false); }, 250);
+    }, 2200);
     return () => clearTimeout(timer);
   }, [toast]);
 
   const colors = {
-    success: 'bg-green-600',
+    success: 'bg-gray-800',
     error: 'bg-red-600',
     info: 'bg-primary',
   };
@@ -30,7 +30,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={showToast}>
       {children}
       {toast && (
-        <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl text-white text-sm font-medium shadow-lg ${colors[toast.type] || colors.success} ${exiting ? 'toast-exit' : 'toast-enter'}`}>
+        <div className={`fixed bottom-24 left-1/2 z-[100] px-5 py-3 rounded-2xl text-white text-sm font-medium shadow-xl max-w-[85%] text-center ${colors[toast.type] || colors.success} ${exiting ? 'toast-exit' : 'toast-enter'}`}>
           {toast.message}
         </div>
       )}
