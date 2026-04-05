@@ -7,73 +7,96 @@ export default function Login() {
   const { login, addUser } = useCurrentUser();
   const users = useUsers();
   const navigate = useNavigate();
-  const [newName, setNewName] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [showNew, setShowNew] = useState(false);
-  const [loginUserId, setLoginUserId] = useState(null);
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [mode, setMode] = useState(null); // null | 'login' | 'register'
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const userList = Object.values(users);
 
-  const handleSelectUser = (userId) => {
-    setLoginUserId(userId);
-    setLoginPassword('');
-    setLoginError('');
-  };
-
   const handleLogin = (e) => {
     e.preventDefault();
-    if (!loginUserId) return;
-    if (verifyPassword(loginUserId, loginPassword)) {
-      login(loginUserId);
-      navigate('/');
-    } else {
-      setLoginError('סיסמא שגויה');
+    const trimmed = name.trim();
+    if (!trimmed || !password) return;
+
+    // Find user by display name (case-insensitive)
+    const found = userList.find(
+      (u) => u.displayName.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!found) {
+      setError('שם משתמש לא קיים');
+      return;
     }
+    if (!verifyPassword(found.id, password)) {
+      setError('סיסמא שגויה');
+      return;
+    }
+    login(found.id);
+    navigate('/');
   };
 
-  const handleCreateUser = (e) => {
+  const handleRegister = (e) => {
     e.preventDefault();
-    const name = newName.trim();
-    if (!name || !newPassword) return;
-    const userId = addUser(name, newPassword);
+    const trimmed = name.trim();
+    if (!trimmed || !password) return;
+
+    // Check if name already exists
+    const exists = userList.some(
+      (u) => u.displayName.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setError('שם משתמש כבר קיים, בחר שם אחר');
+      return;
+    }
+
+    const userId = addUser(trimmed, password);
     login(userId);
     navigate('/');
   };
 
-  // Password entry for selected user
-  if (loginUserId) {
-    const selectedUser = users[loginUserId];
+  // Login or Register form
+  if (mode) {
+    const isLogin = mode === 'login';
     return (
       <div className="text-center">
         <div className="py-6">
-          <div className="text-5xl mb-3">🔐</div>
-          <h1 className="text-xl font-bold text-primary mb-1">הכנס סיסמא</h1>
-          <p className="text-gray-500 text-sm">{selectedUser?.displayName}</p>
+          <div className="text-5xl mb-3">{isLogin ? '🔐' : '⚽'}</div>
+          <h1 className="text-xl font-bold text-primary mb-1">
+            {isLogin ? 'התחברות' : 'הרשמה'}
+          </h1>
+          <p className="text-gray-500 text-sm">
+            {isLogin ? 'הכנס את פרטי המשתמש שלך' : (userList.length === 0 ? 'השחקן הראשון הופך למנהל המשחק' : 'צור משתמש חדש')}
+          </p>
         </div>
-        <form onSubmit={handleLogin} className="bg-white rounded-xl p-4 border border-gray-100">
+        <form onSubmit={isLogin ? handleLogin : handleRegister} className="bg-white rounded-xl p-4 border border-gray-100">
           <input
-            type="password"
-            value={loginPassword}
-            onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
-            placeholder="סיסמא..."
+            type="text"
+            value={name}
+            onChange={(e) => { setName(e.target.value); setError(''); }}
+            placeholder="שם משתמש..."
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
             autoFocus
           />
-          {loginError && (
-            <div className="text-sm text-red-500 mb-3">{loginError}</div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setError(''); }}
+            placeholder="סיסמא..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
+          />
+          {error && (
+            <div className="text-sm text-red-500 mb-3">{error}</div>
           )}
           <button
             type="submit"
-            disabled={!loginPassword}
+            disabled={!name.trim() || !password}
             className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
           >
-            כניסה
+            {isLogin ? 'התחבר' : (userList.length === 0 ? 'צור משחק והצטרף' : 'הרשם')}
           </button>
           <button
             type="button"
-            onClick={() => setLoginUserId(null)}
+            onClick={() => { setMode(null); setError(''); setName(''); setPassword(''); }}
             className="mt-2 text-sm text-gray-500 hover:text-primary"
           >
             חזרה →
@@ -83,93 +106,29 @@ export default function Login() {
     );
   }
 
+  // Main screen — two buttons
   return (
     <div className="text-center">
       <div className="py-6">
         <div className="text-5xl mb-3">⚽</div>
-        <h1 className="text-xl font-bold text-primary mb-1">!ברוכים הבאים</h1>
-        <p className="text-gray-500 text-sm">בחר את השם שלך או צור שחקן חדש</p>
+        <h1 className="text-xl font-bold text-primary mb-1">ברוכים הבאים!</h1>
+        <p className="text-gray-500 text-sm">טורניר הניחושים של בארי - מונדיאל 2026</p>
       </div>
 
-      {/* Existing users */}
-      {userList.length > 0 && !showNew && (
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">
-            בחר את השם שלך
-          </h2>
-          <div className="space-y-2">
-            {userList.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => handleSelectUser(u.id)}
-                className="w-full bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition text-right"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold">
-                  {u.displayName.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-800">{u.displayName}</div>
-                  {u.isAdmin && (
-                    <span className="text-xs text-primary">מנהל</span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Add new user */}
-      {showNew || userList.length === 0 ? (
-        <form onSubmit={handleCreateUser} className="bg-white rounded-xl p-4 border border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-600 mb-3">
-            {userList.length === 0 ? 'יצירת שחקן ראשון (מנהל)' : 'שחקן חדש'}
-          </h2>
-          {userList.length === 0 && (
-            <p className="text-xs text-gray-400 mb-3">
-              השחקן הראשון הופך למנהל המשחק
-            </p>
-          )}
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="שם מלא..."
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
-            autoFocus
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="סיסמא..."
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
-          />
-          <button
-            type="submit"
-            disabled={!newName.trim() || !newPassword}
-            className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
-          >
-            {userList.length === 0 ? 'צור משחק והצטרף' : 'הצטרף למשחק'}
-          </button>
-          {userList.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowNew(false)}
-              className="mt-2 text-sm text-gray-500 hover:text-primary"
-            >
-              חזרה לרשימת השחקנים →
-            </button>
-          )}
-        </form>
-      ) : (
+      <div className="space-y-3">
         <button
-          onClick={() => setShowNew(true)}
-          className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition"
+          onClick={() => { setMode('login'); setError(''); setName(''); setPassword(''); }}
+          className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base"
         >
-          + הוסף שחקן חדש
+          התחברות
         </button>
-      )}
+        <button
+          onClick={() => { setMode('register'); setError(''); setName(''); setPassword(''); }}
+          className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base"
+        >
+          הרשמה
+        </button>
+      </div>
     </div>
   );
 }
