@@ -68,24 +68,34 @@ export default function Results() {
                   {match.date && <span className="text-xs text-gray-300">{match.date}</span>}
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className={`text-sm font-semibold ${homeTeam ? 'text-gray-800' : 'text-gray-300'}`}>{homeTeam?.name || 'טרם נקבע'}</div>
-                  <div className={`text-sm font-semibold mt-1.5 ${awayTeam ? 'text-gray-800' : 'text-gray-300'}`}>{awayTeam?.name || 'טרם נקבע'}</div>
-                </div>
-                {result ? (
-                  <div className="text-center">
-                    <span className="font-extrabold text-primary text-xl tracking-wider">{result.homeScore} – {result.awayScore}</span>
-                    {isKnockout && result.homeScore === result.awayScore && result.advancingTeam && (
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        פנדלים: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam}
-                      </div>
-                    )}
+              {result ? (
+                <div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className={`text-sm font-semibold ${homeTeam ? 'text-gray-800' : 'text-gray-300 italic'}`}>{homeTeam?.name || 'טרם נקבע'}</span>
+                    <span className={`text-lg font-extrabold tabular-nums ${result.homeScore > result.awayScore ? 'text-primary' : 'text-gray-400'}`}>{result.homeScore}</span>
                   </div>
-                ) : (
-                  <span className="text-gray-300 text-sm">טרם שוחק</span>
-                )}
-              </div>
+                  <div className="flex items-center justify-between py-1 border-t border-gray-50">
+                    <span className={`text-sm font-semibold ${awayTeam ? 'text-gray-800' : 'text-gray-300 italic'}`}>{awayTeam?.name || 'טרם נקבע'}</span>
+                    <span className={`text-lg font-extrabold tabular-nums ${result.awayScore > result.homeScore ? 'text-primary' : 'text-gray-400'}`}>{result.awayScore}</span>
+                  </div>
+                  {isKnockout && result.homeScore === result.awayScore && result.advancingTeam && (
+                    <div className="text-[11px] text-gray-400 text-center mt-1 pt-1 border-t border-gray-50">
+                      בעיטות הכרעה: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className={`text-sm font-semibold ${homeTeam ? 'text-gray-800' : 'text-gray-300 italic'}`}>{homeTeam?.name || 'טרם נקבע'}</span>
+                    <span className="text-sm text-gray-300">–</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-t border-gray-50">
+                    <span className={`text-sm font-semibold ${awayTeam ? 'text-gray-800' : 'text-gray-300 italic'}`}>{awayTeam?.name || 'טרם נקבע'}</span>
+                    <span className="text-sm text-gray-300">–</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
