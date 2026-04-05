@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as store from '../store';
+import { auth, firebaseSignOut, onAuthStateChanged } from '../firebase';
 
 // Hook that re-renders when Firestore data changes (via store-updated events)
 function useStoreUpdates() {
@@ -8,9 +9,7 @@ function useStoreUpdates() {
   useEffect(() => {
     const handler = () => setTick((t) => t + 1);
     window.addEventListener('store-updated', handler);
-    return () => {
-      window.removeEventListener('store-updated', handler);
-    };
+    return () => window.removeEventListener('store-updated', handler);
   }, []);
 }
 
@@ -21,21 +20,33 @@ export function useStoreReady() {
 
 export function useCurrentUser() {
   useStoreUpdates();
-  const user = store.getCurrentUser();
+  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
+  const [authReady, setAuthReady] = useState(false);
 
-  const login = useCallback((userId) => {
-    store.setCurrentUser(userId);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      setFirebaseUser(fbUser);
+      setAuthReady(true);
+      if (fbUser) {
+        // Sync Firebase Auth user to localStorage for store compatibility
+        store.setCurrentUser(fbUser.uid);
+        store.ensureUserInStore(fbUser.uid, fbUser.displayName || fbUser.phoneNumber || 'משתמש');
+      } else {
+        store.logoutUser();
+      }
+    });
+    return unsubscribe;
   }, []);
 
-  const logout = useCallback(() => {
+  // Get enriched user from Firestore (has isAdmin, etc.)
+  const user = firebaseUser ? store.getUser(firebaseUser.uid) : null;
+
+  const logout = useCallback(async () => {
+    await firebaseSignOut();
     store.logoutUser();
   }, []);
 
-  const addUser = useCallback((name, password) => {
-    return store.addUser(name, password);
-  }, []);
-
-  return { user, login, logout, addUser };
+  return { user, logout, authReady };
 }
 
 export function useUsers() {
@@ -43,20 +54,17 @@ export function useUsers() {
   return store.getUsers();
 }
 
-// Get all forms for a specific user
 export function useUserForms(userId) {
   useStoreUpdates();
   if (!userId) return [];
   return store.getFormsForUser(userId);
 }
 
-// Get the currently active form ID (from localStorage)
 export function useActiveFormId() {
   useStoreUpdates();
   return store.getActiveFormId();
 }
 
-// Get a specific form's full data
 export function useFormData(formId) {
   useStoreUpdates();
   if (!formId) return { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };

@@ -75,10 +75,33 @@ export function getUsers() {
   return cache.users || {};
 }
 
+// Called when a user signs in via Firebase Auth (Google or Phone)
+// Creates/updates the user record in Firestore
+export function ensureUserInStore(uid, displayName) {
+  const users = { ...getUsers() };
+  if (users[uid]) {
+    // Update display name if changed
+    if (displayName && users[uid].displayName !== displayName) {
+      users[uid] = { ...users[uid], displayName };
+      writeDoc('users', users);
+    }
+    return uid;
+  }
+  // New user
+  users[uid] = {
+    id: uid,
+    displayName: displayName || 'משתמש',
+    isAdmin: Object.keys(users).length === 0,
+    createdAt: new Date().toISOString(),
+  };
+  writeDoc('users', users);
+  return uid;
+}
+
 export function addUser(name, password) {
   const users = getUsers();
   const id = name.toLowerCase().replace(/\s+/g, '-');
-  if (users[id]) return id; // already exists
+  if (users[id]) return id;
   const updated = { ...users };
   updated[id] = {
     id,
