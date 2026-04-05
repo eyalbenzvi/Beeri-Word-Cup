@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser, useSettings } from '../hooks/useStore';
 
 export default function Home() {
   const { user } = useCurrentUser();
   const settings = useSettings();
+  const [showScoring, setShowScoring] = useState(false);
 
   return (
     <div className="text-center">
@@ -59,68 +61,78 @@ export default function Home() {
 
       {/* Scoring Info */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-right">
-        <h2 className="text-base font-bold text-primary mb-3">שיטת הניקוד</h2>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-gray-500 border-b border-gray-200">
-              <th className="text-right py-1.5">שלב</th>
-              <th className="text-center py-1.5">הכרעה</th>
-              <th className="text-center py-1.5">+מדויק</th>
-              <th className="text-center py-1.5">עליה</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-700">
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">בתים</td>
-              <td className="text-center font-semibold">1</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center font-semibold text-purple-600">2</td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">שלב ה-32</td>
-              <td className="text-center font-semibold">3</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center font-semibold text-purple-600">4</td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">רבע גמר</td>
-              <td className="text-center font-semibold">5</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center font-semibold text-purple-600">6</td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">חצי גמר</td>
-              <td className="text-center font-semibold">7</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center font-semibold text-purple-600">8</td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">מקום שלישי</td>
-              <td className="text-center font-semibold">7</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center">-</td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-1.5">גמר</td>
-              <td className="text-center font-semibold">9</td>
-              <td className="text-center font-semibold text-green-600">+3</td>
-              <td className="text-center">-</td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="mt-3 space-y-1 text-xs text-gray-600">
-          <div className="flex justify-between">
-            <span>🏆 ניחוש אלופה</span>
-            <span className="font-bold text-yellow-600">9 נק׳</span>
-          </div>
-          <div className="flex justify-between">
-            <span>⚽ מלך שערים</span>
-            <span className="font-bold text-yellow-600">8 נק׳</span>
-          </div>
-        </div>
-        <p className="text-xs text-gray-400 mt-3">
-          ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בפנדלטים לא נספרים למלך השערים.
-        </p>
+        <button
+          onClick={() => setShowScoring(!showScoring)}
+          className="w-full flex items-center justify-between text-base font-bold text-primary bg-transparent border-none cursor-pointer p-0"
+        >
+          <span>{showScoring ? '▾' : '▸'}</span>
+          <span>שיטת הניקוד</span>
+        </button>
+        {showScoring && (
+          <>
+            <table className="w-full text-xs mt-3">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-200">
+                  <th className="text-right py-1.5">שלב</th>
+                  <th className="text-center py-1.5">הכרעה</th>
+                  <th className="text-center py-1.5">+מדויק</th>
+                  <th className="text-center py-1.5">עליה</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-700">
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">בתים</td>
+                  <td className="text-center font-semibold">1</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center font-semibold text-purple-600">2</td>
+                </tr>
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">שלב ה-32</td>
+                  <td className="text-center font-semibold">3</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center font-semibold text-purple-600">4</td>
+                </tr>
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">רבע גמר</td>
+                  <td className="text-center font-semibold">5</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center font-semibold text-purple-600">6</td>
+                </tr>
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">חצי גמר</td>
+                  <td className="text-center font-semibold">7</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center font-semibold text-purple-600">8</td>
+                </tr>
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">מקום שלישי</td>
+                  <td className="text-center font-semibold">7</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center">-</td>
+                </tr>
+                <tr className="border-b border-gray-50">
+                  <td className="py-1.5">גמר</td>
+                  <td className="text-center font-semibold">9</td>
+                  <td className="text-center font-semibold text-green-600">+3</td>
+                  <td className="text-center">-</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="mt-3 space-y-1 text-xs text-gray-600">
+              <div className="flex justify-between">
+                <span>🏆 ניחוש אלופה</span>
+                <span className="font-bold text-yellow-600">9 נק׳</span>
+              </div>
+              <div className="flex justify-between">
+                <span>⚽ מלך שערים</span>
+                <span className="font-bold text-yellow-600">8 נק׳</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בפנדלטים לא נספרים למלך השערים.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
