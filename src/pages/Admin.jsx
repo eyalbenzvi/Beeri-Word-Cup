@@ -5,7 +5,7 @@ import {
 } from '../hooks/useStore';
 import {
   saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
-  saveActualBonuses, approvePredictions, rejectPredictions,
+  clearMatchResults, saveActualBonuses, approvePredictions, rejectPredictions,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
@@ -332,6 +332,16 @@ export default function Admin() {
 
       <div className="bg-white rounded-xl p-4 border border-red-200">
         <h3 className="font-semibold text-sm text-red-600 mb-2">אזור מסוכן</h3>
+        <button
+          onClick={() => {
+            if (window.confirm('בטוח? פעולה זו תמחק את כל תוצאות האמת.')) {
+              clearMatchResults();
+            }
+          }}
+          className="w-full bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-orange-600 transition mb-3"
+        >
+          מחק את כל תוצאות האמת
+        </button>
         <p className="text-xs text-gray-400 mb-3">מחיקת כל הנתונים: משתמשים, ניחושים, תוצאות. לא ניתן לבטל.</p>
         <button
           onClick={() => {

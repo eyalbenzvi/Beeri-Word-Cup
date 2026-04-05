@@ -218,6 +218,10 @@ export function rejectPredictions(userId) {
 
 // ============ MATCH RESULTS (admin) ============
 
+export function clearMatchResults() {
+  writeDoc('matchResults', {});
+}
+
 export function getMatchResults() {
   return cache.matchResults || {};
 }
