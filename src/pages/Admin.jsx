@@ -356,8 +356,8 @@ export default function Admin() {
     <div className="space-y-2">
       {Object.entries(users).map(([uid, u]) => {
         const userForms = Object.entries(allPredictions).filter(([, p]) => p.userId === uid);
-        const submittedCount = userForms.filter(([, p]) => p.status === 'submitted').length;
-        const draftCount = userForms.filter(([, p]) => p.status === 'draft').length;
+        const submittedCount = userForms.filter(([, p]) => ['submitted','approved','pending'].includes(p.status)).length;
+        const draftCount = userForms.filter(([, p]) => p.status === 'draft' || !p.status).length;
         return (
           <div key={uid} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">

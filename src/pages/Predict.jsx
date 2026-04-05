@@ -19,6 +19,11 @@ const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
 const knockoutStageOrder = ['R32', 'R16', 'QF', 'SF', '3RD', 'F'];
 
+// Normalize legacy statuses (pending/approved → submitted)
+function normalizeStatus(s) {
+  return (s === 'pending' || s === 'approved') ? 'submitted' : (s || 'draft');
+}
+
 // Random score generator - weighted toward realistic football scores
 function randomScore() {
   const weights = [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 5];
@@ -41,7 +46,7 @@ export default function Predict() {
 
   // Make sure active form belongs to current user
   const activeForm = activeFormId && formData?.userId === user?.id ? formData : null;
-  const status = activeForm?.status || 'draft';
+  const status = normalizeStatus(activeForm?.status);
   const canEdit = status === 'draft' && !settings.predictionsLocked;
 
   // Must call useMemo unconditionally (React hooks rules)
@@ -191,9 +196,11 @@ export default function Predict() {
 
         {/* Existing forms */}
         <div className="space-y-2 mb-4">
-          {forms.map((form) => (
+          {forms.map((form) => {
+            const formStatus = normalizeStatus(form.status);
+            return (
             <div key={form.formId} className={`bg-white rounded-xl p-4 border ${
-              form.status === 'submitted' ? 'border-green-200 bg-green-50/30' :
+              formStatus === 'submitted' ? 'border-green-200 bg-green-50/30' :
               'border-gray-100'
             }`}>
               <div className="flex items-center gap-3">
@@ -205,10 +212,10 @@ export default function Predict() {
                   </div>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  form.status === 'submitted' ? 'bg-green-100 text-green-700' :
+                  formStatus === 'submitted' ? 'bg-green-100 text-green-700' :
                   'bg-gray-100 text-gray-500'
                 }`}>
-                  {form.status === 'submitted' ? '✅ הוגש' : 'טיוטה'}
+                  {formStatus === 'submitted' ? '✅ הוגש' : 'טיוטה'}
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
@@ -216,9 +223,9 @@ export default function Predict() {
                   onClick={() => setActiveFormId(form.formId)}
                   className="flex-1 bg-primary text-white text-sm font-semibold py-2 rounded-lg hover:bg-primary-light transition"
                 >
-                  {form.status === 'draft' ? 'ערוך' : 'צפה'}
+                  {formStatus === 'draft' ? 'ערוך' : 'צפה'}
                 </button>
-                {form.status === 'submitted' && !settings.predictionsLocked && (
+                {formStatus === 'submitted' && !settings.predictionsLocked && (
                   <button
                     onClick={() => reopenForm(form.formId)}
                     className="px-3 py-2 bg-yellow-50 text-yellow-700 text-sm rounded-lg hover:bg-yellow-100 transition"
@@ -226,7 +233,7 @@ export default function Predict() {
                     פתח לעריכה
                   </button>
                 )}
-                {form.status === 'draft' && (
+                {formStatus === 'draft' && (
                   <button
                     onClick={() => {
                       if (window.confirm(`למחוק את "${form.formName}"?`)) handleDeleteForm(form.formId);
@@ -238,7 +245,8 @@ export default function Predict() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* New form */}

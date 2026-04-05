@@ -31,7 +31,10 @@ export default function Leaderboard() {
 
   // Calculate scores for approved forms only
   const leaderboard = Object.entries(allPredictions)
-    .filter(([, predData]) => predData.status === 'submitted')
+    .filter(([, predData]) => {
+      const s = predData.status;
+      return s === 'submitted' || s === 'approved' || s === 'pending';
+    })
     .map(([formId, predData]) => {
       const matchPreds = predData.matches || {};
       const predBracket = calcBracketTeams(matchPreds);
