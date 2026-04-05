@@ -53,16 +53,15 @@ export default function Login() {
       const confirmation = await sendPhoneOTP(formatted);
       setConfirmationResult(confirmation);
     } catch (err) {
-      console.error('OTP error:', err);
+      console.error('OTP error:', err.code, err.message);
       if (err.code === 'auth/too-many-requests') {
         setError('יותר מדי ניסיונות. נסה שוב מאוחר יותר');
+      } else if (err.code === 'auth/invalid-phone-number') {
+        setError('מספר טלפון לא תקין');
+      } else if (err.code === 'auth/quota-exceeded') {
+        setError('חריגה ממכסת SMS. נסה שוב מחר');
       } else {
-        setError('שגיאה בשליחת SMS. נסה שוב');
-      }
-      // Reset recaptcha on error
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
+        setError(`שגיאה: ${err.code || err.message || 'לא ידועה'}`);
       }
     } finally {
       setLoading(false);
