@@ -250,7 +250,7 @@ export function deriveAdvancingTeams(bracketTeams) {
     else if (matchId.startsWith('R16-')) addTeams('R16');
     else if (matchId.startsWith('QF-')) addTeams('QF');
     else if (matchId.startsWith('SF-')) addTeams('SF');
-    else if (matchId === 'FINAL-1') addTeams('F');
+    else if (matchId === 'F-1') addTeams('F');
   }
 
   return advancing;
@@ -258,10 +258,10 @@ export function deriveAdvancingTeams(bracketTeams) {
 
 // Derive champion from final match prediction
 export function deriveChampion(matchPredictions, bracketTeams) {
-  const finalTeams = bracketTeams['FINAL-1'];
+  const finalTeams = bracketTeams['F-1'];
   if (!finalTeams?.home || !finalTeams?.away) return null;
 
-  const pred = matchPredictions['FINAL-1'];
+  const pred = matchPredictions['F-1'];
   if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
       pred.awayScore === null || pred.awayScore === undefined) return null;
 

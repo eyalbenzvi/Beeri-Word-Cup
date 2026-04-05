@@ -77,7 +77,7 @@ export default function Home() {
               <td className="text-center font-semibold text-purple-600">2</td>
             </tr>
             <tr className="border-b border-gray-50">
-              <td className="py-1.5">שמינית גמר</td>
+              <td className="py-1.5">שלב ה-32</td>
               <td className="text-center font-semibold">3</td>
               <td className="text-center font-semibold text-green-600">+3</td>
               <td className="text-center font-semibold text-purple-600">4</td>

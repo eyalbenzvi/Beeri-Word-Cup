@@ -141,8 +141,8 @@ export function generateKnockoutMatches() {
 
 export const STAGES = {
   group: 'שלב הבתים',
-  R32: 'שמינית גמר',
-  R16: 'שמינית גמר (16)',
+  R32: 'שלב ה-32',
+  R16: 'שמינית גמר',
   QF: 'רבע גמר',
   SF: 'חצי גמר',
   '3RD': 'מקום שלישי',
@@ -151,8 +151,8 @@ export const STAGES = {
 
 // Knockout stage naming for display
 export const KNOCKOUT_ROUNDS = [
-  { id: 'R32', name: 'שמינית גמר', matches: 16 },
-  { id: 'R16', name: 'שמינית גמר (16)', matches: 8 },
+  { id: 'R32', name: 'שלב ה-32', matches: 16 },
+  { id: 'R16', name: 'שמינית גמר', matches: 8 },
   { id: 'QF', name: 'רבע גמר', matches: 4 },
   { id: 'SF', name: 'חצי גמר', matches: 2 },
   { id: '3RD', name: 'מקום שלישי', matches: 1 },
