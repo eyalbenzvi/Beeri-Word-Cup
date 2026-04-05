@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <div className="text-center">
       {/* Hero */}
-      <div className="py-6">
+      <div className="pt-4 pb-3">
         <div className="text-5xl mb-3">⚽🏆</div>
         <h1 className="text-2xl font-extrabold text-primary mb-1.5 tracking-tight">
           טורניר הניחושים של בארי
