@@ -4,6 +4,14 @@ import { generateGroupMatches, R32_MATCHES, R16_MATCHES, QF_MATCHES, SF_MATCHES,
 
 const groupMatches = generateGroupMatches();
 
+// Map team code → group letter (for deriveActualAdvancing)
+const ALL_TEAMS_MAP = {};
+for (const [groupName, teams] of Object.entries(GROUPS)) {
+  for (const team of teams) {
+    ALL_TEAMS_MAP[team.code] = groupName;
+  }
+}
+
 // Calculate group standings from match predictions
 export function calcGroupStandings(matchPredictions) {
   const standings = {};
@@ -251,6 +259,89 @@ export function deriveAdvancingTeams(bracketTeams) {
     else if (matchId.startsWith('QF-')) addTeams('QF');
     else if (matchId.startsWith('SF-')) addTeams('SF');
     else if (matchId === 'F-1') addTeams('F');
+  }
+
+  return advancing;
+}
+
+// Like deriveAdvancingTeams, but only includes teams from completed stages.
+// R32 teams only from groups where all 6 matches have actual results.
+// Knockout teams only from matches that have actually been played.
+export function deriveActualAdvancing(bracketTeams, actualResults) {
+  const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
+
+  // Determine which groups are fully completed (6 matches each)
+  const groupMatchCounts = {};
+  for (const matchId of Object.keys(actualResults)) {
+    const groupMatch = matchId.match(/^group-([A-L])-/);
+    if (groupMatch) {
+      const g = groupMatch[1];
+      groupMatchCounts[g] = (groupMatchCounts[g] || 0) + 1;
+    }
+  }
+  const completedGroups = new Set(
+    Object.entries(groupMatchCounts).filter(([, count]) => count >= 6).map(([g]) => g)
+  );
+
+  // R32: only include teams from completed groups
+  for (const [matchId, teams] of Object.entries(bracketTeams)) {
+    if (!matchId.startsWith('R32-')) continue;
+    // Both teams must come from completed groups to count
+    if (teams.home) {
+      const homeGroup = ALL_TEAMS_MAP[teams.home];
+      if (homeGroup && completedGroups.has(homeGroup) && !advancing.R32.includes(teams.home)) {
+        advancing.R32.push(teams.home);
+      }
+    }
+    if (teams.away) {
+      const awayGroup = ALL_TEAMS_MAP[teams.away];
+      if (awayGroup && completedGroups.has(awayGroup) && !advancing.R32.includes(teams.away)) {
+        advancing.R32.push(teams.away);
+      }
+    }
+  }
+
+  // Knockout rounds: only include teams from matches that have been played
+  for (const [matchId, teams] of Object.entries(bracketTeams)) {
+    if (matchId.startsWith('R32-') || matchId.startsWith('group-')) continue;
+
+    // The teams in this match advance from the previous round,
+    // but only if the match feeding them has been played.
+    // A team appears in R16 bracket if its R32 match was played.
+    // Check: does the result exist for the match that produced this team?
+    let round = null;
+    if (matchId.startsWith('R16-')) round = 'R16';
+    else if (matchId.startsWith('QF-')) round = 'QF';
+    else if (matchId.startsWith('SF-')) round = 'SF';
+    else if (matchId === 'F-1') round = 'F';
+    if (!round) continue;
+
+    // For knockout, the teams here were determined by previous matches.
+    // We only count them as "advancing to this round" if the previous round matches have results.
+    // Simple approach: check if the feeding matches have results.
+    const feedingMatchesPlayed = (teamCode) => {
+      if (!teamCode) return false;
+      // Find which previous match this team won to get here
+      // The team is in this bracket slot because it won a prior match
+      // Check all matches in the prior round for this team
+      const priorRound = round === 'R16' ? 'R32' : round === 'QF' ? 'R16' : round === 'SF' ? 'QF' : round === 'F' ? 'SF' : null;
+      if (!priorRound) return false;
+      for (const [mId, result] of Object.entries(actualResults)) {
+        if (!mId.startsWith(priorRound + '-') && !(priorRound === 'R32' && mId.startsWith('R32-'))) continue;
+        if (result.homeScore === null || result.homeScore === undefined) continue;
+        // This match was played - did this team participate?
+        const bt = bracketTeams[mId];
+        if (bt && (bt.home === teamCode || bt.away === teamCode)) return true;
+      }
+      return false;
+    };
+
+    if (teams.home && feedingMatchesPlayed(teams.home) && !advancing[round].includes(teams.home)) {
+      advancing[round].push(teams.home);
+    }
+    if (teams.away && feedingMatchesPlayed(teams.away) && !advancing[round].includes(teams.away)) {
+      advancing[round].push(teams.away);
+    }
   }
 
   return advancing;

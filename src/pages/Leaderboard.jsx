@@ -6,7 +6,7 @@ import {
 import { calculateFullScore, compareTiebreaker, calculateMatchPoints } from '../utils/scoring';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
 import { getTeamByCode } from '../data/teams';
-import { calcBracketTeams, deriveAdvancingTeams, deriveChampion } from '../utils/bracket';
+import { calcBracketTeams, deriveAdvancingTeams, deriveActualAdvancing, deriveChampion } from '../utils/bracket';
 import MatchCard from '../components/MatchCard';
 
 const groupMatches = generateGroupMatches();
@@ -24,11 +24,10 @@ export default function Leaderboard() {
   const [selectedForm, setSelectedForm] = useState(null);
 
   // Compute bracket from actual results (once, shared)
-  // Only derive advancing/champion when there are actual results
-  const hasAnyResults = Object.keys(results).length > 0;
-  const actualBracket = hasAnyResults ? calcBracketTeams(results) : {};
-  const actualDerivedAdvancing = hasAnyResults ? deriveAdvancingTeams(actualBracket) : {};
-  const actualDerivedChampion = hasAnyResults ? deriveChampion(results, actualBracket) : null;
+  const actualBracket = calcBracketTeams(results);
+  // Only award advancing points for completed groups/played knockout matches
+  const actualDerivedAdvancing = deriveActualAdvancing(actualBracket, results);
+  const actualDerivedChampion = deriveChampion(results, actualBracket);
 
   // Calculate scores for approved forms only
   const leaderboard = Object.entries(allPredictions)
