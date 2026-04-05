@@ -305,7 +305,7 @@ export default function Admin() {
     const allEntries = Object.entries(allPredictions)
       .map(([userId, pred]) => ({
         userId,
-        displayName: users[userId]?.displayName || userId,
+        displayName: users[userId]?.formName || users[userId]?.displayName || userId,
         status: pred.status || 'draft',
         matchCount: Object.keys(pred.matches || {}).length,
         champion: pred.champion ? getTeamByCode(pred.champion) : null,

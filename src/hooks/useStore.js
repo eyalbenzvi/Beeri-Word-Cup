@@ -28,8 +28,8 @@ export function useCurrentUser() {
     store.logoutUser();
   }, []);
 
-  const addUser = useCallback((name) => {
-    return store.addUser(name);
+  const addUser = useCallback((name, formName, budgetNumber) => {
+    return store.addUser(name, formName, budgetNumber);
   }, []);
 
   return { user, login, logout, addUser };

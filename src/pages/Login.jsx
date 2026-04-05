@@ -7,6 +7,8 @@ export default function Login() {
   const users = useUsers();
   const navigate = useNavigate();
   const [newName, setNewName] = useState('');
+  const [formName, setFormName] = useState('');
+  const [budgetNumber, setBudgetNumber] = useState('');
   const [showNew, setShowNew] = useState(false);
 
   const userList = Object.values(users);
@@ -19,8 +21,8 @@ export default function Login() {
   const handleCreateUser = (e) => {
     e.preventDefault();
     const name = newName.trim();
-    if (!name) return;
-    const userId = addUser(name);
+    if (!name || !formName.trim() || !budgetNumber.trim()) return;
+    const userId = addUser(name, formName.trim(), budgetNumber.trim());
     login(userId);
     navigate('/');
   };
@@ -76,13 +78,27 @@ export default function Login() {
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Enter your name..."
+            placeholder="שם מלא..."
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
             autoFocus
           />
+          <input
+            type="text"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            placeholder="שם הטופס (יוצג בטבלה)..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
+          />
+          <input
+            type="text"
+            value={budgetNumber}
+            onChange={(e) => setBudgetNumber(e.target.value)}
+            placeholder="מספר תקציב לחיוב..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
+          />
           <button
             type="submit"
-            disabled={!newName.trim()}
+            disabled={!newName.trim() || !formName.trim() || !budgetNumber.trim()}
             className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
           >
             {userList.length === 0 ? 'Create Game & Join' : 'Join Game'}

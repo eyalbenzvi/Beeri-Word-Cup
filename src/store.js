@@ -32,13 +32,15 @@ export function getUsers() {
   return read(KEYS.users) || {};
 }
 
-export function addUser(name) {
+export function addUser(name, formName, budgetNumber) {
   const users = getUsers();
   const id = name.toLowerCase().replace(/\s+/g, '-');
   if (users[id]) return id; // already exists
   users[id] = {
     id,
     displayName: name,
+    formName: formName || name,
+    budgetNumber: budgetNumber || '',
     isAdmin: Object.keys(users).length === 0, // first user is admin
     createdAt: new Date().toISOString(),
   };

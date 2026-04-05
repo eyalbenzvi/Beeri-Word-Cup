@@ -40,7 +40,7 @@ export default function Leaderboard() {
       const userInfo = users[userId] || {};
       return {
         userId,
-        displayName: userInfo.displayName || userId,
+        displayName: userInfo.formName || userInfo.displayName || userId,
         ...score,
       };
     })
@@ -82,7 +82,7 @@ export default function Leaderboard() {
         </button>
 
         <h2 className="text-lg font-bold text-primary mb-1">
-          {users[selectedUser]?.displayName || selectedUser}
+          {users[selectedUser]?.formName || users[selectedUser]?.displayName || selectedUser}
         </h2>
 
         {/* Score breakdown */}
