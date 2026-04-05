@@ -446,7 +446,7 @@ export default function Predict() {
 
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <h3 className="font-bold text-sm text-primary mb-1">⚽ מלך השערים (8 נק׳)</h3>
-        <p className="text-xs text-gray-400 mb-3">מי יהיה מלך השערים? שערי פנדלים בפנדלטים לא נספרים.</p>
+        <p className="text-xs text-gray-400 mb-3">מי יהיה מלך השערים? שערי פנדלים בבעיטות הכרעה לא נספרים.</p>
         <input type="text" value={activeForm.topScorer || ''} disabled={!canEdit}
           onChange={(e) => saveBonusPrediction(activeFormId, 'topScorer', e.target.value)}
           placeholder="הכנס שם שחקן..."
