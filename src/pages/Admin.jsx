@@ -3,6 +3,7 @@ import {
   useCurrentUser, useMatchResults, useAllPredictions, useUsers,
   useSettings, useActualBonuses,
 } from '../hooks/useStore';
+import { useNavigation } from '../hooks/useNavigation';
 import {
   saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
   clearMatchResults, saveActualBonuses,
@@ -24,6 +25,7 @@ function randomScore() {
 
 export default function Admin() {
   const { user } = useCurrentUser();
+  const { navigate } = useNavigation();
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
   const users = useUsers();
@@ -341,7 +343,7 @@ export default function Admin() {
           onClick={() => {
             if (window.confirm('בטוח? פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות.')) {
               clearAllData();
-              window.location.href = '/';
+              navigate('home');
             }
           }}
           className="w-full bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"

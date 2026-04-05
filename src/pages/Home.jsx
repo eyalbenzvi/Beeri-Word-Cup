@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useCurrentUser, useSettings } from '../hooks/useStore';
+import { useNavigation } from '../hooks/useNavigation';
 
 export default function Home() {
   const { user } = useCurrentUser();
   const settings = useSettings();
+  const { navigate } = useNavigation();
   const [showScoring, setShowScoring] = useState(false);
 
   return (
@@ -35,26 +36,26 @@ export default function Home() {
         </div>
 
         {!user ? (
-          <Link
-            to="/login"
-            className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base no-underline"
+          <button
+            onClick={() => navigate('login')}
+            className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base border-none cursor-pointer"
           >
             הצטרף למשחק
-          </Link>
+          </button>
         ) : (
           <div className="space-y-2">
-            <Link
-              to="/predict"
-              className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base no-underline"
+            <button
+              onClick={() => navigate('predict')}
+              className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base border-none cursor-pointer"
             >
               📋 הטפסים שלי
-            </Link>
-            <Link
-              to="/leaderboard"
-              className="block w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base no-underline"
+            </button>
+            <button
+              onClick={() => navigate('leaderboard')}
+              className="block w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base cursor-pointer"
             >
               🏆 טבלת דירוג
-            </Link>
+            </button>
           </div>
         )}
       </div>

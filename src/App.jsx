@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -9,12 +7,23 @@ import Results from './pages/Results';
 import Admin from './pages/Admin';
 import { initRealtimeListeners } from './store';
 import { useStoreReady } from './hooks/useStore';
+import { NavigationProvider, useNavigation } from './hooks/useNavigation';
 
 // Initialize Firestore listeners once
 initRealtimeListeners();
 
-function App() {
+const PAGES = {
+  home: Home,
+  login: Login,
+  predict: Predict,
+  leaderboard: Leaderboard,
+  results: Results,
+  admin: Admin,
+};
+
+function AppContent() {
   const ready = useStoreReady();
+  const { page } = useNavigation();
 
   if (!ready) {
     return (
@@ -27,19 +36,20 @@ function App() {
     );
   }
 
+  const Page = PAGES[page] || Home;
+
   return (
-    <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/predict" element={<Predict />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/results" element={<Results />} />
-          <Route path="/admin" element={<Admin />} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+    <Layout>
+      <Page />
+    </Layout>
+  );
+}
+
+function App() {
+  return (
+    <NavigationProvider>
+      <AppContent />
+    </NavigationProvider>
   );
 }
 
