@@ -97,6 +97,7 @@ export default function Results() {
           <p>עדיין לא הוזנו תוצאות</p>
         </div>
       )}
+      <div className="h-14 md:hidden" />
     </div>
   );
 }
