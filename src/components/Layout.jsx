@@ -8,7 +8,8 @@ export default function Layout({ children }) {
   const navItems = [
     { path: '/', label: 'בית', icon: '🏠' },
     { path: '/predict', label: 'טפסים', icon: '📋' },
-    { path: '/leaderboard', label: 'תוצאות', icon: '🏆' },
+    { path: '/leaderboard', label: 'דירוג', icon: '🏆' },
+    { path: '/results', label: 'תוצאות', icon: '⚽' },
   ];
 
   if (user?.isAdmin) {

@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Predict from './pages/Predict';
 import Leaderboard from './pages/Leaderboard';
+import Results from './pages/Results';
 import Admin from './pages/Admin';
 import { initRealtimeListeners } from './store';
 import { useStoreReady } from './hooks/useStore';
@@ -34,6 +35,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/predict" element={<Predict />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/results" element={<Results />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </Layout>
