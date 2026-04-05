@@ -25,7 +25,7 @@ export default function Layout({ children }) {
             onClick={() => navigate('home')}
             className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer p-0 tracking-tight"
           >
-            <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="w-7 h-7 rounded-full object-cover" />
+            <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
             בארי מונדיאל
           </button>
           {user ? (
