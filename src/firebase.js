@@ -25,19 +25,18 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Phone auth helpers
-export function setupRecaptcha(elementId) {
-  if (!window.recaptchaVerifier) {
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
-      size: 'invisible',
-      callback: () => {},
-    });
-  }
-  return window.recaptchaVerifier;
-}
-
 export async function sendPhoneOTP(phoneNumber) {
-  const appVerifier = setupRecaptcha('recaptcha-container');
-  const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+  // Clear previous verifier if exists
+  if (window.recaptchaVerifier) {
+    try { window.recaptchaVerifier.clear(); } catch {}
+    window.recaptchaVerifier = null;
+  }
+
+  window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+    size: 'invisible',
+  });
+
+  const confirmation = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
   return confirmation;
 }
 
