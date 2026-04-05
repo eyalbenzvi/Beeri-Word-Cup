@@ -32,20 +32,34 @@ export function getUsers() {
   return read(KEYS.users) || {};
 }
 
-export function addUser(name, formName, budgetNumber) {
+export function addUser(name, password) {
   const users = getUsers();
   const id = name.toLowerCase().replace(/\s+/g, '-');
   if (users[id]) return id; // already exists
   users[id] = {
     id,
     displayName: name,
-    formName: formName || name,
-    budgetNumber: budgetNumber || '',
+    password: password,
+    formName: '',
+    budgetNumber: '',
     isAdmin: Object.keys(users).length === 0, // first user is admin
     createdAt: new Date().toISOString(),
   };
   write(KEYS.users, users);
   return id;
+}
+
+export function verifyPassword(userId, password) {
+  const user = getUser(userId);
+  if (!user) return false;
+  return user.password === password;
+}
+
+export function updateUser(userId, fields) {
+  const users = getUsers();
+  if (!users[userId]) return;
+  Object.assign(users[userId], fields);
+  write(KEYS.users, users);
 }
 
 export function getUser(userId) {

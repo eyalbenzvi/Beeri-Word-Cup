@@ -1,31 +1,87 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser, useUsers } from '../hooks/useStore';
+import { verifyPassword } from '../store';
 
 export default function Login() {
   const { login, addUser } = useCurrentUser();
   const users = useUsers();
   const navigate = useNavigate();
   const [newName, setNewName] = useState('');
-  const [formName, setFormName] = useState('');
-  const [budgetNumber, setBudgetNumber] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [loginUserId, setLoginUserId] = useState(null);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   const userList = Object.values(users);
 
   const handleSelectUser = (userId) => {
-    login(userId);
-    navigate('/');
+    setLoginUserId(userId);
+    setLoginPassword('');
+    setLoginError('');
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (!loginUserId) return;
+    if (verifyPassword(loginUserId, loginPassword)) {
+      login(loginUserId);
+      navigate('/');
+    } else {
+      setLoginError('סיסמא שגויה');
+    }
   };
 
   const handleCreateUser = (e) => {
     e.preventDefault();
     const name = newName.trim();
-    if (!name || !formName.trim() || !budgetNumber.trim()) return;
-    const userId = addUser(name, formName.trim(), budgetNumber.trim());
+    if (!name || !newPassword) return;
+    const userId = addUser(name, newPassword);
     login(userId);
     navigate('/');
   };
+
+  // Password entry for selected user
+  if (loginUserId) {
+    const selectedUser = users[loginUserId];
+    return (
+      <div className="text-center">
+        <div className="py-6">
+          <div className="text-5xl mb-3">🔐</div>
+          <h1 className="text-xl font-bold text-primary mb-1">Enter Password</h1>
+          <p className="text-gray-500 text-sm">{selectedUser?.displayName}</p>
+        </div>
+        <form onSubmit={handleLogin} className="bg-white rounded-xl p-4 border border-gray-100">
+          <input
+            type="password"
+            value={loginPassword}
+            onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
+            placeholder="סיסמא..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
+            autoFocus
+          />
+          {loginError && (
+            <div className="text-sm text-red-500 mb-3">{loginError}</div>
+          )}
+          <button
+            type="submit"
+            disabled={!loginPassword}
+            className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginUserId(null)}
+            className="mt-2 text-sm text-gray-500 hover:text-primary"
+          >
+            ← Back
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="text-center">
@@ -83,22 +139,15 @@ export default function Login() {
             autoFocus
           />
           <input
-            type="text"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            placeholder="שם הטופס (יוצג בטבלה)..."
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
-          />
-          <input
-            type="text"
-            value={budgetNumber}
-            onChange={(e) => setBudgetNumber(e.target.value)}
-            placeholder="מספר תקציב לחיוב..."
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="סיסמא..."
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3"
           />
           <button
             type="submit"
-            disabled={!newName.trim() || !formName.trim() || !budgetNumber.trim()}
+            disabled={!newName.trim() || !newPassword}
             className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
           >
             {userList.length === 0 ? 'Create Game & Join' : 'Join Game'}

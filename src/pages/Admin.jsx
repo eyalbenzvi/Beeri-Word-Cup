@@ -406,7 +406,9 @@ export default function Admin() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{u.displayName}</div>
-              <div className="text-xs text-gray-400">{predStatus}</div>
+              <div className="text-xs text-gray-400">
+                {u.formName ? `טופס: ${u.formName}` : ''}{u.budgetNumber ? ` • תקציב: ${u.budgetNumber}` : ''}{!u.formName && !u.budgetNumber ? predStatus : ` • ${predStatus}`}
+              </div>
             </div>
             <div className="text-right">
               <div className="text-sm font-bold text-primary">{predCount}</div>

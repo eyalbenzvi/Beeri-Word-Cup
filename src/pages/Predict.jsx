@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser, useFullUserPredictions, useSettings } from '../hooks/useStore';
-import { savePrediction, saveBonusPrediction, submitPredictions } from '../store';
+import { savePrediction, saveBonusPrediction, submitPredictions, updateUser } from '../store';
+import { useUsers } from '../hooks/useStore';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS } from '../data/teams';
 import { calcBracketTeams } from '../utils/bracket';
@@ -24,6 +25,8 @@ export default function Predict() {
   const { user } = useCurrentUser();
   const predictions = useFullUserPredictions(user?.id);
   const settings = useSettings();
+  const users = useUsers();
+  const currentUserData = user ? users[user.id] : null;
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
   const [activeTab, setActiveTab] = useState('matches');
@@ -61,7 +64,7 @@ export default function Predict() {
              preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
     ).length;
     if (missingGroup > 0) {
-      errors.push(`${missingGroup} group matches missing scores`);
+      errors.push(`${missingGroup} משחקי בתים חסרים`);
     }
 
     // Check knockout matches
@@ -70,7 +73,7 @@ export default function Predict() {
              preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
     ).length;
     if (missingKnockout > 0) {
-      errors.push(`${missingKnockout} knockout matches missing scores`);
+      errors.push(`${missingKnockout} משחקי נוקאאוט חסרים`);
     }
 
     // Check knockout ties have advancingTeam chosen
@@ -84,12 +87,20 @@ export default function Predict() {
       return !pred.advancingTeam || (teams && pred.advancingTeam !== teams.home && pred.advancingTeam !== teams.away);
     }).length;
     if (unresolvedTies > 0) {
-      errors.push(`${unresolvedTies} knockout ties without "who advances" selection`);
+      errors.push(`${unresolvedTies} תיקו בנוקאאוט בלי בחירת מי עולה`);
     }
 
     // Check top scorer
     if (!predictions.topScorer?.trim()) {
-      errors.push('Top scorer not entered');
+      errors.push('לא הוכנס מלך שערים');
+    }
+
+    // Check form details
+    if (!currentUserData?.formName?.trim()) {
+      errors.push('לא הוכנס שם טופס');
+    }
+    if (!currentUserData?.budgetNumber?.trim()) {
+      errors.push('לא הוכנס מספר תקציב');
     }
 
     setValidationErrors(errors);
@@ -292,8 +303,21 @@ export default function Predict() {
     </>
   );
 
-  const renderTopScorerTab = () => (
+  const renderDetailsTab = () => (
     <div className="space-y-4">
+      <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <h3 className="font-bold text-sm text-primary mb-1">📝 פרטי הטופס</h3>
+        <p className="text-xs text-gray-400 mb-3">שם הטופס הוא מה שיוצג בטבלת התוצאות</p>
+        <input type="text" value={currentUserData?.formName || ''} disabled={!canEdit}
+          onChange={(e) => updateUser(user.id, { formName: e.target.value })}
+          placeholder="שם הטופס..."
+          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3 ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
+        <input type="text" value={currentUserData?.budgetNumber || ''} disabled={!canEdit}
+          onChange={(e) => updateUser(user.id, { budgetNumber: e.target.value })}
+          placeholder="מספר תקציב לחיוב..."
+          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? 'opacity-60 bg-gray-50' : ''}`} />
+      </div>
+
       <div className="bg-white rounded-xl p-4 border border-gray-100">
         <h3 className="font-bold text-sm text-primary mb-1">⚽ מלך השערים (8 נק׳)</h3>
         <p className="text-xs text-gray-400 mb-3">מי יהיה מלך השערים? שערי פנדלים בפנדלטים לא נספרים.</p>
@@ -338,7 +362,7 @@ export default function Predict() {
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
         {[
           { id: 'matches', label: 'Matches' },
-          { id: 'topscorer', label: 'מלך השערים' },
+          { id: 'details', label: 'פרטים' },
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
@@ -350,7 +374,7 @@ export default function Predict() {
       </div>
 
       {activeTab === 'matches' && renderMatchesTab()}
-      {activeTab === 'topscorer' && renderTopScorerTab()}
+      {activeTab === 'details' && renderDetailsTab()}
 
       {/* Action Buttons — only show when draft */}
       {status === 'draft' && !settings.predictionsLocked && (
