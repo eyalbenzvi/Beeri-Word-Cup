@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useMatchResults } from '../hooks/useStore';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
-import { calcBracketTeams } from '../utils/bracket';
 import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
@@ -14,8 +13,6 @@ export default function Results() {
   const results = useMatchResults();
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
-
-  const bracketTeams = calcBracketTeams(results);
 
   const filteredMatches = selectedStage === 'group'
     ? groupMatches.filter((m) => m.group === selectedGroup)
@@ -51,12 +48,15 @@ export default function Results() {
       <div className="space-y-2">
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== 'group';
-          const derived = isKnockout && bracketTeams[match.id]
-            ? { home: bracketTeams[match.id].home, away: bracketTeams[match.id].away }
-            : { home: match.homeTeam, away: match.awayTeam };
-          const homeTeam = getTeamByCode(derived.home);
-          const awayTeam = getTeamByCode(derived.away);
           const result = results[match.id];
+          // For knockout, only show team names if the match has a result
+          const derived = isKnockout && result
+            ? { home: result.homeTeam, away: result.awayTeam }
+            : isKnockout
+            ? { home: null, away: null }
+            : { home: match.homeTeam, away: match.awayTeam };
+          const homeTeam = derived.home ? getTeamByCode(derived.home) : null;
+          const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
 
           return (
             <div key={match.id} className={`bg-white rounded-xl p-3 border ${
