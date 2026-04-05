@@ -22,10 +22,21 @@ export default function MatchCard({
 
   const hasResult = actualResult && actualResult.homeScore !== null;
 
+  // Show bracket label for knockout matches
+  const showLabel = match.label && match.stage !== 'group';
+
   return (
     <div className={`bg-card rounded-xl shadow-sm border border-gray-100 p-3 mb-2 ${
       hasResult ? 'border-l-4 border-l-primary' : ''
     }`}>
+      {/* Bracket label & date */}
+      {showLabel && (
+        <div className="flex justify-between items-center mb-1.5">
+          <span className="text-xs text-gray-400 font-medium">{match.label}</span>
+          {match.date && <span className="text-xs text-gray-300">{match.date}</span>}
+        </div>
+      )}
+
       {/* Points badge */}
       {showPoints && points !== null && (
         <div className="flex justify-end mb-1">

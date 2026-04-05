@@ -6,37 +6,37 @@
 // exactScore = ADDITIONAL points for exact scoreline (תוצאה נכונה)
 // advancing = correct team advancing to next round (עליה)
 export const POINTS = {
-  group: {
+  group: {           // שלב הבתים
     outcome: 1,
     exactScore: 3,   // additional on top of outcome
     advancing: 2,    // per team correctly advancing to R32
   },
-  R32: {
+  R32: {             // שלב ה-32 (שמינית גמר)
+    outcome: 3,
+    exactScore: 3,
+    advancing: 4,    // correct team advancing to R16
+  },
+  R16: {             // שלב ה-16 (שמינית גמר)
     outcome: 3,
     exactScore: 3,
     advancing: 4,    // correct team advancing to QF
   },
-  R16: {             // Quarter-finals (רבע גמר)
+  QF: {              // רבע גמר
     outcome: 5,
     exactScore: 3,
     advancing: 6,    // correct team advancing to SF
   },
-  QF: {              // Actually this is labeled R16 in our bracket but QF in Hebrew
-    outcome: 5,
-    exactScore: 3,
-    advancing: 6,
-  },
-  SF: {
+  SF: {              // חצי גמר
     outcome: 7,
     exactScore: 3,
     advancing: 8,    // correct team advancing to final
   },
-  '3RD': {
+  '3RD': {           // משחק על מקום שלישי
     outcome: 7,
     exactScore: 3,
-    advancing: 0,    // no advancing from 3rd place match
+    advancing: 0,
   },
-  F: {
+  F: {               // גמר
     outcome: 9,
     exactScore: 3,
     advancing: 0,    // champion bonus is separate
