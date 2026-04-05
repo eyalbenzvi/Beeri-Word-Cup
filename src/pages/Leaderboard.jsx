@@ -24,12 +24,15 @@ export default function Leaderboard() {
   const [selectedForm, setSelectedForm] = useState(null);
 
   // Compute bracket from actual results (once, shared)
-  const actualBracket = calcBracketTeams(results);
-  const actualDerivedAdvancing = deriveAdvancingTeams(actualBracket);
-  const actualDerivedChampion = deriveChampion(results, actualBracket);
+  // Only derive advancing/champion when there are actual results
+  const hasAnyResults = Object.keys(results).length > 0;
+  const actualBracket = hasAnyResults ? calcBracketTeams(results) : {};
+  const actualDerivedAdvancing = hasAnyResults ? deriveAdvancingTeams(actualBracket) : {};
+  const actualDerivedChampion = hasAnyResults ? deriveChampion(results, actualBracket) : null;
 
-  // Calculate scores for all forms (each form is an independent entry)
+  // Calculate scores for approved forms only
   const leaderboard = Object.entries(allPredictions)
+    .filter(([, predData]) => predData.status === 'approved')
     .map(([formId, predData]) => {
       const matchPreds = predData.matches || {};
       const predBracket = calcBracketTeams(matchPreds);

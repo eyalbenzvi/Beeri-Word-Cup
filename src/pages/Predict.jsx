@@ -44,6 +44,10 @@ export default function Predict() {
   const status = activeForm?.status || 'draft';
   const canEdit = status === 'draft' && !settings.predictionsLocked;
 
+  // Must call useMemo unconditionally (React hooks rules)
+  const matchPredictions = activeForm?.matches || {};
+  const bracketTeams = useMemo(() => calcBracketTeams(matchPredictions), [matchPredictions]);
+
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
       if (!activeFormId || !canEdit) return;
@@ -268,9 +272,6 @@ export default function Predict() {
   }
 
   // === FORM EDITING VIEW ===
-  const matchPredictions = activeForm.matches || {};
-  const bracketTeams = useMemo(() => calcBracketTeams(matchPredictions), [matchPredictions]);
-
   const predictedGroupMatches = groupMatches.filter(
     (m) => matchPredictions[m.id]?.homeScore !== undefined && matchPredictions[m.id]?.homeScore !== null
   ).length;
