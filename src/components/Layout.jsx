@@ -20,24 +20,16 @@ function MenuOverlay({ open, onClose }) {
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm" onClick={onClose} />
-
-      {/* Slide-in menu */}
       <div className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[70] shadow-2xl overflow-y-auto animate-slide-in">
-        {/* Menu header */}
         <div className="bg-primary text-white p-5 flex items-center justify-between">
           <button onClick={onClose} className="text-white/80 text-2xl bg-transparent border-none cursor-pointer p-0 leading-none">✕</button>
           <h2 className="text-lg font-extrabold tracking-tight">תפריט</h2>
         </div>
 
         <div className="p-4 space-y-2">
-          {/* שיטת הניקוד */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => toggleSection('scoring')}
-              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
-            >
+            <button onClick={() => toggleSection('scoring')} className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right">
               <span className="text-gray-400 text-xs">{activeSection === 'scoring' ? '▲' : '▼'}</span>
               <span className="text-sm font-bold text-primary">📊 שיטת הניקוד</span>
             </button>
@@ -80,12 +72,8 @@ function MenuOverlay({ open, onClose }) {
             )}
           </div>
 
-          {/* החוקים */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => toggleSection('rules')}
-              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
-            >
+            <button onClick={() => toggleSection('rules')} className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right">
               <span className="text-gray-400 text-xs">{activeSection === 'rules' ? '▲' : '▼'}</span>
               <span className="text-sm font-bold text-primary">📜 החוקים</span>
             </button>
@@ -104,12 +92,8 @@ function MenuOverlay({ open, onClose }) {
             )}
           </div>
 
-          {/* אודות */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => toggleSection('about')}
-              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
-            >
+            <button onClick={() => toggleSection('about')} className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right">
               <span className="text-gray-400 text-xs">{activeSection === 'about' ? '▲' : '▼'}</span>
               <span className="text-sm font-bold text-primary">ℹ️ אודות</span>
             </button>
@@ -123,12 +107,8 @@ function MenuOverlay({ open, onClose }) {
             )}
           </div>
 
-          {/* תמיכה טכנית */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => toggleSection('support')}
-              className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
-            >
+            <button onClick={() => toggleSection('support')} className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right">
               <span className="text-gray-400 text-xs">{activeSection === 'support' ? '▲' : '▼'}</span>
               <span className="text-sm font-bold text-primary">🛠 תמיכה טכנית</span>
             </button>
@@ -171,10 +151,10 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-bg">
+    <div className="min-h-screen bg-bg">
       {/* Header */}
       <header className="bg-primary text-white sticky top-0 z-50 shadow-md">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
@@ -191,6 +171,24 @@ export default function Layout({ children }) {
               בארי מונדיאל
             </button>
           </div>
+
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold bg-transparent border-none cursor-pointer transition-all ${
+                  page === item.id
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </div>
+
           {user ? (
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
@@ -217,16 +215,15 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Hamburger Menu */}
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       {/* Main Content */}
-      <main className="max-w-lg mx-auto w-full px-4 pt-4 pb-16">
+      <main className="max-w-5xl mx-auto w-full px-4 md:px-8 pt-4 md:pt-6 pb-16 md:pb-8">
         {children}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+      {/* Bottom Navigation — mobile only */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.04)] md:hidden">
         <div className="max-w-lg mx-auto flex">
           {navItems.map((item) => (
             <button

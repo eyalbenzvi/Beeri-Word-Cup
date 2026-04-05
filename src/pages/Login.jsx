@@ -67,7 +67,7 @@ export default function Login() {
   if (mode) {
     const isLogin = mode === 'login';
     return (
-      <div className="text-center">
+      <div className="text-center max-w-md mx-auto">
         <div className="py-6">
           <div className="text-5xl mb-3">{isLogin ? '🔐' : '⚽'}</div>
           <h1 className="text-xl font-bold text-primary mb-1">
@@ -117,7 +117,7 @@ export default function Login() {
 
   // Main screen — two buttons
   return (
-    <div className="text-center">
+    <div className="text-center max-w-md mx-auto">
       <div className="py-6">
         <div className="text-5xl mb-3">⚽</div>
         <h1 className="text-xl font-bold text-primary mb-1">ברוכים הבאים!</h1>
