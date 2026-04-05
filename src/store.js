@@ -77,9 +77,15 @@ export function getAllPredictions() {
   return read(KEYS.predictions) || {};
 }
 
+const DEFAULT_PREDICTIONS = { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
+// status: 'draft' | 'pending' | 'approved'
+// draft = user is still editing
+// pending = user submitted, waiting for admin approval
+// approved = admin approved, locked permanently
+
 export function getFullUserPredictions(userId) {
   const all = getAllPredictions();
-  return all[userId] || { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
+  return all[userId] || { userId, ...DEFAULT_PREDICTIONS };
 }
 
 export function getUserPredictions(userId) {
@@ -87,21 +93,32 @@ export function getUserPredictions(userId) {
   return all[userId]?.matches || {};
 }
 
-export function savePrediction(userId, matchId, prediction) {
+export function getUserPredictionStatus(userId) {
   const all = getAllPredictions();
+  return all[userId]?.status || 'draft';
+}
+
+function ensureUser(all, userId) {
   if (!all[userId]) {
-    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
+    all[userId] = { userId, ...DEFAULT_PREDICTIONS };
   }
+  return all;
+}
+
+export function savePrediction(userId, matchId, prediction) {
+  let all = getAllPredictions();
+  all = ensureUser(all, userId);
+  // Can only edit if draft
+  if (all[userId].status !== 'draft') return;
   all[userId].matches[matchId] = prediction;
   all[userId].updatedAt = new Date().toISOString();
   write(KEYS.predictions, all);
 }
 
 export function saveAdvancingPrediction(userId, round, teams) {
-  const all = getAllPredictions();
-  if (!all[userId]) {
-    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
-  }
+  let all = getAllPredictions();
+  all = ensureUser(all, userId);
+  if (all[userId].status !== 'draft') return;
   if (!all[userId].advancing) all[userId].advancing = {};
   all[userId].advancing[round] = teams;
   all[userId].updatedAt = new Date().toISOString();
@@ -109,12 +126,38 @@ export function saveAdvancingPrediction(userId, round, teams) {
 }
 
 export function saveBonusPrediction(userId, field, value) {
-  const all = getAllPredictions();
-  if (!all[userId]) {
-    all[userId] = { userId, matches: {}, advancing: {}, champion: null, topScorer: '' };
-  }
+  let all = getAllPredictions();
+  all = ensureUser(all, userId);
+  if (all[userId].status !== 'draft') return;
   all[userId][field] = value;
   all[userId].updatedAt = new Date().toISOString();
+  write(KEYS.predictions, all);
+}
+
+// User submits predictions for admin approval
+export function submitPredictions(userId) {
+  let all = getAllPredictions();
+  all = ensureUser(all, userId);
+  all[userId].status = 'pending';
+  all[userId].submittedAt = new Date().toISOString();
+  write(KEYS.predictions, all);
+}
+
+// Admin approves user's predictions
+export function approvePredictions(userId) {
+  const all = getAllPredictions();
+  if (!all[userId]) return;
+  all[userId].status = 'approved';
+  all[userId].approvedAt = new Date().toISOString();
+  write(KEYS.predictions, all);
+}
+
+// Admin rejects user's predictions (sends back to draft)
+export function rejectPredictions(userId) {
+  const all = getAllPredictions();
+  if (!all[userId]) return;
+  all[userId].status = 'draft';
+  all[userId].rejectedAt = new Date().toISOString();
   write(KEYS.predictions, all);
 }
 
