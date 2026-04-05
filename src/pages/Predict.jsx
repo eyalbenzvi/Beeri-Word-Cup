@@ -249,6 +249,14 @@ export default function Predict() {
           })}
         </div>
 
+        {/* View all forms */}
+        <Link
+          to="/all-forms"
+          className="block w-full text-center bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition text-base no-underline mb-4"
+        >
+          👀 צפייה בטפסים של כולם
+        </Link>
+
         {/* New form */}
         {showNewForm ? (
           <div className="bg-white rounded-xl p-4 border border-primary">
