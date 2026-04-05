@@ -73,12 +73,13 @@ export default function MatchCard({
                 min="0"
                 max="20"
                 value={predHome}
-                onChange={(e) =>
-                  onPredictionChange?.({
-                    ...prediction,
-                    homeScore: e.target.value === '' ? null : parseInt(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  const newHome = e.target.value === '' ? null : parseInt(e.target.value);
+                  const newPred = { ...prediction, homeScore: newHome };
+                  // Clear advancingTeam when score changes (tie status may change)
+                  if (isKnockout) delete newPred.advancingTeam;
+                  onPredictionChange?.(newPred);
+                }}
                 className="w-10 h-9 text-center border-2 border-gray-200 rounded-lg text-lg font-bold focus:border-primary focus:outline-none"
                 placeholder="-"
               />
@@ -88,12 +89,13 @@ export default function MatchCard({
                 min="0"
                 max="20"
                 value={predAway}
-                onChange={(e) =>
-                  onPredictionChange?.({
-                    ...prediction,
-                    awayScore: e.target.value === '' ? null : parseInt(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  const newAway = e.target.value === '' ? null : parseInt(e.target.value);
+                  const newPred = { ...prediction, awayScore: newAway };
+                  // Clear advancingTeam when score changes (tie status may change)
+                  if (isKnockout) delete newPred.advancingTeam;
+                  onPredictionChange?.(newPred);
+                }}
                 className="w-10 h-9 text-center border-2 border-gray-200 rounded-lg text-lg font-bold focus:border-primary focus:outline-none"
                 placeholder="-"
               />

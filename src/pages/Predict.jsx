@@ -11,6 +11,7 @@ import StageSelector from '../components/StageSelector';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
+const knockoutStageOrder = ['R32', 'R16', 'QF', 'SF', '3RD', 'F'];
 
 // Random score generator - weighted toward realistic football scores
 function randomScore() {
@@ -26,6 +27,7 @@ export default function Predict() {
   const [selectedGroup, setSelectedGroup] = useState('A');
   const [activeTab, setActiveTab] = useState('matches');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   const status = predictions.status || 'draft';
   // User can edit only when status is 'draft' and predictions aren't globally locked
@@ -43,33 +45,91 @@ export default function Predict() {
     if (!user) return;
     submitPredictions(user.id);
     setShowConfirm(false);
+    setValidationErrors([]);
+  };
+
+  // Validate predictions before showing submit dialog
+  const handleTrySubmit = () => {
+    if (!user) return;
+    const preds = predictions.matches || {};
+    const errors = [];
+
+    // Check group matches
+    const missingGroup = groupMatches.filter(
+      (m) => preds[m.id]?.homeScore === undefined || preds[m.id]?.homeScore === null ||
+             preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
+    ).length;
+    if (missingGroup > 0) {
+      errors.push(`${missingGroup} group matches missing scores`);
+    }
+
+    // Check knockout matches
+    const missingKnockout = knockoutMatches.filter(
+      (m) => preds[m.id]?.homeScore === undefined || preds[m.id]?.homeScore === null ||
+             preds[m.id]?.awayScore === undefined || preds[m.id]?.awayScore === null
+    ).length;
+    if (missingKnockout > 0) {
+      errors.push(`${missingKnockout} knockout matches missing scores`);
+    }
+
+    // Check knockout ties have advancingTeam chosen
+    const bracket = calcBracketTeams(preds);
+    const unresolvedTies = knockoutMatches.filter((m) => {
+      const pred = preds[m.id];
+      if (!pred || pred.homeScore === null || pred.awayScore === null) return false;
+      if (pred.homeScore !== pred.awayScore) return false;
+      // It's a tie — check that advancingTeam is a valid team code
+      const teams = bracket[m.id];
+      return !pred.advancingTeam || (teams && pred.advancingTeam !== teams.home && pred.advancingTeam !== teams.away);
+    }).length;
+    if (unresolvedTies > 0) {
+      errors.push(`${unresolvedTies} knockout ties without "who advances" selection`);
+    }
+
+    // Check top scorer
+    if (!predictions.topScorer?.trim()) {
+      errors.push('Top scorer not entered');
+    }
+
+    setValidationErrors(errors);
+    setShowConfirm(true);
   };
 
   const handleRandomize = () => {
     if (!user || !canEdit) return;
 
+    const allPreds = {};
+
     // 1. Randomize group match scores
     groupMatches.forEach((match) => {
-      savePrediction(user.id, match.id, {
-        homeScore: randomScore(),
-        awayScore: randomScore(),
-      });
-    });
-
-    // 2. Randomize knockout match scores (with advancing team for ties)
-    knockoutMatches.forEach((match) => {
-      const home = randomScore();
-      const away = randomScore();
-      const pred = { homeScore: home, awayScore: away };
-      if (home === away) {
-        // Random team advances on penalties
-        pred.advancingTeam = Math.random() < 0.5 ? 'home' : 'away';
-        // Will be resolved to actual team code when bracket is computed
-      }
+      const pred = { homeScore: randomScore(), awayScore: randomScore() };
+      allPreds[match.id] = pred;
       savePrediction(user.id, match.id, pred);
     });
 
-    // 3. Random top scorer from a list of well-known players
+    // 2. Randomize knockout match scores (no advancingTeam yet)
+    knockoutMatches.forEach((match) => {
+      const pred = { homeScore: randomScore(), awayScore: randomScore() };
+      allPreds[match.id] = pred;
+      savePrediction(user.id, match.id, pred);
+    });
+
+    // 3. Resolve ties stage-by-stage using computed bracket
+    for (const stage of knockoutStageOrder) {
+      const bracket = calcBracketTeams(allPreds);
+      for (const match of knockoutMatches.filter((m) => m.stage === stage)) {
+        const pred = allPreds[match.id];
+        if (pred.homeScore === pred.awayScore) {
+          const teams = bracket[match.id];
+          if (teams?.home && teams?.away) {
+            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+            savePrediction(user.id, match.id, pred);
+          }
+        }
+      }
+    }
+
+    // 4. Random top scorer
     const topScorers = [
       'Mbappé', 'Haaland', 'Vinicius Jr', 'Messi', 'Kane',
       'Salah', 'Lewandowski', 'Rashford', 'Morata', 'Lautaro Martínez',
@@ -149,31 +209,49 @@ export default function Predict() {
   // Submit confirmation dialog
   const renderConfirmDialog = () => {
     if (!showConfirm) return null;
+    const hasErrors = validationErrors.length > 0;
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
-          <div className="text-3xl text-center mb-3">📋</div>
-          <h3 className="text-lg font-bold text-center text-primary mb-2">Submit Predictions?</h3>
-          <p className="text-sm text-gray-600 text-center mb-4">
-            Once you submit, you won't be able to make changes until the admin reviews your predictions.
-          </p>
-          <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
-            <div>Matches predicted: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
-            <div>Top Scorer: {predictions.topScorer || 'Not entered'}</div>
-          </div>
+          <div className="text-3xl text-center mb-3">{hasErrors ? '⚠️' : '📋'}</div>
+          <h3 className="text-lg font-bold text-center text-primary mb-2">
+            {hasErrors ? 'Cannot Submit Yet' : 'Submit Predictions?'}
+          </h3>
+          {hasErrors ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <div className="text-sm font-semibold text-red-700 mb-1">Please fix the following:</div>
+              <ul className="text-xs text-red-600 space-y-1">
+                {validationErrors.map((err, i) => (
+                  <li key={i}>- {err}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600 text-center mb-4">
+                Once you submit, you won't be able to make changes until the admin reviews your predictions.
+              </p>
+              <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
+                <div>Matches: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
+                <div>Top Scorer: {predictions.topScorer || 'Not entered'}</div>
+              </div>
+            </>
+          )}
           <div className="flex gap-2">
             <button
-              onClick={() => setShowConfirm(false)}
+              onClick={() => { setShowConfirm(false); setValidationErrors([]); }}
               className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition"
             >
-              Cancel
+              {hasErrors ? 'Go Back' : 'Cancel'}
             </button>
-            <button
-              onClick={handleSubmit}
-              className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-light transition"
-            >
-              Submit
-            </button>
+            {!hasErrors && (
+              <button
+                onClick={handleSubmit}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-light transition"
+              >
+                Submit
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -280,7 +358,7 @@ export default function Predict() {
             🎲 Randomize All Predictions
           </button>
           <button
-            onClick={() => setShowConfirm(true)}
+            onClick={handleTrySubmit}
             className="w-full bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-600 active:bg-green-700 transition text-base"
           >
             Submit Predictions for Approval
