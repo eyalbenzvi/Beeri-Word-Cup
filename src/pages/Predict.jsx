@@ -1,11 +1,8 @@
 import { useState, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import {
-  useUserPredictions,
-  useTournamentSettings,
-  savePrediction,
-} from '../hooks/useFirestore';
-import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
+import { Link } from 'react-router-dom';
+import { useCurrentUser, useUserPredictions, useSettings } from '../hooks/useStore';
+import { savePrediction } from '../store';
+import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS } from '../data/teams';
 import MatchCard from '../components/MatchCard';
 import GroupSelector from '../components/GroupSelector';
@@ -13,28 +10,18 @@ import StageSelector from '../components/StageSelector';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
-const allMatches = [...groupMatches, ...knockoutMatches];
 
 export default function Predict() {
-  const { user, login } = useAuth();
-  const { predictions, loading } = useUserPredictions(user?.uid);
-  const { settings } = useTournamentSettings();
+  const { user } = useCurrentUser();
+  const predictions = useUserPredictions(user?.id);
+  const settings = useSettings();
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
-  const [saving, setSaving] = useState({});
 
   const handlePredictionChange = useCallback(
-    async (matchId, prediction) => {
+    (matchId, prediction) => {
       if (!user || settings.predictionsLocked) return;
-
-      // Optimistic - save immediately
-      setSaving((prev) => ({ ...prev, [matchId]: true }));
-      try {
-        await savePrediction(user.uid, matchId, prediction);
-      } catch (err) {
-        console.error('Failed to save prediction:', err);
-      }
-      setSaving((prev) => ({ ...prev, [matchId]: false }));
+      savePrediction(user.id, matchId, prediction);
     },
     [user, settings.predictionsLocked]
   );
@@ -43,23 +30,14 @@ export default function Predict() {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-lg font-bold text-gray-700 mb-2">Sign In Required</h2>
-        <p className="text-gray-500 mb-4">You need to sign in to make predictions</p>
-        <button
-          onClick={login}
-          className="bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-light transition"
+        <h2 className="text-lg font-bold text-gray-700 mb-2">Join the Game First</h2>
+        <p className="text-gray-500 mb-4">You need to pick your name to make predictions</p>
+        <Link
+          to="/login"
+          className="inline-block bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-light transition no-underline"
         >
-          Sign In with Google
-        </button>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-4xl animate-spin">⚽</div>
-        <p className="text-gray-500 mt-2">Loading predictions...</p>
+          Join Game
+        </Link>
       </div>
     );
   }
@@ -71,11 +49,9 @@ export default function Predict() {
       : knockoutMatches.filter((m) => m.stage === selectedStage);
 
   // Count predictions
-  const totalGroupMatches = groupMatches.length;
   const predictedGroupMatches = groupMatches.filter(
     (m) => predictions[m.id]?.homeScore !== undefined && predictions[m.id]?.homeScore !== null
   ).length;
-  const totalKnockout = knockoutMatches.length;
   const predictedKnockout = knockoutMatches.filter(
     (m) => predictions[m.id]?.homeScore !== undefined && predictions[m.id]?.homeScore !== null
   ).length;
@@ -94,14 +70,14 @@ export default function Predict() {
       {/* Progress */}
       <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-          <span>Group: {predictedGroupMatches}/{totalGroupMatches}</span>
-          <span>Knockout: {predictedKnockout}/{totalKnockout}</span>
+          <span>Group: {predictedGroupMatches}/{groupMatches.length}</span>
+          <span>Knockout: {predictedKnockout}/{knockoutMatches.length}</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-2">
           <div
             className="bg-primary rounded-full h-2 transition-all"
             style={{
-              width: `${((predictedGroupMatches + predictedKnockout) / (totalGroupMatches + totalKnockout)) * 100}%`,
+              width: `${((predictedGroupMatches + predictedKnockout) / (groupMatches.length + knockoutMatches.length)) * 100}%`,
             }}
           />
         </div>
@@ -122,19 +98,13 @@ export default function Predict() {
       {/* Match Cards */}
       <div className="space-y-2">
         {filteredMatches.map((match) => (
-          <div key={match.id} className="relative">
-            <MatchCard
-              match={match}
-              prediction={predictions[match.id]}
-              editable={!settings.predictionsLocked}
-              onPredictionChange={(pred) => handlePredictionChange(match.id, pred)}
-            />
-            {saving[match.id] && (
-              <div className="absolute top-2 right-2">
-                <span className="text-xs text-primary animate-pulse">Saving...</span>
-              </div>
-            )}
-          </div>
+          <MatchCard
+            key={match.id}
+            match={match}
+            prediction={predictions[match.id]}
+            editable={!settings.predictionsLocked}
+            onPredictionChange={(pred) => handlePredictionChange(match.id, pred)}
+          />
         ))}
 
         {filteredMatches.length === 0 && (

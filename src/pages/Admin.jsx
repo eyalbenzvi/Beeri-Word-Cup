@@ -1,14 +1,7 @@
-import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import {
-  useMatchResults,
-  useAllPredictions,
-  useAllUsers,
-  useTournamentSettings,
-  saveMatchResult,
-  updateTournamentSettings,
-} from '../hooks/useFirestore';
-import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
+import { useState, useRef } from 'react';
+import { useCurrentUser, useMatchResults, useAllPredictions, useUsers, useSettings } from '../hooks/useStore';
+import { saveMatchResult, updateSettings, exportAllData, importAllData } from '../store';
+import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
@@ -17,19 +10,24 @@ const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
 
 export default function Admin() {
-  const { userProfile } = useAuth();
-  const { results } = useMatchResults();
-  const { allPredictions } = useAllPredictions();
-  const { users } = useAllUsers();
-  const { settings } = useTournamentSettings();
+  const { user } = useCurrentUser();
+  const results = useMatchResults();
+  const allPredictions = useAllPredictions();
+  const users = useUsers();
+  const settings = useSettings();
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
   const [editingMatch, setEditingMatch] = useState(null);
   const [editScores, setEditScores] = useState({ homeScore: '', awayScore: '' });
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('results'); // 'results' | 'settings' | 'users'
+  const [activeTab, setActiveTab] = useState('results');
+  const [adminPin, setAdminPin] = useState('');
+  const [pinVerified, setPinVerified] = useState(false);
+  const fileInputRef = useRef(null);
 
-  if (!userProfile?.isAdmin) {
+  // Admin access: either the user is marked as admin, or they enter the PIN
+  const isAdmin = user?.isAdmin;
+
+  if (!isAdmin) {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">🔐</div>
@@ -37,6 +35,49 @@ export default function Admin() {
         <p className="text-gray-500 text-sm mt-2">
           You don't have admin permissions.
         </p>
+        <p className="text-gray-400 text-xs mt-1">
+          The first player to join becomes admin.
+        </p>
+      </div>
+    );
+  }
+
+  // PIN verification for destructive actions
+  if (!pinVerified && activeTab === 'settings') {
+    const currentPin = settings.adminPin || '1234';
+    return (
+      <div className="text-center py-12">
+        <div className="text-5xl mb-4">🔑</div>
+        <h2 className="text-lg font-bold text-gray-700 mb-4">Enter Admin PIN</h2>
+        <p className="text-xs text-gray-400 mb-3">Default PIN: 1234</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (adminPin === currentPin) setPinVerified(true);
+          }}
+        >
+          <input
+            type="password"
+            value={adminPin}
+            onChange={(e) => setAdminPin(e.target.value)}
+            placeholder="PIN"
+            className="w-32 px-4 py-2 border-2 border-gray-200 rounded-xl text-center text-lg tracking-widest focus:border-primary focus:outline-none mb-3"
+            autoFocus
+          />
+          <br />
+          <button
+            type="submit"
+            className="bg-primary text-white font-semibold px-6 py-2 rounded-xl hover:bg-primary-light transition"
+          >
+            Verify
+          </button>
+        </form>
+        <button
+          onClick={() => setActiveTab('results')}
+          className="mt-3 text-sm text-gray-400 hover:text-primary"
+        >
+          ← Back to Results
+        </button>
       </div>
     );
   }
@@ -46,31 +87,50 @@ export default function Admin() {
       ? groupMatches.filter((m) => m.group === selectedGroup)
       : knockoutMatches.filter((m) => m.stage === selectedStage);
 
-  const handleSaveResult = async (match) => {
+  const handleSaveResult = (match) => {
     if (editScores.homeScore === '' || editScores.awayScore === '') return;
-    setSaving(true);
-    try {
-      await saveMatchResult(match.id, {
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        homeScore: parseInt(editScores.homeScore),
-        awayScore: parseInt(editScores.awayScore),
-        stage: match.stage || 'group',
-        group: match.group || null,
-        played: true,
-      });
-      setEditingMatch(null);
-      setEditScores({ homeScore: '', awayScore: '' });
-    } catch (err) {
-      console.error('Failed to save result:', err);
-    }
-    setSaving(false);
+    saveMatchResult(match.id, {
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      homeScore: parseInt(editScores.homeScore),
+      awayScore: parseInt(editScores.awayScore),
+      stage: match.stage || 'group',
+      group: match.group || null,
+      played: true,
+    });
+    setEditingMatch(null);
+    setEditScores({ homeScore: '', awayScore: '' });
   };
 
-  const toggleLock = async () => {
-    await updateTournamentSettings({
-      predictionsLocked: !settings.predictionsLocked,
-    });
+  const toggleLock = () => {
+    updateSettings({ predictionsLocked: !settings.predictionsLocked });
+  };
+
+  const handleExport = () => {
+    const data = exportAllData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `beeri-worldcup-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        importAllData(data);
+        alert('Data imported successfully!');
+      } catch {
+        alert('Invalid file format');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const renderResultsTab = () => (
@@ -142,8 +202,7 @@ export default function Admin() {
                     <div className="flex flex-col gap-1">
                       <button
                         onClick={() => handleSaveResult(match)}
-                        disabled={saving}
-                        className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 disabled:opacity-50"
+                        className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
                       >
                         ✓
                       </button>
@@ -211,6 +270,16 @@ export default function Admin() {
             />
           </button>
         </div>
+
+        <div className="py-3">
+          <div className="text-sm font-medium mb-2">Change Admin PIN</div>
+          <input
+            type="text"
+            defaultValue={settings.adminPin || '1234'}
+            onBlur={(e) => updateSettings({ adminPin: e.target.value })}
+            className="w-32 px-3 py-1.5 border rounded text-sm"
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-gray-100">
@@ -232,7 +301,7 @@ export default function Admin() {
             <div className="text-2xl font-bold text-primary">
               {Object.keys(allPredictions).length}
             </div>
-            <div className="text-xs text-gray-500">Predictions</div>
+            <div className="text-xs text-gray-500">Players Predicted</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-primary">
@@ -240,6 +309,34 @@ export default function Admin() {
             </div>
             <div className="text-xs text-gray-500">Total Matches</div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <h3 className="font-semibold text-sm mb-3">Data Backup</h3>
+        <p className="text-xs text-gray-400 mb-3">
+          Export all data to share with friends or as backup. Import to restore.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
+          >
+            Export Data
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition"
+          >
+            Import Data
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
         </div>
       </div>
     </div>
@@ -254,16 +351,11 @@ export default function Admin() {
             key={uid}
             className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3"
           >
-            {u.photoURL ? (
-              <img src={u.photoURL} alt="" className="w-9 h-9 rounded-full" />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                {(u.displayName || '?').charAt(0)}
-              </div>
-            )}
+            <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+              {(u.displayName || '?').charAt(0).toUpperCase()}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{u.displayName}</div>
-              <div className="text-xs text-gray-400">{u.email}</div>
             </div>
             <div className="text-right">
               <div className="text-sm font-bold text-primary">{predCount}</div>
@@ -277,6 +369,12 @@ export default function Admin() {
           </div>
         );
       })}
+
+      {Object.keys(users).length === 0 && (
+        <div className="text-center py-8 text-gray-400">
+          <p>No players have joined yet</p>
+        </div>
+      )}
     </div>
   );
 

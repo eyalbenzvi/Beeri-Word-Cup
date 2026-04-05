@@ -1,15 +1,8 @@
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import {
-  useMatchResults,
-  useAllPredictions,
-  useAllUsers,
-} from '../hooks/useFirestore';
+import { useCurrentUser, useMatchResults, useAllPredictions, useUsers } from '../hooks/useStore';
 import { calculateMatchPoints } from '../utils/scoring';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
-import { getTeamByCode } from '../data/teams';
 import MatchCard from '../components/MatchCard';
-import StageSelector from '../components/StageSelector';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -18,21 +11,11 @@ const allMatchesMap = Object.fromEntries(
 );
 
 export default function Leaderboard() {
-  const { user } = useAuth();
-  const { results, loading: resultsLoading } = useMatchResults();
-  const { allPredictions, loading: predictionsLoading } = useAllPredictions();
-  const { users, loading: usersLoading } = useAllUsers();
+  const { user } = useCurrentUser();
+  const results = useMatchResults();
+  const allPredictions = useAllPredictions();
+  const users = useUsers();
   const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedStage, setSelectedStage] = useState(null);
-
-  if (resultsLoading || predictionsLoading || usersLoading) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-4xl animate-spin">⚽</div>
-        <p className="text-gray-500 mt-2">Loading leaderboard...</p>
-      </div>
-    );
-  }
 
   // Calculate scores for all users
   const leaderboard = Object.entries(allPredictions)
@@ -56,8 +39,7 @@ export default function Leaderboard() {
       const userInfo = users[userId] || {};
       return {
         userId,
-        displayName: userInfo.displayName || 'Unknown',
-        photoURL: userInfo.photoURL,
+        displayName: userInfo.displayName || userId,
         totalPoints,
         exactScores,
         correctOutcomes,
@@ -91,7 +73,7 @@ export default function Leaderboard() {
         </button>
 
         <h2 className="text-lg font-bold text-primary mb-3">
-          {users[selectedUser]?.displayName}'s Results
+          {users[selectedUser]?.displayName || selectedUser}'s Results
         </h2>
 
         {Object.entries(matchesByStage).map(([stage, matches]) => (
@@ -165,23 +147,15 @@ export default function Leaderboard() {
                 </div>
 
                 {/* Avatar */}
-                {entry.photoURL ? (
-                  <img
-                    src={entry.photoURL}
-                    alt=""
-                    className="w-9 h-9 rounded-full"
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                    {entry.displayName.charAt(0)}
-                  </div>
-                )}
+                <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  {entry.displayName.charAt(0).toUpperCase()}
+                </div>
 
                 {/* Name & Stats */}
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-gray-800 truncate">
                     {entry.displayName}
-                    {entry.userId === user?.uid && (
+                    {entry.userId === user?.id && (
                       <span className="text-xs text-primary ml-1">(You)</span>
                     )}
                   </div>

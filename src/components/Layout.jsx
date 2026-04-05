@@ -1,8 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useCurrentUser } from '../hooks/useStore';
 
 export default function Layout({ children }) {
-  const { user, userProfile, login, logout } = useAuth();
+  const { user, logout } = useCurrentUser();
   const location = useLocation();
 
   const navItems = [
@@ -11,7 +11,7 @@ export default function Layout({ children }) {
     { path: '/leaderboard', label: 'Scores', icon: '🏆' },
   ];
 
-  if (userProfile?.isAdmin) {
+  if (user?.isAdmin) {
     navItems.push({ path: '/admin', label: 'Admin', icon: '⚙️' });
   }
 
@@ -25,30 +25,26 @@ export default function Layout({ children }) {
           </Link>
           {user ? (
             <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
+                {user.displayName.charAt(0).toUpperCase()}
+              </div>
               <span className="text-sm opacity-90 hidden sm:inline">
-                {userProfile?.displayName}
+                {user.displayName}
               </span>
-              {user.photoURL && (
-                <img
-                  src={user.photoURL}
-                  alt=""
-                  className="w-7 h-7 rounded-full border-2 border-white/30"
-                />
-              )}
               <button
                 onClick={logout}
                 className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition"
               >
-                Logout
+                Switch
               </button>
             </div>
           ) : (
-            <button
-              onClick={login}
-              className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition"
+            <Link
+              to="/login"
+              className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition no-underline"
             >
-              Sign In
-            </button>
+              Join Game
+            </Link>
           )}
         </div>
       </header>

@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { useTournamentSettings } from '../hooks/useFirestore';
+import { useCurrentUser, useSettings } from '../hooks/useStore';
 
 export default function Home() {
-  const { user, login } = useAuth();
-  const { settings } = useTournamentSettings();
+  const { user } = useCurrentUser();
+  const settings = useSettings();
 
   return (
     <div className="text-center">
@@ -34,12 +33,12 @@ export default function Home() {
         </div>
 
         {!user ? (
-          <button
-            onClick={login}
-            className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base"
+          <Link
+            to="/login"
+            className="block w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition text-base no-underline"
           >
-            Sign In to Play
-          </button>
+            Join the Game
+          </Link>
         ) : (
           <div className="space-y-2">
             <Link
