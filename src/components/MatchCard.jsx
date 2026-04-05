@@ -25,7 +25,7 @@ export default function MatchCard({
   const showLabel = match.label && match.stage !== 'group';
 
   return (
-    <div className={`bg-white rounded-2xl border p-3.5 mb-2 transition-all ${
+    <div className={`bg-white rounded-2xl border p-3.5 transition-all ${
       hasResult ? 'border-primary/30 shadow-sm' :
       hasPrediction && !editable ? 'border-green-200' : 'border-gray-100'
     }`}>

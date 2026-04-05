@@ -212,7 +212,7 @@ export default function Predict() {
         )}
 
         {/* Existing forms */}
-        <div className="space-y-2.5 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           {forms.map((form) => {
             const formStatus = normalizeStatus(form.status);
             return (
@@ -406,7 +406,7 @@ export default function Predict() {
       {selectedStage === 'group' && (
         <GroupTable matchData={matchPredictions} group={selectedGroup} />
       )}
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {filteredMatches.map((match) => {
           const derivedMatch = match.stage !== 'group' && bracketTeams[match.id]
             ? { ...match, homeTeam: bracketTeams[match.id].home, awayTeam: bracketTeams[match.id].away }

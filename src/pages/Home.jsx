@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useCurrentUser, useSettings } from '../hooks/useStore';
 import { useNavigation } from '../hooks/useNavigation';
 
-
 // World Cup 2026 kickoff: June 11, 2026, 12:00 ET (16:00 UTC)
 const KICKOFF = new Date('2026-06-11T16:00:00Z').getTime();
 
@@ -25,10 +24,10 @@ function useCountdown() {
 function CountdownUnit({ value, label }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="bg-primary text-white w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-extrabold shadow-md tabular-nums">
+      <div className="bg-primary text-white w-14 h-14 md:w-20 md:h-20 rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-extrabold shadow-md tabular-nums">
         {String(value).padStart(2, '0')}
       </div>
-      <span className="text-[10px] text-gray-400 font-semibold mt-1.5">{label}</span>
+      <span className="text-[10px] md:text-xs text-gray-400 font-semibold mt-1.5">{label}</span>
     </div>
   );
 }
@@ -40,27 +39,27 @@ export default function Home() {
   const countdown = useCountdown();
 
   return (
-    <div className="text-center">
+    <div className="text-center max-w-xl mx-auto">
       {/* Hero */}
-      <div className="pt-4 pb-3">
-        <div className="text-5xl mb-3">⚽🏆</div>
-        <h1 className="text-2xl font-extrabold text-primary mb-1.5 tracking-tight">
+      <div className="pt-4 pb-3 md:pt-8 md:pb-6">
+        <div className="text-5xl md:text-6xl mb-3">⚽🏆</div>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-primary mb-1.5 tracking-tight">
           טורניר הניחושים של בארי
         </h1>
-        <p className="text-gray-500 text-sm font-medium">מונדיאל 2026</p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-gray-500 text-sm md:text-base font-medium">מונדיאל 2026</p>
+        <p className="text-xs md:text-sm text-gray-400 mt-1">
           ארה״ב • מקסיקו • קנדה
         </p>
       </div>
 
       {/* Countdown */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-3">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-8 mb-3">
         {countdown.started ? (
-          <div className="text-lg font-extrabold text-green-600">🎉 המונדיאל התחיל!</div>
+          <div className="text-lg md:text-2xl font-extrabold text-green-600">🎉 המונדיאל התחיל!</div>
         ) : (
           <>
-            <p className="text-xs font-bold text-gray-400 mb-3">⏱ שריקת הפתיחה בעוד</p>
-            <div className="flex justify-center gap-3" dir="ltr">
+            <p className="text-xs md:text-sm font-bold text-gray-400 mb-3 md:mb-5">⏱ שריקת הפתיחה בעוד</p>
+            <div className="flex justify-center gap-3 md:gap-5" dir="ltr">
               <CountdownUnit value={countdown.seconds} label="שניות" />
               <CountdownUnit value={countdown.minutes} label="דקות" />
               <CountdownUnit value={countdown.hours} label="שעות" />
@@ -86,13 +85,12 @@ export default function Home() {
         {!user && (
           <button
             onClick={() => navigate('login')}
-            className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm mt-4"
+            className="w-full md:w-auto md:px-12 bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm mt-4"
           >
             התחבר למשחק
           </button>
         )}
       </div>
-
     </div>
   );
 }

@@ -204,7 +204,7 @@ export default function AllFormsView({ onBack }) {
               ? `${submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה`
               : `מציג ${filteredForms.length} מתוך ${submittedForms.length} טפסים`}
           </p>
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {filteredForms.map(form => (
               <FormCard
                 key={form.formId}
