@@ -103,7 +103,7 @@ export default function MatchCard({
           ) : (
             !hasResult && (
               <div className="text-sm text-gray-400">
-                {predHome !== '' ? `${predHome} - ${predAway}` : 'No prediction'}
+                {predHome !== '' ? `${predHome} - ${predAway}` : 'אין ניחוש'}
               </div>
             )
           )}
@@ -111,7 +111,7 @@ export default function MatchCard({
           {/* Show user prediction under actual result */}
           {hasResult && !editable && predHome !== '' && (
             <div className="text-xs text-gray-500">
-              Your guess: {predHome} - {predAway}
+              הניחוש שלך: {predHome} - {predAway}
             </div>
           )}
         </div>

@@ -6,13 +6,13 @@ export default function Layout({ children }) {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Home', icon: '🏠' },
-    { path: '/predict', label: 'Predict', icon: '🎯' },
-    { path: '/leaderboard', label: 'Scores', icon: '🏆' },
+    { path: '/', label: 'בית', icon: '🏠' },
+    { path: '/predict', label: 'ניחושים', icon: '🎯' },
+    { path: '/leaderboard', label: 'תוצאות', icon: '🏆' },
   ];
 
   if (user?.isAdmin) {
-    navItems.push({ path: '/admin', label: 'Admin', icon: '⚙️' });
+    navItems.push({ path: '/admin', label: 'ניהול', icon: '⚙️' });
   }
 
   return (
@@ -21,7 +21,7 @@ export default function Layout({ children }) {
       <header className="bg-primary text-white shadow-lg sticky top-0 z-50">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="text-lg font-bold no-underline text-white flex items-center gap-2">
-            ⚽ Beeri World Cup
+            ⚽ בארי מונדיאל
           </Link>
           {user ? (
             <div className="flex items-center gap-2">
@@ -35,7 +35,7 @@ export default function Layout({ children }) {
                 onClick={logout}
                 className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition"
               >
-                Switch
+                החלף
               </button>
             </div>
           ) : (
@@ -43,7 +43,7 @@ export default function Layout({ children }) {
               to="/login"
               className="bg-white text-primary font-semibold px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100 transition no-underline"
             >
-              Join Game
+              הצטרף
             </Link>
           )}
         </div>

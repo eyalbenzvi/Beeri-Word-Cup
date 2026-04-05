@@ -49,7 +49,7 @@ export default function Login() {
       <div className="text-center">
         <div className="py-6">
           <div className="text-5xl mb-3">🔐</div>
-          <h1 className="text-xl font-bold text-primary mb-1">Enter Password</h1>
+          <h1 className="text-xl font-bold text-primary mb-1">הכנס סיסמא</h1>
           <p className="text-gray-500 text-sm">{selectedUser?.displayName}</p>
         </div>
         <form onSubmit={handleLogin} className="bg-white rounded-xl p-4 border border-gray-100">
@@ -69,14 +69,14 @@ export default function Login() {
             disabled={!loginPassword}
             className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
           >
-            Login
+            כניסה
           </button>
           <button
             type="button"
             onClick={() => setLoginUserId(null)}
             className="mt-2 text-sm text-gray-500 hover:text-primary"
           >
-            ← Back
+            ← חזרה
           </button>
         </form>
       </div>
@@ -87,15 +87,15 @@ export default function Login() {
     <div className="text-center">
       <div className="py-6">
         <div className="text-5xl mb-3">⚽</div>
-        <h1 className="text-xl font-bold text-primary mb-1">Welcome!</h1>
-        <p className="text-gray-500 text-sm">Choose your name or create a new player</p>
+        <h1 className="text-xl font-bold text-primary mb-1">!ברוכים הבאים</h1>
+        <p className="text-gray-500 text-sm">בחר את השם שלך או צור שחקן חדש</p>
       </div>
 
       {/* Existing users */}
       {userList.length > 0 && !showNew && (
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-            Select Your Name
+            בחר את השם שלך
           </h2>
           <div className="space-y-2">
             {userList.map((u) => (
@@ -123,11 +123,11 @@ export default function Login() {
       {showNew || userList.length === 0 ? (
         <form onSubmit={handleCreateUser} className="bg-white rounded-xl p-4 border border-gray-100">
           <h2 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
-            {userList.length === 0 ? 'Create First Player (Admin)' : 'New Player'}
+            {userList.length === 0 ? 'יצירת שחקן ראשון (מנהל)' : 'שחקן חדש'}
           </h2>
           {userList.length === 0 && (
             <p className="text-xs text-gray-400 mb-3">
-              The first player becomes the game admin
+              השחקן הראשון הופך למנהל המשחק
             </p>
           )}
           <input
@@ -150,7 +150,7 @@ export default function Login() {
             disabled={!newName.trim() || !newPassword}
             className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-light transition disabled:opacity-40"
           >
-            {userList.length === 0 ? 'Create Game & Join' : 'Join Game'}
+            {userList.length === 0 ? 'צור משחק והצטרף' : 'הצטרף למשחק'}
           </button>
           {userList.length > 0 && (
             <button
@@ -158,7 +158,7 @@ export default function Login() {
               onClick={() => setShowNew(false)}
               className="mt-2 text-sm text-gray-500 hover:text-primary"
             >
-              ← Back to player list
+              ← חזרה לרשימת השחקנים
             </button>
           )}
         </form>
@@ -167,7 +167,7 @@ export default function Login() {
           onClick={() => setShowNew(true)}
           className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary hover:bg-gray-50 transition"
         >
-          + Add New Player
+          + הוסף שחקן חדש
         </button>
       )}
     </div>

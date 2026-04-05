@@ -90,7 +90,7 @@ export default function Leaderboard() {
           onClick={() => setSelectedUser(null)}
           className="text-sm text-primary mb-3 flex items-center gap-1"
         >
-          ← Back to leaderboard
+          ← חזרה לטבלת הדירוג
         </button>
 
         <h2 className="text-lg font-bold text-primary mb-1">
@@ -193,7 +193,7 @@ export default function Leaderboard() {
 
         {playedMatches.length === 0 && (
           <p className="text-center text-gray-400 py-8">
-            No matches have been played yet
+            עדיין לא שוחקו משחקים
           </p>
         )}
       </div>
@@ -202,7 +202,7 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-primary mb-4">🏆 Leaderboard</h1>
+      <h1 className="text-xl font-bold text-primary mb-4">🏆 טבלת דירוג</h1>
 
       {selectedUser ? (
         renderUserDetail()
@@ -210,8 +210,8 @@ export default function Leaderboard() {
         <>
           <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
             <div className="text-xs text-gray-500 text-center">
-              {Object.keys(results).length} matches played •{' '}
-              {leaderboard.length} players
+              {Object.keys(results).length} משחקים שוחקו •{' '}
+              {leaderboard.length} שחקנים
             </div>
           </div>
 
@@ -244,11 +244,11 @@ export default function Leaderboard() {
                   <div className="font-semibold text-sm text-gray-800 truncate">
                     {entry.displayName}
                     {entry.userId === user?.id && (
-                      <span className="text-xs text-primary ml-1">(You)</span>
+                      <span className="text-xs text-primary ml-1">(אתה)</span>
                     )}
                   </div>
                   <div className="text-xs text-gray-400">
-                    {entry.exactScoreCount} exact • {entry.outcomeCount} correct
+                    {entry.exactScoreCount} מדויקים • {entry.outcomeCount} הכרעות
                   </div>
                 </div>
 
@@ -256,7 +256,7 @@ export default function Leaderboard() {
                   <div className="text-lg font-bold text-primary">
                     {entry.totalPoints}
                   </div>
-                  <div className="text-xs text-gray-400">pts</div>
+                  <div className="text-xs text-gray-400">נק׳</div>
                 </div>
               </button>
             ))}
@@ -264,7 +264,7 @@ export default function Leaderboard() {
             {leaderboard.length === 0 && (
               <div className="text-center py-8 text-gray-400">
                 <div className="text-4xl mb-2">🏟️</div>
-                <p>No predictions yet. Be the first!</p>
+                <p>אין ניחושים עדיין. היה הראשון!</p>
               </div>
             )}
           </div>

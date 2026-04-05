@@ -11,20 +11,20 @@ export default function GroupTable({ matchData, group }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-3 mb-3 overflow-x-auto">
-      <h4 className="text-xs font-bold text-primary mb-2">Group {group}</h4>
+      <h4 className="text-xs font-bold text-primary mb-2">בית {group}</h4>
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-400 border-b border-gray-100">
             <th className="text-left py-1 pr-1 w-5">#</th>
-            <th className="text-left py-1">Team</th>
-            <th className="text-center py-1 w-6">P</th>
-            <th className="text-center py-1 w-6">W</th>
-            <th className="text-center py-1 w-6">D</th>
-            <th className="text-center py-1 w-6">L</th>
-            <th className="text-center py-1 w-8">GF</th>
-            <th className="text-center py-1 w-8">GA</th>
-            <th className="text-center py-1 w-8">GD</th>
-            <th className="text-center py-1 w-8 font-bold">Pts</th>
+            <th className="text-left py-1">קבוצה</th>
+            <th className="text-center py-1 w-6">מש׳</th>
+            <th className="text-center py-1 w-6">נ</th>
+            <th className="text-center py-1 w-6">ת</th>
+            <th className="text-center py-1 w-6">ה</th>
+            <th className="text-center py-1 w-8">שע+</th>
+            <th className="text-center py-1 w-8">שע-</th>
+            <th className="text-center py-1 w-8">הפ</th>
+            <th className="text-center py-1 w-8 font-bold">נק׳</th>
           </tr>
         </thead>
         <tbody>
@@ -58,8 +58,8 @@ export default function GroupTable({ matchData, group }) {
         </tbody>
       </table>
       <div className="flex gap-3 mt-1.5 text-[10px] text-gray-400">
-        <span><span className="inline-block w-2 h-2 rounded-sm bg-green-100 mr-0.5" /> Qualifies</span>
-        <span><span className="inline-block w-2 h-2 rounded-sm bg-yellow-100 mr-0.5" /> 3rd (possible)</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-green-100 mr-0.5" /> עולה</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-yellow-100 mr-0.5" /> מקום 3 (אפשרי)</span>
       </div>
     </div>
   );

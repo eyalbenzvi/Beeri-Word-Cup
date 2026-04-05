@@ -155,10 +155,10 @@ export default function Predict() {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-lg font-bold text-gray-700 mb-2">Join the Game First</h2>
-        <p className="text-gray-500 mb-4">You need to pick your name to make predictions</p>
+        <h2 className="text-lg font-bold text-gray-700 mb-2">הצטרף למשחק קודם</h2>
+        <p className="text-gray-500 mb-4">צריך לבחור שם כדי למלא ניחושים</p>
         <Link to="/login" className="inline-block bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-light transition no-underline">
-          Join Game
+          הצטרף למשחק
         </Link>
       </div>
     );
@@ -188,9 +188,9 @@ export default function Predict() {
       return (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 text-center">
           <div className="text-2xl mb-1">⏳</div>
-          <div className="text-sm font-semibold text-yellow-700">Submitted — Waiting for Admin Approval</div>
+          <div className="text-sm font-semibold text-yellow-700">הוגש — ממתין לאישור מנהל</div>
           <div className="text-xs text-yellow-600 mt-1">
-            Your predictions are locked until the admin reviews them.
+            הניחושים שלך נעולים עד שהמנהל יבדוק אותם.
           </div>
         </div>
       );
@@ -199,9 +199,9 @@ export default function Predict() {
       return (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 text-center">
           <div className="text-2xl mb-1">✅</div>
-          <div className="text-sm font-semibold text-green-700">Approved by Admin</div>
+          <div className="text-sm font-semibold text-green-700">אושר על ידי המנהל</div>
           <div className="text-xs text-green-600 mt-1">
-            Your predictions are locked and will be scored when matches are played.
+            הניחושים שלך נעולים ויחושבו כאשר משחקים יתקיימו.
           </div>
         </div>
       );
@@ -210,7 +210,7 @@ export default function Predict() {
       return (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-center">
           <div className="text-xs text-red-600">
-            Your previous submission was sent back by the admin. Please review and resubmit.
+            ההגשה הקודמת הוחזרה על ידי המנהל. אנא בדוק ושלח מחדש.
           </div>
         </div>
       );
@@ -227,11 +227,11 @@ export default function Predict() {
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
           <div className="text-3xl text-center mb-3">{hasErrors ? '⚠️' : '📋'}</div>
           <h3 className="text-lg font-bold text-center text-primary mb-2">
-            {hasErrors ? 'Cannot Submit Yet' : 'Submit Predictions?'}
+            {hasErrors ? 'לא ניתן להגיש עדיין' : 'להגיש ניחושים?'}
           </h3>
           {hasErrors ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <div className="text-sm font-semibold text-red-700 mb-1">Please fix the following:</div>
+              <div className="text-sm font-semibold text-red-700 mb-1">אנא תקן את הבאים:</div>
               <ul className="text-xs text-red-600 space-y-1">
                 {validationErrors.map((err, i) => (
                   <li key={i}>- {err}</li>
@@ -241,11 +241,11 @@ export default function Predict() {
           ) : (
             <>
               <p className="text-sm text-gray-600 text-center mb-4">
-                Once you submit, you won't be able to make changes until the admin reviews your predictions.
+                לאחר ההגשה לא תוכל לשנות עד שהמנהל יבדוק את הניחושים שלך.
               </p>
               <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
-                <div>Matches: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
-                <div>Top Scorer: {predictions.topScorer || 'Not entered'}</div>
+                <div>משחקים: {predictedGroupMatches + predictedKnockout} / {groupMatches.length + knockoutMatches.length}</div>
+                <div>מלך שערים: {predictions.topScorer || 'לא הוכנס'}</div>
               </div>
             </>
           )}
@@ -254,14 +254,14 @@ export default function Predict() {
               onClick={() => { setShowConfirm(false); setValidationErrors([]); }}
               className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition"
             >
-              {hasErrors ? 'Go Back' : 'Cancel'}
+              {hasErrors ? 'חזרה' : 'ביטול'}
             </button>
             {!hasErrors && (
               <button
                 onClick={handleSubmit}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-light transition"
               >
-                Submit
+                הגש
               </button>
             )}
           </div>
@@ -297,7 +297,7 @@ export default function Predict() {
           );
         })}
         {filteredMatches.length === 0 && (
-          <div className="text-center py-8 text-gray-400"><p>No matches in this stage yet</p></div>
+          <div className="text-center py-8 text-gray-400"><p>אין משחקים בשלב הזה</p></div>
         )}
       </div>
     </>
@@ -332,15 +332,15 @@ export default function Predict() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-primary">Your Predictions</h1>
+        <h1 className="text-xl font-bold text-primary">הניחושים שלך</h1>
         {status === 'pending' && (
-          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">⏳ Pending</span>
+          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">⏳ ממתין</span>
         )}
         {status === 'approved' && (
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">✅ Approved</span>
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">✅ אושר</span>
         )}
         {settings.predictionsLocked && status === 'draft' && (
-          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">🔒 Locked</span>
+          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">🔒 נעול</span>
         )}
       </div>
 
@@ -349,8 +349,8 @@ export default function Predict() {
       {/* Progress */}
       <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-          <span>Group: {predictedGroupMatches}/{groupMatches.length}</span>
-          <span>Knockout: {predictedKnockout}/{knockoutMatches.length}</span>
+          <span>בתים: {predictedGroupMatches}/{groupMatches.length}</span>
+          <span>נוקאאוט: {predictedKnockout}/{knockoutMatches.length}</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-2">
           <div className="bg-primary rounded-full h-2 transition-all"
@@ -361,7 +361,7 @@ export default function Predict() {
       {/* Main Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
         {[
-          { id: 'matches', label: 'Matches' },
+          { id: 'matches', label: 'משחקים' },
           { id: 'details', label: 'פרטים' },
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -383,13 +383,13 @@ export default function Predict() {
             onClick={handleRandomize}
             className="w-full bg-white text-primary font-semibold py-3 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-base"
           >
-            🎲 Randomize All Predictions
+            🎲 הגרלת כל הניחושים
           </button>
           <button
             onClick={handleTrySubmit}
             className="w-full bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-600 active:bg-green-700 transition text-base"
           >
-            Submit Predictions for Approval
+            הגש ניחושים לאישור
           </button>
         </div>
       )}

@@ -46,8 +46,8 @@ export default function Admin() {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">🔐</div>
-        <h2 className="text-lg font-bold text-gray-700">Admin Access Required</h2>
-        <p className="text-gray-500 text-sm mt-2">The first player to join becomes admin.</p>
+        <h2 className="text-lg font-bold text-gray-700">נדרשת גישת מנהל</h2>
+        <p className="text-gray-500 text-sm mt-2">השחקן הראשון שמצטרף הופך למנהל.</p>
       </div>
     );
   }
@@ -57,15 +57,15 @@ export default function Admin() {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">🔑</div>
-        <h2 className="text-lg font-bold text-gray-700 mb-4">Enter Admin PIN</h2>
-        <p className="text-xs text-gray-400 mb-3">Default PIN: 1234</p>
+        <h2 className="text-lg font-bold text-gray-700 mb-4">הכנס קוד מנהל</h2>
+        <p className="text-xs text-gray-400 mb-3">קוד ברירת מחדל: 1234</p>
         <form onSubmit={(e) => { e.preventDefault(); if (adminPin === currentPin) setPinVerified(true); }}>
           <input type="password" value={adminPin} onChange={(e) => setAdminPin(e.target.value)}
             placeholder="PIN" className="w-32 px-4 py-2 border-2 border-gray-200 rounded-xl text-center text-lg tracking-widest focus:border-primary focus:outline-none mb-3" autoFocus />
           <br />
-          <button type="submit" className="bg-primary text-white font-semibold px-6 py-2 rounded-xl hover:bg-primary-light transition">Verify</button>
+          <button type="submit" className="bg-primary text-white font-semibold px-6 py-2 rounded-xl hover:bg-primary-light transition">אימות</button>
         </form>
-        <button onClick={() => setActiveTab('results')} className="mt-3 text-sm text-gray-400 hover:text-primary">← Back</button>
+        <button onClick={() => setActiveTab('results')} className="mt-3 text-sm text-gray-400 hover:text-primary">← חזרה</button>
       </div>
     );
   }
@@ -99,14 +99,14 @@ export default function Admin() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try { importAllData(JSON.parse(ev.target.result)); alert('Data imported!'); }
-      catch { alert('Invalid file'); }
+      try { importAllData(JSON.parse(ev.target.result)); alert('הנתונים יובאו בהצלחה!'); }
+      catch { alert('קובץ לא תקין'); }
     };
     reader.readAsText(file);
   };
 
   const handleRandomizeResults = () => {
-    if (!window.confirm('This will overwrite ALL actual results with random scores. Continue?')) return;
+    if (!window.confirm('פעולה זו תדרוס את כל התוצאות בתוצאות אקראיות. להמשיך?')) return;
 
     const allResults = {};
 
@@ -155,7 +155,7 @@ export default function Admin() {
         onClick={handleRandomizeResults}
         className="w-full mb-3 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"
       >
-        🎲 Randomize All Results
+        🎲 הגרלת כל התוצאות
       </button>
       <StageSelector selectedStage={selectedStage} onSelect={setSelectedStage} />
       {selectedStage === 'group' && (
@@ -216,11 +216,11 @@ export default function Admin() {
                     {result ? (
                       <span className="font-bold text-primary text-lg">{result.homeScore} - {result.awayScore}</span>
                     ) : (
-                      <span className="text-gray-400 text-sm">Not played</span>
+                      <span className="text-gray-400 text-sm">לא שוחק</span>
                     )}
                     <button onClick={() => { setEditingMatch(match.id); setEditScores({ homeScore: result?.homeScore ?? '', awayScore: result?.awayScore ?? '' }); }}
                       className="text-xs bg-primary text-white px-2 py-1.5 rounded hover:bg-primary-light">
-                      {result ? 'Edit' : 'Enter'}
+                      {result ? 'ערוך' : 'הכנס'}
                     </button>
                   </div>
                 )}
@@ -290,11 +290,11 @@ export default function Admin() {
   const renderSettingsTab = () => (
     <div className="space-y-4">
       <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-semibold text-sm mb-3">Tournament Controls</h3>
+        <h3 className="font-semibold text-sm mb-3">בקרת טורניר</h3>
         <div className="flex items-center justify-between py-3 border-b border-gray-50">
           <div>
-            <div className="text-sm font-medium">Lock Predictions</div>
-            <div className="text-xs text-gray-400">Prevent changes</div>
+            <div className="text-sm font-medium">נעילת ניחושים</div>
+            <div className="text-xs text-gray-400">מונע שינויים</div>
           </div>
           <button onClick={() => updateSettings({ predictionsLocked: !settings.predictionsLocked })}
             className={`relative w-12 h-6 rounded-full transition-colors ${settings.predictionsLocked ? 'bg-red-400' : 'bg-gray-300'}`}>
@@ -302,7 +302,7 @@ export default function Admin() {
           </button>
         </div>
         <div className="py-3">
-          <div className="text-sm font-medium mb-2">Admin PIN</div>
+          <div className="text-sm font-medium mb-2">קוד מנהל</div>
           <input type="text" defaultValue={settings.adminPin || '1234'}
             onBlur={(e) => updateSettings({ adminPin: e.target.value })}
             className="w-32 px-3 py-1.5 border rounded text-sm" />
@@ -310,41 +310,41 @@ export default function Admin() {
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-semibold text-sm mb-2">Stats</h3>
+        <h3 className="font-semibold text-sm mb-2">סטטיסטיקות</h3>
         <div className="grid grid-cols-2 gap-3 text-center">
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-primary">{Object.keys(users).length}</div>
-            <div className="text-xs text-gray-500">Players</div>
+            <div className="text-xs text-gray-500">שחקנים</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-primary">{Object.keys(results).length}</div>
-            <div className="text-xs text-gray-500">Results</div>
+            <div className="text-xs text-gray-500">תוצאות</div>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-semibold text-sm mb-3">Data Backup</h3>
+        <h3 className="font-semibold text-sm mb-3">גיבוי נתונים</h3>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition">Export</button>
-          <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition">Import</button>
+          <button onClick={handleExport} className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition">ייצוא</button>
+          <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition">ייבוא</button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
         </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-red-200">
-        <h3 className="font-semibold text-sm text-red-600 mb-2">Danger Zone</h3>
-        <p className="text-xs text-gray-400 mb-3">Delete all data: users, predictions, results. This cannot be undone.</p>
+        <h3 className="font-semibold text-sm text-red-600 mb-2">אזור מסוכן</h3>
+        <p className="text-xs text-gray-400 mb-3">מחיקת כל הנתונים: משתמשים, ניחושים, תוצאות. לא ניתן לבטל.</p>
         <button
           onClick={() => {
-            if (window.confirm('Are you sure? This will delete ALL data — users, predictions, and results.')) {
+            if (window.confirm('בטוח? פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות.')) {
               clearAllData();
               window.location.href = '/';
             }
           }}
           className="w-full bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"
         >
-          Clear All Data
+          מחק את כל הנתונים
         </button>
       </div>
     </div>
@@ -373,7 +373,7 @@ export default function Admin() {
     return (
       <div className="space-y-2">
         {allEntries.length === 0 && (
-          <div className="text-center py-8 text-gray-400">No predictions submitted yet</div>
+          <div className="text-center py-8 text-gray-400">עדיין לא הוגשו ניחושים</div>
         )}
         {allEntries.map((entry) => (
           <div key={entry.userId} className={`bg-white rounded-xl p-4 border ${
@@ -388,7 +388,7 @@ export default function Admin() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">{entry.displayName}</div>
                 <div className="text-xs text-gray-400">
-                  {entry.matchCount} matches •
+                  {entry.matchCount} משחקים •
                   {entry.topScorer ? ` מלך: ${entry.topScorer}` : ' ללא מלך שערים'}
                 </div>
               </div>
@@ -397,8 +397,8 @@ export default function Admin() {
                 entry.status === 'approved' ? 'bg-green-100 text-green-700' :
                 'bg-gray-100 text-gray-500'
               }`}>
-                {entry.status === 'pending' ? '⏳ Pending' :
-                 entry.status === 'approved' ? '✅ Approved' : 'Draft'}
+                {entry.status === 'pending' ? '⏳ ממתין' :
+                 entry.status === 'approved' ? '✅ אושר' : 'טיוטה'}
               </span>
             </div>
 
@@ -406,11 +406,11 @@ export default function Admin() {
               <div className="flex gap-2 mt-2">
                 <button onClick={() => approvePredictions(entry.userId)}
                   className="flex-1 bg-green-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-600 transition">
-                  ✓ Approve
+                  ✓ אשר
                 </button>
                 <button onClick={() => rejectPredictions(entry.userId)}
                   className="flex-1 bg-red-100 text-red-600 text-sm font-semibold py-2 rounded-lg hover:bg-red-200 transition">
-                  ✕ Send Back
+                  ✕ החזר
                 </button>
               </div>
             )}
@@ -419,7 +419,7 @@ export default function Admin() {
               <div className="flex gap-2 mt-2">
                 <button onClick={() => rejectPredictions(entry.userId)}
                   className="w-full bg-gray-100 text-gray-500 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition">
-                  Revoke Approval (allow editing)
+                  בטל אישור (אפשר עריכה)
                 </button>
               </div>
             )}
@@ -447,7 +447,7 @@ export default function Admin() {
             </div>
             <div className="text-right">
               <div className="text-sm font-bold text-primary">{predCount}</div>
-              <div className="text-xs text-gray-400">predictions</div>
+              <div className="text-xs text-gray-400">ניחושים</div>
             </div>
             {u.isAdmin && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Admin</span>}
           </div>
@@ -458,14 +458,14 @@ export default function Admin() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-primary mb-4">⚙️ Admin Panel</h1>
+      <h1 className="text-xl font-bold text-primary mb-4">⚙️ לוח ניהול</h1>
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto">
         {[
-          { id: 'approvals', label: pendingCount > 0 ? `Approve (${pendingCount})` : 'Approve' },
-          { id: 'results', label: 'Results' },
+          { id: 'approvals', label: pendingCount > 0 ? `אישור (${pendingCount})` : 'אישור' },
+          { id: 'results', label: 'תוצאות' },
           { id: 'topscorer', label: 'מלך שערים' },
-          { id: 'settings', label: 'Settings' },
-          { id: 'users', label: 'Users' },
+          { id: 'settings', label: 'הגדרות' },
+          { id: 'users', label: 'משתמשים' },
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-shrink-0 px-2 py-2 text-xs font-medium rounded-md transition ${
