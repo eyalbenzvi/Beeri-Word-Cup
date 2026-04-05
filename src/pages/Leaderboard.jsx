@@ -222,25 +222,25 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            {leaderboard.map((entry, index) => (
+          <div className="space-y-1.5">
+            {leaderboard.map((entry, index) => {
+              const isTop3 = index < 3;
+              const borderColor = index === 0 ? 'border-yellow-300' : index === 1 ? 'border-gray-300' : index === 2 ? 'border-amber-400' : 'border-gray-100';
+              return (
               <button
                 key={entry.formId}
                 onClick={() => setSelectedForm(entry.formId)}
-                className="w-full bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm flex items-center gap-3 hover:bg-gray-50 transition text-right cursor-pointer"
+                className={`w-full bg-white rounded-2xl p-3.5 border shadow-sm flex items-center gap-3 text-right cursor-pointer card-hover ${borderColor} ${
+                  entry.userId === user?.id ? 'ring-2 ring-primary/10' : ''
+                }`}
               >
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold ${
-                    index === 0
-                      ? 'bg-yellow-400 text-white'
-                      : index === 1
-                      ? 'bg-gray-400 text-white'
-                      : index === 2
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}
-                >
-                  {index + 1}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                  index === 0 ? 'bg-gradient-to-br from-yellow-300 to-yellow-500 text-white shadow-sm' :
+                  index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-white' :
+                  index === 2 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' :
+                  'bg-gray-100 text-gray-400'
+                }`}>
+                  {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                 </div>
 
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
@@ -248,25 +248,26 @@ export default function Leaderboard() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm text-gray-800 truncate">
+                  <div className={`font-semibold text-sm truncate ${isTop3 ? 'text-gray-900' : 'text-gray-700'}`}>
                     {entry.formName}
                     {entry.userId === user?.id && (
-                      <span className="text-xs text-primary mr-1">(שלי)</span>
+                      <span className="text-[10px] text-primary mr-1 font-bold">(שלי)</span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-[11px] text-gray-400">
                     {entry.userName} • {entry.exactScoreCount} מדויקים • {entry.outcomeCount} הכרעות
                   </div>
                 </div>
 
-                <div className="text-left">
-                  <div className="text-lg font-bold text-primary">
+                <div className="text-left min-w-[50px]">
+                  <div className={`text-lg font-extrabold ${isTop3 ? 'text-primary' : 'text-gray-500'}`}>
                     {entry.totalPoints}
                   </div>
-                  <div className="text-xs text-gray-400">נק׳</div>
+                  <div className="text-[10px] text-gray-400">נק׳</div>
                 </div>
               </button>
-            ))}
+              );
+            })}
 
             {leaderboard.length === 0 && (
               <div className="text-center py-12 text-gray-400">
