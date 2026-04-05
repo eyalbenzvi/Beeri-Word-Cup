@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useAllPredictions, useUsers } from '../hooks/useStore';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
@@ -110,7 +109,7 @@ function FormCard({ form, userName, championDisplay }) {
   );
 }
 
-export default function AllForms() {
+export default function AllFormsView({ onBack }) {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const [filterText, setFilterText] = useState('');
@@ -149,9 +148,12 @@ export default function AllForms() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-primary">כל הטפסים</h1>
-        <Link to="/predict" className="text-sm text-primary font-medium no-underline">
+        <button
+          onClick={onBack}
+          className="text-sm text-primary font-medium bg-transparent border-none cursor-pointer"
+        >
           חזרה לטפסים שלי →
-        </Link>
+        </button>
       </div>
 
       {submittedForms.length === 0 ? (
