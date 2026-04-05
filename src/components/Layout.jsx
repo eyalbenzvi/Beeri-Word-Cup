@@ -142,7 +142,7 @@ export default function Layout({ children }) {
             </button>
             <button onClick={() => navigate('home')} className="text-lg font-bold text-white flex items-center gap-2 bg-transparent border-none cursor-pointer p-0 tracking-tight">
               <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
-              <span className="hidden sm:inline">בארי מונדיאל</span>
+              בארי מונדיאל
             </button>
           </div>
 
@@ -181,7 +181,7 @@ export default function Layout({ children }) {
 
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <main className="max-w-3xl mx-auto w-full px-4 md:px-6 pt-4 md:pt-6 pb-2 md:pb-8">
+      <main className="max-w-3xl mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-0 md:pb-8">
         {children}
       </main>
 

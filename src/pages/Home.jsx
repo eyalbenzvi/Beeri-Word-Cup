@@ -23,7 +23,7 @@ function useCountdown() {
 function CountdownUnit({ value, label, accent }) {
   return (
     <div className="flex flex-col items-center">
-      <div className={`${accent || 'bg-primary'} text-white w-14 h-14 md:w-18 md:h-18 rounded-2xl flex items-center justify-center text-2xl md:text-3xl font-extrabold shadow-md tabular-nums`}>
+      <div className={`${accent || 'bg-primary'} text-white w-12 h-12 md:w-18 md:h-18 rounded-xl md:rounded-2xl flex items-center justify-center text-xl md:text-3xl font-extrabold shadow-md tabular-nums`}>
         {String(value).padStart(2, '0')}
       </div>
       <span className="text-[10px] md:text-xs text-gray-400 font-semibold mt-1.5">{label}</span>
@@ -40,37 +40,37 @@ export default function Home() {
   return (
     <div className="text-center max-w-xl mx-auto">
       {/* Hero */}
-      <div className="pt-4 pb-3 md:pt-8 md:pb-5">
-        <div className="text-5xl md:text-6xl mb-3">⚽🏆</div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-primary mb-1 tracking-tight">
+      <div className="pt-2 pb-2 md:pt-8 md:pb-5">
+        <div className="text-4xl md:text-6xl mb-2">⚽🏆</div>
+        <h1 className="text-xl md:text-3xl font-extrabold text-primary mb-0.5 tracking-tight">
           טורניר הניחושים של בארי
         </h1>
-        <p className="text-gray-500 text-sm md:text-base font-medium">מונדיאל 2026</p>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-gray-500 text-xs md:text-base font-medium">מונדיאל 2026</p>
+        <p className="text-[10px] md:text-sm text-gray-400 mt-0.5">
           ארה״ב • מקסיקו • קנדה
         </p>
       </div>
 
       {/* Countdown */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-7 mb-3">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-7 mb-2">
         {countdown.started ? (
           <div className="text-lg md:text-2xl font-extrabold text-green-600">🎉 המונדיאל התחיל!</div>
         ) : (
           <>
-            <p className="text-xs md:text-sm font-bold text-gray-400 mb-3 md:mb-4">⏱ שריקת הפתיחה בעוד</p>
+            <p className="text-[11px] md:text-sm font-bold text-gray-400 mb-2 md:mb-4">⏱ שריקת הפתיחה בעוד</p>
             <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
               <CountdownUnit value={countdown.seconds} label="שניות" />
               <CountdownUnit value={countdown.minutes} label="דקות" />
               <CountdownUnit value={countdown.hours} label="שעות" />
               <CountdownUnit value={countdown.days} label="ימים" accent="bg-primary-light" />
             </div>
-            <p className="text-[10px] text-gray-300 mt-3">11 ביוני 2026, 19:00 שעון ישראל</p>
+            <p className="text-[10px] text-gray-300 mt-2">11 ביוני 2026, 19:00 שעון ישראל</p>
           </>
         )}
       </div>
 
       {/* Status */}
-      <div className={`rounded-2xl shadow-sm border p-4 ${
+      <div className={`rounded-2xl shadow-sm border p-3 ${
         settings.predictionsLocked
           ? 'bg-red-50 border-red-200'
           : 'bg-green-50 border-green-200'
