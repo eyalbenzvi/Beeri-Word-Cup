@@ -5,7 +5,7 @@ import {
 } from '../hooks/useStore';
 import {
   saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
-  clearMatchResults, saveActualBonuses, approvePredictions, rejectPredictions,
+  clearMatchResults, saveActualBonuses,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
@@ -33,7 +33,7 @@ export default function Admin() {
   const [selectedGroup, setSelectedGroup] = useState('A');
   const [editingMatch, setEditingMatch] = useState(null);
   const [editScores, setEditScores] = useState({ homeScore: '', awayScore: '' });
-  const [activeTab, setActiveTab] = useState('approvals');
+  const [activeTab, setActiveTab] = useState('results');
   const [adminPin, setAdminPin] = useState('');
   const [pinVerified, setPinVerified] = useState(false);
   const [topScorerInput, setTopScorerInput] = useState('');
@@ -281,8 +281,8 @@ export default function Admin() {
         <h3 className="font-semibold text-sm mb-3">בקרת טורניר</h3>
         <div className="flex items-center justify-between py-3 border-b border-gray-50">
           <div>
-            <div className="text-sm font-medium">נעילת ניחושים</div>
-            <div className="text-xs text-gray-400">מונע שינויים</div>
+            <div className="text-sm font-medium">הקפאת טפסים</div>
+            <div className="text-xs text-gray-400">מונע הגשה, עריכה ופתיחה מחדש</div>
           </div>
           <button onClick={() => updateSettings({ predictionsLocked: !settings.predictionsLocked })}
             className={`relative w-12 h-6 rounded-full transition-colors ${settings.predictionsLocked ? 'bg-red-400' : 'bg-gray-300'}`}>
@@ -352,99 +352,11 @@ export default function Admin() {
     </div>
   );
 
-  // Count pending forms
-  const pendingForms = Object.entries(allPredictions).filter(([, p]) => p.status === 'pending');
-  const pendingCount = pendingForms.length;
-
-  const renderApprovalsTab = () => {
-    const allEntries = Object.entries(allPredictions)
-      .map(([formId, pred]) => {
-        const userInfo = users[pred.userId] || {};
-        return {
-          formId,
-          userId: pred.userId,
-          formName: pred.formName || 'טופס ללא שם',
-          userName: userInfo.displayName || pred.userId,
-          status: pred.status || 'draft',
-          matchCount: Object.keys(pred.matches || {}).length,
-          topScorer: pred.topScorer || '',
-          budgetNumber: pred.budgetNumber || '',
-          submittedAt: pred.submittedAt,
-          approvedAt: pred.approvedAt,
-        };
-      })
-      .sort((a, b) => {
-        const order = { pending: 0, draft: 1, approved: 2 };
-        return (order[a.status] ?? 1) - (order[b.status] ?? 1);
-      });
-
-    return (
-      <div className="space-y-2">
-        {allEntries.length === 0 && (
-          <div className="text-center py-8 text-gray-400">עדיין לא הוגשו ניחושים</div>
-        )}
-        {allEntries.map((entry) => (
-          <div key={entry.formId} className={`bg-white rounded-xl p-4 border ${
-            entry.status === 'pending' ? 'border-yellow-300 bg-yellow-50/30' :
-            entry.status === 'approved' ? 'border-green-200 bg-green-50/30' :
-            'border-gray-100'
-          }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                {entry.formName.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{entry.formName}</div>
-                <div className="text-xs text-gray-400">
-                  {entry.userName} • {entry.matchCount} משחקים
-                  {entry.topScorer ? ` • מלך: ${entry.topScorer}` : ''}
-                  {entry.budgetNumber ? ` • תקציב: ${entry.budgetNumber}` : ''}
-                </div>
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                entry.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                entry.status === 'approved' ? 'bg-green-100 text-green-700' :
-                'bg-gray-100 text-gray-500'
-              }`}>
-                {entry.status === 'pending' ? '⏳ ממתין' :
-                 entry.status === 'approved' ? '✅ אושר' : 'טיוטה'}
-              </span>
-            </div>
-
-            {entry.status === 'pending' && (
-              <div className="flex gap-2 mt-2">
-                <button onClick={() => approvePredictions(entry.formId)}
-                  className="flex-1 bg-green-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-600 transition">
-                  ✓ אשר
-                </button>
-                <button onClick={() => rejectPredictions(entry.formId)}
-                  className="flex-1 bg-red-100 text-red-600 text-sm font-semibold py-2 rounded-lg hover:bg-red-200 transition">
-                  ✕ החזר
-                </button>
-              </div>
-            )}
-
-            {entry.status === 'approved' && (
-              <div className="flex gap-2 mt-2">
-                <button onClick={() => rejectPredictions(entry.formId)}
-                  className="w-full bg-gray-100 text-gray-500 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition">
-                  בטל אישור (אפשר עריכה)
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const renderUsersTab = () => (
     <div className="space-y-2">
       {Object.entries(users).map(([uid, u]) => {
-        // Count forms for this user
         const userForms = Object.entries(allPredictions).filter(([, p]) => p.userId === uid);
-        const approvedCount = userForms.filter(([, p]) => p.status === 'approved').length;
-        const pendingCount = userForms.filter(([, p]) => p.status === 'pending').length;
+        const submittedCount = userForms.filter(([, p]) => p.status === 'submitted').length;
         const draftCount = userForms.filter(([, p]) => p.status === 'draft').length;
         return (
           <div key={uid} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
@@ -455,8 +367,7 @@ export default function Admin() {
               <div className="text-sm font-medium truncate">{u.displayName}</div>
               <div className="text-xs text-gray-400">
                 {userForms.length} טפסים
-                {approvedCount > 0 && ` • ${approvedCount} אושרו`}
-                {pendingCount > 0 && ` • ${pendingCount} ממתינים`}
+                {submittedCount > 0 && ` • ${submittedCount} הוגשו`}
                 {draftCount > 0 && ` • ${draftCount} טיוטות`}
               </div>
             </div>
@@ -476,7 +387,6 @@ export default function Admin() {
       <h1 className="text-xl font-bold text-primary mb-4">⚙️ לוח ניהול</h1>
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto">
         {[
-          { id: 'approvals', label: pendingCount > 0 ? `אישור (${pendingCount})` : 'אישור' },
           { id: 'results', label: 'תוצאות' },
           { id: 'topscorer', label: 'מלך שערים' },
           { id: 'settings', label: 'הגדרות' },
@@ -485,13 +395,12 @@ export default function Admin() {
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-shrink-0 px-2 py-2 text-xs font-medium rounded-md transition ${
               activeTab === tab.id ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            } ${tab.id === 'approvals' && pendingCount > 0 ? 'text-yellow-700' : ''}`}>
+            }`}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {activeTab === 'approvals' && renderApprovalsTab()}
       {activeTab === 'results' && renderResultsTab()}
       {activeTab === 'topscorer' && renderTopScorerTab()}
       {activeTab === 'settings' && renderSettingsTab()}

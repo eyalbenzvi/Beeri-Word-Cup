@@ -236,26 +236,17 @@ export function submitPredictions(formId) {
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId] };
-  all[formId].status = 'pending';
+  all[formId].status = 'submitted';
   all[formId].submittedAt = new Date().toISOString();
   writeDoc('predictions', all);
 }
 
-export function approvePredictions(formId) {
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  all[formId].status = 'approved';
-  all[formId].approvedAt = new Date().toISOString();
-  writeDoc('predictions', all);
-}
-
-export function rejectPredictions(formId) {
+export function reopenForm(formId) {
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId] };
   all[formId].status = 'draft';
-  all[formId].rejectedAt = new Date().toISOString();
+  all[formId].reopenedAt = new Date().toISOString();
   writeDoc('predictions', all);
 }
 

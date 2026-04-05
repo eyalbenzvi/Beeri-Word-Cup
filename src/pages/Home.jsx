@@ -27,8 +27,8 @@ export default function Home() {
           } animate-pulse`} />
           <span className="text-sm font-medium text-gray-700">
             {settings.predictionsLocked
-              ? 'הניחושים נעולים!'
-              : 'הניחושים פתוחים'}
+              ? 'הגשת טפסים נעולה!'
+              : 'הגשת טפסים פתוחה'}
           </span>
         </div>
 

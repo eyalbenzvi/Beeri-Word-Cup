@@ -4,7 +4,7 @@ import {
   useCurrentUser, useUserForms, useActiveFormId, useFormData, useSettings,
 } from '../hooks/useStore';
 import {
-  savePrediction, saveBonusPrediction, submitPredictions,
+  savePrediction, saveBonusPrediction, submitPredictions, reopenForm,
   createForm, deleteForm, setActiveFormId, updateFormDetails,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
@@ -193,8 +193,7 @@ export default function Predict() {
         <div className="space-y-2 mb-4">
           {forms.map((form) => (
             <div key={form.formId} className={`bg-white rounded-xl p-4 border ${
-              form.status === 'pending' ? 'border-yellow-300 bg-yellow-50/30' :
-              form.status === 'approved' ? 'border-green-200 bg-green-50/30' :
+              form.status === 'submitted' ? 'border-green-200 bg-green-50/30' :
               'border-gray-100'
             }`}>
               <div className="flex items-center gap-3">
@@ -206,12 +205,10 @@ export default function Predict() {
                   </div>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  form.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                  form.status === 'approved' ? 'bg-green-100 text-green-700' :
+                  form.status === 'submitted' ? 'bg-green-100 text-green-700' :
                   'bg-gray-100 text-gray-500'
                 }`}>
-                  {form.status === 'pending' ? '⏳ ממתין' :
-                   form.status === 'approved' ? '✅ אושר' : 'טיוטה'}
+                  {form.status === 'submitted' ? '✅ הוגש' : 'טיוטה'}
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
@@ -221,6 +218,14 @@ export default function Predict() {
                 >
                   {form.status === 'draft' ? 'ערוך' : 'צפה'}
                 </button>
+                {form.status === 'submitted' && !settings.predictionsLocked && (
+                  <button
+                    onClick={() => reopenForm(form.formId)}
+                    className="px-3 py-2 bg-yellow-50 text-yellow-700 text-sm rounded-lg hover:bg-yellow-100 transition"
+                  >
+                    פתח לעריכה
+                  </button>
+                )}
                 {form.status === 'draft' && (
                   <button
                     onClick={() => {
@@ -285,28 +290,20 @@ export default function Predict() {
       : knockoutMatches.filter((m) => m.stage === selectedStage);
 
   const renderStatusBanner = () => {
-    if (status === 'pending') {
-      return (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 text-center">
-          <div className="text-2xl mb-1">⏳</div>
-          <div className="text-sm font-semibold text-yellow-700">הוגש — ממתין לאישור מנהל</div>
-          <div className="text-xs text-yellow-600 mt-1">הניחושים נעולים עד שהמנהל יבדוק אותם.</div>
-        </div>
-      );
-    }
-    if (status === 'approved') {
+    if (status === 'submitted') {
       return (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 text-center">
           <div className="text-2xl mb-1">✅</div>
-          <div className="text-sm font-semibold text-green-700">אושר על ידי המנהל</div>
+          <div className="text-sm font-semibold text-green-700">הטופס הוגש</div>
           <div className="text-xs text-green-600 mt-1">הניחושים נעולים ויחושבו כאשר משחקים יתקיימו.</div>
-        </div>
-      );
-    }
-    if (activeForm.rejectedAt) {
-      return (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-center">
-          <div className="text-xs text-red-600">ההגשה הקודמת הוחזרה על ידי המנהל. אנא בדוק ושלח מחדש.</div>
+          {!settings.predictionsLocked && (
+            <button
+              onClick={() => reopenForm(activeFormId)}
+              className="mt-2 text-xs bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg hover:bg-yellow-200 transition"
+            >
+              פתח לעריכה
+            </button>
+          )}
         </div>
       );
     }
@@ -321,11 +318,11 @@ export default function Predict() {
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
           <div className="text-3xl text-center mb-3">{hasErrors ? '⚠️' : '📋'}</div>
           <h3 className="text-lg font-bold text-center text-primary mb-2">
-            {hasErrors ? 'לא ניתן להגיש עדיין' : 'להגיש ניחושים?'}
+            {hasErrors ? 'הטופס לא מלא' : 'להגיש את הטופס?'}
           </h3>
           {hasErrors ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <div className="text-sm font-semibold text-red-700 mb-1">אנא תקן את הבאים:</div>
+              <div className="text-sm font-semibold text-red-700 mb-1">יש להשלים את הבאים:</div>
               <ul className="text-xs text-red-600 space-y-1">
                 {validationErrors.map((err, i) => (
                   <li key={i}>- {err}</li>
@@ -335,7 +332,7 @@ export default function Predict() {
           ) : (
             <>
               <p className="text-sm text-gray-600 text-center mb-4">
-                לאחר ההגשה לא תוכל לשנות עד שהמנהל יבדוק.
+                לאחר ההגשה הטופס יינעל. תוכל לפתוח אותו לעריכה בכל עת.
               </p>
               <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-4">
                 <div>טופס: {activeForm.formName}</div>
@@ -435,13 +432,10 @@ export default function Predict() {
           <span className="text-gray-300">|</span>
           <h1 className="text-lg font-bold text-primary truncate">{activeForm.formName}</h1>
         </div>
-        {status === 'pending' && (
-          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">⏳ ממתין</span>
+        {status === 'submitted' && (
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">✅ הוגש</span>
         )}
-        {status === 'approved' && (
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">✅ אושר</span>
-        )}
-        {settings.predictionsLocked && status === 'draft' && (
+        {settings.predictionsLocked && (
           <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">🔒 נעול</span>
         )}
       </div>
@@ -491,7 +485,7 @@ export default function Predict() {
             onClick={handleTrySubmit}
             className="w-full bg-green-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-600 active:bg-green-700 transition text-base"
           >
-            הגש ניחושים לאישור
+            הגש טופס
           </button>
         </div>
       )}
