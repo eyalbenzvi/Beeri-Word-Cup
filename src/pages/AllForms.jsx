@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAllPredictions, useUsers } from '../hooks/useStore';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
-import { calcBracketTeams } from '../utils/bracket';
+import { calcBracketTeams, deriveChampion } from '../utils/bracket';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -36,7 +36,7 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, userName }) {
+function FormCard({ form, userName, championDisplay }) {
   const [expanded, setExpanded] = useState(false);
   const predictions = form.matches || {};
   const bracketTeams = useMemo(() => calcBracketTeams(predictions), [predictions]);
@@ -58,6 +58,9 @@ function FormCard({ form, userName }) {
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm truncate">{form.formName || 'טופס ללא שם'}</div>
           <div className="text-xs text-gray-400">{userName} • {filledCount}/{totalCount} משחקים</div>
+          {championDisplay && (
+            <div className="text-xs text-yellow-600 mt-0.5">🏆 {championDisplay}</div>
+          )}
         </div>
         <span className="text-gray-400 text-sm">{expanded ? '▾' : '▸'}</span>
       </button>
@@ -111,12 +114,18 @@ export default function AllForms() {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const [filterText, setFilterText] = useState('');
-  const [filterBy, setFilterBy] = useState('form'); // 'form' or 'user'
+  const [filterBy, setFilterBy] = useState('form'); // 'form', 'user', or 'champion'
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
       .filter(([, form]) => normalizeStatus(form.status) === 'submitted')
-      .map(([formId, form]) => ({ formId, ...form }))
+      .map(([formId, form]) => {
+        const predictions = form.matches || {};
+        const bracketTeams = calcBracketTeams(predictions);
+        const championCode = deriveChampion(predictions, bracketTeams);
+        const championTeam = championCode ? getTeamByCode(championCode) : null;
+        return { formId, ...form, championCode, championName: championTeam?.name || null };
+      })
       .sort((a, b) => (a.formName || '').localeCompare(b.formName || ''));
   }, [allPredictions]);
 
@@ -127,8 +136,12 @@ export default function AllForms() {
       if (filterBy === 'form') {
         return (form.formName || '').toLowerCase().includes(query);
       }
-      const userName = users[form.userId]?.displayName || form.userId;
-      return userName.toLowerCase().includes(query);
+      if (filterBy === 'user') {
+        const userName = users[form.userId]?.displayName || form.userId;
+        return userName.toLowerCase().includes(query);
+      }
+      // champion
+      return (form.championName || '').toLowerCase().includes(query);
     });
   }, [submittedForms, filterText, filterBy, users]);
 
@@ -154,6 +167,7 @@ export default function AllForms() {
               {[
                 { id: 'form', label: 'לפי טופס' },
                 { id: 'user', label: 'לפי משתמש' },
+                { id: 'champion', label: 'לפי אלופה' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -170,7 +184,11 @@ export default function AllForms() {
               type="text"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder={filterBy === 'form' ? 'חפש לפי שם טופס...' : 'חפש לפי שם משתמש...'}
+              placeholder={
+                filterBy === 'form' ? 'חפש לפי שם טופס...' :
+                filterBy === 'user' ? 'חפש לפי שם משתמש...' :
+                'חפש לפי שם אלופה...'
+              }
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-primary focus:outline-none"
             />
           </div>
@@ -186,6 +204,7 @@ export default function AllForms() {
                 key={form.formId}
                 form={form}
                 userName={users[form.userId]?.displayName || form.userId}
+                championDisplay={form.championName}
               />
             ))}
             {filteredForms.length === 0 && (
