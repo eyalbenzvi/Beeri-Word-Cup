@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react';
 import {
   useCurrentUser, useMatchResults, useAllPredictions, useUsers,
-  useSettings, useActualAdvancing, useActualBonuses,
+  useSettings, useActualBonuses,
 } from '../hooks/useStore';
 import {
   saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
-  saveActualAdvancing, saveActualBonuses, approvePredictions, rejectPredictions,
+  saveActualBonuses, approvePredictions, rejectPredictions,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
-import { GROUPS, ALL_TEAMS, getTeamByCode } from '../data/teams';
+import { GROUPS, getTeamByCode } from '../data/teams';
 import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
@@ -16,13 +16,17 @@ import StageSelector from '../components/StageSelector';
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
 
+function randomScore() {
+  const weights = [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 5];
+  return weights[Math.floor(Math.random() * weights.length)];
+}
+
 export default function Admin() {
   const { user } = useCurrentUser();
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const settings = useSettings();
-  const actualAdvancing = useActualAdvancing();
   const actualBonuses = useActualBonuses();
   const [selectedStage, setSelectedStage] = useState('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
@@ -97,8 +101,25 @@ export default function Admin() {
     reader.readAsText(file);
   };
 
+  const handleRandomizeResults = () => {
+    if (!window.confirm('This will overwrite ALL actual results with random scores. Continue?')) return;
+    [...groupMatches, ...knockoutMatches].forEach((match) => {
+      saveMatchResult(match.id, {
+        homeTeam: match.homeTeam, awayTeam: match.awayTeam,
+        homeScore: randomScore(), awayScore: randomScore(),
+        stage: match.stage || 'group', group: match.group || null, played: true,
+      });
+    });
+  };
+
   const renderResultsTab = () => (
     <>
+      <button
+        onClick={handleRandomizeResults}
+        className="w-full mb-3 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"
+      >
+        🎲 Randomize All Results
+      </button>
       <StageSelector selectedStage={selectedStage} onSelect={setSelectedStage} />
       {selectedStage === 'group' && (
         <GroupSelector groups={Object.keys(GROUPS)} selectedGroup={selectedGroup} onSelect={setSelectedGroup} />
@@ -161,72 +182,14 @@ export default function Admin() {
     </>
   );
 
-  const renderAdvancingTab = () => {
-    const rounds = [
-      { id: 'R32', label: 'Teams in Round of 32', count: 32 },
-      { id: 'R16', label: 'Teams in Round of 16', count: 16 },
-      { id: 'QF', label: 'Teams in Quarter-Finals', count: 8 },
-      { id: 'SF', label: 'Teams in Semi-Finals', count: 4 },
-      { id: 'F', label: 'Teams in Final', count: 2 },
-    ];
-
-    return (
-      <div className="space-y-4">
-        <p className="text-xs text-gray-400">Select teams that actually advanced to each round.</p>
-        {rounds.map((round) => {
-          const selected = actualAdvancing[round.id] || [];
-          return (
-            <div key={round.id} className="bg-white rounded-xl p-4 border border-gray-100">
-              <h3 className="font-bold text-sm text-primary mb-2">
-                {round.label} ({selected.length}/{round.count})
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_TEAMS.map((team) => {
-                  const isSelected = selected.includes(team.code);
-                  return (
-                    <button key={team.code} onClick={() => {
-                      const newSelected = isSelected
-                        ? selected.filter(t => t !== team.code)
-                        : selected.length < round.count ? [...selected, team.code] : selected;
-                      saveActualAdvancing(round.id, newSelected);
-                    }}
-                    className={`px-2 py-1 rounded-lg text-xs font-medium transition ${
-                      isSelected ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}>
-                      {team.flag} {team.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderBonusesTab = () => (
+  const renderTopScorerTab = () => (
     <div className="space-y-4">
       <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">🏆 Champion</h3>
-        <div className="flex flex-wrap gap-1.5">
-          {ALL_TEAMS.map((team) => (
-            <button key={team.code} onClick={() => saveActualBonuses({ ...actualBonuses, champion: team.code })}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition ${
-                actualBonuses.champion === team.code ? 'bg-yellow-400 text-yellow-900 font-bold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
-              {team.flag} {team.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">⚽ Top Scorers</h3>
-        <p className="text-xs text-gray-400 mb-2">Add all players tied for top scorer.</p>
+        <h3 className="font-bold text-sm text-primary mb-2">⚽ מלך השערים</h3>
+        <p className="text-xs text-gray-400 mb-2">הוסף את כל השחקנים שנמצאים בראש טבלת הכובשים (במקרה של שוויון).</p>
         <div className="flex gap-2 mb-2">
           <input type="text" value={topScorerInput} onChange={(e) => setTopScorerInput(e.target.value)}
-            placeholder="Player name..." className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+            placeholder="שם שחקן..." className="flex-1 px-3 py-2 border rounded-lg text-sm" />
           <button onClick={() => {
             if (!topScorerInput.trim()) return;
             const current = actualBonuses.topScorers || [];
@@ -324,7 +287,6 @@ export default function Admin() {
         displayName: users[userId]?.formName || users[userId]?.displayName || userId,
         status: pred.status || 'draft',
         matchCount: Object.keys(pred.matches || {}).length,
-        champion: pred.champion ? getTeamByCode(pred.champion) : null,
         topScorer: pred.topScorer || '',
         submittedAt: pred.submittedAt,
         approvedAt: pred.approvedAt,
@@ -353,8 +315,7 @@ export default function Admin() {
                 <div className="text-sm font-semibold truncate">{entry.displayName}</div>
                 <div className="text-xs text-gray-400">
                   {entry.matchCount} matches •
-                  {entry.champion ? ` ${entry.champion.flag} ${entry.champion.name}` : ' No champion'} •
-                  {entry.topScorer ? ` ${entry.topScorer}` : ' No scorer'}
+                  {entry.topScorer ? ` מלך: ${entry.topScorer}` : ' ללא מלך שערים'}
                 </div>
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -428,8 +389,7 @@ export default function Admin() {
         {[
           { id: 'approvals', label: pendingCount > 0 ? `Approve (${pendingCount})` : 'Approve' },
           { id: 'results', label: 'Results' },
-          { id: 'advancing', label: 'Advancing' },
-          { id: 'bonuses', label: 'Bonuses' },
+          { id: 'topscorer', label: 'מלך שערים' },
           { id: 'settings', label: 'Settings' },
           { id: 'users', label: 'Users' },
         ].map((tab) => (
@@ -444,8 +404,7 @@ export default function Admin() {
 
       {activeTab === 'approvals' && renderApprovalsTab()}
       {activeTab === 'results' && renderResultsTab()}
-      {activeTab === 'advancing' && renderAdvancingTab()}
-      {activeTab === 'bonuses' && renderBonusesTab()}
+      {activeTab === 'topscorer' && renderTopScorerTab()}
       {activeTab === 'settings' && renderSettingsTab()}
       {activeTab === 'users' && renderUsersTab()}
     </div>
