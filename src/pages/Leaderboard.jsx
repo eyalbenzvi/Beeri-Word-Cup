@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   useCurrentUser, useMatchResults, useAllPredictions,
-  useUsers, useActualAdvancing, useActualBonuses,
+  useUsers, useActualBonuses,
 } from '../hooks/useStore';
 import { calculateFullScore, compareTiebreaker, calculateMatchPoints } from '../utils/scoring';
 import { generateGroupMatches, generateKnockoutMatches, STAGES } from '../data/matches';
@@ -20,23 +20,31 @@ export default function Leaderboard() {
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
   const users = useUsers();
-  const actualAdvancing = useActualAdvancing();
   const actualBonuses = useActualBonuses();
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Compute bracket from actual results (once, shared)
+  const actualBracket = calcBracketTeams(results);
+  const actualDerivedAdvancing = deriveAdvancingTeams(actualBracket);
+  const actualDerivedChampion = deriveChampion(results, actualBracket);
 
   // Calculate scores for all users (derive advancing & champion from bracket)
   const leaderboard = Object.entries(allPredictions)
     .map(([userId, predData]) => {
       const matchPreds = predData.matches || {};
-      const bracket = calcBracketTeams(matchPreds);
-      const derivedAdvancing = deriveAdvancingTeams(bracket);
-      const derivedChampion = deriveChampion(matchPreds, bracket);
+      const predBracket = calcBracketTeams(matchPreds);
+      const derivedAdvancing = deriveAdvancingTeams(predBracket);
+      const derivedChampion = deriveChampion(matchPreds, predBracket);
       const enrichedPredData = {
         ...predData,
         advancing: derivedAdvancing,
         champion: derivedChampion,
       };
-      const score = calculateFullScore(enrichedPredData, results, actualAdvancing, actualBonuses);
+      const score = calculateFullScore(
+        enrichedPredData, results, actualDerivedAdvancing,
+        { ...actualBonuses, champion: actualDerivedChampion },
+        predBracket, actualBracket
+      );
       const userInfo = users[userId] || {};
       return {
         userId,
@@ -56,15 +64,16 @@ export default function Leaderboard() {
 
     const predData = allPredictions[selectedUser] || {};
     const matchPreds = predData.matches || {};
-    const bracket = calcBracketTeams(matchPreds);
-    const derivedAdvancing = deriveAdvancingTeams(bracket);
-    const derivedChampion = deriveChampion(matchPreds, bracket);
+    const predBracket = calcBracketTeams(matchPreds);
+    const derivedAdvancing = deriveAdvancingTeams(predBracket);
+    const derivedChampion = deriveChampion(matchPreds, predBracket);
     const enrichedPredData = { ...predData, advancing: derivedAdvancing, champion: derivedChampion };
-    const score = calculateFullScore(enrichedPredData, results, actualAdvancing, actualBonuses);
+    const score = calculateFullScore(
+      enrichedPredData, results, actualDerivedAdvancing,
+      { ...actualBonuses, champion: actualDerivedChampion },
+      predBracket, actualBracket
+    );
     const playedMatches = Object.keys(results);
-
-    // Compute bracket from actual results for knockout team names
-    const resultsBracket = calcBracketTeams(results);
 
     const matchesByStage = {};
     for (const matchId of playedMatches) {
@@ -89,38 +98,54 @@ export default function Leaderboard() {
         </h2>
 
         {/* Score breakdown */}
-        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 grid grid-cols-2 gap-2 text-center text-xs">
+        <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-lg font-bold text-primary">{score.totalPoints}</div>
-            <div className="text-gray-500">Total Points</div>
+            <div className="text-gray-500">סה״כ</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-lg font-bold text-green-600">{score.exactScoreCount}</div>
-            <div className="text-gray-500">Exact Scores</div>
+            <div className="text-gray-500">תוצאות מדויקות</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-lg font-bold text-blue-600">{score.outcomeCount}</div>
-            <div className="text-gray-500">Correct Outcomes</div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-lg font-bold">
-              {score.correctChampion ? '✅' : '❌'}
-            </div>
-            <div className="text-gray-500">Champion</div>
+            <div className="text-gray-500">הכרעות</div>
           </div>
         </div>
+
+        {/* Advancing points */}
+        {Object.values(score.advancingPoints).some(v => v > 0) && (
+          <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 text-sm">
+            <div className="text-xs font-semibold text-gray-600 mb-1">נקודות עליה:</div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[['R32','שמינית'],['R16','שמינית-16'],['QF','רבע'],['SF','חצי'],['F','גמר']].map(([round, label]) => {
+                const pts = score.advancingPoints[round] || 0;
+                if (!pts) return null;
+                return (
+                  <span key={round} className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                    {label}: +{pts}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Bonus predictions */}
         <div className="bg-white rounded-xl p-3 mb-4 border border-gray-100 text-sm">
           <div className="flex justify-between py-1 border-b border-gray-50">
-            <span className="text-gray-600">Champion pick:</span>
+            <span className="text-gray-600">ניחוש אלופה:</span>
             <span className="font-medium">
-              {derivedChampion ? (getTeamByCode(derivedChampion)?.flag + ' ' + getTeamByCode(derivedChampion)?.name) : 'None'}
+              {derivedChampion ? (getTeamByCode(derivedChampion)?.flag + ' ' + getTeamByCode(derivedChampion)?.name) : 'אין'}
+              {score.correctChampion ? ' ✅' : ''}
             </span>
           </div>
           <div className="flex justify-between py-1">
-            <span className="text-gray-600">Top scorer pick:</span>
-            <span className="font-medium">{predData.topScorer || 'None'}</span>
+            <span className="text-gray-600">ניחוש מלך שערים:</span>
+            <span className="font-medium">
+              {predData.topScorer || 'אין'}
+              {score.correctTopScorer ? ' ✅' : ''}
+            </span>
           </div>
         </div>
 
@@ -132,20 +157,35 @@ export default function Leaderboard() {
             </h3>
             {matches.map(({ matchId, match, result }) => {
               const prediction = predData.matches?.[matchId];
-              const pts = calculateMatchPoints(prediction, result, stage);
+              const predTeams = predBracket[matchId] || null;
+              const actTeams = actualBracket[matchId] || null;
+              const pts = calculateMatchPoints(prediction, result, stage, predTeams, actTeams);
               // For knockout, derive real team names from actual results bracket
-              const derivedMatch = match?.stage !== 'group' && resultsBracket[matchId]
-                ? { ...match, homeTeam: resultsBracket[matchId].home, awayTeam: resultsBracket[matchId].away }
+              const derivedMatch = match?.stage !== 'group' && actTeams
+                ? { ...match, homeTeam: actTeams.home, awayTeam: actTeams.away }
                 : match || { homeTeam: result.homeTeam, awayTeam: result.awayTeam };
+              // Show user's predicted matchup for knockout
+              const predMatchup = (stage !== 'group' && predTeams?.home && predTeams?.away)
+                ? { home: getTeamByCode(predTeams.home), away: getTeamByCode(predTeams.away) }
+                : null;
               return (
-                <MatchCard
-                  key={matchId}
-                  match={derivedMatch}
-                  prediction={prediction}
-                  actualResult={result}
-                  showPoints
-                  points={pts}
-                />
+                <div key={matchId}>
+                  <MatchCard
+                    match={derivedMatch}
+                    prediction={prediction}
+                    actualResult={result}
+                    showPoints
+                    points={pts}
+                  />
+                  {predMatchup && (
+                    <div className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl ${
+                      pts.wrongMatchup ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
+                    }`}>
+                      ניחש: {predMatchup.home?.flag} {predMatchup.home?.name || predTeams.home} vs {predMatchup.away?.flag} {predMatchup.away?.name || predTeams.away}
+                      {prediction ? ` (${prediction.homeScore}-${prediction.awayScore})` : ''}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

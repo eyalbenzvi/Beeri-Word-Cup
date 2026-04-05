@@ -56,14 +56,26 @@ function getOutcome(homeScore, awayScore) {
 }
 
 // Calculate points for a single match prediction
-// Returns { points, outcomePoints, exactPoints, breakdown }
-export function calculateMatchPoints(prediction, actual, stage) {
+// For knockout: predTeams/actualTeams = {home, away} — only score if same matchup
+// Returns { points, outcomePoints, exactPoints, breakdown, wrongMatchup }
+export function calculateMatchPoints(prediction, actual, stage, predTeams, actualTeams) {
   if (!prediction || !actual || actual.homeScore === null || actual.awayScore === null) {
-    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'Not played yet' };
+    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'Not played yet', wrongMatchup: false };
   }
   if (prediction.homeScore === null || prediction.homeScore === undefined ||
       prediction.awayScore === null || prediction.awayScore === undefined) {
-    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'No prediction' };
+    return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'No prediction', wrongMatchup: false };
+  }
+
+  // For knockout: check if the user predicted the same teams playing
+  if (stage !== 'group' && predTeams && actualTeams) {
+    const predSet = new Set([predTeams.home, predTeams.away].filter(Boolean));
+    const actSet = new Set([actualTeams.home, actualTeams.away].filter(Boolean));
+    const sameMatchup = predSet.size === 2 && actSet.size === 2 &&
+      [...predSet].every(t => actSet.has(t));
+    if (!sameMatchup) {
+      return { points: 0, outcomePoints: 0, exactPoints: 0, breakdown: 'Different matchup', wrongMatchup: true };
+    }
   }
 
   const stagePoints = POINTS[stage] || POINTS.group;
@@ -93,7 +105,7 @@ export function calculateMatchPoints(prediction, actual, stage) {
   }
 
   const breakdown = parts.length > 0 ? parts.join(', ') : 'No points';
-  return { points, outcomePoints, exactPoints, breakdown };
+  return { points, outcomePoints, exactPoints, breakdown, wrongMatchup: false };
 }
 
 // Calculate advancing points for knockout matches
@@ -104,7 +116,9 @@ export function calculateAdvancingPoints(predictedTeam, actualTeam, stage) {
 }
 
 // Calculate full score for a user including all bonuses
-export function calculateFullScore(userPredictions, actualResults, actualAdvancing, actualBonuses) {
+// predBracket = user's bracket derived from their predictions
+// actualBracket = bracket derived from actual results
+export function calculateFullScore(userPredictions, actualResults, actualAdvancing, actualBonuses, predBracket, actualBracket) {
   let totalPoints = 0;
   let exactScoreCount = 0;
   let outcomeCount = 0;
@@ -116,7 +130,12 @@ export function calculateFullScore(userPredictions, actualResults, actualAdvanci
   for (const [matchId, actual] of Object.entries(actualResults)) {
     const prediction = userPredictions.matches?.[matchId];
     const stage = actual.stage || 'group';
-    const result = calculateMatchPoints(prediction, actual, stage);
+
+    // For knockout, pass team info to check matchup
+    const predTeams = predBracket?.[matchId] || null;
+    const actualTeams = actualBracket?.[matchId] || null;
+
+    const result = calculateMatchPoints(prediction, actual, stage, predTeams, actualTeams);
     matchScores[matchId] = result;
     totalPoints += result.points;
     if (result.exactPoints > 0) exactScoreCount++;
@@ -124,13 +143,19 @@ export function calculateFullScore(userPredictions, actualResults, actualAdvanci
   }
 
   // 2. Advancing predictions (group stage + knockout)
+  // Derive actual advancing from actual bracket if not provided separately
+  const effectiveActualAdvancing = actualAdvancing && Object.keys(actualAdvancing).length > 0
+    ? actualAdvancing : null;
+
   const advancingPoints = { R32: 0, R16: 0, QF: 0, SF: 0, F: 0 };
 
-  if (actualAdvancing && userPredictions.advancing) {
-    for (const [round, actualTeams] of Object.entries(actualAdvancing)) {
-      const predictedTeams = userPredictions.advancing[round] || [];
-      const stage = round === 'R32' ? 'group' : // advancing TO R32 = group stage pts
-                    round === 'R16' ? 'R32' :    // advancing TO R16 = R32 pts
+  if (userPredictions.advancing) {
+    const advancingSource = effectiveActualAdvancing || {};
+    for (const [round, predictedTeams] of Object.entries(userPredictions.advancing)) {
+      const actualTeams = advancingSource[round] || [];
+      if (actualTeams.length === 0) continue;
+      const stage = round === 'R32' ? 'group' :
+                    round === 'R16' ? 'R32' :
                     round === 'QF' ? 'R16' :
                     round === 'SF' ? 'QF' :
                     round === 'F' ? 'SF' : 'group';
