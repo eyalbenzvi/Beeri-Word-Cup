@@ -26,10 +26,16 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Phone auth helpers
 export async function sendPhoneOTP(phoneNumber) {
-  // Clear previous verifier if exists
+  // Destroy and recreate the recaptcha container DOM element
   if (window.recaptchaVerifier) {
     try { window.recaptchaVerifier.clear(); } catch {}
     window.recaptchaVerifier = null;
+  }
+  const oldEl = document.getElementById('recaptcha-container');
+  if (oldEl) {
+    const newEl = document.createElement('div');
+    newEl.id = 'recaptcha-container';
+    oldEl.replaceWith(newEl);
   }
 
   window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
