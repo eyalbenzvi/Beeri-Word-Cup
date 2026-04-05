@@ -63,6 +63,9 @@ export default function Leaderboard() {
     const score = calculateFullScore(enrichedPredData, results, actualAdvancing, actualBonuses);
     const playedMatches = Object.keys(results);
 
+    // Compute bracket from actual results for knockout team names
+    const resultsBracket = calcBracketTeams(results);
+
     const matchesByStage = {};
     for (const matchId of playedMatches) {
       const match = allMatchesMap[matchId];
@@ -112,7 +115,7 @@ export default function Leaderboard() {
           <div className="flex justify-between py-1 border-b border-gray-50">
             <span className="text-gray-600">Champion pick:</span>
             <span className="font-medium">
-              {predData.champion ? (getTeamByCode(predData.champion)?.flag + ' ' + getTeamByCode(predData.champion)?.name) : 'None'}
+              {derivedChampion ? (getTeamByCode(derivedChampion)?.flag + ' ' + getTeamByCode(derivedChampion)?.name) : 'None'}
             </span>
           </div>
           <div className="flex justify-between py-1">
@@ -130,10 +133,14 @@ export default function Leaderboard() {
             {matches.map(({ matchId, match, result }) => {
               const prediction = predData.matches?.[matchId];
               const pts = calculateMatchPoints(prediction, result, stage);
+              // For knockout, derive real team names from actual results bracket
+              const derivedMatch = match?.stage !== 'group' && resultsBracket[matchId]
+                ? { ...match, homeTeam: resultsBracket[matchId].home, awayTeam: resultsBracket[matchId].away }
+                : match || { homeTeam: result.homeTeam, awayTeam: result.awayTeam };
               return (
                 <MatchCard
                   key={matchId}
-                  match={match || { homeTeam: result.homeTeam, awayTeam: result.awayTeam }}
+                  match={derivedMatch}
                   prediction={prediction}
                   actualResult={result}
                   showPoints
