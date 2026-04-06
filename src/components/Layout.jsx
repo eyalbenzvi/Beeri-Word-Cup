@@ -123,13 +123,15 @@ export default function Layout({ children }) {
   const { page, navigate } = useNavigation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const navItems = [
-    { id: 'home', label: 'בית', icon: '🏠' },
-    { id: 'predict', label: 'טפסים', icon: '📋' },
-    { id: 'leaderboard', label: 'דירוג', icon: '🏆' },
-    { id: 'results', label: 'תוצאות', icon: '⚽' },
-    { id: 'stats', label: 'סטטיסטיקות', icon: '📈' },
-  ];
+  const navItems = user
+    ? [
+        { id: 'home', label: 'בית', icon: '🏠' },
+        { id: 'predict', label: 'טפסים', icon: '📋' },
+        { id: 'leaderboard', label: 'דירוג', icon: '🏆' },
+        { id: 'results', label: 'תוצאות', icon: '⚽' },
+        { id: 'stats', label: 'סטטיסטיקות', icon: '📈' },
+      ]
+    : [{ id: 'home', label: 'בית', icon: '🏠' }];
   if (user?.isAdmin) navItems.push({ id: 'admin', label: 'ניהול', icon: '⚙️' });
 
   return (
