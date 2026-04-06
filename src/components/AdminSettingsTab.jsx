@@ -67,15 +67,6 @@ export default function AdminSettingsTab({
             />
           </button>
         </div>
-        <div className="py-3">
-          <div className="text-sm font-medium mb-2">קוד מנהל</div>
-          <input
-            type="text"
-            defaultValue={settings.adminPin || "1234"}
-            onBlur={(e) => updateSettings({ adminPin: e.target.value })}
-            className="w-32 px-3 py-1.5 border rounded text-sm"
-          />
-        </div>
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-gray-100">

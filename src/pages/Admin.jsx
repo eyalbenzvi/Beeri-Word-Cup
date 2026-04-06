@@ -23,8 +23,6 @@ export default function Admin() {
   const settings = useSettings();
   const actualBonuses = useActualBonuses();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [adminPin, setAdminPin] = useState("");
-  const [pinVerified, setPinVerified] = useState(false);
   const [topScorerInput, setTopScorerInput] = useState("");
 
   if (!user?.isAdmin) {
@@ -35,45 +33,6 @@ export default function Admin() {
         <p className="text-gray-500 text-sm mt-2">
           השחקן הראשון שמצטרף הופך למנהל.
         </p>
-      </div>
-    );
-  }
-
-  if (!pinVerified && activeTab === "settings") {
-    const currentPin = settings.adminPin || "1234";
-    return (
-      <div className="text-center py-12">
-        <div className="text-5xl mb-4">🔑</div>
-        <h2 className="text-lg font-bold text-gray-700 mb-4">הכנס קוד מנהל</h2>
-        <p className="text-xs text-gray-400 mb-3">קוד ברירת מחדל: 1234</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (adminPin === currentPin) setPinVerified(true);
-          }}
-        >
-          <input
-            type="password"
-            value={adminPin}
-            onChange={(e) => setAdminPin(e.target.value)}
-            placeholder="PIN"
-            className="w-32 px-4 py-2 border-2 border-gray-200 rounded-xl text-center text-lg tracking-widest focus:border-primary focus:outline-none mb-3"
-            autoFocus
-          />
-          <br />
-          <button
-            type="submit"
-            className="bg-primary text-white font-semibold px-6 py-2 rounded-xl hover:bg-primary-light transition"
-          >
-            אימות
-          </button>
-        </form>
-        <button
-          onClick={() => setActiveTab("results")}
-          className="mt-3 text-sm text-gray-400 hover:text-primary"
-        >
-          חזרה →
-        </button>
       </div>
     );
   }
