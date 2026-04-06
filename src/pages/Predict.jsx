@@ -16,9 +16,9 @@ import {
   setActiveFormId,
 } from "../store";
 import { groupMatches, knockoutMatches } from "../data/matches";
-import { GROUPS } from "../data/teams";
+import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
-import { randomScore, normalizeStatus } from "../utils/helpers";
+import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
@@ -222,66 +222,112 @@ export default function Predict() {
     setShowConfirm(true);
   }, [activeFormId, activeForm, allPredictions]);
 
-  const handleRandomize = useCallback(() => {
+  const [aiProgress, setAiProgress] = useState(null); // null | { current, total, label }
+
+  const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
-    if (!window.confirm("פעולה זו תדרוס את כל הניחושים הקיימים בהגרלה אקראית. להמשיך?")) return;
+    if (!window.confirm("פעולה זו תמלא את כל הניחושים בעזרת AI. ניחושים קיימים יידרסו. להמשיך?")) return;
 
     const allPreds = {};
+    const groupNames = Object.keys(GROUPS);
+    const totalSteps = groupNames.length + 2; // 12 groups + knockout + top scorer
+    let step = 0;
 
-    groupMatches.forEach((match) => {
-      const pred = { homeScore: randomScore(), awayScore: randomScore() };
-      allPreds[match.id] = pred;
-      savePrediction(activeFormId, match.id, pred);
-    });
+    try {
+      // 1. Group stage: one API call per group (12 calls)
+      for (const groupName of groupNames) {
+        step++;
+        setAiProgress({ current: step, total: totalSteps, label: `בית ${groupName}` });
 
-    knockoutMatches.forEach((match) => {
-      const pred = { homeScore: randomScore(), awayScore: randomScore() };
-      allPreds[match.id] = pred;
-      savePrediction(activeFormId, match.id, pred);
-    });
+        const gMatches = groupMatches.filter((m) => m.group === groupName);
+        const matchData = gMatches.map((m) => ({
+          id: m.id,
+          homeTeamName: getTeamByCode(m.homeTeam)?.name || m.homeTeam,
+          awayTeamName: getTeamByCode(m.awayTeam)?.name || m.awayTeam,
+          stage: "group",
+          group: groupName,
+        }));
 
-    for (const stage of knockoutStageOrder) {
-      const bracket = calcBracketTeams(allPreds);
-      for (const match of knockoutMatches.filter((m) => m.stage === stage)) {
-        const pred = allPreds[match.id];
-        if (pred.homeScore === pred.awayScore) {
-          const teams = bracket[match.id];
-          if (teams?.home && teams?.away) {
-            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-            savePrediction(activeFormId, match.id, pred);
-          }
+        const res = await fetch("/.netlify/functions/batch-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ matches: matchData }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `שגיאה בבית ${groupName}`);
+
+        for (const r of data.results) {
+          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
+          allPreds[r.id] = pred;
+          savePrediction(activeFormId, r.id, pred);
         }
       }
-    }
 
-    const topScorers = [
-      "Mbappé",
-      "Haaland",
-      "Vinicius Jr",
-      "Messi",
-      "Kane",
-      "Salah",
-      "Lewandowski",
-      "Rashford",
-      "Morata",
-      "Lautaro Martínez",
-      "Osimhen",
-      "Álvarez",
-      "Isak",
-      "Saka",
-      "Yamal",
-      "Gyökeres",
-      "Son",
-      "Retegui",
-      "Pulisic",
-      "David",
-    ];
-    saveBonusPrediction(
-      activeFormId,
-      "topScorer",
-      topScorers[Math.floor(Math.random() * topScorers.length)],
-    );
-    showToast("כל הניחושים הוגרלו! 🎲");
+      // 2. Knockout stage: derive bracket from group results, then predict
+      step++;
+      setAiProgress({ current: step, total: totalSteps, label: "שלב הנוקאאוט" });
+
+      // Build bracket from group predictions to know knockout teams
+      for (const stage of knockoutStageOrder) {
+        const bracket = calcBracketTeams(allPreds);
+        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
+        const matchData = stageMatches
+          .filter((m) => {
+            const teams = bracket[m.id];
+            return teams?.home && teams?.away;
+          })
+          .map((m) => {
+            const teams = bracket[m.id];
+            return {
+              id: m.id,
+              homeTeamName: getTeamByCode(teams.home)?.name || teams.home,
+              awayTeamName: getTeamByCode(teams.away)?.name || teams.away,
+              stage: m.stage,
+            };
+          });
+
+        if (matchData.length === 0) continue;
+
+        const res = await fetch("/.netlify/functions/batch-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ matches: matchData }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `שגיאה ב${stage}`);
+
+        for (const r of data.results) {
+          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
+          // Handle knockout draws: pick home team as advancing
+          if (pred.homeScore === pred.awayScore) {
+            const teams = bracket[r.id];
+            if (teams?.home) pred.advancingTeam = teams.home;
+          }
+          allPreds[r.id] = pred;
+          savePrediction(activeFormId, r.id, pred);
+        }
+      }
+
+      // 3. Top scorer
+      step++;
+      setAiProgress({ current: step, total: totalSteps, label: "מלך שערים" });
+
+      const tsRes = await fetch("/.netlify/functions/batch-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "topScorer" }),
+      });
+      const tsData = await tsRes.json();
+      if (tsRes.ok && tsData.name) {
+        saveBonusPrediction(activeFormId, "topScorer", tsData.name);
+      }
+
+      showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
+    } catch (err) {
+      showToast(`שגיאה: ${err.message}`);
+    } finally {
+      setAiProgress(null);
+    }
   }, [activeFormId, canEdit, showToast]);
 
   const handleMatchJump = useCallback((match) => {
@@ -542,10 +588,18 @@ export default function Predict() {
       {status === "draft" && !settings.predictionsLocked && (
         <div className="sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto">
           <button
-            onClick={handleRandomize}
-            className="w-full bg-white text-primary font-bold py-3 rounded-2xl border-2 border-primary/20 shadow-sm hover:bg-gray-50 transition text-sm border-none cursor-pointer"
+            onClick={handleAIFill}
+            disabled={!!aiProgress}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-blue-600 hover:to-purple-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            🎲 הגרלת כל הניחושים
+            {aiProgress ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {aiProgress.label} ({aiProgress.current}/{aiProgress.total})
+              </span>
+            ) : (
+              "🤖 מלא הכל עם AI"
+            )}
           </button>
           <button
             onClick={handleTrySubmit}
