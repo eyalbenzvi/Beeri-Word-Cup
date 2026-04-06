@@ -20,39 +20,30 @@ const PAGES = {
   admin: Admin,
 };
 
+function Loading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-4xl animate-bounce">⚽</div>
+        <div className="text-gray-500 text-sm mt-3">טוען...</div>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const ready = useStoreReady();
   const { page } = useNavigation();
-  const { user, authReady } = useCurrentUser();
+  const { user, authReady, isLoggedIn } = useCurrentUser();
 
   // Wait for Firebase Auth to determine login state
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl animate-bounce">⚽</div>
-          <div className="text-gray-500 text-sm mt-3">טוען...</div>
-        </div>
-      </div>
-    );
-  }
+  if (!authReady) return <Loading />;
 
-  // Not logged in — show welcome/login screen (no Firestore needed)
-  if (!user) {
-    return <WelcomeScreen />;
-  }
+  // Not logged in at all — show welcome/login screen
+  if (!isLoggedIn) return <WelcomeScreen />;
 
-  // Logged in but Firestore data still loading
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl animate-bounce">⚽</div>
-          <div className="text-gray-500 text-sm mt-3">טוען...</div>
-        </div>
-      </div>
-    );
-  }
+  // Logged in but Firestore data or user record still loading
+  if (!ready || !user) return <Loading />;
 
   const Page = PAGES[page] || Home;
 

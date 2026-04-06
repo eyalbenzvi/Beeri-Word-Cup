@@ -57,7 +57,7 @@ export function useCurrentUser() {
     }
   }, []);
 
-  return { user, logout, authReady };
+  return { user, logout, authReady, isLoggedIn: !!firebaseUser };
 }
 
 export function useUsers() {
