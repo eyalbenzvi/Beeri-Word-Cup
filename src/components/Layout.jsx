@@ -194,8 +194,12 @@ function InfoDropdown({ open, onToggle }) {
   );
 }
 
-function BottomMoreSheet({ open, onClose, navigate, page }) {
+function BottomMoreSheet({ open, onClose, navigate, page, isAdmin }) {
   if (!open) return null;
+  const items = [{ id: "stats", label: "סטטיסטיקות", icon: BarChart3 }];
+  if (isAdmin) {
+    items.push({ id: "admin", label: "ניהול", icon: Settings });
+  }
   return (
     <>
       <div
@@ -207,7 +211,7 @@ function BottomMoreSheet({ open, onClose, navigate, page }) {
           <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
         <div className="px-4 pb-4 space-y-1">
-          {[{ id: "stats", label: "סטטיסטיקות" }].map(({ id, label }) => (
+          {items.map(({ id, label, icon: ItemIcon }) => (
             <button
               key={id}
               onClick={() => {
@@ -220,7 +224,7 @@ function BottomMoreSheet({ open, onClose, navigate, page }) {
                   : "text-ink hover:bg-gray-50"
               }`}
             >
-              <BarChart3 size={20} />
+              <ItemIcon size={20} />
               {label}
             </button>
           ))}
@@ -257,7 +261,7 @@ export default function Layout({ children }) {
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול" });
 
   const mobileNavItems = user
-    ? allNavItems.filter((item) => item.id !== "stats")
+    ? allNavItems.filter((item) => item.id !== "stats" && item.id !== "admin")
     : allNavItems;
 
   return (
@@ -362,12 +366,14 @@ export default function Layout({ children }) {
             <button
               onClick={() => setMoreOpen(true)}
               className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[11px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
-                page === "stats" ? "text-primary font-bold" : "text-ink-muted"
+                page === "stats" || page === "admin"
+                  ? "text-primary font-bold"
+                  : "text-ink-muted"
               }`}
             >
               <MoreHorizontal
                 size={22}
-                strokeWidth={page === "stats" ? 2.5 : 1.5}
+                strokeWidth={page === "stats" || page === "admin" ? 2.5 : 1.5}
                 className="mb-0.5"
               />
               עוד
@@ -381,6 +387,7 @@ export default function Layout({ children }) {
         onClose={() => setMoreOpen(false)}
         navigate={navigate}
         page={page}
+        isAdmin={user?.isAdmin}
       />
     </div>
   );
