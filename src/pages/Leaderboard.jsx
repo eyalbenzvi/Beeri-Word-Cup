@@ -314,9 +314,6 @@ export default function Leaderboard({
                     </div>
                     <div className="text-[10px] text-ink-muted/60">נק׳</div>
                   </div>
-                  {!forceUnlockView && !locked && entry.userId !== user?.id && (
-                    <span className="text-gray-300 text-sm">🔒</span>
-                  )}
                 </button>
               );
             })}
