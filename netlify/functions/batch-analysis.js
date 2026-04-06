@@ -37,15 +37,9 @@ function pickRandom(arr) {
 function generateVarietyContext() {
   const persona = pickRandom(PERSONAS);
   const narrative = pickRandom(NARRATIVES);
-  const temperature = 0.8 + Math.random() * 0.7;
+  const temperature = 0.8 + Math.random() * 0.4; // 0.8-1.2 (less wild)
   const seed = Math.floor(Math.random() * 100000);
-  const darkHorses = [];
-  const candidates = ["MAR", "JPN", "KOR", "SEN", "AUS", "TUR", "CIV", "EGY", "IRQ", "NOR", "AUT", "SCO", "GHA", "UZB"];
-  while (darkHorses.length < 2) {
-    const dh = pickRandom(candidates);
-    if (!darkHorses.includes(dh)) darkHorses.push(dh);
-  }
-  return { persona, narrative, temperature, seed, darkHorses };
+  return { persona, narrative, temperature, seed };
 }
 
 function createGroqClient() {
@@ -109,28 +103,21 @@ export async function handler(event) {
     ? "שלב הבתים"
     : getStageLabel(matches[0].stage);
 
-  const moodHints = matches.length > 4
-    ? matches.slice(0, 3).map((m) => `${m.id}: mood is "${pickRandom(MOODS)}"`).join("; ")
-    : "";
-
   const prompt = `${variety.persona.style}
 
-TOURNAMENT NARRATIVE: ${variety.narrative}
 RANDOM SEED: ${variety.seed}
 
 Predict realistic scores for these FIFA World Cup 2026 matches (${stageInfo}):
 
 ${matchList}
 
-${moodHints ? `MATCH MOODS (use these to influence specific predictions): ${moodHints}` : ""}
-${variety.darkHorses.length ? `DARK HORSES this tournament: ${variety.darkHorses.join(", ")} — give them better results if they appear.` : ""}
-
-STATISTICAL CONSTRAINTS (based on real World Cup data):
-- Real World Cups: ~25% draws, ~25% upsets, avg 2.5 goals/match
-- Score distribution should roughly follow: 1-0 (18%), 2-1 (14%), 0-0 (8%), 2-0 (10%), 1-1 (10%), 3-1 (7%), other (33%)
-- NEVER repeat the same exact score more than twice in this batch
-- Upsets must be by narrow margins (1-0, 2-1, 0-1) — never extreme
-- Include at least 1 high-scoring game (3+ goals per side combined)
+RULES:
+- Favorites should win MOST matches. Upsets are rare (max 1-2 per group, by narrow margins like 1-0).
+- Include 1-2 draws per group (0-0 or 1-1). Draws are common in World Cups.
+- Use varied scores — don't repeat the same score more than twice.
+- Most matches: 0-3 total goals. Occasionally 4-5 total.
+- Strong teams (BRA, FRA, ARG, GER, ESP, ENG, POR, NED, BEL) should generally advance.
+- Weaker teams (HAI, CUR, NZL, PAN, CPV, IRQ) rarely win — draws at best.
 
 Return a JSON object with a "results" array:
 {"results": [{"id": "match-id", "homeScore": 2, "awayScore": 1}, ...]}

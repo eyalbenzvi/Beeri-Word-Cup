@@ -269,17 +269,23 @@ export default function Predict() {
     return data;
   };
 
+  // Generate a reasonable local score for small knockout rounds
+  function localKnockoutScore() {
+    const scores = [[1,0],[2,1],[0,1],[1,2],[2,0],[0,0],[1,1],[3,1],[1,0],[2,1],[0,1],[1,0]];
+    const [h, a] = scores[Math.floor(Math.random() * scores.length)];
+    return { homeScore: h, awayScore: a };
+  }
+
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
     if (!window.confirm("פעולה זו תמלא את כל הניחושים בעזרת AI. ניחושים קיימים יידרסו. להמשיך?")) return;
 
     const allPreds = {};
-    // 3 steps: groups (1 call) + knockout rounds (sequential, ~6 calls) + top scorer (1 call)
     const totalSteps = 3;
 
     try {
-      // 1. ALL group matches in ONE call (72 matches)
-      setAiProgress({ current: 1, total: totalSteps, label: "שלב הבתים (72 משחקים)" });
+      // Step 1: Group stage + Top scorer in PARALLEL (both independent)
+      setAiProgress({ current: 1, total: totalSteps, label: "שלב הבתים — 72 משחקים" });
 
       const groupMatchData = groupMatches.map((m) => ({
         id: m.id,
@@ -289,48 +295,88 @@ export default function Predict() {
         group: m.group,
       }));
 
-      const groupData = await callBatchAPI({ matches: groupMatchData });
+      // Fire both in parallel
+      const [groupData, tsData] = await Promise.all([
+        callBatchAPI({ matches: groupMatchData }),
+        callBatchAPI({ type: "topScorer" }).catch(() => null),
+      ]);
+
       for (const r of groupData.results) {
-        const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
-        allPreds[r.id] = pred;
-        savePrediction(activeFormId, r.id, pred);
+        allPreds[r.id] = { homeScore: r.homeScore, awayScore: r.awayScore };
+        savePrediction(activeFormId, r.id, allPreds[r.id]);
       }
 
-      // 2. Knockout: one call per round (each round needs previous round's results)
-      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט" });
+      // Step 2: R32 + R16 — 2 API calls (~4 sec)
+      setAiProgress({ current: 2, total: totalSteps, label: "שלב ה-32 — 16 משחקים" });
 
-      for (const stage of knockoutStageOrder) {
-        setAiProgress({ current: 2, total: totalSteps, label: getStageLabel(stage) });
-        const bracket = calcBracketTeams(allPreds);
-        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
-        const matchData = stageMatches
-          .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
-          .map((m) => ({
-            id: m.id,
-            homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
-            awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
-            stage: m.stage,
-          }));
+      let bracket = calcBracketTeams(allPreds);
+      const r32Data = knockoutMatches.filter((m) => m.stage === "R32")
+        .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
+        .map((m) => ({
+          id: m.id,
+          homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
+          awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
+          stage: "R32",
+        }));
 
-        if (matchData.length === 0) continue;
-
-        const data = await callBatchAPI({ matches: matchData });
+      if (r32Data.length > 0) {
+        const data = await callBatchAPI({ matches: r32Data });
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
           if (pred.homeScore === pred.awayScore) {
             const teams = bracket[r.id];
-            if (teams?.home) pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
           }
           allPreds[r.id] = pred;
           savePrediction(activeFormId, r.id, pred);
         }
       }
 
-      // 3. Top scorer
-      setAiProgress({ current: 3, total: totalSteps, label: "מלך שערים" });
+      setAiProgress({ current: 2, total: totalSteps, label: "שמינית גמר — 8 משחקים" });
 
-      const tsData = await callBatchAPI({ type: "topScorer" });
-      if (tsData.name) {
+      bracket = calcBracketTeams(allPreds);
+      const r16Data = knockoutMatches.filter((m) => m.stage === "R16")
+        .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
+        .map((m) => ({
+          id: m.id,
+          homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
+          awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
+          stage: "R16",
+        }));
+
+      if (r16Data.length > 0) {
+        const data = await callBatchAPI({ matches: r16Data });
+        for (const r of data.results) {
+          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
+          if (pred.homeScore === pred.awayScore) {
+            const teams = bracket[r.id];
+            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+          }
+          allPreds[r.id] = pred;
+          savePrediction(activeFormId, r.id, pred);
+        }
+      }
+
+      // Step 3: QF + SF + 3RD + F — generated locally (instant)
+      setAiProgress({ current: 3, total: totalSteps, label: "רבע גמר עד הגמר" });
+
+      for (const stage of ["QF", "SF", "3RD", "F"]) {
+        bracket = calcBracketTeams(allPreds);
+        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
+        for (const m of stageMatches) {
+          const teams = bracket[m.id];
+          if (!teams?.home || !teams?.away) continue;
+          const pred = localKnockoutScore();
+          if (pred.homeScore === pred.awayScore) {
+            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+          }
+          allPreds[m.id] = pred;
+          savePrediction(activeFormId, m.id, pred);
+        }
+      }
+
+      // Top scorer — already fetched in parallel with groups
+      if (tsData?.name) {
         saveBonusPrediction(activeFormId, "topScorer", tsData.name);
       }
 
