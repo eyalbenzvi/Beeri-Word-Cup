@@ -9,23 +9,6 @@ import {
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import {
-<<<<<<< Updated upstream
-  saveMatchResult,
-  deleteMatchResult,
-  updateSettings,
-  exportAllData,
-  importAllData,
-  clearAllData,
-  clearMatchResults,
-  saveActualBonuses,
-} from "../store";
-import { generateGroupMatches, generateKnockoutMatches } from "../data/matches";
-import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams } from "../utils/bracket";
-import GroupTable from "../components/GroupTable";
-import GroupSelector from "../components/GroupSelector";
-import StageSelector from "../components/StageSelector";
-=======
   saveMatchResult, deleteMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
   clearMatchResults, saveActualBonuses, updateUser,
 } from '../store';
@@ -35,7 +18,6 @@ import { calcBracketTeams } from '../utils/bracket';
 import GroupTable from '../components/GroupTable';
 import GroupSelector from '../components/GroupSelector';
 import StageSelector from '../components/StageSelector';
->>>>>>> Stashed changes
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -660,12 +642,6 @@ export default function Admin() {
               </div>
               <div className="text-xs text-gray-400">טפסים</div>
             </div>
-<<<<<<< Updated upstream
-            {u.isAdmin && (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                מנהל
-              </span>
-=======
             {u.isAdmin ? (
               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">מנהל</span>
             ) : (
@@ -679,7 +655,6 @@ export default function Admin() {
               >
                 הפוך למנהל
               </button>
->>>>>>> Stashed changes
             )}
           </div>
         );
