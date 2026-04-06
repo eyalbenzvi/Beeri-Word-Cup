@@ -130,8 +130,65 @@ export function calcGroupStandings(matchPredictions) {
       return h2h;
     }
 
-    // FIFA 2026 sort: pts → H2H(pts → gd → gf) → overall gd → overall gf
+    // FIFA 2026 sort with recursive H2H
     const teamList = Object.values(stats);
+
+    // Recursively sort a group of teams tied on points
+    function sortTiedGroup(tiedTeams) {
+      if (tiedTeams.length <= 1) return tiedTeams;
+
+      const tiedCodes = tiedTeams.map((t) => t.code);
+      const h2h = computeH2HStats(tiedCodes);
+
+      // Sort by H2H then overall
+      tiedTeams.sort((a, b) => {
+        const ha = h2h[a.code],
+          hb = h2h[b.code];
+        if (hb.pts !== ha.pts) return hb.pts - ha.pts;
+        if (hb.gd !== ha.gd) return hb.gd - ha.gd;
+        if (hb.gf !== ha.gf) return hb.gf - ha.gf;
+        const gdA = a.gf - a.ga,
+          gdB = b.gf - b.ga;
+        if (gdB !== gdA) return gdB - gdA;
+        return b.gf - a.gf;
+      });
+
+      // Check for sub-groups that are still tied — re-apply H2H recursively
+      // Only recurse if the sub-group is smaller than the current group (to avoid infinite loops)
+      const result = [];
+      let i = 0;
+      while (i < tiedTeams.length) {
+        let j = i + 1;
+        // Find consecutive teams that have identical H2H + overall stats
+        while (j < tiedTeams.length) {
+          const a = tiedTeams[i],
+            b = tiedTeams[j];
+          const ha = h2h[a.code],
+            hb = h2h[b.code];
+          const gdA = a.gf - a.ga,
+            gdB = b.gf - b.ga;
+          if (
+            ha.pts !== hb.pts ||
+            ha.gd !== hb.gd ||
+            ha.gf !== hb.gf ||
+            gdA !== gdB ||
+            a.gf !== b.gf
+          )
+            break;
+          j++;
+        }
+        const subGroup = tiedTeams.slice(i, j);
+        if (subGroup.length > 1 && subGroup.length < tiedTeams.length) {
+          // Smaller tied sub-group — recurse with fresh H2H among just these teams
+          result.push(...sortTiedGroup(subGroup));
+        } else {
+          result.push(...subGroup);
+        }
+        i = j;
+      }
+      return result;
+    }
+
     // Group teams by equal points
     const pointGroups = {};
     for (const t of teamList) {
@@ -141,7 +198,6 @@ export function calcGroupStandings(matchPredictions) {
     }
 
     const sorted = [];
-    // Process point groups in descending order
     const pointValues = Object.keys(pointGroups)
       .map(Number)
       .sort((a, b) => b - a);
@@ -150,22 +206,7 @@ export function calcGroupStandings(matchPredictions) {
       if (group.length === 1) {
         sorted.push(group[0]);
       } else {
-        // Compute H2H among tied teams
-        const tiedCodes = group.map((t) => t.code);
-        const h2h = computeH2HStats(tiedCodes);
-        group.sort((a, b) => {
-          const ha = h2h[a.code],
-            hb = h2h[b.code];
-          if (hb.pts !== ha.pts) return hb.pts - ha.pts;
-          if (hb.gd !== ha.gd) return hb.gd - ha.gd;
-          if (hb.gf !== ha.gf) return hb.gf - ha.gf;
-          // Fall back to overall GD then GF
-          const gdA = a.gf - a.ga,
-            gdB = b.gf - b.ga;
-          if (gdB !== gdA) return gdB - gdA;
-          return b.gf - a.gf;
-        });
-        sorted.push(...group);
+        sorted.push(...sortTiedGroup(group));
       }
     }
 

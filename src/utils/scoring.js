@@ -103,14 +103,13 @@ export function calculateMatchPoints(
 
   // For knockout: check if the user predicted the same teams playing
   if (stage !== "group" && predTeams && actualTeams) {
-    const predSet = new Set([predTeams.home, predTeams.away].filter(Boolean));
-    const actSet = new Set(
-      [actualTeams.home, actualTeams.away].filter(Boolean),
-    );
     const sameMatchup =
-      predSet.size === 2 &&
-      actSet.size === 2 &&
-      [...predSet].every((t) => actSet.has(t));
+      predTeams.home &&
+      predTeams.away &&
+      actualTeams.home &&
+      actualTeams.away &&
+      predTeams.home === actualTeams.home &&
+      predTeams.away === actualTeams.away;
     if (!sameMatchup) {
       return {
         points: 0,
@@ -124,10 +123,10 @@ export function calculateMatchPoints(
 
   const stagePoints = POINTS[stage] || POINTS.group;
 
-  const predHome = prediction.homeScore;
-  const predAway = prediction.awayScore;
-  const actHome = actual.homeScore;
-  const actAway = actual.awayScore;
+  const predHome = Number(prediction.homeScore);
+  const predAway = Number(prediction.awayScore);
+  const actHome = Number(actual.homeScore);
+  const actAway = Number(actual.awayScore);
 
   let points = 0;
   let outcomePoints = 0;
@@ -297,7 +296,11 @@ export function compareTiebreaker(a, b) {
   const aQF = a.advancingPoints?.QF || 0;
   const bQF = b.advancingPoints?.QF || 0;
   if (aQF !== bQF) return bQF - aQF;
-  // 8. More correct teams in R32 (שמינית)
+  // 8. More correct teams in R16 (שמינית-16)
+  const aR16 = a.advancingPoints?.R16 || 0;
+  const bR16 = b.advancingPoints?.R16 || 0;
+  if (aR16 !== bR16) return bR16 - aR16;
+  // 9. More correct teams in R32 (שמינית)
   const aR32 = a.advancingPoints?.R32 || 0;
   const bR32 = b.advancingPoints?.R32 || 0;
   if (aR32 !== bR32) return bR32 - aR32;
