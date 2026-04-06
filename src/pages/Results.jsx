@@ -1,17 +1,10 @@
 import { useState } from "react";
 import { useMatchResults } from "../hooks/useStore";
-import {
-  generateGroupMatches,
-  generateKnockoutMatches,
-  STAGES,
-} from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
-
-const groupMatches = generateGroupMatches();
-const knockoutMatches = generateKnockoutMatches();
 
 export default function Results() {
   const results = useMatchResults();

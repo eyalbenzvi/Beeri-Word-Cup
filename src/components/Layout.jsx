@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useCurrentUser } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
+import ScoringTable from "./ScoringTable";
 import {
   Home,
   ClipboardList,
@@ -13,16 +14,6 @@ import {
   X,
   MoreHorizontal,
 } from "lucide-react";
-
-const SCORING_DATA = [
-  ["בתים", 1, 3, 2],
-  ["שלב ה-32", 3, 3, 4],
-  ["שמינית גמר", 5, 3, 6],
-  ["רבע גמר", 7, 3, 8],
-  ["חצי גמר", 9, 3, 10],
-  ["מקום שלישי", 9, 3, null],
-  ["גמר", 11, 3, null],
-];
 
 const NAV_ICONS = {
   home: Home,
@@ -79,40 +70,7 @@ function MenuOverlay({ open, onClose }) {
             active={activeSection === "scoring"}
             onToggle={() => toggle("scoring")}
           >
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-ink-muted border-b-2 border-border">
-                  <th className="text-right py-2 font-semibold">שלב</th>
-                  <th className="text-center py-2 font-semibold">הכרעה</th>
-                  <th className="text-center py-2 font-semibold">+מדויק</th>
-                  <th className="text-center py-2 font-semibold">עליה</th>
-                </tr>
-              </thead>
-              <tbody className="text-ink">
-                {SCORING_DATA.map(([stage, outcome, exact, advance], i) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    <td className="py-2 font-medium">{stage}</td>
-                    <td className="text-center font-bold">{outcome}</td>
-                    <td className="text-center font-bold text-green-600">
-                      +{exact}
-                    </td>
-                    <td className="text-center font-bold text-purple-600">
-                      {advance ?? "–"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-3 space-y-1.5 text-xs">
-              <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
-                <span className="text-ink-muted">🏆 ניחוש אלופה</span>
-                <span className="font-bold text-accent-text">9 נק׳</span>
-              </div>
-              <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
-                <span className="text-ink-muted">⚽ מלך שערים</span>
-                <span className="font-bold text-accent-text">8 נק׳</span>
-              </div>
-            </div>
+            <ScoringTable />
             <p className="text-[11px] text-ink-muted mt-3 leading-relaxed">
               ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בבעיטות הכרעה
               לא נספרים למלך השערים.

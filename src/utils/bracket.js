@@ -1,6 +1,6 @@
 import { GROUPS } from "../data/teams";
 import {
-  generateGroupMatches,
+  groupMatches,
   R32_MATCHES,
   R16_MATCHES,
   QF_MATCHES,
@@ -8,8 +8,6 @@ import {
   FINAL_MATCHES,
 } from "../data/matches";
 import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
-
-const groupMatches = generateGroupMatches();
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {

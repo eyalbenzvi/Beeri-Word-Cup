@@ -19,20 +19,13 @@ import {
   saveActualBonuses,
   updateUser,
 } from "../store";
-import { generateGroupMatches, generateKnockoutMatches } from "../data/matches";
+import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
+import { randomScore } from "../utils/helpers";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
-
-const groupMatches = generateGroupMatches();
-const knockoutMatches = generateKnockoutMatches();
-
-function randomScore() {
-  const weights = [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 5];
-  return weights[Math.floor(Math.random() * weights.length)];
-}
 
 export default function Admin() {
   const { user } = useCurrentUser();

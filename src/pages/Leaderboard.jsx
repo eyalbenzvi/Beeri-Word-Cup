@@ -5,13 +5,10 @@ import {
   useAllPredictions,
   useUsers,
   useActualBonuses,
+  useSettings,
 } from "../hooks/useStore";
 import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
-import {
-  generateGroupMatches,
-  generateKnockoutMatches,
-  STAGES,
-} from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import {
   calcBracketTeams,
@@ -21,8 +18,6 @@ import {
 } from "../utils/bracket";
 import MatchCard from "../components/MatchCard";
 
-const groupMatches = generateGroupMatches();
-const knockoutMatches = generateKnockoutMatches();
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
 );
@@ -33,6 +28,8 @@ export default function Leaderboard() {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const actualBonuses = useActualBonuses();
+  const settings = useSettings();
+  const locked = settings.predictionsLocked;
   const [selectedForm, setSelectedForm] = useState(null);
 
   const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
@@ -328,10 +325,13 @@ export default function Leaderboard() {
               return (
                 <button
                   key={entry.formId}
-                  onClick={() => setSelectedForm(entry.formId)}
-                  className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3 text-right cursor-pointer card-hover ${borderColor} ${
+                  onClick={() => {
+                    const canView = locked || entry.userId === user?.id;
+                    if (canView) setSelectedForm(entry.formId);
+                  }}
+                  className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3 text-right ${borderColor} ${
                     entry.userId === user?.id ? "ring-2 ring-primary/10" : ""
-                  }`}
+                  } ${locked || entry.userId === user?.id ? "cursor-pointer card-hover" : "cursor-default opacity-80"}`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums ${
@@ -382,6 +382,9 @@ export default function Leaderboard() {
                     </div>
                     <div className="text-[10px] text-ink-muted/60">נק׳</div>
                   </div>
+                  {!locked && entry.userId !== user?.id && (
+                    <span className="text-gray-300 text-sm">🔒</span>
+                  )}
                 </button>
               );
             })}

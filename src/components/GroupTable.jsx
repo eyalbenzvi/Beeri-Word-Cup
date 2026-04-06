@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { getTeamByCode } from "../data/teams";
 import { calcGroupStandings } from "../utils/bracket";
 
 export default function GroupTable({ matchData, group }) {
-  const standings = calcGroupStandings(matchData);
+  const standings = useMemo(() => calcGroupStandings(matchData), [matchData]);
   const groupStandings = standings[group];
   if (!groupStandings) return null;
 

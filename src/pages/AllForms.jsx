@@ -1,5 +1,10 @@
 import { useState, useMemo } from "react";
-import { useAllPredictions, useUsers } from "../hooks/useStore";
+import {
+  useAllPredictions,
+  useUsers,
+  useSettings,
+  useCurrentUser,
+} from "../hooks/useStore";
 import {
   generateGroupMatches,
   generateKnockoutMatches,
@@ -47,8 +52,9 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, championDisplay }) {
+function FormCard({ form, championDisplay, locked, isOwnForm }) {
   const [expanded, setExpanded] = useState(false);
+  const canExpand = locked || isOwnForm;
   const predictions = form.matches || {};
   const bracketTeams = useMemo(
     () => calcBracketTeams(predictions),
@@ -58,8 +64,8 @@ function FormCard({ form, championDisplay }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 p-4 text-right bg-transparent border-none cursor-pointer"
+        onClick={() => canExpand && setExpanded(!expanded)}
+        className={`w-full flex items-center gap-3 p-4 text-right bg-transparent border-none ${canExpand ? "cursor-pointer" : "cursor-default"}`}
       >
         <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
           {(form.formName || "?")[0]}
@@ -68,23 +74,32 @@ function FormCard({ form, championDisplay }) {
           <div className="font-semibold text-sm truncate">
             {form.formName || "טופס ללא שם"}
           </div>
-          {championDisplay && (
-            <div className="text-xs text-yellow-600 mt-0.5">
-              🏆 {championDisplay}
-            </div>
-          )}
-          {form.topScorer && (
+          {canExpand ? (
+            <>
+              {championDisplay && (
+                <div className="text-xs text-yellow-600 mt-0.5">
+                  🏆 {championDisplay}
+                </div>
+              )}
+              {form.topScorer && (
+                <div className="text-xs text-gray-400 mt-0.5">
+                  ⚽ {form.topScorer}
+                </div>
+              )}
+            </>
+          ) : (
             <div className="text-xs text-gray-400 mt-0.5">
-              ⚽ {form.topScorer}
+              🔒 הניחושים יוצגו לאחר נעילת הטורניר
             </div>
           )}
         </div>
-        <span className="text-gray-400 text-sm">{expanded ? "▾" : "▸"}</span>
+        {canExpand && (
+          <span className="text-gray-400 text-sm">{expanded ? "▾" : "▸"}</span>
+        )}
       </button>
 
-      {expanded && (
+      {expanded && canExpand && (
         <div className="px-4 pb-4 space-y-3">
-          {/* Group stage */}
           {Object.keys(GROUPS).map((group) => {
             const matches = groupMatches.filter((m) => m.group === group);
             return (
@@ -103,7 +118,6 @@ function FormCard({ form, championDisplay }) {
             );
           })}
 
-          {/* Knockout stages */}
           {["R32", "R16", "QF", "SF", "3RD", "F"].map((stage) => {
             const matches = knockoutMatches.filter((m) => m.stage === stage);
             if (matches.length === 0) return null;
@@ -132,7 +146,6 @@ function FormCard({ form, championDisplay }) {
             );
           })}
 
-          {/* Top Scorer */}
           <div className="pt-2 border-t border-gray-100">
             <div className="flex justify-between text-xs">
               <span className="text-gray-500">⚽ מלך שערים</span>
@@ -150,8 +163,11 @@ function FormCard({ form, championDisplay }) {
 export default function AllFormsView({ onBack }) {
   const allPredictions = useAllPredictions();
   const users = useUsers();
+  const settings = useSettings();
+  const { user } = useCurrentUser();
+  const locked = settings.predictionsLocked;
   const [filterText, setFilterText] = useState("");
-  const [filterBy, setFilterBy] = useState("form"); // 'form' or 'champion'
+  const [filterBy, setFilterBy] = useState("form");
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
@@ -171,16 +187,18 @@ export default function AllFormsView({ onBack }) {
       .sort((a, b) => (a.formName || "").localeCompare(b.formName || ""));
   }, [allPredictions]);
 
+  const activeFilter = locked ? filterBy : "form";
+
   const filteredForms = useMemo(() => {
     const query = filterText.trim().toLowerCase();
     if (!query) return submittedForms;
     return submittedForms.filter((form) => {
-      if (filterBy === "form") {
+      if (activeFilter === "form") {
         return (form.formName || "").toLowerCase().includes(query);
       }
       return (form.championName || "").toLowerCase().includes(query);
     });
-  }, [submittedForms, filterText, filterBy, users]);
+  }, [submittedForms, filterText, activeFilter, users]);
 
   return (
     <div>
@@ -205,36 +223,34 @@ export default function AllFormsView({ onBack }) {
         <>
           {/* Filter controls */}
           <div className="bg-white rounded-2xl border border-border p-4 mb-3 shadow-sm">
-            <div className="flex gap-1 mb-2.5 bg-gray-100 rounded-xl p-1">
-              {[
-                { id: "form", label: "לפי טופס" },
-                { id: "champion", label: "לפי אלופה" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setFilterBy(tab.id);
-                    setFilterText("");
-                  }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition border-none cursor-pointer ${
-                    filterBy === tab.id
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {locked && (
+              <div className="flex gap-1 mb-2.5 bg-gray-100 rounded-xl p-1">
+                {[
+                  { id: "form", label: "לפי טופס" },
+                  { id: "champion", label: "לפי אלופה" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setFilterBy(tab.id);
+                      setFilterText("");
+                    }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition border-none cursor-pointer ${
+                      filterBy === tab.id
+                        ? "bg-white text-primary shadow-sm"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               type="text"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder={
-                filterBy === "form"
-                  ? "חפש לפי שם טופס..."
-                  : "חפש לפי שם אלופה..."
-              }
+              placeholder="חפש לפי שם טופס..."
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
             />
           </div>
@@ -244,12 +260,26 @@ export default function AllFormsView({ onBack }) {
               ? `${submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה`
               : `מציג ${filteredForms.length} מתוך ${submittedForms.length} טפסים`}
           </p>
+          {!locked && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-center">
+              <div className="text-2xl mb-1">🔒</div>
+              <div className="text-sm font-semibold text-amber-700">
+                הטורניר עדיין לא נעול
+              </div>
+              <div className="text-xs text-amber-600 mt-1">
+                ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר נעילת
+                הטורניר
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             {filteredForms.map((form) => (
               <FormCard
                 key={form.formId}
                 form={form}
                 championDisplay={form.championName}
+                locked={locked}
+                isOwnForm={form.userId === user?.id}
               />
             ))}
             {filteredForms.length === 0 && (

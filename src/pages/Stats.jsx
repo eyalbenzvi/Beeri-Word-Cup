@@ -1,20 +1,11 @@
 import { useState, useMemo } from "react";
 import { useAllPredictions, useMatchResults } from "../hooks/useStore";
-import {
-  generateGroupMatches,
-  generateKnockoutMatches,
-  STAGES,
-} from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams, deriveChampion } from "../utils/bracket";
+import { normalizeStatus } from "../utils/helpers";
 
-const groupMatches = generateGroupMatches();
-const knockoutMatches = generateKnockoutMatches();
 const allMatches = [...groupMatches, ...knockoutMatches];
-
-function normalizeStatus(s) {
-  return s === "pending" || s === "approved" ? "submitted" : s || "draft";
-}
 
 function Bar({ label, count, total, color = "bg-primary" }) {
   const pct = total > 0 ? (count / total) * 100 : 0;

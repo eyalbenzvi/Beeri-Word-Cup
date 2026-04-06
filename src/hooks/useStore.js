@@ -1,24 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import * as store from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 
-function useStoreUpdates() {
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    const handler = () => setTick((t) => t + 1);
-    window.addEventListener("store-updated", handler);
-    return () => window.removeEventListener("store-updated", handler);
-  }, []);
+function useStoreValue(getSnapshot) {
+  return useSyncExternalStore(store.subscribe, getSnapshot);
 }
 
 export function useStoreReady() {
-  useStoreUpdates();
-  return store.isStoreReady();
+  return useStoreValue(store.isStoreReady);
 }
 
 export function useCurrentUser() {
-  useStoreUpdates();
+  useStoreValue(store.isStoreReady);
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
   const storeReady = store.isStoreReady();
@@ -63,58 +56,47 @@ export function useCurrentUser() {
 }
 
 export function useUsers() {
-  useStoreUpdates();
-  return store.getUsers();
+  return useStoreValue(store.getUsers);
 }
 
 export function useUserForms(userId) {
-  useStoreUpdates();
-  if (!userId) return [];
-  return store.getFormsForUser(userId);
+  return useStoreValue(() => {
+    if (!userId) return [];
+    return store.getFormsForUser(userId);
+  });
 }
 
 export function useActiveFormId() {
-  useStoreUpdates();
-  return store.getActiveFormId();
+  return useStoreValue(store.getActiveFormId);
 }
 
+const EMPTY_FORM = {
+  matches: {},
+  advancing: {},
+  champion: null,
+  topScorer: "",
+  status: "draft",
+};
+
 export function useFormData(formId) {
-  useStoreUpdates();
-  if (!formId)
-    return {
-      matches: {},
-      advancing: {},
-      champion: null,
-      topScorer: "",
-      status: "draft",
-    };
-  return (
-    store.getForm(formId) || {
-      matches: {},
-      advancing: {},
-      champion: null,
-      topScorer: "",
-      status: "draft",
-    }
-  );
+  return useStoreValue(() => {
+    if (!formId) return EMPTY_FORM;
+    return store.getForm(formId) || EMPTY_FORM;
+  });
 }
 
 export function useAllPredictions() {
-  useStoreUpdates();
-  return store.getAllPredictions();
+  return useStoreValue(store.getAllPredictions);
 }
 
 export function useMatchResults() {
-  useStoreUpdates();
-  return store.getMatchResults();
+  return useStoreValue(store.getMatchResults);
 }
 
 export function useActualBonuses() {
-  useStoreUpdates();
-  return store.getActualBonuses();
+  return useStoreValue(store.getActualBonuses);
 }
 
 export function useSettings() {
-  useStoreUpdates();
-  return store.getSettings();
+  return useStoreValue(store.getSettings);
 }

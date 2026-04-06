@@ -132,6 +132,19 @@ export function isStoreReady() {
   return Object.keys(DOCS).every((k) => cache._ready[k]);
 }
 
+const listeners = new Set();
+
+export function subscribe(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notifyListeners() {
+  for (const listener of listeners) listener();
+}
+
+window.addEventListener("store-updated", notifyListeners);
+
 // ============ USERS ============
 
 export function getUsers() {
@@ -159,28 +172,6 @@ export function ensureUserInStore(uid, displayName) {
   };
   writeDoc("users", users);
   return uid;
-}
-
-export function addUser(name, password) {
-  const users = getUsers();
-  const id = name.toLowerCase().replace(/\s+/g, "-");
-  if (users[id]) return id;
-  const updated = { ...users };
-  updated[id] = {
-    id,
-    displayName: name,
-    password: password,
-    isAdmin: Object.keys(users).length === 0,
-    createdAt: new Date().toISOString(),
-  };
-  writeDoc("users", updated);
-  return id;
-}
-
-export function verifyPassword(userId, password) {
-  const user = getUser(userId);
-  if (!user) return false;
-  return user.password === password;
 }
 
 export function updateUser(userId, fields) {
