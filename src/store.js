@@ -247,16 +247,21 @@ export function getUsers() {
   return cache.users || EMPTY_OBJ;
 }
 
+let lastEnsuredUid = null;
+
 export function ensureUserInStore(uid, displayName) {
   if (!cache._ready.users) return uid;
+  // Prevent repeated writes for the same user in the same session
+  if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
+  lastEnsuredUid = uid;
 
   const users = { ...getUsers() };
   const now = new Date().toISOString();
   if (users[uid]) {
     const needsUpdate =
       displayName && users[uid].displayName !== displayName;
-    users[uid] = { ...users[uid], lastLoginAt: now };
-    if (needsUpdate) users[uid].displayName = displayName;
+    if (!needsUpdate) return uid; // nothing to update
+    users[uid] = { ...users[uid], displayName };
     writeGameDoc("users", users);
     return uid;
   }
@@ -339,6 +344,7 @@ export function setCurrentUser(userId) {
 }
 
 export function logoutUser() {
+  lastEnsuredUid = null;
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");
