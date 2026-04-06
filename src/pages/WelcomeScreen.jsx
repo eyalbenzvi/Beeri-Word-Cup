@@ -31,14 +31,14 @@ export default function WelcomeScreen() {
       </header>
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md text-center space-y-4">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 min-h-0">
+      <div className="w-full max-w-md text-center space-y-3">
         <div>
-          <div className="text-4xl md:text-5xl mb-2">⚽🏆</div>
-          <h1 className="text-xl md:text-3xl font-extrabold text-primary tracking-tight mb-0.5">
+          <div className="text-4xl md:text-5xl mb-1">⚽🏆</div>
+          <h1 className="text-lg md:text-3xl font-extrabold text-primary tracking-tight mb-0.5">
             טורניר הניחושים של בארי
           </h1>
-          <p className="text-ink-muted text-sm">מונדיאל 2026</p>
+          <p className="text-ink-muted text-xs">מונדיאל 2026</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-6">
