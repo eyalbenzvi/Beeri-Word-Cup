@@ -3,9 +3,8 @@ import { getFirestore } from 'firebase/firestore';
 import {
   getAuth,
   GoogleAuthProvider,
-  RecaptchaVerifier,
+  OAuthProvider,
   signInWithPopup,
-  signInWithPhoneNumber,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
@@ -22,32 +21,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
-// Phone auth helpers
-export async function sendPhoneOTP(phoneNumber) {
-  // Destroy and recreate the recaptcha container DOM element
-  if (window.recaptchaVerifier) {
-    try { window.recaptchaVerifier.clear(); } catch {}
-    window.recaptchaVerifier = null;
-  }
-  const oldEl = document.getElementById('recaptcha-container');
-  if (oldEl) {
-    const newEl = document.createElement('div');
-    newEl.id = 'recaptcha-container';
-    oldEl.replaceWith(newEl);
-  }
-
-  window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-    size: 'invisible',
-  });
-
-  const confirmation = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
-  return confirmation;
-}
+const googleProvider = new GoogleAuthProvider();
+const appleProvider = new OAuthProvider('apple.com');
+appleProvider.addScope('name');
+appleProvider.addScope('email');
 
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
+}
+
+export async function signInWithApple() {
+  const result = await signInWithPopup(auth, appleProvider);
   return result.user;
 }
 
