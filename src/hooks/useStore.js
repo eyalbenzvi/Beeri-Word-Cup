@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import * as store from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 
@@ -59,11 +65,30 @@ export function useUsers() {
   return useStoreValue(store.getUsers);
 }
 
+const EMPTY_FORMS = [];
+
 export function useUserForms(userId) {
-  return useStoreValue(() => {
-    if (!userId) return [];
-    return store.getFormsForUser(userId);
-  });
+  const cacheRef = useRef(EMPTY_FORMS);
+  const getSnapshot = useCallback(() => {
+    if (!userId) return EMPTY_FORMS;
+    const next = store.getFormsForUser(userId);
+    if (
+      cacheRef.current.length === next.length &&
+      cacheRef.current.every(
+        (f, i) =>
+          f.formId === next[i].formId &&
+          f.status === next[i].status &&
+          f.formName === next[i].formName &&
+          Object.keys(f.matches || {}).length ===
+            Object.keys(next[i].matches || {}).length,
+      )
+    ) {
+      return cacheRef.current;
+    }
+    cacheRef.current = next;
+    return next;
+  }, [userId]);
+  return useSyncExternalStore(store.subscribe, getSnapshot);
 }
 
 export function useActiveFormId() {
@@ -79,10 +104,11 @@ const EMPTY_FORM = {
 };
 
 export function useFormData(formId) {
-  return useStoreValue(() => {
+  const getSnapshot = useCallback(() => {
     if (!formId) return EMPTY_FORM;
     return store.getForm(formId) || EMPTY_FORM;
-  });
+  }, [formId]);
+  return useSyncExternalStore(store.subscribe, getSnapshot);
 }
 
 export function useAllPredictions() {

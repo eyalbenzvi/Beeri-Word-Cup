@@ -147,8 +147,12 @@ window.addEventListener("store-updated", notifyListeners);
 
 // ============ USERS ============
 
+const EMPTY_OBJ = {};
+const DEFAULT_BONUSES = { champion: null, topScorers: [] };
+const DEFAULT_SETTINGS = { predictionsLocked: false, adminPin: "1234" };
+
 export function getUsers() {
-  return cache.users || {};
+  return cache.users || EMPTY_OBJ;
 }
 
 // Called when a user signs in via Firebase Auth (Google or Phone)
@@ -251,7 +255,7 @@ export function setActiveFormId(formId) {
 // formId format: "userId__1", "userId__2", etc.
 
 export function getAllPredictions() {
-  return cache.predictions || {};
+  return cache.predictions || EMPTY_OBJ;
 }
 
 const DEFAULT_FORM = {
@@ -371,7 +375,7 @@ export function clearMatchResults() {
 }
 
 export function getMatchResults() {
-  return cache.matchResults || {};
+  return cache.matchResults || EMPTY_OBJ;
 }
 
 export function saveMatchResult(matchId, result) {
@@ -392,7 +396,7 @@ export function deleteMatchResult(matchId) {
 // ============ ACTUAL BONUSES (admin) ============
 
 export function getActualBonuses() {
-  return cache.actualBonuses || { champion: null, topScorers: [] };
+  return cache.actualBonuses || DEFAULT_BONUSES;
 }
 
 export function saveActualBonuses(bonuses) {
@@ -402,7 +406,7 @@ export function saveActualBonuses(bonuses) {
 // ============ SETTINGS ============
 
 export function getSettings() {
-  return cache.settings || { predictionsLocked: false, adminPin: "1234" };
+  return cache.settings || DEFAULT_SETTINGS;
 }
 
 export function updateSettings(newSettings) {
