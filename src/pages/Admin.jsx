@@ -5,7 +5,7 @@ import {
 } from '../hooks/useStore';
 import { useNavigation } from '../hooks/useNavigation';
 import {
-  saveMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
+  saveMatchResult, deleteMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
   clearMatchResults, saveActualBonuses,
 } from '../store';
 import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
@@ -213,6 +213,12 @@ export default function Admin() {
                       className="text-xs bg-primary text-white px-2 py-1.5 rounded hover:bg-primary-light">
                       {result ? 'ערוך' : 'הכנס'}
                     </button>
+                    {result && (
+                      <button onClick={() => { if (window.confirm('למחוק תוצאה זו?')) deleteMatchResult(match.id); }}
+                        className="text-xs bg-red-50 text-red-500 px-2 py-1.5 rounded hover:bg-red-100">
+                        מחק
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

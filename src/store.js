@@ -292,6 +292,12 @@ export function saveMatchResult(matchId, result) {
   writeDoc('matchResults', results);
 }
 
+export function deleteMatchResult(matchId) {
+  const results = { ...getMatchResults() };
+  delete results[matchId];
+  writeDoc('matchResults', results);
+}
+
 // ============ ACTUAL ADVANCING TEAMS (admin) ============
 
 export function getActualAdvancing() {
