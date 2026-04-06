@@ -83,7 +83,3 @@ export const ALL_TEAMS = Object.entries(GROUPS).flatMap(([group, teams]) =>
 
 export const getTeamByCode = (code) => ALL_TEAMS.find(t => t.code === code);
 
-export const getTeamDisplay = (code) => {
-  const team = getTeamByCode(code);
-  return team ? team.name : 'טרם נקבע';
-};

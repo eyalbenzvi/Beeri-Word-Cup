@@ -160,6 +160,7 @@ export function hasPendingWrites() {
 
 let listenersInitialized = false;
 let listenersHadError = false;
+let windowListenersAttached = false;
 
 export function initRealtimeListeners() {
   // Only restart if first time or if previous attempt had errors
@@ -167,10 +168,13 @@ export function initRealtimeListeners() {
   listenersInitialized = true;
   listenersHadError = false;
 
-  window.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushPendingWrites();
-  });
-  window.addEventListener("pagehide", flushPendingWrites);
+  if (!windowListenersAttached) {
+    windowListenersAttached = true;
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flushPendingWrites();
+    });
+    window.addEventListener("pagehide", flushPendingWrites);
+  }
 
   // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {

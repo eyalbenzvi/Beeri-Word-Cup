@@ -379,13 +379,3 @@ export const STAGES = {
   "3RD": "מקום שלישי",
   F: "גמר",
 };
-
-// Knockout stage naming for display
-export const KNOCKOUT_ROUNDS = [
-  { id: "R32", name: "שלב ה-32", matches: 16 },
-  { id: "R16", name: "שמינית גמר", matches: 8 },
-  { id: "QF", name: "רבע גמר", matches: 4 },
-  { id: "SF", name: "חצי גמר", matches: 2 },
-  { id: "3RD", name: "מקום שלישי", matches: 1 },
-  { id: "F", name: "גמר", matches: 1 },
-];

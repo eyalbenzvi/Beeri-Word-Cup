@@ -5,6 +5,7 @@ import {
   useSettings,
   useCurrentUser,
 } from "../hooks/useStore";
+import { normalizeStatus } from "../utils/helpers";
 import {
   generateGroupMatches,
   generateKnockoutMatches,
@@ -17,9 +18,6 @@ import { getCachedChampion } from "../utils/bracketCache";
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
 
-function normalizeStatus(s) {
-  return s === "pending" || s === "approved" ? "submitted" : s || "draft";
-}
 
 function MatchRow({ match, prediction }) {
   const home = getTeamByCode(match.homeTeam);
