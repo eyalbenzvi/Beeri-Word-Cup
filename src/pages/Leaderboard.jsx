@@ -276,7 +276,7 @@ export default function Leaderboard() {
               </div>
             )}
           </div>
-          <div className="h-14 md:hidden" />
+          <div className="h-20 md:hidden" />
         </>
       )}
     </div>
