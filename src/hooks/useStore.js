@@ -29,7 +29,7 @@ export function useCurrentUser() {
       setAuthReady(true);
       if (fbUser) {
         // (Re-)init Firestore listeners now that we have auth
-        initRealtimeListeners();
+        initRealtimeListeners(fbUser.uid);
         store.setCurrentUser(fbUser.uid);
       } else {
         store.logoutUser();

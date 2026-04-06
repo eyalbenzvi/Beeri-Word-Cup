@@ -7,6 +7,8 @@ import {
   writeBatch,
   collection,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 
 // ============ AUDIT LOG ============
@@ -161,12 +163,67 @@ export function hasPendingWrites() {
 let listenersInitialized = false;
 let listenersHadError = false;
 let windowListenersAttached = false;
+let currentListenerUserId = null;
+let predictionsUnsub = null;
+let predictionsShowAll = false;
 
-export function initRealtimeListeners() {
+function setupPredictionsListener(userId, showAll) {
+  if (predictionsUnsub) predictionsUnsub();
+  predictionsShowAll = showAll;
+
+  const q = showAll
+    ? predictionsCollectionRef
+    : query(predictionsCollectionRef, where("userId", "==", userId));
+
+  predictionsUnsub = onSnapshot(
+    q,
+    (snapshot) => {
+      if (showAll) {
+        // Full collection: replace entire cache
+        const preds = {};
+        snapshot.forEach((docSnap) => {
+          preds[docSnap.id] = docSnap.data();
+        });
+        cache.predictions = preds;
+      } else {
+        // Filtered: merge own forms into cache (keep any previously loaded data)
+        const preds = { ...cache.predictions };
+        // Remove old entries for this user (in case a form was deleted)
+        for (const key of Object.keys(preds)) {
+          if (preds[key]?.userId === userId) delete preds[key];
+        }
+        snapshot.forEach((docSnap) => {
+          preds[docSnap.id] = docSnap.data();
+        });
+        cache.predictions = preds;
+      }
+      cache._ready.predictions = true;
+      notifyAndEmit("predictions");
+    },
+    (err) => {
+      console.error("Listener error for predictions:", err);
+      listenersHadError = true;
+      cache._ready.predictions = true;
+      notifyAndEmit("predictions");
+    },
+  );
+}
+
+function maybeUpgradePredictionsListener() {
+  if (predictionsShowAll || !currentListenerUserId) return;
+  const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
+  const isLocked = cache.settings?.predictionsLocked === true;
+  if (isUserAdmin || isLocked) {
+    setupPredictionsListener(currentListenerUserId, true);
+  }
+}
+
+export function initRealtimeListeners(userId) {
   // Only restart if first time or if previous attempt had errors
   if (listenersInitialized && !listenersHadError) return;
   listenersInitialized = true;
   listenersHadError = false;
+  currentListenerUserId = userId;
 
   if (!windowListenersAttached) {
     windowListenersAttached = true;
@@ -184,6 +241,10 @@ export function initRealtimeListeners() {
         if (snap.exists()) cache[key] = snap.data().data;
         cache._ready[key] = true;
         notifyAndEmit(key);
+        // When settings or users load, check if we should upgrade to all predictions
+        if (key === "settings" || key === "users") {
+          maybeUpgradePredictionsListener();
+        }
       },
       (err) => {
         console.error(`Listener error for ${docName}:`, err);
@@ -194,25 +255,8 @@ export function initRealtimeListeners() {
     );
   }
 
-  // Listen to predictions collection (one doc per form)
-  onSnapshot(
-    predictionsCollectionRef,
-    (snapshot) => {
-      const preds = {};
-      snapshot.forEach((docSnap) => {
-        preds[docSnap.id] = docSnap.data();
-      });
-      cache.predictions = preds;
-      cache._ready.predictions = true;
-      notifyAndEmit("predictions");
-    },
-    (err) => {
-      console.error("Listener error for predictions collection:", err);
-      listenersHadError = true;
-      cache._ready.predictions = true;
-      notifyAndEmit("predictions");
-    },
-  );
+  // Start with filtered predictions (own forms only)
+  setupPredictionsListener(userId, false);
 }
 
 export function isStoreReady() {

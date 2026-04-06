@@ -39,7 +39,10 @@ service cloud.firestore {
 
     // predictions collection — one document per form
     match /predictions/{formId} {
-      allow read: if isAuth();
+      // Before lock: users can only read their own forms. After lock or admin: read all.
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid || isLocked() || isAdmin()
+      );
 
       // Users can create their own forms only when predictions not locked
       allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked();
