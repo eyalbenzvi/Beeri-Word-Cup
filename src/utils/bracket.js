@@ -1,6 +1,13 @@
 // Calculate group standings and knockout bracket from predictions
-import { GROUPS } from '../data/teams';
-import { generateGroupMatches, R32_MATCHES, R16_MATCHES, QF_MATCHES, SF_MATCHES, FINAL_MATCHES } from '../data/matches';
+import { GROUPS } from "../data/teams";
+import {
+  generateGroupMatches,
+  R32_MATCHES,
+  R16_MATCHES,
+  QF_MATCHES,
+  SF_MATCHES,
+  FINAL_MATCHES,
+} from "../data/matches";
 
 const groupMatches = generateGroupMatches();
 
@@ -20,15 +27,32 @@ export function calcGroupStandings(matchPredictions) {
     // Initialize team stats
     const stats = {};
     for (const team of teams) {
-      stats[team.code] = { code: team.code, group: groupName, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+      stats[team.code] = {
+        code: team.code,
+        group: groupName,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        gf: 0,
+        ga: 0,
+        gd: 0,
+        pts: 0,
+      };
     }
 
     // Process group matches
     const gMatches = groupMatches.filter((m) => m.group === groupName);
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
-      if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
-          pred.awayScore === null || pred.awayScore === undefined) continue;
+      if (
+        !pred ||
+        pred.homeScore === null ||
+        pred.homeScore === undefined ||
+        pred.awayScore === null ||
+        pred.awayScore === undefined
+      )
+        continue;
 
       const h = pred.homeScore;
       const a = pred.awayScore;
@@ -36,24 +60,119 @@ export function calcGroupStandings(matchPredictions) {
       const away = stats[match.awayTeam];
       if (!home || !away) continue;
 
-      home.played++; away.played++;
-      home.gf += h; home.ga += a;
-      away.gf += a; away.ga += h;
+      home.played++;
+      away.played++;
+      home.gf += h;
+      home.ga += a;
+      away.gf += a;
+      away.ga += h;
 
-      if (h > a) { home.won++; home.pts += 3; away.lost++; }
-      else if (h < a) { away.won++; away.pts += 3; home.lost++; }
-      else { home.drawn++; home.pts += 1; away.drawn++; away.pts += 1; }
+      if (h > a) {
+        home.won++;
+        home.pts += 3;
+        away.lost++;
+      } else if (h < a) {
+        away.won++;
+        away.pts += 3;
+        home.lost++;
+      } else {
+        home.drawn++;
+        home.pts += 1;
+        away.drawn++;
+        away.pts += 1;
+      }
     }
 
-    // Sort: pts > gd > gf
-    const sorted = Object.values(stats).sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      const gdA = a.gf - a.ga, gdB = b.gf - b.ga;
-      if (gdB !== gdA) return gdB - gdA;
-      return b.gf - a.gf;
-    });
+    // Build match list for H2H computation
+    const groupMatchResults = [];
+    for (const match of gMatches) {
+      const pred = matchPredictions[match.id];
+      if (
+        !pred ||
+        pred.homeScore === null ||
+        pred.homeScore === undefined ||
+        pred.awayScore === null ||
+        pred.awayScore === undefined
+      )
+        continue;
+      groupMatchResults.push({
+        team1Code: match.homeTeam,
+        team2Code: match.awayTeam,
+        team1Score: pred.homeScore,
+        team2Score: pred.awayScore,
+      });
+    }
 
-    sorted.forEach((t, i) => { t.gd = t.gf - t.ga; t.position = i + 1; });
+    // Compute H2H stats for a subset of tied teams
+    function computeH2HStats(tiedCodes) {
+      const codeSet = new Set(tiedCodes);
+      const h2h = {};
+      for (const code of tiedCodes) {
+        h2h[code] = { pts: 0, gd: 0, gf: 0 };
+      }
+      for (const m of groupMatchResults) {
+        if (!codeSet.has(m.team1Code) || !codeSet.has(m.team2Code)) continue;
+        const s1 = h2h[m.team1Code];
+        const s2 = h2h[m.team2Code];
+        s1.gf += m.team1Score;
+        s1.gd += m.team1Score - m.team2Score;
+        s2.gf += m.team2Score;
+        s2.gd += m.team2Score - m.team1Score;
+        if (m.team1Score > m.team2Score) {
+          s1.pts += 3;
+        } else if (m.team2Score > m.team1Score) {
+          s2.pts += 3;
+        } else {
+          s1.pts += 1;
+          s2.pts += 1;
+        }
+      }
+      return h2h;
+    }
+
+    // FIFA 2026 sort: pts → H2H(pts → gd → gf) → overall gd → overall gf
+    const teamList = Object.values(stats);
+    // Group teams by equal points
+    const pointGroups = {};
+    for (const t of teamList) {
+      const key = t.pts;
+      if (!pointGroups[key]) pointGroups[key] = [];
+      pointGroups[key].push(t);
+    }
+
+    const sorted = [];
+    // Process point groups in descending order
+    const pointValues = Object.keys(pointGroups)
+      .map(Number)
+      .sort((a, b) => b - a);
+    for (const pts of pointValues) {
+      const group = pointGroups[pts];
+      if (group.length === 1) {
+        sorted.push(group[0]);
+      } else {
+        // Compute H2H among tied teams
+        const tiedCodes = group.map((t) => t.code);
+        const h2h = computeH2HStats(tiedCodes);
+        group.sort((a, b) => {
+          const ha = h2h[a.code],
+            hb = h2h[b.code];
+          if (hb.pts !== ha.pts) return hb.pts - ha.pts;
+          if (hb.gd !== ha.gd) return hb.gd - ha.gd;
+          if (hb.gf !== ha.gf) return hb.gf - ha.gf;
+          // Fall back to overall GD then GF
+          const gdA = a.gf - a.ga,
+            gdB = b.gf - b.ga;
+          if (gdB !== gdA) return gdB - gdA;
+          return b.gf - a.gf;
+        });
+        sorted.push(...group);
+      }
+    }
+
+    sorted.forEach((t, i) => {
+      t.gd = t.gf - t.ga;
+      t.position = i + 1;
+    });
     standings[groupName] = sorted;
   }
 
@@ -86,14 +205,14 @@ function getBestThirdPlaceTeams(standings) {
 // Each R32 match with a 3rd-place slot has constraints on which groups' 3rd-place teams can play there
 function assignThirdPlaceTeams(qualifyingThird) {
   const slots = [
-    { matchId: 'R32-2',  thirdFrom: ['A','B','C','D','F'] },
-    { matchId: 'R32-5',  thirdFrom: ['C','D','F','G','H'] },
-    { matchId: 'R32-7',  thirdFrom: ['C','E','F','H','I'] },
-    { matchId: 'R32-8',  thirdFrom: ['E','H','I','J','K'] },
-    { matchId: 'R32-9',  thirdFrom: ['B','E','F','I','J'] },
-    { matchId: 'R32-10', thirdFrom: ['A','E','H','I','J'] },
-    { matchId: 'R32-13', thirdFrom: ['E','F','G','I','J'] },
-    { matchId: 'R32-15', thirdFrom: ['D','E','I','J','L'] },
+    { matchId: "R32-2", thirdFrom: ["A", "B", "C", "D", "F"] },
+    { matchId: "R32-5", thirdFrom: ["C", "D", "F", "G", "H"] },
+    { matchId: "R32-7", thirdFrom: ["C", "E", "F", "H", "I"] },
+    { matchId: "R32-8", thirdFrom: ["E", "H", "I", "J", "K"] },
+    { matchId: "R32-9", thirdFrom: ["B", "E", "F", "I", "J"] },
+    { matchId: "R32-10", thirdFrom: ["A", "E", "H", "I", "J"] },
+    { matchId: "R32-13", thirdFrom: ["E", "F", "G", "I", "J"] },
+    { matchId: "R32-15", thirdFrom: ["D", "E", "I", "J", "L"] },
   ];
 
   // Map qualifying groups to team codes
@@ -128,7 +247,7 @@ function assignThirdPlaceTeams(qualifyingThird) {
 // Resolve a bracket position like "1A" or "2F" to a team code
 function resolvePosition(pos, standings) {
   const position = parseInt(pos[0]); // 1 or 2
-  const group = pos.slice(1);         // A-L
+  const group = pos.slice(1); // A-L
   const groupStandings = standings[group];
   if (!groupStandings || !groupStandings[position - 1]) return null;
   return groupStandings[position - 1].code;
@@ -140,8 +259,14 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   if (!teams || !teams.home || !teams.away) return null;
 
   const pred = matchPredictions[matchId];
-  if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
-      pred.awayScore === null || pred.awayScore === undefined) return null;
+  if (
+    !pred ||
+    pred.homeScore === null ||
+    pred.homeScore === undefined ||
+    pred.awayScore === null ||
+    pred.awayScore === undefined
+  )
+    return null;
 
   // In knockout: if draw, use advancingTeam choice; default to home
   if (pred.homeScore === pred.awayScore) {
@@ -157,8 +282,8 @@ export function calcBracketTeams(matchPredictions) {
   const bracket = {};
 
   // Check if we have enough group predictions to calculate standings
-  const hasGroupPredictions = Object.values(standings).some(
-    (group) => group.some((t) => t.played > 0)
+  const hasGroupPredictions = Object.values(standings).some((group) =>
+    group.some((t) => t.played > 0),
   );
   if (!hasGroupPredictions) return bracket;
 
@@ -168,15 +293,16 @@ export function calcBracketTeams(matchPredictions) {
 
   // === R32 ===
   for (const match of R32_MATCHES) {
-    let home = null, away = null;
+    let home = null,
+      away = null;
 
-    if (match.home === '3rd') {
+    if (match.home === "3rd") {
       // This shouldn't happen based on our data
     } else if (match.home.match(/^[12][A-L]$/)) {
       home = resolvePosition(match.home, standings);
     }
 
-    if (match.away === '3rd') {
+    if (match.away === "3rd") {
       away = thirdAssignments[match.id] || null;
     } else if (match.away.match(/^[12][A-L]$/)) {
       away = resolvePosition(match.away, standings);
@@ -208,28 +334,45 @@ export function calcBracketTeams(matchPredictions) {
 
   // === 3RD & FINAL ===
   for (const match of FINAL_MATCHES) {
-    if (match.id === '3RD-1') {
+    if (match.id === "3RD-1") {
       // Losers of semis
-      const sf1Teams = bracket['SF-1'];
-      const sf2Teams = bracket['SF-2'];
-      const sf1Pred = matchPredictions['SF-1'];
-      const sf2Pred = matchPredictions['SF-2'];
+      const sf1Teams = bracket["SF-1"];
+      const sf2Teams = bracket["SF-2"];
+      const sf1Pred = matchPredictions["SF-1"];
+      const sf2Pred = matchPredictions["SF-2"];
 
-      let home = null, away = null;
-      if (sf1Teams?.home && sf1Teams?.away && sf1Pred?.homeScore !== null && sf1Pred?.homeScore !== undefined) {
+      let home = null,
+        away = null;
+      if (
+        sf1Teams?.home &&
+        sf1Teams?.away &&
+        sf1Pred?.homeScore !== null &&
+        sf1Pred?.homeScore !== undefined
+      ) {
         if (sf1Pred.homeScore === sf1Pred.awayScore) {
           const winner = sf1Pred.advancingTeam || sf1Teams.home;
           home = winner === sf1Teams.home ? sf1Teams.away : sf1Teams.home;
         } else {
-          home = sf1Pred.homeScore > sf1Pred.awayScore ? sf1Teams.away : sf1Teams.home;
+          home =
+            sf1Pred.homeScore > sf1Pred.awayScore
+              ? sf1Teams.away
+              : sf1Teams.home;
         }
       }
-      if (sf2Teams?.home && sf2Teams?.away && sf2Pred?.homeScore !== null && sf2Pred?.homeScore !== undefined) {
+      if (
+        sf2Teams?.home &&
+        sf2Teams?.away &&
+        sf2Pred?.homeScore !== null &&
+        sf2Pred?.homeScore !== undefined
+      ) {
         if (sf2Pred.homeScore === sf2Pred.awayScore) {
           const winner = sf2Pred.advancingTeam || sf2Teams.home;
           away = winner === sf2Teams.home ? sf2Teams.away : sf2Teams.home;
         } else {
-          away = sf2Pred.homeScore > sf2Pred.awayScore ? sf2Teams.away : sf2Teams.home;
+          away =
+            sf2Pred.homeScore > sf2Pred.awayScore
+              ? sf2Teams.away
+              : sf2Teams.home;
         }
       }
       bracket[match.id] = { home, away };
@@ -250,15 +393,17 @@ export function deriveAdvancingTeams(bracketTeams) {
 
   for (const [matchId, teams] of Object.entries(bracketTeams)) {
     const addTeams = (round) => {
-      if (teams.home && !advancing[round].includes(teams.home)) advancing[round].push(teams.home);
-      if (teams.away && !advancing[round].includes(teams.away)) advancing[round].push(teams.away);
+      if (teams.home && !advancing[round].includes(teams.home))
+        advancing[round].push(teams.home);
+      if (teams.away && !advancing[round].includes(teams.away))
+        advancing[round].push(teams.away);
     };
 
-    if (matchId.startsWith('R32-')) addTeams('R32');
-    else if (matchId.startsWith('R16-')) addTeams('R16');
-    else if (matchId.startsWith('QF-')) addTeams('QF');
-    else if (matchId.startsWith('SF-')) addTeams('SF');
-    else if (matchId === 'F-1') addTeams('F');
+    if (matchId.startsWith("R32-")) addTeams("R32");
+    else if (matchId.startsWith("R16-")) addTeams("R16");
+    else if (matchId.startsWith("QF-")) addTeams("QF");
+    else if (matchId.startsWith("SF-")) addTeams("SF");
+    else if (matchId === "F-1") addTeams("F");
   }
 
   return advancing;
@@ -280,7 +425,9 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     }
   }
   const completedGroups = new Set(
-    Object.entries(groupMatchCounts).filter(([, count]) => count >= 6).map(([g]) => g)
+    Object.entries(groupMatchCounts)
+      .filter(([, count]) => count >= 6)
+      .map(([g]) => g),
   );
 
   // R32: only award when ALL 12 groups are complete
@@ -288,7 +435,7 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
   const allGroupsComplete = completedGroups.size >= 12;
   if (allGroupsComplete) {
     for (const [matchId, teams] of Object.entries(bracketTeams)) {
-      if (!matchId.startsWith('R32-')) continue;
+      if (!matchId.startsWith("R32-")) continue;
       if (teams.home && !advancing.R32.includes(teams.home)) {
         advancing.R32.push(teams.home);
       }
@@ -300,17 +447,17 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
 
   // Knockout rounds: only include teams from matches that have been played
   for (const [matchId, teams] of Object.entries(bracketTeams)) {
-    if (matchId.startsWith('R32-') || matchId.startsWith('group-')) continue;
+    if (matchId.startsWith("R32-") || matchId.startsWith("group-")) continue;
 
     // The teams in this match advance from the previous round,
     // but only if the match feeding them has been played.
     // A team appears in R16 bracket if its R32 match was played.
     // Check: does the result exist for the match that produced this team?
     let round = null;
-    if (matchId.startsWith('R16-')) round = 'R16';
-    else if (matchId.startsWith('QF-')) round = 'QF';
-    else if (matchId.startsWith('SF-')) round = 'SF';
-    else if (matchId === 'F-1') round = 'F';
+    if (matchId.startsWith("R16-")) round = "R16";
+    else if (matchId.startsWith("QF-")) round = "QF";
+    else if (matchId.startsWith("SF-")) round = "SF";
+    else if (matchId === "F-1") round = "F";
     if (!round) continue;
 
     // For knockout, the teams here were determined by previous matches.
@@ -321,11 +468,25 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
       // Find which previous match this team won to get here
       // The team is in this bracket slot because it won a prior match
       // Check all matches in the prior round for this team
-      const priorRound = round === 'R16' ? 'R32' : round === 'QF' ? 'R16' : round === 'SF' ? 'QF' : round === 'F' ? 'SF' : null;
+      const priorRound =
+        round === "R16"
+          ? "R32"
+          : round === "QF"
+            ? "R16"
+            : round === "SF"
+              ? "QF"
+              : round === "F"
+                ? "SF"
+                : null;
       if (!priorRound) return false;
       for (const [mId, result] of Object.entries(actualResults)) {
-        if (!mId.startsWith(priorRound + '-') && !(priorRound === 'R32' && mId.startsWith('R32-'))) continue;
-        if (result.homeScore === null || result.homeScore === undefined) continue;
+        if (
+          !mId.startsWith(priorRound + "-") &&
+          !(priorRound === "R32" && mId.startsWith("R32-"))
+        )
+          continue;
+        if (result.homeScore === null || result.homeScore === undefined)
+          continue;
         // This match was played - did this team participate?
         const bt = bracketTeams[mId];
         if (bt && (bt.home === teamCode || bt.away === teamCode)) return true;
@@ -333,10 +494,18 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
       return false;
     };
 
-    if (teams.home && feedingMatchesPlayed(teams.home) && !advancing[round].includes(teams.home)) {
+    if (
+      teams.home &&
+      feedingMatchesPlayed(teams.home) &&
+      !advancing[round].includes(teams.home)
+    ) {
       advancing[round].push(teams.home);
     }
-    if (teams.away && feedingMatchesPlayed(teams.away) && !advancing[round].includes(teams.away)) {
+    if (
+      teams.away &&
+      feedingMatchesPlayed(teams.away) &&
+      !advancing[round].includes(teams.away)
+    ) {
       advancing[round].push(teams.away);
     }
   }
@@ -346,12 +515,18 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
 
 // Derive champion from final match prediction
 export function deriveChampion(matchPredictions, bracketTeams) {
-  const finalTeams = bracketTeams['F-1'];
+  const finalTeams = bracketTeams["F-1"];
   if (!finalTeams?.home || !finalTeams?.away) return null;
 
-  const pred = matchPredictions['F-1'];
-  if (!pred || pred.homeScore === null || pred.homeScore === undefined ||
-      pred.awayScore === null || pred.awayScore === undefined) return null;
+  const pred = matchPredictions["F-1"];
+  if (
+    !pred ||
+    pred.homeScore === null ||
+    pred.homeScore === undefined ||
+    pred.awayScore === null ||
+    pred.awayScore === undefined
+  )
+    return null;
 
   if (pred.homeScore === pred.awayScore) {
     return pred.advancingTeam || finalTeams.home;
