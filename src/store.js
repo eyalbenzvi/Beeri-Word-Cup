@@ -159,17 +159,13 @@ export function hasPendingWrites() {
 // ============ REALTIME LISTENERS ============
 
 let listenersInitialized = false;
-let listenerUnsubscribes = [];
+let listenersHadError = false;
 
 export function initRealtimeListeners() {
-  // Tear down previous listeners so we can re-attach after auth change
-  if (listenersInitialized) {
-    listenerUnsubscribes.forEach((unsub) => unsub());
-    listenerUnsubscribes = [];
-    for (const key of Object.keys(DOCS)) cache._ready[key] = false;
-    cache._ready.predictions = false;
-  }
+  // Only restart if first time or if previous attempt had errors
+  if (listenersInitialized && !listenersHadError) return;
   listenersInitialized = true;
+  listenersHadError = false;
 
   window.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushPendingWrites();
@@ -178,7 +174,7 @@ export function initRealtimeListeners() {
 
   // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {
-    const unsub = onSnapshot(
+    onSnapshot(
       gameDocRef(docName),
       (snap) => {
         if (snap.exists()) cache[key] = snap.data().data;
@@ -187,15 +183,15 @@ export function initRealtimeListeners() {
       },
       (err) => {
         console.error(`Listener error for ${docName}:`, err);
+        listenersHadError = true;
         cache._ready[key] = true;
         notifyAndEmit(key);
       },
     );
-    listenerUnsubscribes.push(unsub);
   }
 
   // Listen to predictions collection (one doc per form)
-  const unsubPreds = onSnapshot(
+  onSnapshot(
     predictionsCollectionRef,
     (snapshot) => {
       const preds = {};
@@ -208,11 +204,11 @@ export function initRealtimeListeners() {
     },
     (err) => {
       console.error("Listener error for predictions collection:", err);
+      listenersHadError = true;
       cache._ready.predictions = true;
       notifyAndEmit("predictions");
     },
   );
-  listenerUnsubscribes.push(unsubPreds);
 }
 
 export function isStoreReady() {
