@@ -104,7 +104,6 @@ export default function Leaderboard() {
         <h2 className="text-lg font-bold text-primary mb-0.5">
           {predData.formName || 'טופס ללא שם'}
         </h2>
-        <p className="text-xs text-gray-400 mb-3">{userInfo.displayName || predData.userId}</p>
 
         {/* Score breakdown */}
         <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
@@ -255,7 +254,7 @@ export default function Leaderboard() {
                     )}
                   </div>
                   <div className="text-[11px] text-gray-400">
-                    {entry.userName} • {entry.exactScoreCount} מדויקים • {entry.outcomeCount} הכרעות
+                    {entry.exactScoreCount} מדויקים • {entry.outcomeCount} הכרעות
                   </div>
                 </div>
 

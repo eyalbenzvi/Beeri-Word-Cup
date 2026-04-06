@@ -39,15 +39,10 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, userName, championDisplay }) {
+function FormCard({ form, championDisplay }) {
   const [expanded, setExpanded] = useState(false);
   const predictions = form.matches || {};
   const bracketTeams = useMemo(() => calcBracketTeams(predictions), [predictions]);
-
-  const filledCount = Object.values(predictions).filter(
-    p => p?.homeScore !== undefined && p?.homeScore !== null
-  ).length;
-  const totalCount = groupMatches.length + knockoutMatches.length;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -60,7 +55,6 @@ function FormCard({ form, userName, championDisplay }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm truncate">{form.formName || 'טופס ללא שם'}</div>
-          <div className="text-xs text-gray-400">{userName} • {filledCount}/{totalCount} משחקים</div>
           {championDisplay && (
             <div className="text-xs text-yellow-600 mt-0.5">🏆 {championDisplay}</div>
           )}
@@ -117,7 +111,7 @@ export default function AllFormsView({ onBack }) {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const [filterText, setFilterText] = useState('');
-  const [filterBy, setFilterBy] = useState('form'); // 'form', 'user', or 'champion'
+  const [filterBy, setFilterBy] = useState('form'); // 'form' or 'champion'
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
@@ -139,11 +133,6 @@ export default function AllFormsView({ onBack }) {
       if (filterBy === 'form') {
         return (form.formName || '').toLowerCase().includes(query);
       }
-      if (filterBy === 'user') {
-        const userName = users[form.userId]?.displayName || form.userId;
-        return userName.toLowerCase().includes(query);
-      }
-      // champion
       return (form.championName || '').toLowerCase().includes(query);
     });
   }, [submittedForms, filterText, filterBy, users]);
@@ -172,7 +161,6 @@ export default function AllFormsView({ onBack }) {
             <div className="flex gap-1 mb-2.5 bg-gray-100 rounded-xl p-1">
               {[
                 { id: 'form', label: 'לפי טופס' },
-                { id: 'user', label: 'לפי משתמש' },
                 { id: 'champion', label: 'לפי אלופה' },
               ].map(tab => (
                 <button
@@ -190,11 +178,7 @@ export default function AllFormsView({ onBack }) {
               type="text"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder={
-                filterBy === 'form' ? 'חפש לפי שם טופס...' :
-                filterBy === 'user' ? 'חפש לפי שם משתמש...' :
-                'חפש לפי שם אלופה...'
-              }
+              placeholder={filterBy === 'form' ? 'חפש לפי שם טופס...' : 'חפש לפי שם אלופה...'}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
             />
           </div>
@@ -209,7 +193,6 @@ export default function AllFormsView({ onBack }) {
               <FormCard
                 key={form.formId}
                 form={form}
-                userName={users[form.userId]?.displayName || form.userId}
                 championDisplay={form.championName}
               />
             ))}
