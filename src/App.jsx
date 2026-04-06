@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Predict from './pages/Predict';
 import Leaderboard from './pages/Leaderboard';
 import Results from './pages/Results';
+import Stats from './pages/Stats';
 import Admin from './pages/Admin';
 import { initRealtimeListeners } from './store';
 import { useStoreReady } from './hooks/useStore';
@@ -19,6 +20,7 @@ const PAGES = {
   predict: Predict,
   leaderboard: Leaderboard,
   results: Results,
+  stats: Stats,
   admin: Admin,
 };
 
