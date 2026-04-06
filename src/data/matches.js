@@ -58,7 +58,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1E vs 3rd place",
     date: "Jun 28",
-    thirdFrom: "A/B/C/D/F",
+    thirdFrom: "E/F/G/I/J",
   },
   {
     id: "R32-3",
@@ -83,7 +83,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1I vs 3rd place",
     date: "Jun 30",
-    thirdFrom: "C/D/F/G/H",
+    thirdFrom: "A/B/C/D/F",
   },
   {
     id: "R32-6",
@@ -100,7 +100,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1A vs 3rd place",
     date: "Jun 30",
-    thirdFrom: "C/E/F/H/I",
+    thirdFrom: "C/D/F/G/H",
   },
   {
     id: "R32-8",
@@ -109,7 +109,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1L vs 3rd place",
     date: "Jul 1",
-    thirdFrom: "E/H/I/J/K",
+    thirdFrom: "C/E/F/H/I",
   },
 
   // === RIGHT SIDE OF BRACKET ===
@@ -120,7 +120,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1D vs 3rd place",
     date: "Jul 1",
-    thirdFrom: "B/E/F/I/J",
+    thirdFrom: "E/H/I/J/K",
   },
   {
     id: "R32-10",
@@ -129,7 +129,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1G vs 3rd place",
     date: "Jul 1",
-    thirdFrom: "A/E/H/I/J",
+    thirdFrom: "B/E/F/I/J",
   },
   {
     id: "R32-11",
@@ -154,7 +154,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1B vs 3rd place",
     date: "Jul 2",
-    thirdFrom: "E/F/G/I/J",
+    thirdFrom: "A/E/H/I/J",
   },
   {
     id: "R32-14",
