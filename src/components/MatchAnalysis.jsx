@@ -41,8 +41,8 @@ export default function MatchAnalysis({
           group,
         }),
       });
-      if (!res.ok) throw new Error("API error");
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) throw new Error(data?.error || `שגיאה ${res.status}`);
       if (data.error) throw new Error(data.error);
       analysisCache[key] = data;
       setResult(data);

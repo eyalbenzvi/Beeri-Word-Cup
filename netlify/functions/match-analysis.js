@@ -55,7 +55,8 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blo
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+    const model = genAI.getGenerativeModel({ model: modelName });
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
 
@@ -88,10 +89,13 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blo
       }),
     };
   } catch (err) {
-    console.error("Gemini API error:", err);
+    console.error("Gemini API error:", err?.message || err);
     return {
       statusCode: 502,
-      body: JSON.stringify({ error: "ניתוח לא זמין כרגע. נסה שוב." }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: `שגיאת API: ${err?.message || "לא זמין כרגע"}`,
+      }),
     };
   }
 }
