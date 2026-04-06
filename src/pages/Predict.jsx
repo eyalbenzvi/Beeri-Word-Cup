@@ -33,6 +33,9 @@ import MatchSearch from "../components/MatchSearch";
 
 const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
 
+const STAGE_LABELS = { R32: "שלב ה-32", R16: "שמינית גמר", QF: "רבע גמר", SF: "חצי גמר", "3RD": "מקום שלישי", F: "גמר" };
+function getStageLabel(stage) { return STAGE_LABELS[stage] || stage; }
+
 const AI_MESSAGES = [
   "⚽ סורק דירוגי FIFA...",
   "📊 מנתח סטטיסטיקות של נבחרות...",
@@ -293,43 +296,30 @@ export default function Predict() {
         savePrediction(activeFormId, r.id, pred);
       }
 
-      // 2. Knockout: cascade round by round, but batch into max 2 calls
-      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט (32 משחקים)" });
+      // 2. Knockout: one call per round (each round needs previous round's results)
+      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט" });
 
-      // Process knockout in 2 batches to minimize API calls:
-      // Batch A: R32 (16 matches) — teams known from group stage
-      // Batch B: R16+QF+SF+3RD+F (16 matches) — teams derived from R32 results
-      const batchRounds = [
-        ["R32"],
-        ["R16", "QF", "SF", "3RD", "F"],
-      ];
-
-      for (const rounds of batchRounds) {
+      for (const stage of knockoutStageOrder) {
+        setAiProgress({ current: 2, total: totalSteps, label: getStageLabel(stage) });
         const bracket = calcBracketTeams(allPreds);
-        const batchMatches = [];
-        for (const stage of rounds) {
-          const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
-          for (const m of stageMatches) {
-            const teams = bracket[m.id];
-            if (teams?.home && teams?.away) {
-              batchMatches.push({
-                id: m.id,
-                homeTeamName: getTeamByCode(teams.home)?.name || teams.home,
-                awayTeamName: getTeamByCode(teams.away)?.name || teams.away,
-                stage: m.stage,
-              });
-            }
-          }
-        }
+        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
+        const matchData = stageMatches
+          .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
+          .map((m) => ({
+            id: m.id,
+            homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
+            awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
+            stage: m.stage,
+          }));
 
-        if (batchMatches.length === 0) continue;
+        if (matchData.length === 0) continue;
 
-        const data = await callBatchAPI({ matches: batchMatches });
+        const data = await callBatchAPI({ matches: matchData });
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
           if (pred.homeScore === pred.awayScore) {
             const teams = bracket[r.id];
-            if (teams?.home) pred.advancingTeam = teams.home;
+            if (teams?.home) pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
           }
           allPreds[r.id] = pred;
           savePrediction(activeFormId, r.id, pred);
