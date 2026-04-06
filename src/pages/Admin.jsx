@@ -9,21 +9,15 @@ import {
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import {
-  saveMatchResult,
-  deleteMatchResult,
-  updateSettings,
-  exportAllData,
-  importAllData,
-  clearAllData,
-  clearMatchResults,
-  saveActualBonuses,
-} from "../store";
-import { generateGroupMatches, generateKnockoutMatches } from "../data/matches";
-import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams } from "../utils/bracket";
-import GroupTable from "../components/GroupTable";
-import GroupSelector from "../components/GroupSelector";
-import StageSelector from "../components/StageSelector";
+  saveMatchResult, deleteMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
+  clearMatchResults, saveActualBonuses, updateUser,
+} from '../store';
+import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
+import { GROUPS, getTeamByCode } from '../data/teams';
+import { calcBracketTeams } from '../utils/bracket';
+import GroupTable from '../components/GroupTable';
+import GroupSelector from '../components/GroupSelector';
+import StageSelector from '../components/StageSelector';
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -648,10 +642,19 @@ export default function Admin() {
               </div>
               <div className="text-xs text-gray-400">טפסים</div>
             </div>
-            {u.isAdmin && (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                מנהל
-              </span>
+            {u.isAdmin ? (
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">מנהל</span>
+            ) : (
+              <button
+                onClick={() => {
+                  if (window.confirm(`להפוך את ${u.displayName} למנהל?`)) {
+                    updateUser(uid, { isAdmin: true });
+                  }
+                }}
+                className="text-[11px] bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer"
+              >
+                הפוך למנהל
+              </button>
             )}
           </div>
         );
