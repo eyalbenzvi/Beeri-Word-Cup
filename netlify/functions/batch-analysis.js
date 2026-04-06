@@ -42,14 +42,24 @@ export async function handler(event) {
     ? `שלב הבתים, בית ${matches[0].group}`
     : getStageLabel(matches[0].stage);
 
+  // Random seed so each user gets different results
+  const seed = Math.floor(Math.random() * 10000);
+
   const prompt = `You are an expert football analyst predicting FIFA World Cup 2026 results.
+Random variation seed: ${seed} — use this to vary your predictions from other runs.
 
 Predict realistic scores for these matches (${stageInfo}):
 
 ${matchList}
 
-Consider team strength, FIFA rankings, recent form, and historical results.
-Scores should be realistic (most goals 0-3, occasionally 4-5).
+IMPORTANT RULES FOR REALISTIC WORLD CUP PREDICTIONS:
+- Base predictions on real team strength and FIFA rankings.
+- But the World Cup ALWAYS has surprises. In real World Cups, about 20-30% of group stage matches end in upsets.
+- Include 1-2 upsets in this group where a weaker team wins by a narrow margin (1-0 or 2-1).
+- Include at least 1 draw (0-0 or 1-1). Draws are common in group stages (~25% of matches).
+- Use VARIED scores. Don't repeat the same score more than twice. Mix: 1-0, 0-0, 2-1, 0-1, 1-1, 3-1, 2-0, 0-2, etc.
+- Most matches should have 0-3 total goals. Occasionally one can have 4-5 total goals.
+- Upsets should be realistic (1-0, 2-1) not extreme (5-0 for a weak team).
 
 Return ONLY a JSON array, no markdown, no explanation:
 [{"id": "match-id", "homeScore": 2, "awayScore": 1}, ...]
@@ -98,9 +108,12 @@ Return predictions for ALL ${matches.length} matches.`;
 }
 
 async function handleTopScorer(apiKey) {
-  const prompt = `You are an expert football analyst. Who is the most likely top scorer (Golden Boot winner) for FIFA World Cup 2026?
+  const seed = Math.floor(Math.random() * 10000);
+  const prompt = `You are an expert football analyst predicting the FIFA World Cup 2026 Golden Boot winner.
+Random seed: ${seed}
 
-Consider current form, team strength, and historical World Cup scoring records.
+Pick ONE player who could realistically win the Golden Boot. Don't always pick the obvious choice.
+Consider: Mbappé, Haaland, Vinicius Jr, Kane, Salah, Lewandowski, Lautaro Martínez, Isak, Gyökeres, Son, Osimhen, Yamal, Saka, Álvarez, Retegui, and other realistic candidates.
 
 Return ONLY valid JSON, no markdown:
 {"name": "Player Name", "team": "Country"}`;
