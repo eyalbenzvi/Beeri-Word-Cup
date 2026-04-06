@@ -1,12 +1,14 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
-} from 'firebase/auth';
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyClBCMln44vz46xiloR2EakCIVdOMA0EVs",
@@ -30,6 +32,32 @@ export async function signInWithGoogle() {
 
 export async function firebaseSignOut() {
   await signOut(auth);
+}
+
+let recaptchaVerifier = null;
+
+function setupRecaptcha() {
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+    });
+  }
+  return recaptchaVerifier;
+}
+
+export async function signInWithPhone(phoneNumber) {
+  const verifier = setupRecaptcha();
+  const confirmationResult = await signInWithPhoneNumber(
+    auth,
+    phoneNumber,
+    verifier,
+  );
+  return confirmationResult;
+}
+
+export async function confirmPhoneCode(confirmationResult, code) {
+  const result = await confirmationResult.confirm(code);
+  return result.user;
 }
 
 export { onAuthStateChanged };
