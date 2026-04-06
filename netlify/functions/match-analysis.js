@@ -1,16 +1,15 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.GROQ_API_KEY) {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Missing GEMINI_API_KEY" }),
+      body: JSON.stringify({ error: "Missing GROQ_API_KEY" }),
     };
   }
 
@@ -42,7 +41,7 @@ export async function handler(event) {
   const stageName = stageNames[stage] || stage;
   const groupInfo = group ? ` (בית ${group})` : "";
 
-  // ~30% chance the analyst "smells an upset" or predicts a draw
+  // ~30% chance the analyst predicts an upset or draw
   const roll = Math.random();
   let twist = "";
   if (roll < 0.15) {
@@ -60,25 +59,20 @@ Based on current team strength, FIFA rankings, recent form, historical matchups,
 1. Give a concise analysis in Hebrew (2-3 sentences max). Be specific and insightful.
 2. Predict the most likely score.${twist}
 
-IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blocks:
+Return a JSON object:
 {"analysis": "הניתוח בעברית כאן", "homeScore": 2, "awayScore": 1}`;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.9,
+      max_tokens: 512,
+      response_format: { type: "json_object" },
     });
-    const text = response.text.trim();
-
-    // Parse the JSON response, handling possible markdown wrapping
-    let cleaned = text;
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(cleaned);
+    const text = completion.choices[0]?.message?.content || "";
+    const parsed = JSON.parse(text);
 
     if (
       typeof parsed.analysis !== "string" ||
@@ -101,7 +95,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blo
       }),
     };
   } catch (err) {
-    console.error("Gemini API error:", err?.message || err);
+    console.error("Groq API error:", err?.message || err);
     return {
       statusCode: 502,
       headers: { "Content-Type": "application/json" },

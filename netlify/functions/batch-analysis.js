@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
 // ---- Variety generators ----
 
@@ -37,18 +37,31 @@ function pickRandom(arr) {
 function generateVarietyContext() {
   const persona = pickRandom(PERSONAS);
   const narrative = pickRandom(NARRATIVES);
-  const temperature = 0.8 + Math.random() * 0.7; // 0.8 - 1.5
+  const temperature = 0.8 + Math.random() * 0.7;
   const seed = Math.floor(Math.random() * 100000);
-
-  // Pick 2-3 random dark horse teams
-  const darkHorses = ["MAR", "JPN", "KOR", "SEN", "AUS", "TUR", "CIV", "EGY", "IRQ", "NOR", "AUT", "SCO", "GHA", "UZB"];
-  const picked = [];
-  while (picked.length < 2) {
-    const dh = pickRandom(darkHorses);
-    if (!picked.includes(dh)) picked.push(dh);
+  const darkHorses = [];
+  const candidates = ["MAR", "JPN", "KOR", "SEN", "AUS", "TUR", "CIV", "EGY", "IRQ", "NOR", "AUT", "SCO", "GHA", "UZB"];
+  while (darkHorses.length < 2) {
+    const dh = pickRandom(candidates);
+    if (!darkHorses.includes(dh)) darkHorses.push(dh);
   }
+  return { persona, narrative, temperature, seed, darkHorses };
+}
 
-  return { persona, narrative, temperature, seed, darkHorses: picked };
+function createGroqClient() {
+  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
+
+async function callGroq(prompt, temperature = 1.0) {
+  const groq = createGroqClient();
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: "user", content: prompt }],
+    model: "llama-3.3-70b-versatile",
+    temperature,
+    max_tokens: 4096,
+    response_format: { type: "json_object" },
+  });
+  return completion.choices[0]?.message?.content || "";
 }
 
 // ---- Handler ----
@@ -58,12 +71,11 @@ export async function handler(event) {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.GROQ_API_KEY) {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Missing GEMINI_API_KEY" }),
+      body: JSON.stringify({ error: "Missing GROQ_API_KEY" }),
     };
   }
 
@@ -77,7 +89,7 @@ export async function handler(event) {
   const { matches, type } = body;
 
   if (type === "topScorer") {
-    return handleTopScorer(apiKey);
+    return handleTopScorer();
   }
 
   if (!Array.isArray(matches) || matches.length === 0) {
@@ -97,7 +109,6 @@ export async function handler(event) {
     ? "שלב הבתים"
     : getStageLabel(matches[0].stage);
 
-  // Assign random moods to some matches for extra variety
   const moodHints = matches.length > 4
     ? matches.slice(0, 3).map((m) => `${m.id}: mood is "${pickRandom(MOODS)}"`).join("; ")
     : "";
@@ -121,33 +132,22 @@ STATISTICAL CONSTRAINTS (based on real World Cup data):
 - Upsets must be by narrow margins (1-0, 2-1, 0-1) — never extreme
 - Include at least 1 high-scoring game (3+ goals per side combined)
 
-Return ONLY a JSON array, no markdown, no explanation:
-[{"id": "match-id", "homeScore": 2, "awayScore": 1}, ...]
+Return a JSON object with a "results" array:
+{"results": [{"id": "match-id", "homeScore": 2, "awayScore": 1}, ...]}
 
 Return predictions for ALL ${matches.length} matches.`;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: { temperature: variety.temperature },
-    });
-    const text = response.text.trim();
+    const text = await callGroq(prompt, variety.temperature);
+    let parsed = JSON.parse(text);
 
-    let cleaned = text;
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
+    // Handle both {results: [...]} and direct array
+    let results = Array.isArray(parsed) ? parsed : parsed.results;
+    if (!Array.isArray(results)) throw new Error("No results array in response");
 
-    let parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed)) throw new Error("Response is not an array");
+    results = enforceVariety(results);
 
-    // Post-processing: enforce variety in code (safety net)
-    parsed = enforceVariety(parsed);
-
-    const results = parsed.map((p) => ({
+    results = results.map((p) => ({
       id: p.id,
       homeScore: Math.max(0, Math.round(Number(p.homeScore) || 0)),
       awayScore: Math.max(0, Math.round(Number(p.awayScore) || 0)),
@@ -159,7 +159,7 @@ Return predictions for ALL ${matches.length} matches.`;
       body: JSON.stringify({ results, persona: variety.persona.name }),
     };
   } catch (err) {
-    console.error("Gemini batch error:", err?.message || err);
+    console.error("Groq batch error:", err?.message || err);
     return {
       statusCode: 502,
       headers: { "Content-Type": "application/json" },
@@ -170,19 +170,17 @@ Return predictions for ALL ${matches.length} matches.`;
   }
 }
 
-// ---- Post-processing: enforce score variety in code ----
+// ---- Post-processing: enforce score variety ----
 
 function enforceVariety(results) {
   if (results.length <= 2) return results;
 
-  // Count score frequencies
   const scoreCounts = {};
   for (const r of results) {
     const key = `${r.homeScore}-${r.awayScore}`;
     scoreCounts[key] = (scoreCounts[key] || 0) + 1;
   }
 
-  // If any score appears > 2 times, swap some
   const alternatives = [
     [0, 0], [1, 0], [0, 1], [1, 1], [2, 0], [0, 2], [2, 1],
     [1, 2], [3, 1], [1, 3], [3, 0], [0, 3], [2, 2], [3, 2],
@@ -191,7 +189,6 @@ function enforceVariety(results) {
   for (const r of results) {
     const key = `${r.homeScore}-${r.awayScore}`;
     if (scoreCounts[key] > 2) {
-      // Replace with a random alternative that's not overused
       const alt = alternatives.find((a) => {
         const ak = `${a[0]}-${a[1]}`;
         return (scoreCounts[ak] || 0) < 2;
@@ -206,7 +203,6 @@ function enforceVariety(results) {
     }
   }
 
-  // Ensure at least some draws exist (~20% for group stage)
   const drawCount = results.filter((r) => r.homeScore === r.awayScore).length;
   const targetDraws = Math.max(1, Math.floor(results.length * 0.18));
   if (drawCount < targetDraws) {
@@ -227,7 +223,7 @@ function enforceVariety(results) {
 
 // ---- Top scorer ----
 
-async function handleTopScorer(apiKey) {
+async function handleTopScorer() {
   const seed = Math.floor(Math.random() * 100000);
   const persona = pickRandom(PERSONAS);
 
@@ -238,23 +234,12 @@ Pick ONE player who could realistically win the FIFA World Cup 2026 Golden Boot.
 Don't always pick the most obvious choice. Consider form, team strength, and World Cup history.
 Candidates include but are not limited to: Mbappé, Haaland, Vinicius Jr, Kane, Salah, Lewandowski, Lautaro Martínez, Isak, Gyökeres, Son, Osimhen, Yamal, Saka, Álvarez, Retegui, Pulisic, David, Rashford, Morata.
 
-Return ONLY valid JSON, no markdown:
+Return a JSON object:
 {"name": "Player Name", "team": "Country"}`;
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: { temperature: 0.9 + Math.random() * 0.5 },
-    });
-    const text = response.text.trim();
-    let cleaned = text;
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    const parsed = JSON.parse(cleaned);
+    const text = await callGroq(prompt, 0.9 + Math.random() * 0.5);
+    const parsed = JSON.parse(text);
 
     return {
       statusCode: 200,
@@ -262,7 +247,7 @@ Return ONLY valid JSON, no markdown:
       body: JSON.stringify({ name: parsed.name, team: parsed.team }),
     };
   } catch (err) {
-    console.error("Gemini topScorer error:", err?.message || err);
+    console.error("Groq topScorer error:", err?.message || err);
     return {
       statusCode: 502,
       headers: { "Content-Type": "application/json" },
