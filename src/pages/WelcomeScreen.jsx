@@ -10,7 +10,7 @@ export default function WelcomeScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="h-screen bg-bg flex flex-col overflow-hidden">
+    <div className="h-dvh bg-bg flex flex-col overflow-hidden">
       {/* Header with hamburger */}
       <header className="header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-white/10">
         <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">

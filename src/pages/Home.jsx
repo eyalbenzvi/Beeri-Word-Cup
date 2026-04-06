@@ -20,7 +20,7 @@ export default function Home() {
       {!settings.predictionsLocked && (
         <button
           onClick={() => navigate("predict")}
-          className="w-full bg-secondary text-white font-extrabold py-4 rounded-2xl hover:bg-secondary/90 transition text-base border-none cursor-pointer shadow-md mb-3"
+          className="w-full bg-primary text-white font-extrabold py-4 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mb-3"
         >
           מלא ניחושים עכשיו
         </button>
