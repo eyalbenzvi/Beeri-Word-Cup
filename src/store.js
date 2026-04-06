@@ -20,7 +20,7 @@ const cache = {
   matchResults: {},
   actualAdvancing: {},
   actualBonuses: { champion: null, topScorers: [] },
-  settings: { predictionsLocked: false, adminPin: "1234" },
+  settings: { predictionsLocked: false },
   _ready: {},
 };
 
@@ -149,7 +149,7 @@ window.addEventListener("store-updated", notifyListeners);
 
 const EMPTY_OBJ = {};
 const DEFAULT_BONUSES = { champion: null, topScorers: [] };
-const DEFAULT_SETTINGS = { predictionsLocked: false, adminPin: "1234" };
+const DEFAULT_SETTINGS = { predictionsLocked: false };
 
 export function getUsers() {
   return cache.users || EMPTY_OBJ;
@@ -511,7 +511,7 @@ export function clearAllData() {
   writeDoc("matchResults", {});
   writeDoc("actualAdvancing", {});
   writeDoc("actualBonuses", { champion: null, topScorers: [] });
-  writeDoc("settings", { predictionsLocked: false, adminPin: "1234" });
+  writeDoc("settings", { predictionsLocked: false });
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   window.dispatchEvent(

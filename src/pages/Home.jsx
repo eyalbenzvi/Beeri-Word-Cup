@@ -56,19 +56,19 @@ export default function Home() {
       <div
         className={`rounded-2xl shadow-sm border p-3 ${
           settings.predictionsLocked
-            ? "bg-red-50 border-red-200"
+            ? "bg-amber-50 border-amber-200"
             : "bg-green-50 border-green-200"
         }`}
       >
         <div className="flex items-center justify-center gap-2">
           <span
             className={`w-2.5 h-2.5 rounded-full ${
-              settings.predictionsLocked ? "bg-red-400" : "bg-green-400"
+              settings.predictionsLocked ? "bg-amber-400" : "bg-green-400"
             } animate-pulse`}
           />
           <span
             className={`text-sm font-bold ${
-              settings.predictionsLocked ? "text-red-700" : "text-green-700"
+              settings.predictionsLocked ? "text-amber-700" : "text-green-700"
             }`}
           >
             {settings.predictionsLocked

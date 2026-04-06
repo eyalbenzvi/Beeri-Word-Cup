@@ -1,20 +1,41 @@
+import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import MenuOverlay from "../components/MenuOverlay";
+import { Menu } from "lucide-react";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4 py-8">
+    <div className="h-screen bg-bg flex flex-col overflow-hidden">
+      {/* Header with hamburger */}
+      <header className="header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-white/10">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="text-white/90 bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-white"
+              aria-label="תפריט"
+            >
+              <Menu size={22} />
+            </button>
+            <span className="text-lg font-bold flex items-center gap-2 tracking-tight">
+              <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
+              בארי מונדיאל
+            </span>
+          </div>
+        </div>
+      </header>
+      <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-md text-center space-y-4">
         <div>
-          <img
-            src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png"
-            alt="בארי"
-            className="h-14 w-auto object-contain mx-auto mb-3"
-          />
-          <h1 className="text-2xl md:text-3xl font-extrabold text-primary tracking-tight mb-0.5">
+          <div className="text-4xl md:text-5xl mb-2">⚽🏆</div>
+          <h1 className="text-xl md:text-3xl font-extrabold text-primary tracking-tight mb-0.5">
             טורניר הניחושים של בארי
           </h1>
           <p className="text-ink-muted text-sm">מונדיאל 2026</p>
@@ -50,6 +71,7 @@ export default function WelcomeScreen() {
         <div className="pt-1">
           <GoogleSignInButton />
         </div>
+      </div>
       </div>
     </div>
   );
