@@ -293,30 +293,38 @@ export default function Predict() {
         savePrediction(activeFormId, r.id, pred);
       }
 
-      // 2. Knockout: must be sequential (each round depends on previous bracket)
-      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט" });
+      // 2. Knockout: cascade round by round, but batch into max 2 calls
+      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט (32 משחקים)" });
 
-      for (const stage of knockoutStageOrder) {
+      // Process knockout in 2 batches to minimize API calls:
+      // Batch A: R32 (16 matches) — teams known from group stage
+      // Batch B: R16+QF+SF+3RD+F (16 matches) — teams derived from R32 results
+      const batchRounds = [
+        ["R32"],
+        ["R16", "QF", "SF", "3RD", "F"],
+      ];
+
+      for (const rounds of batchRounds) {
         const bracket = calcBracketTeams(allPreds);
-        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
-        const matchData = stageMatches
-          .filter((m) => {
+        const batchMatches = [];
+        for (const stage of rounds) {
+          const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
+          for (const m of stageMatches) {
             const teams = bracket[m.id];
-            return teams?.home && teams?.away;
-          })
-          .map((m) => {
-            const teams = bracket[m.id];
-            return {
-              id: m.id,
-              homeTeamName: getTeamByCode(teams.home)?.name || teams.home,
-              awayTeamName: getTeamByCode(teams.away)?.name || teams.away,
-              stage: m.stage,
-            };
-          });
+            if (teams?.home && teams?.away) {
+              batchMatches.push({
+                id: m.id,
+                homeTeamName: getTeamByCode(teams.home)?.name || teams.home,
+                awayTeamName: getTeamByCode(teams.away)?.name || teams.away,
+                stage: m.stage,
+              });
+            }
+          }
+        }
 
-        if (matchData.length === 0) continue;
+        if (batchMatches.length === 0) continue;
 
-        const data = await callBatchAPI({ matches: matchData });
+        const data = await callBatchAPI({ matches: batchMatches });
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
           if (pred.homeScore === pred.awayScore) {
