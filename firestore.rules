@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/gameData/users).data.data[request.auth.uid].isAdmin == true;
+    }
+
+    // gameData collection — single documents
+    match /gameData/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && docId == 'users';
+      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing'];
+    }
+
+    // predictions collection — one document per form
+    match /predictions/{formId} {
+      allow read: if isAuth();
+      // Users can write their own forms (formId starts with their uid)
+      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*');
+      allow update: if isAuth() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow delete: if isAuth() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+  }
+}

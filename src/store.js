@@ -1,5 +1,13 @@
 import { db } from "./firebase";
-import { doc, setDoc, onSnapshot, writeBatch } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  writeBatch,
+  collection,
+  getDocs,
+} from "firebase/firestore";
 
 // ============ AUDIT LOG ============
 const AUDIT_LOG_KEY = "wc2026_audit_log";
@@ -21,9 +29,12 @@ export function getAuditLog() {
   return auditLog;
 }
 
+// ============ DOCUMENT STRUCTURE ============
+// gameData/{users, matchResults, actualAdvancing, actualBonuses, settings} — single docs
+// predictions/{formId} — one document per form (NEW)
+
 const DOCS = {
   users: "users",
-  predictions: "predictions",
   matchResults: "matchResults",
   actualAdvancing: "actualAdvancing",
   actualBonuses: "actualBonuses",
@@ -31,12 +42,11 @@ const DOCS = {
 };
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
-
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
 
 const cache = {
   users: {},
-  predictions: {},
+  predictions: {}, // formId -> formData (assembled from individual docs)
   matchResults: {},
   actualAdvancing: {},
   actualBonuses: { champion: null, topScorers: [] },
@@ -44,87 +54,109 @@ const cache = {
   _ready: {},
 };
 
-function docRef(docName) {
+// ============ FIRESTORE HELPERS ============
+
+function gameDocRef(docName) {
   return doc(db, "gameData", docName);
 }
 
-async function writeDoc(docName, data) {
+function formDocRef(formId) {
+  return doc(db, "predictions", formId);
+}
+
+const predictionsCollectionRef = collection(db, "predictions");
+
+async function writeGameDoc(docName, data) {
   cache[docName] = data;
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: docName } }),
-  );
-  window.dispatchEvent(
-    new CustomEvent("store-saving", { detail: { key: docName } }),
-  );
+  notifyAndEmit(docName);
+  emitSaving(docName);
   try {
-    await setDoc(docRef(docName), { data: structuredClone(data) });
-    window.dispatchEvent(
-      new CustomEvent("store-saved", { detail: { key: docName } }),
-    );
+    await setDoc(gameDocRef(docName), { data: structuredClone(data) });
+    emitSaved(docName);
     return true;
   } catch (err) {
     console.error(`Failed to write ${docName}:`, err);
-    window.dispatchEvent(
-      new CustomEvent("store-write-error", {
-        detail: { key: docName, error: err.message },
-      }),
-    );
+    emitWriteError(docName, err);
+    return false;
+  }
+}
+
+async function writeFormDoc(formId, formData) {
+  cache.predictions = { ...cache.predictions, [formId]: formData };
+  notifyAndEmit("predictions");
+  emitSaving("predictions");
+  try {
+    await setDoc(formDocRef(formId), structuredClone(formData));
+    emitSaved("predictions");
+    return true;
+  } catch (err) {
+    console.error(`Failed to write form ${formId}:`, err);
+    emitWriteError("predictions", err);
     return false;
   }
 }
 
 const pendingWrites = {};
 
-function debouncedWriteDoc(docName, data, delay = 500) {
-  cache[docName] = data;
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: docName } }),
-  );
-  window.dispatchEvent(
-    new CustomEvent("store-saving", { detail: { key: docName } }),
-  );
-  clearTimeout(pendingWrites[docName]);
-  pendingWrites[docName] = setTimeout(() => {
-    delete pendingWrites[docName];
-    setDoc(docRef(docName), { data: structuredClone(data) })
-      .then(() => {
-        window.dispatchEvent(
-          new CustomEvent("store-saved", { detail: { key: docName } }),
-        );
-      })
+function debouncedWriteForm(formId, formData, delay = 500) {
+  cache.predictions = { ...cache.predictions, [formId]: formData };
+  notifyAndEmit("predictions");
+  emitSaving("predictions");
+  const key = `form:${formId}`;
+  clearTimeout(pendingWrites[key]);
+  pendingWrites[key] = setTimeout(() => {
+    delete pendingWrites[key];
+    setDoc(formDocRef(formId), structuredClone(formData))
+      .then(() => emitSaved("predictions"))
       .catch((err) => {
-        console.error(`Failed to write ${docName}:`, err);
-        window.dispatchEvent(
-          new CustomEvent("store-write-error", {
-            detail: { key: docName, error: err.message },
-          }),
-        );
+        console.error(`Failed to write form ${formId}:`, err);
+        emitWriteError("predictions", err);
       });
   }, delay);
 }
 
 function flushPendingWrites() {
-  for (const docName of Object.keys(pendingWrites)) {
-    clearTimeout(pendingWrites[docName]);
-    delete pendingWrites[docName];
+  for (const key of Object.keys(pendingWrites)) {
+    clearTimeout(pendingWrites[key]);
+    delete pendingWrites[key];
     try {
-      const data = structuredClone(cache[docName]);
-      // Use keepalive fetch for reliability on page close
-      setDoc(docRef(docName), { data }).catch((err) => {
-        console.error(`Failed to flush ${docName}:`, err);
-        window.dispatchEvent(
-          new CustomEvent("store-write-error", { detail: { key: docName, error: err } }),
-        );
-      });
+      if (key.startsWith("form:")) {
+        const formId = key.slice(5);
+        const data = structuredClone(cache.predictions[formId]);
+        if (data) {
+          setDoc(formDocRef(formId), data).catch((err) =>
+            console.error(`Failed to flush ${key}:`, err),
+          );
+        }
+      }
     } catch (err) {
-      console.error(`Failed to clone ${docName} for flush:`, err);
+      console.error(`Failed to clone for flush ${key}:`, err);
     }
   }
+}
+
+function notifyAndEmit(key) {
+  window.dispatchEvent(new CustomEvent("store-updated", { detail: { key } }));
+}
+function emitSaving(key) {
+  window.dispatchEvent(new CustomEvent("store-saving", { detail: { key } }));
+}
+function emitSaved(key) {
+  window.dispatchEvent(new CustomEvent("store-saved", { detail: { key } }));
+}
+function emitWriteError(key, error) {
+  window.dispatchEvent(
+    new CustomEvent("store-write-error", {
+      detail: { key, error: error?.message || String(error) },
+    }),
+  );
 }
 
 export function hasPendingWrites() {
   return Object.keys(pendingWrites).length > 0;
 }
+
+// ============ REALTIME LISTENERS ============
 
 let listenersInitialized = false;
 
@@ -137,17 +169,14 @@ export function initRealtimeListeners() {
   });
   window.addEventListener("pagehide", flushPendingWrites);
 
+  // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {
     onSnapshot(
-      docRef(docName),
+      gameDocRef(docName),
       (snap) => {
-        if (snap.exists()) {
-          cache[key] = snap.data().data;
-        }
+        if (snap.exists()) cache[key] = snap.data().data;
         cache._ready[key] = true;
-        window.dispatchEvent(
-          new CustomEvent("store-updated", { detail: { key } }),
-        );
+        notifyAndEmit(key);
       },
       (err) => {
         console.error(`Listener error for ${docName}:`, err);
@@ -155,11 +184,34 @@ export function initRealtimeListeners() {
       },
     );
   }
+
+  // Listen to predictions collection (one doc per form)
+  onSnapshot(
+    predictionsCollectionRef,
+    (snapshot) => {
+      const preds = {};
+      snapshot.forEach((docSnap) => {
+        preds[docSnap.id] = docSnap.data();
+      });
+      cache.predictions = preds;
+      cache._ready.predictions = true;
+      notifyAndEmit("predictions");
+    },
+    (err) => {
+      console.error("Listener error for predictions collection:", err);
+      cache._ready.predictions = true;
+    },
+  );
 }
 
 export function isStoreReady() {
-  return Object.keys(DOCS).every((k) => cache._ready[k]);
+  return (
+    Object.keys(DOCS).every((k) => cache._ready[k]) &&
+    cache._ready.predictions
+  );
 }
+
+// ============ SUBSCRIPTIONS ============
 
 const listeners = new Set();
 
@@ -184,19 +236,17 @@ export function getUsers() {
   return cache.users || EMPTY_OBJ;
 }
 
-// Called when a user signs in via Firebase Auth (Google or Phone)
-// Creates/updates the user record in Firestore
 export function ensureUserInStore(uid, displayName) {
   if (!cache._ready.users) return uid;
 
   const users = { ...getUsers() };
   const now = new Date().toISOString();
   if (users[uid]) {
-    // Update display name if changed + touch lastLoginAt in one write
-    const needsUpdate = (displayName && users[uid].displayName !== displayName);
+    const needsUpdate =
+      displayName && users[uid].displayName !== displayName;
     users[uid] = { ...users[uid], lastLoginAt: now };
     if (needsUpdate) users[uid].displayName = displayName;
-    writeDoc("users", users);
+    writeGameDoc("users", users);
     return uid;
   }
   users[uid] = {
@@ -206,7 +256,7 @@ export function ensureUserInStore(uid, displayName) {
     createdAt: now,
     lastLoginAt: now,
   };
-  writeDoc("users", users);
+  writeGameDoc("users", users);
   return uid;
 }
 
@@ -214,14 +264,14 @@ export function updateUser(userId, fields) {
   const users = { ...getUsers() };
   if (!users[userId]) return;
   users[userId] = { ...users[userId], ...fields };
-  writeDoc("users", users);
+  writeGameDoc("users", users);
 }
 
 export function touchUserLogin(uid) {
   const users = { ...getUsers() };
   if (!users[uid]) return;
   users[uid] = { ...users[uid], lastLoginAt: new Date().toISOString() };
-  writeDoc("users", users);
+  writeGameDoc("users", users);
 }
 
 export function demoteAdmin(userId) {
@@ -230,25 +280,30 @@ export function demoteAdmin(userId) {
   const adminCount = Object.values(users).filter((u) => u.isAdmin).length;
   if (adminCount <= 1) return;
   users[userId] = { ...users[userId], isAdmin: false };
-  writeDoc("users", users);
+  writeGameDoc("users", users);
 }
 
 export async function deleteUser(userId) {
   const users = { ...getUsers() };
   delete users[userId];
 
-  const predictions = { ...getAllPredictions() };
-  for (const key of Object.keys(predictions)) {
-    if (predictions[key].userId === userId) delete predictions[key];
-  }
+  // Delete user's forms
+  const formsToDelete = Object.keys(cache.predictions).filter(
+    (fid) => cache.predictions[fid]?.userId === userId,
+  );
 
-  // Atomic batch write — both docs update together or not at all
   cache.users = users;
-  cache.predictions = predictions;
+  for (const fid of formsToDelete) {
+    delete cache.predictions[fid];
+  }
+  cache.predictions = { ...cache.predictions };
   notifyListeners();
+
   const batch = writeBatch(db);
-  batch.set(docRef("users"), { data: structuredClone(users) });
-  batch.set(docRef("predictions"), { data: structuredClone(predictions) });
+  batch.set(gameDocRef("users"), { data: structuredClone(users) });
+  for (const fid of formsToDelete) {
+    batch.delete(formDocRef(fid));
+  }
   await batch.commit();
 }
 
@@ -269,17 +324,13 @@ export function getCurrentUser() {
 
 export function setCurrentUser(userId) {
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userId));
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: "currentUser" } }),
-  );
+  notifyAndEmit("currentUser");
 }
 
 export function logoutUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: "currentUser" } }),
-  );
+  notifyAndEmit("currentUser");
 }
 
 // ============ ACTIVE FORM (local per-browser) ============
@@ -294,14 +345,10 @@ export function getActiveFormId() {
 
 export function setActiveFormId(formId) {
   localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: "activeForm" } }),
-  );
+  notifyAndEmit("activeForm");
 }
 
-// ============ PREDICTIONS (MULTI-FORM) ============
-// predictions[formId] = { userId, formName, budgetNumber, matches, advancing, champion, topScorer, status, ... }
-// formId format: "userId__1", "userId__2", etc.
+// ============ PREDICTIONS (PER-FORM DOCUMENTS) ============
 
 export function getAllPredictions() {
   return cache.predictions || EMPTY_OBJ;
@@ -323,7 +370,6 @@ export function getFormsForUser(userId) {
       forms.push({ formId, ...data });
     }
   }
-  // Sort by creation time
   forms.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   return forms;
 }
@@ -336,7 +382,6 @@ export function getForm(formId) {
 const MAX_FORMS_PER_USER = 10;
 
 export function createForm(userId, formName) {
-  const all = { ...getAllPredictions() };
   const userForms = getFormsForUser(userId);
   if (userForms.length >= MAX_FORMS_PER_USER) {
     throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
@@ -344,152 +389,164 @@ export function createForm(userId, formName) {
   const nextIndex = userForms.length + 1;
   const formId = `${userId}__${nextIndex}`;
 
-  all[formId] = {
+  const formData = {
     userId,
     formName: formName || `טופס ${nextIndex}`,
     budgetNumber: "",
     ...DEFAULT_FORM,
     createdAt: new Date().toISOString(),
   };
-  writeDoc("predictions", all);
+  writeFormDoc(formId, formData);
   setActiveFormId(formId);
   return formId;
 }
 
-export function deleteForm(formId) {
-  const all = { ...getAllPredictions() };
-  const form = all[formId];
-  if (!form || form.status !== "draft") return; // can only delete drafts
-  delete all[formId];
-  writeDoc("predictions", all);
-  // If this was the active form, clear it
+export async function deleteForm(formId) {
+  const form = getForm(formId);
+  if (!form || form.status !== "draft") return;
+
+  const newPreds = { ...cache.predictions };
+  delete newPreds[formId];
+  cache.predictions = newPreds;
+  notifyAndEmit("predictions");
+
+  await deleteDoc(formDocRef(formId));
+
   if (getActiveFormId() === formId) {
     localStorage.removeItem(ACTIVE_FORM_KEY);
-    window.dispatchEvent(
-      new CustomEvent("store-updated", { detail: { key: "activeForm" } }),
-    );
+    notifyAndEmit("activeForm");
   }
 }
 
 export function updateFormDetails(formId, fields) {
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId], ...fields };
-  debouncedWriteDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  const updated = { ...form, ...fields };
+  debouncedWriteForm(formId, updated);
 }
 
 export function savePrediction(formId, matchId, prediction) {
   if (getSettings().predictionsLocked) return;
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId], matches: { ...all[formId].matches } };
-  if (all[formId].status !== "draft") return;
-  all[formId].matches[matchId] = prediction;
-  all[formId].updatedAt = new Date().toISOString();
-  debouncedWriteDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form || form.status !== "draft") return;
+  const updated = {
+    ...form,
+    matches: { ...form.matches, [matchId]: prediction },
+    updatedAt: new Date().toISOString(),
+  };
+  debouncedWriteForm(formId, updated);
 }
 
 export function saveBonusPrediction(formId, field, value) {
   if (getSettings().predictionsLocked) return;
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  if (all[formId].status !== "draft") return;
-  all[formId][field] = value;
-  all[formId].updatedAt = new Date().toISOString();
-  debouncedWriteDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form || form.status !== "draft") return;
+  const updated = {
+    ...form,
+    [field]: value,
+    updatedAt: new Date().toISOString(),
+  };
+  debouncedWriteForm(formId, updated);
 }
 
 export function submitPredictions(formId) {
   if (getSettings().predictionsLocked) return;
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  all[formId].status = "submitted";
-  all[formId].submittedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  const updated = {
+    ...form,
+    status: "submitted",
+    submittedAt: new Date().toISOString(),
+  };
+  writeFormDoc(formId, updated);
 }
 
 export function reopenForm(formId) {
   if (getSettings().predictionsLocked) return;
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  all[formId].status = "draft";
-  all[formId].reopenedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  const updated = {
+    ...form,
+    status: "draft",
+    reopenedAt: new Date().toISOString(),
+  };
+  writeFormDoc(formId, updated);
 }
 
 export function adminForceSubmitForm(formId) {
   logAdminAction("force-submit", { formId });
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  all[formId].status = "submitted";
-  all[formId].submittedAt = new Date().toISOString();
-  all[formId].adminSubmittedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  const now = new Date().toISOString();
+  writeFormDoc(formId, {
+    ...form,
+    status: "submitted",
+    submittedAt: now,
+    adminSubmittedAt: now,
+  });
 }
 
 export function adminReopenForm(formId) {
   logAdminAction("reopen-form", { formId });
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId] };
-  all[formId].status = "draft";
-  all[formId].reopenedAt = new Date().toISOString();
-  all[formId].adminReopenedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  const now = new Date().toISOString();
+  writeFormDoc(formId, {
+    ...form,
+    status: "draft",
+    reopenedAt: now,
+    adminReopenedAt: now,
+  });
 }
 
-export function adminDeleteForm(formId) {
+export async function adminDeleteForm(formId) {
   logAdminAction("delete-form", { formId });
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  delete all[formId];
-  writeDoc("predictions", all);
+  const newPreds = { ...cache.predictions };
+  delete newPreds[formId];
+  cache.predictions = newPreds;
+  notifyAndEmit("predictions");
+  await deleteDoc(formDocRef(formId));
   if (getActiveFormId() === formId) {
     localStorage.removeItem(ACTIVE_FORM_KEY);
-    window.dispatchEvent(
-      new CustomEvent("store-updated", { detail: { key: "activeForm" } }),
-    );
+    notifyAndEmit("activeForm");
   }
 }
 
 export function adminUpdateForm(formId, fields) {
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = {
-    ...all[formId],
+  const form = getForm(formId);
+  if (!form) return;
+  const updated = {
+    ...form,
     ...fields,
     updatedAt: new Date().toISOString(),
   };
   if (fields.adminNote != null) {
-    all[formId].adminEditedAt = new Date().toISOString();
+    updated.adminEditedAt = new Date().toISOString();
   }
-  writeDoc("predictions", all);
+  writeFormDoc(formId, updated);
 }
 
 export function adminSaveMatchPrediction(formId, matchId, prediction) {
   flushPendingWrites();
-  const all = { ...getAllPredictions() };
-  if (!all[formId]) return;
-  all[formId] = { ...all[formId], matches: { ...all[formId].matches } };
-  all[formId].matches[matchId] = prediction;
-  all[formId].updatedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  const form = getForm(formId);
+  if (!form) return;
+  writeFormDoc(formId, {
+    ...form,
+    matches: { ...form.matches, [matchId]: prediction },
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 // ============ MATCH RESULTS (admin) ============
 
 export function clearMatchResults() {
   logAdminAction("clear-match-results");
-  writeDoc("matchResults", {});
+  writeGameDoc("matchResults", {});
 }
 
 export function getMatchResults() {
@@ -498,17 +555,14 @@ export function getMatchResults() {
 
 export function saveMatchResult(matchId, result) {
   const results = { ...getMatchResults() };
-  results[matchId] = {
-    ...result,
-    updatedAt: new Date().toISOString(),
-  };
-  writeDoc("matchResults", results);
+  results[matchId] = { ...result, updatedAt: new Date().toISOString() };
+  writeGameDoc("matchResults", results);
 }
 
 export function deleteMatchResult(matchId) {
   const results = { ...getMatchResults() };
   delete results[matchId];
-  writeDoc("matchResults", results);
+  writeGameDoc("matchResults", results);
 }
 
 // ============ ACTUAL BONUSES (admin) ============
@@ -518,7 +572,7 @@ export function getActualBonuses() {
 }
 
 export function saveActualBonuses(bonuses) {
-  writeDoc("actualBonuses", bonuses);
+  writeGameDoc("actualBonuses", bonuses);
 }
 
 // ============ SETTINGS ============
@@ -529,7 +583,7 @@ export function getSettings() {
 
 export function updateSettings(newSettings) {
   const settings = { ...getSettings(), ...newSettings };
-  writeDoc("settings", settings);
+  writeGameDoc("settings", settings);
 }
 
 // ============ DATA EXPORT/IMPORT ============
@@ -546,32 +600,66 @@ export function exportAllData() {
   };
 }
 
-export function clearAllData() {
+export async function clearAllData() {
   logAdminAction("clear-all-data");
-  writeDoc("users", {});
-  writeDoc("predictions", {});
-  writeDoc("matchResults", {});
-  writeDoc("actualAdvancing", {});
-  writeDoc("actualBonuses", { champion: null, topScorers: [] });
-  writeDoc("settings", { predictionsLocked: false });
+
+  // Delete all form documents
+  const snapshot = await getDocs(predictionsCollectionRef);
+  const batch = writeBatch(db);
+  snapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+  batch.set(gameDocRef("users"), { data: {} });
+  batch.set(gameDocRef("matchResults"), { data: {} });
+  batch.set(gameDocRef("actualAdvancing"), { data: {} });
+  batch.set(gameDocRef("actualBonuses"), {
+    data: { champion: null, topScorers: [] },
+  });
+  batch.set(gameDocRef("settings"), { data: { predictionsLocked: false } });
+  await batch.commit();
+
+  cache.users = {};
+  cache.predictions = {};
+  cache.matchResults = {};
+  cache.actualAdvancing = {};
+  cache.actualBonuses = { champion: null, topScorers: [] };
+  cache.settings = { predictionsLocked: false };
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
-  window.dispatchEvent(
-    new CustomEvent("store-updated", { detail: { key: "all" } }),
-  );
+  notifyAndEmit("all");
 }
 
 export async function importAllData(data) {
   logAdminAction("import-data", { keys: Object.keys(data) });
-  // Use batched write for atomicity
+
   const batch = writeBatch(db);
-  const keys = ["users", "predictions", "matchResults", "actualAdvancing", "actualBonuses", "settings"];
-  for (const key of keys) {
+
+  // Write gameData docs
+  const gameKeys = [
+    "users",
+    "matchResults",
+    "actualAdvancing",
+    "actualBonuses",
+    "settings",
+  ];
+  for (const key of gameKeys) {
     if (data[key]) {
       cache[key] = data[key];
-      batch.set(docRef(key), { data: structuredClone(data[key]) });
+      batch.set(gameDocRef(key), { data: structuredClone(data[key]) });
     }
   }
+
+  // Write prediction forms as individual docs
+  if (data.predictions) {
+    // First delete existing forms
+    const existing = await getDocs(predictionsCollectionRef);
+    existing.forEach((docSnap) => batch.delete(docSnap.ref));
+
+    // Then create new ones
+    for (const [formId, formData] of Object.entries(data.predictions)) {
+      batch.set(formDocRef(formId), structuredClone(formData));
+    }
+    cache.predictions = data.predictions;
+  }
+
   notifyListeners();
   await batch.commit();
 }
