@@ -28,10 +28,6 @@ export function useCurrentUser() {
       setAuthReady(true);
       if (fbUser) {
         store.setCurrentUser(fbUser.uid);
-        store.ensureUserInStore(
-          fbUser.uid,
-          fbUser.displayName || fbUser.phoneNumber || "משתמש",
-        );
       } else {
         store.logoutUser();
       }
@@ -39,18 +35,13 @@ export function useCurrentUser() {
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    if (storeReady && firebaseUser) {
-      store.ensureUserInStore(
-        firebaseUser.uid,
-        firebaseUser.displayName || firebaseUser.phoneNumber || "משתמש",
-      );
-    }
-  }, [storeReady, firebaseUser]);
-
+  // Single consolidated write when both auth and store are ready
   useEffect(() => {
     if (!storeReady || !firebaseUser) return;
-    store.touchUserLogin(firebaseUser.uid);
+    store.ensureUserInStore(
+      firebaseUser.uid,
+      firebaseUser.displayName || firebaseUser.phoneNumber || "משתמש",
+    );
   }, [storeReady, firebaseUser]);
 
   const user = firebaseUser ? store.getUser(firebaseUser.uid) : null;

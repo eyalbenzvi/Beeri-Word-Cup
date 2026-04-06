@@ -69,8 +69,9 @@ button:active:not(:disabled) {
   transition: transform 0.08s;
 }
 
-/* Focus */
-input:focus, button:focus-visible { outline: none; }
+/* Focus — keep ring for accessibility, remove default outline */
+input:focus { outline: none; }
+button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 8px; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }

@@ -102,9 +102,14 @@ export default function Admin() {
                 onClick={() => {
                   if (!topScorerInput.trim()) return;
                   const current = actualBonuses.topScorers || [];
+                  const name = topScorerInput.trim();
+                  if (current.some(n => n.toLowerCase() === name.toLowerCase())) {
+                    alert(`"${name}" כבר ברשימה`);
+                    return;
+                  }
                   saveActualBonuses({
                     ...actualBonuses,
-                    topScorers: [...current, topScorerInput.trim()],
+                    topScorers: [...current, name],
                   });
                   setTopScorerInput("");
                 }}

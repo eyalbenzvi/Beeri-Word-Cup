@@ -14,10 +14,14 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
   const handleCreateForm = useCallback(() => {
     if (!user) return;
     const name = newFormName.trim() || `טופס ${forms.length + 1}`;
-    createForm(user.id, name);
-    setNewFormName("");
-    setShowNewForm(false);
-    showToast(`"${name}" נוצר בהצלחה`);
+    try {
+      createForm(user.id, name);
+      setNewFormName("");
+      setShowNewForm(false);
+      showToast(`"${name}" נוצר בהצלחה`);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
   }, [user, newFormName, forms.length, showToast]);
 
   const handleDeleteForm = useCallback(

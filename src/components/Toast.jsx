@@ -38,6 +38,8 @@ export function ToastProvider({ children }) {
       {children}
       {toast && (
         <div
+          role="status"
+          aria-live="polite"
           className={`fixed bottom-20 md:bottom-8 left-1/2 z-[100] px-5 py-3 rounded-2xl text-white text-sm font-medium shadow-xl max-w-[90%] md:max-w-sm text-center backdrop-blur-sm ${
             toast.type === "error"
               ? "bg-red-600/95"
