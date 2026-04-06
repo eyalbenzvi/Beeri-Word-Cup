@@ -81,10 +81,17 @@ export default function MatchCard({
     showcase: "text-base font-medium",
   };
 
+  const clampScore = (raw) => {
+    if (raw === "") return null;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(20, n));
+  };
+
   const handleHomeChange = useCallback(
     (e) => {
       const raw = e.target.value;
-      const v = raw === "" ? null : parseInt(raw);
+      const v = clampScore(raw);
       const p = { ...prediction, homeScore: v };
       if (isKnockout) delete p.advancingTeam;
       onPredictionChange?.(p);
@@ -101,7 +108,7 @@ export default function MatchCard({
   const handleAwayChange = useCallback(
     (e) => {
       const raw = e.target.value;
-      const v = raw === "" ? null : parseInt(raw);
+      const v = clampScore(raw);
       const p = { ...prediction, awayScore: v };
       if (isKnockout) delete p.advancingTeam;
       onPredictionChange?.(p);

@@ -1,5 +1,6 @@
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import WelcomeScreen from "./pages/WelcomeScreen";
 import Predict from "./pages/Predict";
@@ -7,11 +8,8 @@ import Leaderboard from "./pages/Leaderboard";
 import Results from "./pages/Results";
 import Stats from "./pages/Stats";
 import Admin from "./pages/Admin";
-import { initRealtimeListeners } from "./store";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
-
-initRealtimeListeners();
 
 const PAGES = {
   home: Home,
@@ -55,11 +53,13 @@ function AppContent() {
 
 function App() {
   return (
-    <NavigationProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </NavigationProvider>
+    <ErrorBoundary>
+      <NavigationProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </NavigationProvider>
+    </ErrorBoundary>
   );
 }
 
