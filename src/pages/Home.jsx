@@ -38,7 +38,7 @@ export default function Home() {
   const countdown = useCountdown();
 
   return (
-    <div className="text-center max-w-xl mx-auto">
+    <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
       {/* Hero */}
       <div className="pt-2 pb-2 md:pt-8 md:pb-5">
         <div className="text-4xl md:text-6xl mb-2">⚽🏆</div>
