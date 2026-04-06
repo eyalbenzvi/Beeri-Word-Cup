@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
+import MatchAnalysis from "./MatchAnalysis";
 
 function focusNextInput(currentInput) {
   const card = currentInput.closest("[data-match-card]");
@@ -40,6 +41,7 @@ export default function MatchCard({
   const homeInputRef = useRef(null);
   const awayInputRef = useRef(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const saveTimerRef = useRef(null);
 
   const prevPredRef = useRef(prediction);
@@ -223,6 +225,19 @@ export default function MatchCard({
                   placeholder="–"
                 />
               </div>
+              {homeTeam && awayTeam && (
+                <button
+                  onClick={() => setShowAnalysis(!showAnalysis)}
+                  className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border-none cursor-pointer transition-all ${
+                    showAnalysis
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-50 text-ink-muted hover:bg-blue-50 hover:text-blue-600"
+                  }`}
+                  title="ניתוח AI"
+                >
+                  ✨ ניתוח AI
+                </button>
+              )}
             </div>
           ) : (
             !hasResult && (
@@ -286,6 +301,23 @@ export default function MatchCard({
             {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
           </div>
         ) : null)}
+
+      {showAnalysis && editable && homeTeam && awayTeam && (
+        <MatchAnalysis
+          homeTeam={match.homeTeam}
+          awayTeam={match.awayTeam}
+          homeTeamName={homeName}
+          awayTeamName={awayName}
+          stage={match.stage}
+          group={match.group}
+          onAccept={(h, a) => {
+            const p = { homeScore: h, awayScore: a };
+            onPredictionChange?.(p);
+            setShowAnalysis(false);
+          }}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
     </div>
   );
 }
