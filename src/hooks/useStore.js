@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import * as store from "../store";
+import { initRealtimeListeners } from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 
 function useStoreValue(getSnapshot) {
@@ -27,6 +28,8 @@ export function useCurrentUser() {
       setFirebaseUser(fbUser);
       setAuthReady(true);
       if (fbUser) {
+        // (Re-)init Firestore listeners now that we have auth
+        initRealtimeListeners();
         store.setCurrentUser(fbUser.uid);
       } else {
         store.logoutUser();

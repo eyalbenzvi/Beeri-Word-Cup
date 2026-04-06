@@ -159,9 +159,16 @@ export function hasPendingWrites() {
 // ============ REALTIME LISTENERS ============
 
 let listenersInitialized = false;
+let listenerUnsubscribes = [];
 
 export function initRealtimeListeners() {
-  if (listenersInitialized) return;
+  // Tear down previous listeners so we can re-attach after auth change
+  if (listenersInitialized) {
+    listenerUnsubscribes.forEach((unsub) => unsub());
+    listenerUnsubscribes = [];
+    for (const key of Object.keys(DOCS)) cache._ready[key] = false;
+    cache._ready.predictions = false;
+  }
   listenersInitialized = true;
 
   window.addEventListener("visibilitychange", () => {
@@ -171,7 +178,7 @@ export function initRealtimeListeners() {
 
   // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {
-    onSnapshot(
+    const unsub = onSnapshot(
       gameDocRef(docName),
       (snap) => {
         if (snap.exists()) cache[key] = snap.data().data;
@@ -181,12 +188,14 @@ export function initRealtimeListeners() {
       (err) => {
         console.error(`Listener error for ${docName}:`, err);
         cache._ready[key] = true;
+        notifyAndEmit(key);
       },
     );
+    listenerUnsubscribes.push(unsub);
   }
 
   // Listen to predictions collection (one doc per form)
-  onSnapshot(
+  const unsubPreds = onSnapshot(
     predictionsCollectionRef,
     (snapshot) => {
       const preds = {};
@@ -200,8 +209,10 @@ export function initRealtimeListeners() {
     (err) => {
       console.error("Listener error for predictions collection:", err);
       cache._ready.predictions = true;
+      notifyAndEmit("predictions");
     },
   );
+  listenerUnsubscribes.push(unsubPreds);
 }
 
 export function isStoreReady() {

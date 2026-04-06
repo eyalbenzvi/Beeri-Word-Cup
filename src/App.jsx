@@ -23,9 +23,10 @@ const PAGES = {
 function AppContent() {
   const ready = useStoreReady();
   const { page } = useNavigation();
-  const { user } = useCurrentUser();
+  const { user, authReady } = useCurrentUser();
 
-  if (!ready) {
+  // Wait for Firebase Auth to determine login state
+  if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -36,8 +37,21 @@ function AppContent() {
     );
   }
 
+  // Not logged in — show welcome/login screen (no Firestore needed)
   if (!user) {
     return <WelcomeScreen />;
+  }
+
+  // Logged in but Firestore data still loading
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl animate-bounce">⚽</div>
+          <div className="text-gray-500 text-sm mt-3">טוען...</div>
+        </div>
+      </div>
+    );
   }
 
   const Page = PAGES[page] || Home;
