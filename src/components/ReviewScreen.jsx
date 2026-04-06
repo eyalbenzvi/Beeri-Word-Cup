@@ -1,5 +1,3 @@
-import { getTeamByCode } from "../data/teams";
-
 export default function ReviewScreen({
   errors,
   activeForm,
@@ -9,8 +7,6 @@ export default function ReviewScreen({
   predictedKnockoutCount,
   onClose,
   onSubmit,
-  onJumpToMatch,
-  onJumpToDetails,
 }) {
   const hasErrors = errors.length > 0;
   const totalMatches = groupMatchesCount + knockoutMatchesCount;
@@ -19,7 +15,6 @@ export default function ReviewScreen({
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[85vh] flex flex-col">
-        {}
         <div className="p-5 pb-3 border-b border-gray-100">
           <div className="text-3xl text-center mb-2">
             {hasErrors ? "⚠️" : "📋"}
@@ -29,9 +24,7 @@ export default function ReviewScreen({
           </h3>
         </div>
 
-        {}
         <div className="overflow-y-auto flex-1 p-5 pt-3">
-          {}
           <div className="bg-gray-50 rounded-xl p-3.5 mb-4">
             <div className="text-xs text-gray-600 space-y-1.5">
               <div className="flex justify-between">

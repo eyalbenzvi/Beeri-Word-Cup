@@ -367,6 +367,9 @@ export function generateKnockoutMatches() {
 export const groupMatches = generateGroupMatches();
 export const knockoutMatches = generateKnockoutMatches();
 
+export const ALL_MATCHES = [...groupMatches, ...knockoutMatches];
+export const TOTAL_MATCH_COUNT = ALL_MATCHES.length;
+
 export const STAGES = {
   group: "שלב הבתים",
   R32: "שלב ה-32",

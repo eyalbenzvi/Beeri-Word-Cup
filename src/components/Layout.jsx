@@ -207,25 +207,23 @@ function BottomMoreSheet({ open, onClose, navigate, page }) {
           <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
         <div className="px-4 pb-4 space-y-1">
-          {[{ id: "stats", label: "סטטיסטיקות", Icon: BarChart3 }].map(
-            ({ id, label, Icon }) => (
-              <button
-                key={id}
-                onClick={() => {
-                  navigate(id);
-                  onClose();
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-transparent border-none cursor-pointer transition-colors ${
-                  page === id
-                    ? "bg-primary/10 text-primary font-bold"
-                    : "text-ink hover:bg-gray-50"
-                }`}
-              >
-                <Icon size={20} />
-                {label}
-              </button>
-            ),
-          )}
+          {[{ id: "stats", label: "סטטיסטיקות" }].map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => {
+                navigate(id);
+                onClose();
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-transparent border-none cursor-pointer transition-colors ${
+                page === id
+                  ? "bg-primary/10 text-primary font-bold"
+                  : "text-ink hover:bg-gray-50"
+              }`}
+            >
+              <BarChart3 size={20} />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </>
@@ -240,7 +238,7 @@ export default function Layout({ children }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
-    const handler = (e) => {
+    const handler = () => {
       setMenuOpen(true);
     };
     document.addEventListener("open-info-drawer", handler);

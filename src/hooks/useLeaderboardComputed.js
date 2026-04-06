@@ -1,0 +1,100 @@
+import { useMemo } from "react";
+import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
+import {
+  calcBracketTeams,
+  deriveAdvancingTeams,
+  deriveActualAdvancing,
+  deriveChampion,
+} from "../utils/bracket";
+
+export function useLeaderboardComputed(
+  results,
+  allPredictions,
+  users,
+  actualBonuses,
+) {
+  const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
+
+  const actualDerivedAdvancing = useMemo(
+    () => deriveActualAdvancing(actualBracket, results),
+    [actualBracket, results],
+  );
+  const actualDerivedChampion = useMemo(
+    () => deriveChampion(results, actualBracket),
+    [results, actualBracket],
+  );
+
+  const formBracketMap = useMemo(() => {
+    const map = {};
+    for (const [formId, predData] of Object.entries(allPredictions)) {
+      const s = predData.status;
+      if (s !== "submitted" && s !== "approved") continue;
+      const matchPreds = predData.matches || {};
+      const predBracket = calcBracketTeams(matchPreds);
+      map[formId] = {
+        predBracket,
+        advancing: deriveAdvancingTeams(predBracket),
+        champion: deriveChampion(matchPreds, predBracket),
+      };
+    }
+    return map;
+  }, [allPredictions]);
+
+  const scoredForms = useMemo(() => {
+    return Object.entries(allPredictions)
+      .filter(([formId]) => formBracketMap[formId])
+      .map(([formId, predData]) => {
+        const { predBracket, advancing, champion } = formBracketMap[formId];
+        const enrichedPredData = {
+          ...predData,
+          advancing,
+          champion,
+        };
+        const score = calculateFullScore(
+          enrichedPredData,
+          results,
+          actualDerivedAdvancing,
+          { ...actualBonuses, champion: actualDerivedChampion },
+          predBracket,
+          actualBracket,
+        );
+        return {
+          formId,
+          userId: predData.userId,
+          formName: predData.formName || "טופס ללא שם",
+          ...score,
+        };
+      })
+      .sort((a, b) => {
+        if (a.totalPoints !== b.totalPoints)
+          return b.totalPoints - a.totalPoints;
+        const tb = compareTiebreaker(a, b);
+        if (tb !== 0) return tb;
+        return a.formId.localeCompare(b.formId);
+      });
+  }, [
+    allPredictions,
+    formBracketMap,
+    results,
+    actualBonuses,
+    actualDerivedAdvancing,
+    actualDerivedChampion,
+    actualBracket,
+  ]);
+
+  const leaderboard = useMemo(() => {
+    return scoredForms.map((entry) => ({
+      ...entry,
+      userName: users[entry.userId]?.displayName || entry.userId,
+    }));
+  }, [scoredForms, users]);
+
+  return {
+    actualBracket,
+    actualDerivedAdvancing,
+    actualDerivedChampion,
+    formBracketMap,
+    scoredForms,
+    leaderboard,
+  };
+}

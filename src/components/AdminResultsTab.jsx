@@ -1,16 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useMatchResults } from "../hooks/useStore";
 import { saveMatchResult, deleteMatchResult } from "../store";
-import { groupMatches, knockoutMatches } from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import { randomScore } from "../utils/helpers";
 import GroupTable from "./GroupTable";
 import GroupSelector from "./GroupSelector";
-import StageSelector from "./StageSelector";
+
+const ADMIN_STAGES = { all: "הכל", ...STAGES };
 
 export default function AdminResultsTab() {
   const results = useMatchResults();
+  const undoStackRef = useRef([]);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [editingMatch, setEditingMatch] = useState(null);
@@ -31,10 +33,49 @@ export default function AdminResultsTab() {
   }, [results]);
   const allGroupsComplete = completedGroupCount >= 12;
 
-  const filteredMatches =
-    selectedStage === "group"
-      ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
+  const saveWithUndo = useCallback(
+    (matchId, result) => {
+      const prev = results[matchId] ? { ...results[matchId] } : undefined;
+      undoStackRef.current = [
+        ...undoStackRef.current.slice(-19),
+        { matchId, previousResult: prev },
+      ];
+      saveMatchResult(matchId, result);
+    },
+    [results],
+  );
+
+  const deleteWithUndo = useCallback(
+    (matchId) => {
+      const prev = results[matchId] ? { ...results[matchId] } : undefined;
+      undoStackRef.current = [
+        ...undoStackRef.current.slice(-19),
+        { matchId, previousResult: prev },
+      ];
+      deleteMatchResult(matchId);
+    },
+    [results],
+  );
+
+  const undoLast = useCallback(() => {
+    const stack = undoStackRef.current;
+    if (!stack.length) return;
+    const last = stack.pop();
+    if (!last) return;
+    if (last.previousResult === undefined) {
+      deleteMatchResult(last.matchId);
+    } else {
+      saveMatchResult(last.matchId, last.previousResult);
+    }
+  }, []);
+
+  const filteredMatches = useMemo(() => {
+    if (selectedStage === "all") return [...groupMatches, ...knockoutMatches];
+    if (selectedStage === "group") {
+      return groupMatches.filter((m) => m.group === selectedGroup);
+    }
+    return knockoutMatches.filter((m) => m.stage === selectedStage);
+  }, [selectedStage, selectedGroup]);
 
   const handleSaveResult = (match) => {
     if (editScores.homeScore === "" || editScores.awayScore === "") return;
@@ -51,7 +92,7 @@ export default function AdminResultsTab() {
     if (isKnockout && homeScore === awayScore) {
       const existing = results[match.id];
       if (!existing?.advancingTeam) {
-        saveMatchResult(match.id, {
+        saveWithUndo(match.id, {
           homeTeam: match.homeTeam,
           awayTeam: match.awayTeam,
           homeScore,
@@ -66,7 +107,7 @@ export default function AdminResultsTab() {
         setEditScores({ homeScore: "", awayScore: "" });
         return;
       }
-      saveMatchResult(match.id, {
+      saveWithUndo(match.id, {
         ...existing,
         homeScore,
         awayScore,
@@ -76,7 +117,7 @@ export default function AdminResultsTab() {
       setEditScores({ homeScore: "", awayScore: "" });
       return;
     }
-    saveMatchResult(match.id, {
+    saveWithUndo(match.id, {
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
       homeScore,
@@ -164,16 +205,39 @@ export default function AdminResultsTab() {
           </div>
         </div>
       )}
-      <button
-        onClick={handleRandomizeResults}
-        className="w-full mb-3 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"
-      >
-        🎲 הגרלת כל התוצאות
-      </button>
-      <StageSelector
-        selectedStage={selectedStage}
-        onSelect={setSelectedStage}
-      />
+      <div className="flex gap-2 mb-3">
+        <button
+          type="button"
+          onClick={handleRandomizeResults}
+          className="flex-1 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"
+        >
+          🎲 הגרלת כל התוצאות
+        </button>
+        <button
+          type="button"
+          onClick={undoLast}
+          className="px-4 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          title="בטל את השינוי האחרון בתוצאה בודדת"
+        >
+          ↩︎ ביטול
+        </button>
+      </div>
+      <div className="flex overflow-x-auto gap-1.5 mb-3 pb-1 -mx-1 px-1 scrollbar-hide">
+        {Object.entries(ADMIN_STAGES).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSelectedStage(key)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0 border-none cursor-pointer ${
+              selectedStage === key
+                ? "bg-primary text-white shadow-md"
+                : "bg-white text-ink-muted shadow-sm hover:text-primary"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {selectedStage === "group" && (
         <GroupSelector
           groups={Object.keys(GROUPS)}
@@ -211,6 +275,17 @@ export default function AdminResultsTab() {
               key={match.id}
               className={`bg-white rounded-xl p-3 border ${result ? "border-green-200 bg-green-50/30" : "border-gray-100"}`}
             >
+              <div className="flex justify-end mb-1">
+                {result ? (
+                  <span className="text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    הוזן
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                    ממתין
+                  </span>
+                )}
+              </div>
               {isKnockout && match.label && (
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-xs text-gray-400 font-medium">
@@ -302,9 +377,10 @@ export default function AdminResultsTab() {
                     </button>
                     {result && (
                       <button
+                        type="button"
                         onClick={() => {
                           if (window.confirm("למחוק תוצאה זו?"))
-                            deleteMatchResult(match.id);
+                            deleteWithUndo(match.id);
                         }}
                         className="text-xs bg-red-50 text-red-500 px-2 py-1.5 rounded hover:bg-red-100"
                       >
@@ -326,8 +402,9 @@ export default function AdminResultsTab() {
                   )}
                   <div className="flex gap-2 justify-center">
                     <button
+                      type="button"
                       onClick={() =>
-                        saveMatchResult(match.id, {
+                        saveWithUndo(match.id, {
                           ...result,
                           advancingTeam: derived.home,
                         })

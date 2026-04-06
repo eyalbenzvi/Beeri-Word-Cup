@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 
 const DOCS = {
   users: "users",
@@ -185,6 +185,22 @@ export function updateUser(userId, fields) {
   writeDoc("users", users);
 }
 
+export function touchUserLogin(uid) {
+  const users = { ...getUsers() };
+  if (!users[uid]) return;
+  users[uid] = { ...users[uid], lastLoginAt: new Date().toISOString() };
+  writeDoc("users", users);
+}
+
+export function demoteAdmin(userId) {
+  const users = { ...getUsers() };
+  if (!users[userId] || !users[userId].isAdmin) return;
+  const adminCount = Object.values(users).filter((u) => u.isAdmin).length;
+  if (adminCount <= 1) return;
+  users[userId] = { ...users[userId], isAdmin: false };
+  writeDoc("users", users);
+}
+
 export function deleteUser(userId) {
   const users = { ...getUsers() };
   delete users[userId];
@@ -365,6 +381,67 @@ export function reopenForm(formId) {
   all[formId] = { ...all[formId] };
   all[formId].status = "draft";
   all[formId].reopenedAt = new Date().toISOString();
+  writeDoc("predictions", all);
+}
+
+export function adminForceSubmitForm(formId) {
+  flushPendingWrites();
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  all[formId].status = "submitted";
+  all[formId].submittedAt = new Date().toISOString();
+  all[formId].adminSubmittedAt = new Date().toISOString();
+  writeDoc("predictions", all);
+}
+
+export function adminReopenForm(formId) {
+  flushPendingWrites();
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId] };
+  all[formId].status = "draft";
+  all[formId].reopenedAt = new Date().toISOString();
+  all[formId].adminReopenedAt = new Date().toISOString();
+  writeDoc("predictions", all);
+}
+
+export function adminDeleteForm(formId) {
+  flushPendingWrites();
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  delete all[formId];
+  writeDoc("predictions", all);
+  if (getActiveFormId() === formId) {
+    localStorage.removeItem(ACTIVE_FORM_KEY);
+    window.dispatchEvent(
+      new CustomEvent("store-updated", { detail: { key: "activeForm" } }),
+    );
+  }
+}
+
+export function adminUpdateForm(formId, fields) {
+  flushPendingWrites();
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = {
+    ...all[formId],
+    ...fields,
+    updatedAt: new Date().toISOString(),
+  };
+  if (fields.adminNote != null) {
+    all[formId].adminEditedAt = new Date().toISOString();
+  }
+  writeDoc("predictions", all);
+}
+
+export function adminSaveMatchPrediction(formId, matchId, prediction) {
+  flushPendingWrites();
+  const all = { ...getAllPredictions() };
+  if (!all[formId]) return;
+  all[formId] = { ...all[formId], matches: { ...all[formId].matches } };
+  all[formId].matches[matchId] = prediction;
+  all[formId].updatedAt = new Date().toISOString();
   writeDoc("predictions", all);
 }
 

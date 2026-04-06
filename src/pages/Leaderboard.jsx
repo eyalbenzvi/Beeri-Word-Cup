@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   useCurrentUser,
   useMatchResults,
@@ -7,22 +7,19 @@ import {
   useActualBonuses,
   useSettings,
 } from "../hooks/useStore";
-import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
+import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
-import {
-  calcBracketTeams,
-  deriveAdvancingTeams,
-  deriveActualAdvancing,
-  deriveChampion,
-} from "../utils/bracket";
 import MatchCard from "../components/MatchCard";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
 );
 
-export default function Leaderboard() {
+export default function Leaderboard({
+  embedded = false,
+  forceUnlockView = false,
+}) {
   const { user } = useCurrentUser();
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
@@ -32,81 +29,8 @@ export default function Leaderboard() {
   const locked = settings.predictionsLocked;
   const [selectedForm, setSelectedForm] = useState(null);
 
-  const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
-
-  const actualDerivedAdvancing = useMemo(
-    () => deriveActualAdvancing(actualBracket, results),
-    [actualBracket, results],
-  );
-  const actualDerivedChampion = useMemo(
-    () => deriveChampion(results, actualBracket),
-    [results, actualBracket],
-  );
-
-  const formBracketMap = useMemo(() => {
-    const map = {};
-    for (const [formId, predData] of Object.entries(allPredictions)) {
-      const s = predData.status;
-      if (s !== "submitted" && s !== "approved") continue;
-      const matchPreds = predData.matches || {};
-      const predBracket = calcBracketTeams(matchPreds);
-      map[formId] = {
-        predBracket,
-        advancing: deriveAdvancingTeams(predBracket),
-        champion: deriveChampion(matchPreds, predBracket),
-      };
-    }
-    return map;
-  }, [allPredictions]);
-
-  const scoredForms = useMemo(() => {
-    return Object.entries(allPredictions)
-      .filter(([formId]) => formBracketMap[formId])
-      .map(([formId, predData]) => {
-        const { predBracket, advancing, champion } = formBracketMap[formId];
-        const enrichedPredData = {
-          ...predData,
-          advancing,
-          champion,
-        };
-        const score = calculateFullScore(
-          enrichedPredData,
-          results,
-          actualDerivedAdvancing,
-          { ...actualBonuses, champion: actualDerivedChampion },
-          predBracket,
-          actualBracket,
-        );
-        return {
-          formId,
-          userId: predData.userId,
-          formName: predData.formName || "טופס ללא שם",
-          ...score,
-        };
-      })
-      .sort((a, b) => {
-        if (a.totalPoints !== b.totalPoints)
-          return b.totalPoints - a.totalPoints;
-        const tb = compareTiebreaker(a, b);
-        if (tb !== 0) return tb;
-        return a.formId.localeCompare(b.formId);
-      });
-  }, [
-    allPredictions,
-    formBracketMap,
-    results,
-    actualBonuses,
-    actualDerivedAdvancing,
-    actualDerivedChampion,
-    actualBracket,
-  ]);
-
-  const leaderboard = useMemo(() => {
-    return scoredForms.map((entry) => ({
-      ...entry,
-      userName: users[entry.userId]?.displayName || entry.userId,
-    }));
-  }, [scoredForms, users]);
+  const { formBracketMap, scoredForms, leaderboard, actualBracket } =
+    useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
   const renderFormDetail = () => {
     if (!selectedForm) return null;
@@ -149,7 +73,6 @@ export default function Leaderboard() {
           {predData.formName || "טופס ללא שם"}
         </h2>
 
-        {}
         <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-xl font-extrabold text-primary tabular-nums">
@@ -171,7 +94,6 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {}
         {Object.values(score.advancingPoints).some((v) => v > 0) && (
           <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm text-sm">
             <div className="text-xs font-semibold text-ink-muted mb-1">
@@ -200,7 +122,6 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {}
         <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm text-sm">
           <div className="flex justify-between py-1 border-b border-gray-50">
             <span className="text-ink-muted">ניחוש אלופה:</span>
@@ -220,7 +141,6 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {}
         {Object.entries(matchesByStage).map(([stage, matches]) => (
           <div key={stage} className="mb-4">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">
@@ -296,9 +216,16 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
-        🏆 טבלת דירוג
-      </h1>
+      {!embedded && (
+        <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
+          🏆 טבלת דירוג
+        </h1>
+      )}
+      {embedded && (
+        <p className="text-sm font-semibold text-primary mb-3">
+          תצוגה מקדימה (מנהל)
+        </p>
+      )}
 
       {selectedForm ? (
         renderFormDetail()
@@ -326,12 +253,17 @@ export default function Leaderboard() {
                 <button
                   key={entry.formId}
                   onClick={() => {
-                    const canView = locked || entry.userId === user?.id;
+                    const canView =
+                      forceUnlockView || locked || entry.userId === user?.id;
                     if (canView) setSelectedForm(entry.formId);
                   }}
                   className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3 text-right ${borderColor} ${
                     entry.userId === user?.id ? "ring-2 ring-primary/10" : ""
-                  } ${locked || entry.userId === user?.id ? "cursor-pointer card-hover" : "cursor-default opacity-80"}`}
+                  } ${
+                    forceUnlockView || locked || entry.userId === user?.id
+                      ? "cursor-pointer card-hover"
+                      : "cursor-default opacity-80"
+                  }`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums ${
@@ -382,7 +314,7 @@ export default function Leaderboard() {
                     </div>
                     <div className="text-[10px] text-ink-muted/60">נק׳</div>
                   </div>
-                  {!locked && entry.userId !== user?.id && (
+                  {!forceUnlockView && !locked && entry.userId !== user?.id && (
                     <span className="text-gray-300 text-sm">🔒</span>
                   )}
                 </button>

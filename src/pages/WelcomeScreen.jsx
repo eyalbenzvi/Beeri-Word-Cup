@@ -1,34 +1,9 @@
-import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
-import { useSettings } from "../hooks/useStore";
 import CountdownUnit from "../components/CountdownUnit";
 import GoogleSignInButton from "../components/GoogleSignInButton";
-import ScoringTable from "../components/ScoringTable";
-import { ChevronDown, ChevronUp } from "lucide-react";
-
-function InfoSection({ title, icon, children }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="bg-white rounded-2xl border border-border overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-3.5 bg-transparent border-none cursor-pointer text-right"
-      >
-        <span className="text-ink-muted">
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </span>
-        <span className="text-sm font-bold text-primary">
-          {icon} {title}
-        </span>
-      </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
-    </div>
-  );
-}
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
-  const settings = useSettings();
 
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4 py-8">
@@ -72,56 +47,8 @@ export default function WelcomeScreen() {
           )}
         </div>
 
-        <div
-          className={`rounded-2xl shadow-sm border p-3 ${
-            settings.predictionsLocked
-              ? "bg-red-50 border-red-200"
-              : "bg-green-50 border-green-200"
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                settings.predictionsLocked ? "bg-red-400" : "bg-green-400"
-              } animate-pulse`}
-            />
-            <span
-              className={`text-sm font-bold ${
-                settings.predictionsLocked ? "text-red-700" : "text-green-700"
-              }`}
-            >
-              {settings.predictionsLocked
-                ? "הגשת טפסים נעולה"
-                : "הגשת טפסים פתוחה"}
-            </span>
-          </div>
-        </div>
-
-        <div className="pt-1 space-y-3">
+        <div className="pt-1">
           <GoogleSignInButton />
-
-          <p className="text-xs text-ink-muted/60">
-            נרשמים בשנייה עם Google — בלי סיסמה נפרדת
-          </p>
-        </div>
-
-        <div className="pt-2 space-y-2">
-          <InfoSection title="שיטת הניקוד" icon="📊">
-            <ScoringTable />
-          </InfoSection>
-
-          <InfoSection title="החוקים" icon="📜">
-            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
-              <p>• כל משתתף ממלא טופס ניחושים לכל משחקי המונדיאל.</p>
-              <p>• ניתן להגיש יותר מטופס אחד.</p>
-              <p>• ניקוד מחושב אוטומטית לפי תוצאות בפועל.</p>
-              <p>• ניחוש הכרעה נכונה (ניצחון/תיקו) מזכה בנקודות בסיס.</p>
-              <p>• ניחוש תוצאה מדויקת מזכה בבונוס נוסף.</p>
-              <p>• ניחוש נכון של קבוצה עולה בנוקאאוט מזכה בנקודות עליה.</p>
-              <p>• בונוסים ניתנים על ניחוש אלופה ומלך שערים.</p>
-              <p>• הטפסים ננעלים לפני שריקת הפתיחה.</p>
-            </div>
-          </InfoSection>
         </div>
       </div>
     </div>

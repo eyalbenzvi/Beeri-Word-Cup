@@ -7,10 +7,13 @@ import {
   useSettings,
   useActualBonuses,
 } from "../hooks/useStore";
-import { updateSettings, saveActualBonuses } from "../store";
+import { saveActualBonuses } from "../store";
 import AdminResultsTab from "../components/AdminResultsTab";
 import AdminSettingsTab from "../components/AdminSettingsTab";
 import AdminUsersTab from "../components/AdminUsersTab";
+import AdminDashboardTab from "../components/AdminDashboardTab";
+import AdminFormsTab from "../components/AdminFormsTab";
+import AdminToolsTab from "../components/AdminToolsTab";
 
 export default function Admin() {
   const { user } = useCurrentUser();
@@ -19,7 +22,7 @@ export default function Admin() {
   const users = useUsers();
   const settings = useSettings();
   const actualBonuses = useActualBonuses();
-  const [activeTab, setActiveTab] = useState("results");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [adminPin, setAdminPin] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
   const [topScorerInput, setTopScorerInput] = useState("");
@@ -80,10 +83,13 @@ export default function Admin() {
       <h1 className="text-xl font-bold text-primary mb-4">⚙️ לוח ניהול</h1>
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto">
         {[
+          { id: "dashboard", label: "סקירה" },
+          { id: "forms", label: "טפסים" },
           { id: "results", label: "תוצאות" },
           { id: "topscorer", label: "מלך שערים" },
-          { id: "settings", label: "הגדרות" },
           { id: "users", label: "משתמשים" },
+          { id: "tools", label: "כלים" },
+          { id: "settings", label: "הגדרות" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -99,7 +105,22 @@ export default function Admin() {
         ))}
       </div>
 
+      {activeTab === "dashboard" && (
+        <AdminDashboardTab
+          settings={settings}
+          users={users}
+          allPredictions={allPredictions}
+          results={results}
+        />
+      )}
+
+      {activeTab === "forms" && (
+        <AdminFormsTab users={users} allPredictions={allPredictions} />
+      )}
+
       {activeTab === "results" && <AdminResultsTab />}
+
+      {activeTab === "tools" && <AdminToolsTab />}
 
       {activeTab === "topscorer" && (
         <div className="space-y-4">

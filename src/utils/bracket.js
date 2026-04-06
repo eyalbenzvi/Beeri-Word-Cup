@@ -298,8 +298,7 @@ export function calcBracketTeams(matchPredictions) {
     let home = null,
       away = null;
 
-    if (match.home === "3rd") {
-    } else if (match.home.match(/^[12][A-L]$/)) {
+    if (match.home.match(/^[12][A-L]$/)) {
       home = resolvePosition(match.home, standings);
     }
 

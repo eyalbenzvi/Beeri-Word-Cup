@@ -48,6 +48,11 @@ export function useCurrentUser() {
     }
   }, [storeReady, firebaseUser]);
 
+  useEffect(() => {
+    if (!storeReady || !firebaseUser) return;
+    store.touchUserLogin(firebaseUser.uid);
+  }, [storeReady, firebaseUser]);
+
   const user = firebaseUser ? store.getUser(firebaseUser.uid) : null;
 
   const logout = useCallback(async () => {
