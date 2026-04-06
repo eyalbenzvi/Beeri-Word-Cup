@@ -3,7 +3,6 @@ import { getFirestore } from 'firebase/firestore';
 import {
   getAuth,
   GoogleAuthProvider,
-  OAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
@@ -23,17 +22,9 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
-const appleProvider = new OAuthProvider('apple.com');
-appleProvider.addScope('name');
-appleProvider.addScope('email');
 
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);
-  return result.user;
-}
-
-export async function signInWithApple() {
-  const result = await signInWithPopup(auth, appleProvider);
   return result.user;
 }
 
