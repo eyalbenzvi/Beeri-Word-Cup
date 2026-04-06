@@ -647,22 +647,16 @@ export default function Predict() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white rounded-3xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
             <div className="text-5xl mb-4 animate-bounce">🤖</div>
-            <div className="text-lg font-extrabold text-primary mb-2">
+            <div className="text-lg font-extrabold text-primary mb-4">
               הבינה המלאכותית מנתחת
-            </div>
-            <div className="text-sm font-bold text-blue-600 mb-4">
-              {aiProgress.label}
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700"
                 style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
               />
-            </div>
-            <div className="text-xs text-ink-muted mb-4">
-              שלב {aiProgress.current} מתוך {aiProgress.total}
             </div>
 
             {/* Rotating fun messages */}
