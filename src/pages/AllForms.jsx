@@ -205,6 +205,7 @@ export default function AllFormsView({ onBack }) {
           </div>
         </>
       )}
+      <div className="h-14 md:hidden" />
     </div>
   );
 }
