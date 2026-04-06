@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useAllPredictions, useMatchResults } from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams, deriveChampion } from "../utils/bracket";
+import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 
 const allMatches = [...groupMatches, ...knockoutMatches];
@@ -233,8 +233,7 @@ function ChampionStats({ forms }) {
     const counts = {};
     forms.forEach((f) => {
       const predictions = f.matches || {};
-      const bracket = calcBracketTeams(predictions);
-      const champ = deriveChampion(predictions, bracket);
+      const champ = getCachedChampion(predictions);
       if (champ) {
         const name = getTeamByCode(champ)?.name || champ;
         counts[name] = (counts[name] || 0) + 1;
@@ -385,8 +384,7 @@ function SearchStats({ forms }) {
     const teamMatches = [];
     forms.forEach((f) => {
       const predictions = f.matches || {};
-      const bracket = calcBracketTeams(predictions);
-      const champ = deriveChampion(predictions, bracket);
+      const champ = getCachedChampion(predictions);
       const champName = champ ? getTeamByCode(champ)?.name || "" : "";
       if (champName.toLowerCase().includes(q)) {
         teamMatches.push({

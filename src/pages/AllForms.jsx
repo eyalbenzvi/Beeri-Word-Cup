@@ -11,7 +11,8 @@ import {
   STAGES,
 } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams, deriveChampion } from "../utils/bracket";
+import { calcBracketTeams } from "../utils/bracket";
+import { getCachedChampion } from "../utils/bracketCache";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -174,8 +175,7 @@ export default function AllFormsView({ onBack }) {
       .filter(([, form]) => normalizeStatus(form.status) === "submitted")
       .map(([formId, form]) => {
         const predictions = form.matches || {};
-        const bracketTeams = calcBracketTeams(predictions);
-        const championCode = deriveChampion(predictions, bracketTeams);
+        const championCode = getCachedChampion(predictions);
         const championTeam = championCode ? getTeamByCode(championCode) : null;
         return {
           formId,
