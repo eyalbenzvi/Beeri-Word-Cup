@@ -109,6 +109,21 @@ export function calculateMatchPoints(
   const actHome = Number(actual.homeScore);
   const actAway = Number(actual.awayScore);
 
+  if (
+    !Number.isFinite(predHome) ||
+    !Number.isFinite(predAway) ||
+    !Number.isFinite(actHome) ||
+    !Number.isFinite(actAway)
+  ) {
+    return {
+      points: 0,
+      outcomePoints: 0,
+      exactPoints: 0,
+      breakdown: "נתון לא תקין",
+      wrongMatchup: false,
+    };
+  }
+
   let points = 0;
   let outcomePoints = 0;
   let exactPoints = 0;
@@ -117,25 +132,18 @@ export function calculateMatchPoints(
   if (getOutcome(predHome, predAway) === getOutcome(actHome, actAway)) {
     outcomePoints = stagePoints.outcome;
     points += outcomePoints;
-    parts.push(`הכרעה: +${outcomePoints}`);
+    parts.push(`הכרעה: ${outcomePoints}`);
 
     // Check exact score (תוצאה) — ADDITIONAL points, only if outcome is correct
     if (predHome === actHome && predAway === actAway) {
       exactPoints = stagePoints.exactScore;
       points += exactPoints;
-      parts.push(`מדויק: +${exactPoints}`);
+      parts.push(`מדויק: ${exactPoints}`);
     }
   }
 
-  const breakdown = parts.length > 0 ? parts.join(", ") : "ללא ניקוד";
+  const breakdown = parts.length > 0 ? parts.join(", ") : "";
   return { points, outcomePoints, exactPoints, breakdown, wrongMatchup: false };
-}
-
-// Calculate advancing points for knockout matches
-export function calculateAdvancingPoints(predictedTeam, actualTeam, stage) {
-  if (!predictedTeam || !actualTeam) return 0;
-  const stagePoints = POINTS[stage] || POINTS.group;
-  return predictedTeam === actualTeam ? stagePoints.advancing : 0;
 }
 
 // Calculate full score for a user including all bonuses

@@ -90,7 +90,9 @@ export default function Leaderboard() {
       .sort((a, b) => {
         if (a.totalPoints !== b.totalPoints)
           return b.totalPoints - a.totalPoints;
-        return compareTiebreaker(a, b);
+        const tb = compareTiebreaker(a, b);
+        if (tb !== 0) return tb;
+        return a.formId.localeCompare(b.formId);
       });
   }, [
     allPredictions,

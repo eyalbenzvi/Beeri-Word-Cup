@@ -109,11 +109,6 @@ export function useMatchResults() {
   return store.getMatchResults();
 }
 
-export function useActualAdvancing() {
-  useStoreUpdates();
-  return store.getActualAdvancing();
-}
-
 export function useActualBonuses() {
   useStoreUpdates();
   return store.getActualBonuses();

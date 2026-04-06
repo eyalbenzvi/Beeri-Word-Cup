@@ -202,9 +202,9 @@ function InfoDropdown({ open, onToggle }) {
     <div className="relative" ref={ref}>
       <button
         onClick={onToggle}
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-semibold bg-transparent border-none cursor-pointer transition-all text-white/60 hover:text-white hover:bg-white/10"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-transparent border-none cursor-pointer transition-all text-white/60 hover:text-white hover:bg-white/10"
       >
-        <Info size={16} />
+        <Info size={14} />
         מידע
       </button>
       {open && (
@@ -307,7 +307,7 @@ export default function Layout({ children }) {
   return (
     <div className="bg-bg">
       <header className="header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-white/10">
-        <div className="max-w-3xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
@@ -330,23 +330,19 @@ export default function Layout({ children }) {
           </div>
 
           <div className="hidden md:flex items-center gap-0.5">
-            {allNavItems.map((item) => {
-              const Icon = NAV_ICONS[item.id] || Home;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => navigate(item.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-transparent border-none cursor-pointer transition-all ${
-                    page === item.id
-                      ? "bg-white/20 text-white"
-                      : "text-white/60 hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {item.label}
-                </button>
-              );
-            })}
+            {allNavItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-transparent border-none cursor-pointer transition-all whitespace-nowrap ${
+                  page === item.id
+                    ? "bg-white/20 text-white"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
             <InfoDropdown
               open={infoOpen}
               onToggle={() => setInfoOpen(!infoOpen)}
@@ -354,16 +350,16 @@ export default function Layout({ children }) {
           </div>
 
           {user ? (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold backdrop-blur-sm">
+            <div className="flex items-center gap-1.5">
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold backdrop-blur-sm">
                 {(user.displayName || "?").charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium hidden sm:inline text-white/90">
+              <span className="text-xs font-medium hidden lg:inline text-white/90 max-w-[80px] truncate">
                 {user.displayName || "משתמש"}
               </span>
               <button
                 onClick={logout}
-                className="text-xs bg-white/10 px-3 py-1.5 rounded-lg hover:bg-white/20 transition cursor-pointer border-none text-white/80 font-medium"
+                className="text-xs bg-white/10 px-2.5 py-1 rounded-lg hover:bg-white/20 transition cursor-pointer border-none text-white/80 font-medium"
               >
                 יציאה
               </button>

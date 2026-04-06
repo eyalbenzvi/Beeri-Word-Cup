@@ -29,7 +29,6 @@ import AllFormsView from "./AllForms";
 import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
-import ProgressHub from "../components/ProgressHub";
 import MatchSearch from "../components/MatchSearch";
 
 const groupMatches = generateGroupMatches();
@@ -62,15 +61,8 @@ export default function Predict() {
   const [newFormName, setNewFormName] = useState("");
   const [showAllForms, setShowAllForms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showOnlyMissing, setShowOnlyMissing] = useState(
-    () => sessionStorage.getItem("predict-hide-filled") === "true",
-  );
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
-
-  useEffect(() => {
-    sessionStorage.setItem("predict-hide-filled", String(showOnlyMissing));
-  }, [showOnlyMissing]);
 
   useEffect(() => {
     if (!activeFormId) return;
@@ -319,64 +311,6 @@ export default function Predict() {
     showToast("הטופס נמחק");
   };
 
-  const isMatchMissing = useCallback(
-    (matchId) => {
-      const p = matchPredictions[matchId];
-      return (
-        !p ||
-        p.homeScore === undefined ||
-        p.homeScore === null ||
-        p.awayScore === undefined ||
-        p.awayScore === null
-      );
-    },
-    [matchPredictions],
-  );
-
-  const totalMissing = useMemo(() => {
-    return (
-      groupMatches.filter((m) => isMatchMissing(m.id)).length +
-      knockoutMatches.filter((m) => isMatchMissing(m.id)).length
-    );
-  }, [isMatchMissing]);
-
-  const handleJumpToNextMissing = useCallback(() => {
-    for (const m of groupMatches) {
-      if (isMatchMissing(m.id)) {
-        setSelectedStage("group");
-        setSelectedGroup(m.group);
-        setActiveTab("matches");
-        setTimeout(() => {
-          document
-            .getElementById(`match-${m.id}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 100);
-        return;
-      }
-    }
-    for (const m of knockoutMatches) {
-      if (isMatchMissing(m.id)) {
-        setSelectedStage(m.stage);
-        setActiveTab("matches");
-        setTimeout(() => {
-          document
-            .getElementById(`match-${m.id}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 100);
-        return;
-      }
-    }
-    if (
-      !activeForm?.topScorer?.trim() ||
-      !activeForm?.formName?.trim() ||
-      !activeForm?.budgetNumber?.trim()
-    ) {
-      setActiveTab("details");
-      return;
-    }
-    showToast("הכל מלא! 🎉");
-  }, [isMatchMissing, activeForm, showToast]);
-
   const handleMatchJump = useCallback((match) => {
     if (match.stage === "group") {
       setSelectedStage("group");
@@ -580,6 +514,19 @@ export default function Predict() {
       : knockoutMatches.filter((m) => m.stage === selectedStage);
 
   const renderStatusBanner = () => {
+    if (activeForm?.status === "pending") {
+      return (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-center">
+          <div className="text-2xl mb-1">⏳</div>
+          <div className="text-sm font-semibold text-amber-700">
+            הטופס ממתין לאישור
+          </div>
+          <div className="text-xs text-amber-600 mt-1">
+            הטופס עדיין לא מופיע בטבלת הדירוג עד לאישור מנהל.
+          </div>
+        </div>
+      );
+    }
     if (status === "submitted") {
       return (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4 text-center">
@@ -622,13 +569,7 @@ export default function Predict() {
   };
 
   const renderMatchesTab = () => {
-    const displayMatches = showOnlyMissing
-      ? filteredMatches.filter((m) => isMatchMissing(m.id))
-      : filteredMatches;
-
-    const currentStageMissing = filteredMatches.filter((m) =>
-      isMatchMissing(m.id),
-    ).length;
+    const displayMatches = filteredMatches;
 
     return (
       <>
@@ -643,55 +584,8 @@ export default function Predict() {
               groups={Object.keys(GROUPS)}
               selectedGroup={selectedGroup}
               onSelect={setSelectedGroup}
-              missingCounts={Object.fromEntries(
-                Object.keys(GROUPS).map((g) => [
-                  g,
-                  groupMatches
-                    .filter((m) => m.group === g)
-                    .filter((m) => isMatchMissing(m.id)).length,
-                ]),
-              )}
             />
           )}
-
-          {/* Filter toggle + jump to next missing */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setShowOnlyMissing(false)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md border-none cursor-pointer transition ${
-                  !showOnlyMissing
-                    ? "bg-white text-primary shadow-sm"
-                    : "text-gray-400 bg-transparent"
-                }`}
-              >
-                הכל
-              </button>
-              <button
-                onClick={() => setShowOnlyMissing(true)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md border-none cursor-pointer transition ${
-                  showOnlyMissing
-                    ? "bg-white text-primary shadow-sm"
-                    : "text-gray-400 bg-transparent"
-                }`}
-              >
-                חסרים
-                {currentStageMissing > 0 && (
-                  <span className="mr-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    {currentStageMissing}
-                  </span>
-                )}
-              </button>
-            </div>
-            {totalMissing > 0 && (
-              <button
-                onClick={handleJumpToNextMissing}
-                className="text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border-none cursor-pointer hover:bg-primary/20 transition active:scale-95 whitespace-nowrap"
-              >
-                ← הבא חסר ({totalMissing})
-              </button>
-            )}
-          </div>
         </div>
 
         {selectedStage === "group" && (
@@ -733,23 +627,7 @@ export default function Predict() {
               </div>
             );
           })}
-          {displayMatches.length === 0 && showOnlyMissing && (
-            <div className="text-center py-8">
-              <div className="text-3xl mb-2">✅</div>
-              <p className="text-gray-500 text-sm font-medium">
-                כל המשחקים בשלב הזה הושלמו!
-              </p>
-              {totalMissing > 0 && (
-                <button
-                  onClick={handleJumpToNextMissing}
-                  className="mt-3 text-sm font-bold text-primary bg-primary/10 px-4 py-2 rounded-xl border-none cursor-pointer hover:bg-primary/20 transition"
-                >
-                  ← עבור לחוסר הבא
-                </button>
-              )}
-            </div>
-          )}
-          {displayMatches.length === 0 && !showOnlyMissing && (
+          {displayMatches.length === 0 && (
             <div className="text-center py-8 text-gray-400">
               <p>אין משחקים בשלב הזה</p>
             </div>
@@ -842,82 +720,25 @@ export default function Predict() {
 
       {renderStatusBanner()}
 
-      {/* Progress */}
-      {(() => {
-        const total = groupMatches.length + knockoutMatches.length;
-        const filled = predictedGroupMatches + predictedKnockout;
-        const pct = Math.round((filled / total) * 100);
-        return (
-          <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm">
-            <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-              <span>
-                בתים: {predictedGroupMatches}/{groupMatches.length} • נוקאאוט:{" "}
-                {predictedKnockout}/{knockoutMatches.length}
-              </span>
-              <span className="font-bold text-primary">{pct}%</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2.5">
-              <div
-                className={`rounded-full h-2.5 transition-all ${pct === 100 ? "bg-green-500" : "bg-primary"}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        );
-      })()}
-
-      <ProgressHub
-        groupMatches={groupMatches}
-        knockoutMatches={knockoutMatches}
-        matchPredictions={matchPredictions}
-        onSelectGroup={(g) => {
-          setSelectedStage("group");
-          setSelectedGroup(g);
-          setActiveTab("matches");
-        }}
-        onSelectStage={(s) => {
-          setSelectedStage(s);
-          setActiveTab("matches");
-        }}
-      />
-
       {/* Main Tabs */}
-      {(() => {
-        const detailsIncomplete =
-          canEdit &&
-          (!activeForm.topScorer?.trim() ||
-            !activeForm.formName?.trim() ||
-            !activeForm.budgetNumber?.trim());
-        return (
-          <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
-            {[
-              { id: "matches", label: "⚽ משחקים", badge: null },
-              {
-                id: "details",
-                label: "📝 פרטים",
-                badge: detailsIncomplete ? "!" : null,
-              },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition border-none cursor-pointer relative ${
-                  activeTab === tab.id
-                    ? "bg-white text-primary shadow-sm"
-                    : "text-gray-400"
-                }`}
-              >
-                {tab.label}
-                {tab.badge && (
-                  <span className="absolute -top-1 left-2 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        );
-      })()}
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+        {[
+          { id: "matches", label: "⚽ משחקים" },
+          { id: "details", label: "📝 פרטים" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition border-none cursor-pointer ${
+              activeTab === tab.id
+                ? "bg-white text-primary shadow-sm"
+                : "text-gray-400"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Breadcrumb + search (only in matches tab) */}
       {activeTab === "matches" && (

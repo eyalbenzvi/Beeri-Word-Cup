@@ -136,14 +136,27 @@ export default function Admin() {
       return;
     const isKnockout = match.stage && match.stage !== "group";
     if (isKnockout && homeScore === awayScore) {
+      const existing = results[match.id];
+      if (!existing?.advancingTeam) {
+        saveMatchResult(match.id, {
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          homeScore,
+          awayScore,
+          advancingTeam: null,
+          stage: match.stage || "group",
+          group: match.group || null,
+          played: true,
+          needsAdvancingTeam: true,
+        });
+        setEditingMatch(null);
+        setEditScores({ homeScore: "", awayScore: "" });
+        return;
+      }
       saveMatchResult(match.id, {
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
+        ...existing,
         homeScore,
         awayScore,
-        advancingTeam: null,
-        stage: match.stage || "group",
-        group: match.group || null,
         played: true,
       });
       setEditingMatch(null);
@@ -243,8 +256,29 @@ export default function Admin() {
     }
   };
 
+  const unresolvedKnockoutTies = useMemo(() => {
+    return Object.entries(results).filter(
+      ([, r]) =>
+        r.stage &&
+        r.stage !== "group" &&
+        r.homeScore === r.awayScore &&
+        !r.advancingTeam,
+    );
+  }, [results]);
+
   const renderResultsTab = () => (
     <>
+      {unresolvedKnockoutTies.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 text-center">
+          <div className="text-sm font-semibold text-red-600">
+            ⚠️ {unresolvedKnockoutTies.length} משחקי נוקאאוט בתיקו ללא בחירת מי
+            עולה
+          </div>
+          <div className="text-xs text-red-500 mt-1">
+            יש לבחור מי עולה בכל משחק תיקו כדי שהניקוד יחושב נכון
+          </div>
+        </div>
+      )}
       <button
         onClick={handleRandomizeResults}
         className="w-full mb-3 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"

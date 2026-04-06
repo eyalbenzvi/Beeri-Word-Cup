@@ -398,18 +398,6 @@ export function deleteMatchResult(matchId) {
   writeDoc("matchResults", results);
 }
 
-// ============ ACTUAL ADVANCING TEAMS (admin) ============
-
-export function getActualAdvancing() {
-  return cache.actualAdvancing || {};
-}
-
-export function saveActualAdvancing(round, teams) {
-  const advancing = { ...getActualAdvancing() };
-  advancing[round] = teams;
-  writeDoc("actualAdvancing", advancing);
-}
-
 // ============ ACTUAL BONUSES (admin) ============
 
 export function getActualBonuses() {
@@ -438,7 +426,7 @@ export function exportAllData() {
     users: getUsers(),
     predictions: getAllPredictions(),
     matchResults: getMatchResults(),
-    actualAdvancing: getActualAdvancing(),
+    actualAdvancing: cache.actualAdvancing || {},
     actualBonuses: getActualBonuses(),
     settings: getSettings(),
     exportedAt: new Date().toISOString(),

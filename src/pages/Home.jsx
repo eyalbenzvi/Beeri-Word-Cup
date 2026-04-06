@@ -1,24 +1,6 @@
-import { useState, useEffect } from "react";
-import { useCurrentUser, useSettings } from "../hooks/useStore";
+import { useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
-
-const KICKOFF = new Date("2026-06-11T16:00:00Z").getTime();
-
-function useCountdown() {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const diff = Math.max(0, KICKOFF - now);
-  return {
-    days: Math.floor(diff / 86400000),
-    hours: Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000),
-    started: diff === 0,
-  };
-}
+import { useCountdown } from "../hooks/useCountdown";
 
 function CountdownUnit({ value, label, accent }) {
   return (
@@ -36,7 +18,6 @@ function CountdownUnit({ value, label, accent }) {
 }
 
 export default function Home() {
-  const { user } = useCurrentUser();
   const settings = useSettings();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
@@ -50,16 +31,7 @@ export default function Home() {
         </h1>
       </div>
 
-      {!user && !settings.predictionsLocked && (
-        <button
-          onClick={() => navigate("login")}
-          className="w-full bg-secondary text-white font-extrabold py-4 rounded-2xl hover:bg-secondary/90 transition text-base border-none cursor-pointer shadow-md mb-3"
-        >
-          התחבר והתחל לנחש
-        </button>
-      )}
-
-      {user && !settings.predictionsLocked && (
+      {!settings.predictionsLocked && (
         <button
           onClick={() => navigate("predict")}
           className="w-full bg-secondary text-white font-extrabold py-4 rounded-2xl hover:bg-secondary/90 transition text-base border-none cursor-pointer shadow-md mb-3"

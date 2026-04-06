@@ -153,8 +153,8 @@ export default function MatchCard({
                 : "bg-gray-50 text-ink-muted"
             }`}
           >
-            {points.points > 0 ? `+${points.points}` : "0"} נק׳ —{" "}
-            {points.breakdown}
+            {points.points > 0 ? `+${points.points}` : "0"} נק׳
+            {points.breakdown ? ` — ${points.breakdown}` : ""}
           </span>
         </div>
       )}
