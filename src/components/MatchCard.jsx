@@ -192,6 +192,7 @@ export default function MatchCard({
                   max="20"
                   inputMode="numeric"
                   enterKeyHint="next"
+                  aria-label={`ניחוש גולים ${homeName}`}
                   value={predHome}
                   onChange={handleHomeChange}
                   className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
@@ -213,6 +214,7 @@ export default function MatchCard({
                   max="20"
                   inputMode="numeric"
                   enterKeyHint="done"
+                  aria-label={`ניחוש גולים ${awayName}`}
                   value={predAway}
                   onChange={handleAwayChange}
                   className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${

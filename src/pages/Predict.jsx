@@ -224,6 +224,7 @@ export default function Predict() {
 
   const handleRandomize = useCallback(() => {
     if (!activeFormId || !canEdit) return;
+    if (!window.confirm("פעולה זו תדרוס את כל הניחושים הקיימים בהגרלה אקראית. להמשיך?")) return;
 
     const allPreds = {};
 

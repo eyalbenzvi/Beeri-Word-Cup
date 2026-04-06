@@ -17,6 +17,17 @@ export default function AdminSettingsTab({
   const { navigate } = useNavigation();
   const fileInputRef = useRef(null);
 
+  const downloadBackup = (label = "backup") => {
+    const data = exportAllData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `beeri-worldcup-${label}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleExport = () => {
     const data = exportAllData();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -36,10 +47,29 @@ export default function AdminSettingsTab({
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        importAllData(JSON.parse(ev.target.result));
+        const data = JSON.parse(ev.target.result);
+        // Validate schema
+        const validKeys = ["users", "predictions", "matchResults", "settings", "actualBonuses", "actualAdvancing"];
+        const dataKeys = Object.keys(data);
+        if (dataKeys.length === 0 || !dataKeys.some(k => validKeys.includes(k))) {
+          alert("קובץ לא תקין — חסרים שדות נדרשים (users, predictions, וכו')");
+          return;
+        }
+        const invalidKeys = dataKeys.filter(k => !validKeys.includes(k));
+        if (invalidKeys.length > 0) {
+          alert(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`);
+          return;
+        }
+        // Confirm with preview
+        const preview = dataKeys.map(k => {
+          const count = typeof data[k] === "object" ? Object.keys(data[k]).length : "?";
+          return `${k}: ${count} רשומות`;
+        }).join("\n");
+        if (!window.confirm(`ייבוא ידרוס את הנתונים הקיימים.\n\nתוכן הקובץ:\n${preview}\n\nלהמשיך?`)) return;
+        importAllData(data);
         alert("הנתונים יובאו בהצלחה!");
       } catch {
-        alert("קובץ לא תקין");
+        alert("קובץ לא תקין — שגיאה בפרסור JSON");
       }
     };
     reader.readAsText(file);
@@ -123,6 +153,7 @@ export default function AdminSettingsTab({
         <button
           onClick={() => {
             if (window.confirm("בטוח? פעולה זו תמחק את כל תוצאות האמת.")) {
+              downloadBackup("before-clear-results");
               clearMatchResults();
             }
           }}
@@ -135,14 +166,12 @@ export default function AdminSettingsTab({
         </p>
         <button
           onClick={() => {
-            if (
-              window.confirm(
-                "בטוח? פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות.",
-              )
-            ) {
-              clearAllData();
-              navigate("home");
-            }
+            if (!window.confirm("בטוח? פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות.")) return;
+            const typed = window.prompt("הקלד DELETE לאישור סופי:");
+            if (typed !== "DELETE") return;
+            downloadBackup("before-clear-all");
+            clearAllData();
+            navigate("home");
           }}
           className="w-full bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"
         >

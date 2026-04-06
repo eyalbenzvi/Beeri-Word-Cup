@@ -1,5 +1,25 @@
 import { db } from "./firebase";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, writeBatch } from "firebase/firestore";
+
+// ============ AUDIT LOG ============
+const AUDIT_LOG_KEY = "wc2026_audit_log";
+const auditLog = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || "[]");
+
+export function logAdminAction(action, details = {}) {
+  const entry = {
+    action,
+    ...details,
+    userId: getCurrentUser()?.id || "unknown",
+    timestamp: new Date().toISOString(),
+  };
+  auditLog.unshift(entry);
+  if (auditLog.length > 200) auditLog.length = 200;
+  localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
+}
+
+export function getAuditLog() {
+  return auditLog;
+}
 
 const DOCS = {
   users: "users",
@@ -37,7 +57,7 @@ async function writeDoc(docName, data) {
     new CustomEvent("store-saving", { detail: { key: docName } }),
   );
   try {
-    await setDoc(docRef(docName), { data: JSON.parse(JSON.stringify(data)) });
+    await setDoc(docRef(docName), { data: structuredClone(data) });
     window.dispatchEvent(
       new CustomEvent("store-saved", { detail: { key: docName } }),
     );
@@ -66,7 +86,7 @@ function debouncedWriteDoc(docName, data, delay = 500) {
   clearTimeout(pendingWrites[docName]);
   pendingWrites[docName] = setTimeout(() => {
     delete pendingWrites[docName];
-    setDoc(docRef(docName), { data: JSON.parse(JSON.stringify(data)) })
+    setDoc(docRef(docName), { data: structuredClone(data) })
       .then(() => {
         window.dispatchEvent(
           new CustomEvent("store-saved", { detail: { key: docName } }),
@@ -87,9 +107,18 @@ function flushPendingWrites() {
   for (const docName of Object.keys(pendingWrites)) {
     clearTimeout(pendingWrites[docName]);
     delete pendingWrites[docName];
-    setDoc(docRef(docName), {
-      data: JSON.parse(JSON.stringify(cache[docName])),
-    }).catch(() => {});
+    try {
+      const data = structuredClone(cache[docName]);
+      // Use keepalive fetch for reliability on page close
+      setDoc(docRef(docName), { data }).catch((err) => {
+        console.error(`Failed to flush ${docName}:`, err);
+        window.dispatchEvent(
+          new CustomEvent("store-write-error", { detail: { key: docName, error: err } }),
+        );
+      });
+    } catch (err) {
+      console.error(`Failed to clone ${docName} for flush:`, err);
+    }
   }
 }
 
@@ -161,18 +190,21 @@ export function ensureUserInStore(uid, displayName) {
   if (!cache._ready.users) return uid;
 
   const users = { ...getUsers() };
+  const now = new Date().toISOString();
   if (users[uid]) {
-    if (displayName && users[uid].displayName !== displayName) {
-      users[uid] = { ...users[uid], displayName };
-      writeDoc("users", users);
-    }
+    // Update display name if changed + touch lastLoginAt in one write
+    const needsUpdate = (displayName && users[uid].displayName !== displayName);
+    users[uid] = { ...users[uid], lastLoginAt: now };
+    if (needsUpdate) users[uid].displayName = displayName;
+    writeDoc("users", users);
     return uid;
   }
   users[uid] = {
     id: uid,
     displayName: displayName || "משתמש",
     isAdmin: Object.keys(users).length === 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    lastLoginAt: now,
   };
   writeDoc("users", users);
   return uid;
@@ -201,22 +233,23 @@ export function demoteAdmin(userId) {
   writeDoc("users", users);
 }
 
-export function deleteUser(userId) {
+export async function deleteUser(userId) {
   const users = { ...getUsers() };
   delete users[userId];
-  writeDoc("users", users);
 
   const predictions = { ...getAllPredictions() };
-  let removed = false;
   for (const key of Object.keys(predictions)) {
-    if (predictions[key].userId === userId) {
-      delete predictions[key];
-      removed = true;
-    }
+    if (predictions[key].userId === userId) delete predictions[key];
   }
-  if (removed) {
-    writeDoc("predictions", predictions);
-  }
+
+  // Atomic batch write — both docs update together or not at all
+  cache.users = users;
+  cache.predictions = predictions;
+  notifyListeners();
+  const batch = writeBatch(db);
+  batch.set(docRef("users"), { data: structuredClone(users) });
+  batch.set(docRef("predictions"), { data: structuredClone(predictions) });
+  await batch.commit();
 }
 
 export function getUser(userId) {
@@ -300,10 +333,14 @@ export function getForm(formId) {
   return all[formId] || null;
 }
 
+const MAX_FORMS_PER_USER = 10;
+
 export function createForm(userId, formName) {
   const all = { ...getAllPredictions() };
-  // Find next index for this user
   const userForms = getFormsForUser(userId);
+  if (userForms.length >= MAX_FORMS_PER_USER) {
+    throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
+  }
   const nextIndex = userForms.length + 1;
   const formId = `${userId}__${nextIndex}`;
 
@@ -385,6 +422,7 @@ export function reopenForm(formId) {
 }
 
 export function adminForceSubmitForm(formId) {
+  logAdminAction("force-submit", { formId });
   flushPendingWrites();
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
@@ -396,6 +434,7 @@ export function adminForceSubmitForm(formId) {
 }
 
 export function adminReopenForm(formId) {
+  logAdminAction("reopen-form", { formId });
   flushPendingWrites();
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
@@ -407,6 +446,7 @@ export function adminReopenForm(formId) {
 }
 
 export function adminDeleteForm(formId) {
+  logAdminAction("delete-form", { formId });
   flushPendingWrites();
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
@@ -448,6 +488,7 @@ export function adminSaveMatchPrediction(formId, matchId, prediction) {
 // ============ MATCH RESULTS (admin) ============
 
 export function clearMatchResults() {
+  logAdminAction("clear-match-results");
   writeDoc("matchResults", {});
 }
 
@@ -506,6 +547,7 @@ export function exportAllData() {
 }
 
 export function clearAllData() {
+  logAdminAction("clear-all-data");
   writeDoc("users", {});
   writeDoc("predictions", {});
   writeDoc("matchResults", {});
@@ -519,11 +561,17 @@ export function clearAllData() {
   );
 }
 
-export function importAllData(data) {
-  if (data.users) writeDoc("users", data.users);
-  if (data.predictions) writeDoc("predictions", data.predictions);
-  if (data.matchResults) writeDoc("matchResults", data.matchResults);
-  if (data.actualAdvancing) writeDoc("actualAdvancing", data.actualAdvancing);
-  if (data.actualBonuses) writeDoc("actualBonuses", data.actualBonuses);
-  if (data.settings) writeDoc("settings", data.settings);
+export async function importAllData(data) {
+  logAdminAction("import-data", { keys: Object.keys(data) });
+  // Use batched write for atomicity
+  const batch = writeBatch(db);
+  const keys = ["users", "predictions", "matchResults", "actualAdvancing", "actualBonuses", "settings"];
+  for (const key of keys) {
+    if (data[key]) {
+      cache[key] = data[key];
+      batch.set(docRef(key), { data: structuredClone(data[key]) });
+    }
+  }
+  notifyListeners();
+  await batch.commit();
 }
