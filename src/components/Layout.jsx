@@ -132,14 +132,14 @@ export default function Layout({ children }) {
 
   const allNavItems = user
     ? [
-        { id: "home", label: "בית" },
-        { id: "predict", label: "טפסים" },
-        { id: "leaderboard", label: "דירוג" },
-        { id: "results", label: "תוצאות" },
-        { id: "stats", label: "סטטיסטיקות" },
+        { id: "home", label: "בית", emoji: "🏠" },
+        { id: "predict", label: "טפסים", emoji: "📋" },
+        { id: "leaderboard", label: "דירוג", emoji: "🏆" },
+        { id: "results", label: "תוצאות", emoji: "⚽" },
+        { id: "stats", label: "נתונים", emoji: "📊" },
       ]
-    : [{ id: "home", label: "בית" }];
-  if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול" });
+    : [{ id: "home", label: "בית", emoji: "🏠" }];
+  if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול", emoji: "⚙️" });
 
   const mobileNavItems = user
     ? allNavItems.filter((item) => item.id !== "stats" && item.id !== "admin")
@@ -224,9 +224,7 @@ export default function Layout({ children }) {
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border/50 z-50 safe-area-bottom md:hidden">
         <div className="max-w-lg mx-auto flex">
-          {mobileNavItems.map((item) => {
-            const Icon = NAV_ICONS[item.id] || Home;
-            return (
+          {mobileNavItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
@@ -234,15 +232,12 @@ export default function Layout({ children }) {
                   page === item.id ? "text-primary font-bold" : "text-ink-muted"
                 }`}
               >
-                <Icon
-                  size={22}
-                  strokeWidth={page === item.id ? 2.5 : 1.5}
-                  className="mb-0.5"
-                />
+                <span className={`text-xl mb-0.5 transition-transform duration-150 ${page === item.id ? "scale-110" : ""}`}>
+                  {item.emoji}
+                </span>
                 {item.label}
               </button>
-            );
-          })}
+            ))}
           {user && (
             <button
               onClick={() => setMoreOpen(true)}
