@@ -44,6 +44,17 @@ export default function Admin() {
   // Compute bracket from actual results (same as Predict does for predictions)
   const bracketTeams = useMemo(() => calcBracketTeams(results), [results]);
 
+  // Check if all 12 groups completed (6 matches each = 72 total group matches)
+  const completedGroupCount = useMemo(() => {
+    const counts = {};
+    for (const matchId of Object.keys(results)) {
+      const m = matchId.match(/^group-([A-L])-/);
+      if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
+    }
+    return Object.values(counts).filter(c => c >= 6).length;
+  }, [results]);
+  const allGroupsComplete = completedGroupCount >= 12;
+
   if (!user?.isAdmin) {
     return (
       <div className="text-center py-12">
@@ -165,9 +176,11 @@ export default function Admin() {
       )}
       <div className="space-y-2">
         {filteredMatches.map((match) => {
-          const derived = match.stage !== 'group' && bracketTeams[match.id]
+          // Only show knockout teams if groups are complete (for R32) or feeding match played
+          const canShowTeams = match.stage === 'group' || (match.stage === 'R32' ? allGroupsComplete : !!bracketTeams[match.id]);
+          const derived = match.stage !== 'group' && canShowTeams && bracketTeams[match.id]
             ? { home: bracketTeams[match.id].home, away: bracketTeams[match.id].away }
-            : { home: match.homeTeam, away: match.awayTeam };
+            : match.stage === 'group' ? { home: match.homeTeam, away: match.awayTeam } : { home: null, away: null };
           const homeTeam = getTeamByCode(derived.home);
           const awayTeam = getTeamByCode(derived.away);
           const result = results[match.id];
