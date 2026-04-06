@@ -128,6 +128,7 @@ export default function Layout({ children }) {
     { id: 'predict', label: 'טפסים', icon: '📋' },
     { id: 'leaderboard', label: 'דירוג', icon: '🏆' },
     { id: 'results', label: 'תוצאות', icon: '⚽' },
+    { id: 'stats', label: 'סטטיסטיקות', icon: '📈' },
   ];
   if (user?.isAdmin) navItems.push({ id: 'admin', label: 'ניהול', icon: '⚙️' });
 
