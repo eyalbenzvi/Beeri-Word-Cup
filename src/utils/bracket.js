@@ -283,19 +283,16 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     Object.entries(groupMatchCounts).filter(([, count]) => count >= 6).map(([g]) => g)
   );
 
-  // R32: only include teams from completed groups
-  for (const [matchId, teams] of Object.entries(bracketTeams)) {
-    if (!matchId.startsWith('R32-')) continue;
-    // Both teams must come from completed groups to count
-    if (teams.home) {
-      const homeGroup = ALL_TEAMS_MAP[teams.home];
-      if (homeGroup && completedGroups.has(homeGroup) && !advancing.R32.includes(teams.home)) {
+  // R32: only award when ALL 12 groups are complete
+  // (because 3rd-place teams' advancement depends on all groups finishing)
+  const allGroupsComplete = completedGroups.size >= 12;
+  if (allGroupsComplete) {
+    for (const [matchId, teams] of Object.entries(bracketTeams)) {
+      if (!matchId.startsWith('R32-')) continue;
+      if (teams.home && !advancing.R32.includes(teams.home)) {
         advancing.R32.push(teams.home);
       }
-    }
-    if (teams.away) {
-      const awayGroup = ALL_TEAMS_MAP[teams.away];
-      if (awayGroup && completedGroups.has(awayGroup) && !advancing.R32.includes(teams.away)) {
+      if (teams.away && !advancing.R32.includes(teams.away)) {
         advancing.R32.push(teams.away);
       }
     }
