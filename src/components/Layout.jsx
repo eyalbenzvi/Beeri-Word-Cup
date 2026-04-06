@@ -1,6 +1,18 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCurrentUser } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
+import {
+  Home,
+  ClipboardList,
+  Trophy,
+  CircleDot,
+  BarChart3,
+  Settings,
+  Info,
+  Menu,
+  X,
+  MoreHorizontal,
+} from "lucide-react";
 
 const SCORING_DATA = [
   ["בתים", 1, 3, 2],
@@ -12,14 +24,23 @@ const SCORING_DATA = [
   ["גמר", 11, 3, null],
 ];
 
+const NAV_ICONS = {
+  home: Home,
+  predict: ClipboardList,
+  leaderboard: Trophy,
+  results: CircleDot,
+  stats: BarChart3,
+  admin: Settings,
+};
+
 function MenuSection({ icon, title, active, onToggle, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-border overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
       >
-        <span className="text-gray-400 text-xs">{active ? "▲" : "▼"}</span>
+        <span className="text-ink-muted text-xs">{active ? "▲" : "▼"}</span>
         <span className="text-sm font-bold text-primary">
           {icon} {title}
         </span>
@@ -44,11 +65,11 @@ function MenuOverlay({ open, onClose }) {
         <div className="header-gradient text-white p-5 flex items-center justify-between">
           <button
             onClick={onClose}
-            className="text-white/80 text-2xl bg-transparent border-none cursor-pointer p-0 leading-none"
+            className="text-white/80 bg-transparent border-none cursor-pointer p-0 leading-none"
           >
-            ✕
+            <X size={24} />
           </button>
-          <h2 className="text-lg font-extrabold tracking-tight">תפריט</h2>
+          <h2 className="text-lg font-extrabold tracking-tight">מידע</h2>
         </div>
 
         <div className="p-4 space-y-2">
@@ -60,14 +81,14 @@ function MenuOverlay({ open, onClose }) {
           >
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-400 border-b-2 border-gray-100">
+                <tr className="text-ink-muted border-b-2 border-border">
                   <th className="text-right py-2 font-semibold">שלב</th>
                   <th className="text-center py-2 font-semibold">הכרעה</th>
                   <th className="text-center py-2 font-semibold">+מדויק</th>
                   <th className="text-center py-2 font-semibold">עליה</th>
                 </tr>
               </thead>
-              <tbody className="text-gray-700">
+              <tbody className="text-ink">
                 {SCORING_DATA.map(([stage, outcome, exact, advance], i) => (
                   <tr key={i} className="border-b border-gray-50">
                     <td className="py-2 font-medium">{stage}</td>
@@ -84,15 +105,15 @@ function MenuOverlay({ open, onClose }) {
             </table>
             <div className="mt-3 space-y-1.5 text-xs">
               <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
-                <span className="text-gray-600">🏆 ניחוש אלופה</span>
-                <span className="font-bold text-yellow-600">9 נק׳</span>
+                <span className="text-ink-muted">🏆 ניחוש אלופה</span>
+                <span className="font-bold text-accent-text">9 נק׳</span>
               </div>
               <div className="flex justify-between items-center bg-yellow-50/60 rounded-xl px-3 py-2">
-                <span className="text-gray-600">⚽ מלך שערים</span>
-                <span className="font-bold text-yellow-600">8 נק׳</span>
+                <span className="text-ink-muted">⚽ מלך שערים</span>
+                <span className="font-bold text-accent-text">8 נק׳</span>
               </div>
             </div>
-            <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+            <p className="text-[11px] text-ink-muted mt-3 leading-relaxed">
               ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בבעיטות הכרעה
               לא נספרים למלך השערים.
             </p>
@@ -104,7 +125,7 @@ function MenuOverlay({ open, onClose }) {
             active={activeSection === "rules"}
             onToggle={() => toggle("rules")}
           >
-            <div className="text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
               <p>• כל משתתף ממלא טופס ניחושים לכל משחקי המונדיאל.</p>
               <p>• ניתן להגיש יותר מטופס אחד.</p>
               <p>• ניקוד מחושב אוטומטית לפי תוצאות בפועל.</p>
@@ -123,11 +144,11 @@ function MenuOverlay({ open, onClose }) {
             active={activeSection === "about"}
             onToggle={() => toggle("about")}
           >
-            <div className="text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
               <p>טורניר הניחושים של קיבוץ בארי למונדיאל 2026.</p>
               <p>ארה״ב 🇺🇸 • מקסיקו 🇲🇽 • קנדה 🇨🇦</p>
               <p>11 ביוני – 19 ביולי 2026</p>
-              <p className="text-gray-400 mt-2">גרסה 1.0</p>
+              <p className="text-ink-muted/60 mt-2">גרסה 1.0</p>
             </div>
           </MenuSection>
 
@@ -137,7 +158,7 @@ function MenuOverlay({ open, onClose }) {
             active={activeSection === "support"}
             onToggle={() => toggle("support")}
           >
-            <div className="text-right text-xs text-gray-600 space-y-2 leading-relaxed">
+            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
               <p>נתקלת בבעיה? יש לך שאלה?</p>
               <a
                 href="https://wa.me/972547918413?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%A2%D7%96%D7%A8%D7%94%20%D7%91%D7%98%D7%95%D7%A8%D7%A0%D7%99%D7%A8%20%D7%94%D7%A0%D7%99%D7%97%D7%95%D7%A9%D7%99%D7%9D"
@@ -154,7 +175,7 @@ function MenuOverlay({ open, onClose }) {
                 </svg>
                 שלח ווטסאפ לתמיכה
               </a>
-              <p className="text-gray-400 mt-3">
+              <p className="text-ink-muted/60 mt-3">
                 טיפ: נסה לרענן את הדף אם משהו לא נטען כמו שצריך.
               </p>
             </div>
@@ -165,34 +186,135 @@ function MenuOverlay({ open, onClose }) {
   );
 }
 
+function InfoDropdown({ open, onToggle }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onToggle();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, onToggle]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-semibold bg-transparent border-none cursor-pointer transition-all text-white/60 hover:text-white hover:bg-white/10"
+      >
+        <Info size={16} />
+        מידע
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-border z-50 overflow-hidden animate-fade-in">
+          {[
+            { label: "📊 שיטת הניקוד", section: "scoring" },
+            { label: "📜 החוקים", section: "rules" },
+            { label: "ℹ️ אודות", section: "about" },
+            { label: "🛠 תמיכה טכנית", section: "support" },
+          ].map((item) => (
+            <button
+              key={item.section}
+              onClick={() => {
+                onToggle();
+                document.dispatchEvent(
+                  new CustomEvent("open-info-drawer", {
+                    detail: item.section,
+                  }),
+                );
+              }}
+              className="w-full text-right px-4 py-3 text-sm text-ink hover:bg-gray-50 bg-transparent border-none cursor-pointer transition-colors border-b border-gray-50 last:border-b-0"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BottomMoreSheet({ open, onClose, navigate, page }) {
+  if (!open) return null;
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/30 z-[55] backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="fixed bottom-0 left-0 right-0 z-[56] bg-white rounded-t-2xl shadow-2xl safe-area-bottom animate-fade-in">
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
+        <div className="px-4 pb-4 space-y-1">
+          {[{ id: "stats", label: "סטטיסטיקות", Icon: BarChart3 }].map(
+            ({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => {
+                  navigate(id);
+                  onClose();
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-transparent border-none cursor-pointer transition-colors ${
+                  page === id
+                    ? "bg-primary/10 text-primary font-bold"
+                    : "text-ink hover:bg-gray-50"
+                }`}
+              >
+                <Icon size={20} />
+                {label}
+              </button>
+            ),
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Layout({ children }) {
   const { user, logout } = useCurrentUser();
   const { page, navigate } = useNavigation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  const navItems = user
+  useEffect(() => {
+    const handler = (e) => {
+      setMenuOpen(true);
+    };
+    document.addEventListener("open-info-drawer", handler);
+    return () => document.removeEventListener("open-info-drawer", handler);
+  }, []);
+
+  const allNavItems = user
     ? [
-        { id: "home", label: "בית", icon: "🏠" },
-        { id: "predict", label: "טפסים", icon: "📋" },
-        { id: "leaderboard", label: "דירוג", icon: "🏆" },
-        { id: "results", label: "תוצאות", icon: "⚽" },
-        { id: "stats", label: "סטטיסטיקות", icon: "📈" },
+        { id: "home", label: "בית" },
+        { id: "predict", label: "טפסים" },
+        { id: "leaderboard", label: "דירוג" },
+        { id: "results", label: "תוצאות" },
+        { id: "stats", label: "סטטיסטיקות" },
       ]
-    : [{ id: "home", label: "בית", icon: "🏠" }];
-  if (user?.isAdmin) navItems.push({ id: "admin", label: "ניהול", icon: "⚙️" });
+    : [{ id: "home", label: "בית" }];
+  if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול" });
+
+  const mobileNavItems = user
+    ? allNavItems.filter((item) => item.id !== "stats" && item.id !== "admin")
+    : allNavItems;
 
   return (
     <div className="bg-bg">
-      {}
-      <header className="header-gradient text-white sticky top-0 z-50 shadow-lg">
+      <header className="header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-white/10">
         <div className="max-w-3xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="text-white/90 text-xl bg-transparent border-none cursor-pointer p-1 leading-none hover:text-white"
+              className="text-white/90 bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-white md:hidden"
               aria-label="תפריט"
             >
-              ☰
+              <Menu size={22} />
             </button>
             <button
               onClick={() => navigate("home")}
@@ -207,21 +329,28 @@ export default function Layout({ children }) {
             </button>
           </div>
 
-          {}
           <div className="hidden md:flex items-center gap-0.5">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.id)}
-                className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-transparent border-none cursor-pointer transition-all ${
-                  page === item.id
-                    ? "bg-white/20 text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                {item.icon} {item.label}
-              </button>
-            ))}
+            {allNavItems.map((item) => {
+              const Icon = NAV_ICONS[item.id] || Home;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(item.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-transparent border-none cursor-pointer transition-all ${
+                    page === item.id
+                      ? "bg-white/20 text-white"
+                      : "text-white/60 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Icon size={16} />
+                  {item.label}
+                </button>
+              );
+            })}
+            <InfoDropdown
+              open={infoOpen}
+              onToggle={() => setInfoOpen(!infoOpen)}
+            />
           </div>
 
           {user ? (
@@ -256,27 +385,51 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      {/* Bottom nav — mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200/50 z-50 safe-area-bottom md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border/50 z-50 safe-area-bottom md:hidden">
         <div className="max-w-lg mx-auto flex">
-          {navItems.map((item) => (
+          {mobileNavItems.map((item) => {
+            const Icon = NAV_ICONS[item.id] || Home;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[11px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
+                  page === item.id ? "text-primary font-bold" : "text-ink-muted"
+                }`}
+              >
+                <Icon
+                  size={22}
+                  strokeWidth={page === item.id ? 2.5 : 1.5}
+                  className="mb-0.5"
+                />
+                {item.label}
+              </button>
+            );
+          })}
+          {user && (
             <button
-              key={item.id}
-              onClick={() => navigate(item.id)}
-              className={`flex-1 flex flex-col items-center pt-2 pb-2.5 text-[11px] bg-transparent border-none cursor-pointer transition-all duration-150 ${
-                page === item.id ? "text-primary font-bold" : "text-gray-400"
+              onClick={() => setMoreOpen(true)}
+              className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[11px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
+                page === "stats" ? "text-primary font-bold" : "text-ink-muted"
               }`}
             >
-              <span
-                className={`text-xl mb-0.5 transition-transform duration-150 ${page === item.id ? "scale-110" : ""}`}
-              >
-                {item.icon}
-              </span>
-              {item.label}
+              <MoreHorizontal
+                size={22}
+                strokeWidth={page === "stats" ? 2.5 : 1.5}
+                className="mb-0.5"
+              />
+              עוד
             </button>
-          ))}
+          )}
         </div>
       </nav>
+
+      <BottomMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        navigate={navigate}
+        page={page}
+      />
     </div>
   );
 }

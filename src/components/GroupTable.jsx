@@ -1,5 +1,5 @@
-import { getTeamByCode } from '../data/teams';
-import { calcGroupStandings } from '../utils/bracket';
+import { getTeamByCode } from "../data/teams";
+import { calcGroupStandings } from "../utils/bracket";
 
 export default function GroupTable({ matchData, group }) {
   const standings = calcGroupStandings(matchData);
@@ -10,7 +10,7 @@ export default function GroupTable({ matchData, group }) {
   if (!hasData) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-3.5 mb-3 overflow-x-auto">
+    <div className="bg-white rounded-2xl border border-border p-4 mb-3 overflow-x-auto">
       <h4 className="text-xs font-bold text-primary mb-2">טבלת בית {group}</h4>
       <table className="w-full text-xs">
         <thead>
@@ -36,29 +36,52 @@ export default function GroupTable({ matchData, group }) {
               <tr
                 key={team.code}
                 className={`border-b border-gray-50 ${
-                  qualifies ? 'bg-green-50/60' : thirdPlace ? 'bg-amber-50/60' : ''
+                  qualifies
+                    ? "bg-green-50/60"
+                    : thirdPlace
+                      ? "bg-amber-50/60"
+                      : ""
                 }`}
               >
-                <td className="py-1.5 pr-1 text-gray-400 font-bold text-[11px]">{i + 1}</td>
-                <td className="py-1.5">
-                  <span className="font-semibold text-gray-700">{info?.name || 'טרם נקבע'}</span>
+                <td className="py-1.5 pr-1 text-gray-400 font-bold text-[11px]">
+                  {i + 1}
                 </td>
-                <td className="text-center py-1.5 text-gray-500">{team.played}</td>
+                <td className="py-1.5">
+                  <span className="font-semibold text-gray-700">
+                    {info?.name || "טרם נקבע"}
+                  </span>
+                </td>
+                <td className="text-center py-1.5 text-gray-500">
+                  {team.played}
+                </td>
                 <td className="text-center py-1.5 text-gray-500">{team.won}</td>
-                <td className="text-center py-1.5 text-gray-500">{team.drawn}</td>
-                <td className="text-center py-1.5 text-gray-500">{team.lost}</td>
+                <td className="text-center py-1.5 text-gray-500">
+                  {team.drawn}
+                </td>
+                <td className="text-center py-1.5 text-gray-500">
+                  {team.lost}
+                </td>
                 <td className="text-center py-1.5 text-gray-500">{team.gf}</td>
                 <td className="text-center py-1.5 text-gray-500">{team.ga}</td>
-                <td className="text-center py-1.5 font-semibold text-gray-600">{team.gd > 0 ? `+${team.gd}` : team.gd}</td>
-                <td className="text-center py-1.5 font-bold text-primary">{team.pts}</td>
+                <td className="text-center py-1.5 font-semibold text-gray-600">
+                  {team.gd > 0 ? `+${team.gd}` : team.gd}
+                </td>
+                <td className="text-center py-1.5 font-bold text-primary">
+                  {team.pts}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
       <div className="flex gap-4 mt-2 text-[10px] text-gray-400">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-100" /> עולה</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100" /> מקום 3 (אפשרי)</span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-green-100" /> עולה
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-amber-100" /> מקום 3
+          (אפשרי)
+        </span>
       </div>
     </div>
   );

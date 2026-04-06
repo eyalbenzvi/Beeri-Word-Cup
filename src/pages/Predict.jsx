@@ -632,8 +632,8 @@ export default function Predict() {
 
     return (
       <>
-        {/* Sticky navigation bar */}
-        <div className="sticky top-0 z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+        {/* Sticky navigation bar pinned below header */}
+        <div className="sticky top-[56px] z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
           <StageSelector
             selectedStage={selectedStage}
             onSelect={setSelectedStage}
@@ -643,6 +643,14 @@ export default function Predict() {
               groups={Object.keys(GROUPS)}
               selectedGroup={selectedGroup}
               onSelect={setSelectedGroup}
+              missingCounts={Object.fromEntries(
+                Object.keys(GROUPS).map((g) => [
+                  g,
+                  groupMatches
+                    .filter((m) => m.group === g)
+                    .filter((m) => isMatchMissing(m.id)).length,
+                ]),
+              )}
             />
           )}
 
@@ -704,7 +712,7 @@ export default function Predict() {
               <div
                 key={match.id}
                 id={`match-${match.id}`}
-                className={`scroll-mt-[180px] rounded-2xl ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
+                className={`scroll-mt-[220px] rounded-2xl ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
               >
                 <MatchCard
                   match={derivedMatch}
@@ -840,7 +848,7 @@ export default function Predict() {
         const filled = predictedGroupMatches + predictedKnockout;
         const pct = Math.round((filled / total) * 100);
         return (
-          <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm">
             <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
               <span>
                 בתים: {predictedGroupMatches}/{groupMatches.length} • נוקאאוט:{" "}

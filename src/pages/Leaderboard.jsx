@@ -151,31 +151,31 @@ export default function Leaderboard() {
         </h2>
 
         {}
-        <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-lg font-bold text-primary">
+            <div className="text-xl font-extrabold text-primary tabular-nums">
               {score.totalPoints}
             </div>
-            <div className="text-gray-500">סה״כ</div>
+            <div className="text-ink-muted">סה״כ</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-lg font-bold text-green-600">
+            <div className="text-xl font-extrabold text-green-600 tabular-nums">
               {score.exactScoreCount}
             </div>
-            <div className="text-gray-500">תוצאות מדויקות</div>
+            <div className="text-ink-muted">תוצאות מדויקות</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-lg font-bold text-blue-600">
+            <div className="text-xl font-extrabold text-blue-600 tabular-nums">
               {score.outcomeCount}
             </div>
-            <div className="text-gray-500">הכרעות</div>
+            <div className="text-ink-muted">הכרעות</div>
           </div>
         </div>
 
         {}
         {Object.values(score.advancingPoints).some((v) => v > 0) && (
-          <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
-            <div className="text-xs font-semibold text-gray-600 mb-1">
+          <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm text-sm">
+            <div className="text-xs font-semibold text-ink-muted mb-1">
               נקודות עליה:
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
@@ -202,9 +202,9 @@ export default function Leaderboard() {
         )}
 
         {}
-        <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
+        <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm text-sm">
           <div className="flex justify-between py-1 border-b border-gray-50">
-            <span className="text-gray-600">ניחוש אלופה:</span>
+            <span className="text-ink-muted">ניחוש אלופה:</span>
             <span className="font-medium">
               {derivedChampion
                 ? getTeamByCode(derivedChampion)?.name || "טרם נקבע"
@@ -213,7 +213,7 @@ export default function Leaderboard() {
             </span>
           </div>
           <div className="flex justify-between py-1">
-            <span className="text-gray-600">ניחוש מלך שערים:</span>
+            <span className="text-ink-muted">ניחוש מלך שערים:</span>
             <span className="font-medium">
               {predData.topScorer || "אין"}
               {score.correctTopScorer ? " ✅" : ""}
@@ -305,8 +305,8 @@ export default function Leaderboard() {
         renderFormDetail()
       ) : (
         <>
-          <div className="bg-white rounded-2xl p-3 mb-4 border border-gray-100 shadow-sm">
-            <div className="text-xs text-gray-400 text-center font-medium">
+          <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm">
+            <div className="text-xs text-ink-muted text-center font-medium">
               {Object.keys(results).length} משחקים שוחקו • {leaderboard.length}{" "}
               טפסים
             </div>
@@ -322,24 +322,24 @@ export default function Leaderboard() {
                     ? "border-gray-300"
                     : index === 2
                       ? "border-amber-400"
-                      : "border-gray-100";
+                      : "border-border";
               return (
                 <button
                   key={entry.formId}
                   onClick={() => setSelectedForm(entry.formId)}
-                  className={`w-full bg-white rounded-2xl p-3.5 border shadow-sm flex items-center gap-3 text-right cursor-pointer card-hover ${borderColor} ${
+                  className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3 text-right cursor-pointer card-hover ${borderColor} ${
                     entry.userId === user?.id ? "ring-2 ring-primary/10" : ""
                   }`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums ${
                       index === 0
                         ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-white shadow-sm"
                         : index === 1
                           ? "bg-gradient-to-br from-gray-300 to-gray-500 text-white"
                           : index === 2
                             ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white"
-                            : "bg-gray-100 text-gray-400"
+                            : "bg-gray-100 text-ink-muted"
                     }`}
                   >
                     {index === 0
@@ -357,7 +357,7 @@ export default function Leaderboard() {
 
                   <div className="flex-1 min-w-0">
                     <div
-                      className={`font-semibold text-sm truncate ${isTop3 ? "text-gray-900" : "text-gray-700"}`}
+                      className={`font-medium text-sm truncate ${isTop3 ? "text-ink" : "text-ink-muted"}`}
                     >
                       {entry.formName}
                       {entry.userId === user?.id && (
@@ -366,7 +366,7 @@ export default function Leaderboard() {
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-gray-400">
+                    <div className="text-[11px] text-ink-muted/70 tabular-nums">
                       {entry.exactScoreCount} מדויקים • {entry.outcomeCount}{" "}
                       הכרעות
                     </div>
@@ -374,11 +374,11 @@ export default function Leaderboard() {
 
                   <div className="text-left min-w-[50px]">
                     <div
-                      className={`text-lg font-extrabold ${isTop3 ? "text-primary" : "text-gray-500"}`}
+                      className={`text-xl font-extrabold tabular-nums ${isTop3 ? "text-primary" : "text-ink-muted"}`}
                     >
                       {entry.totalPoints}
                     </div>
-                    <div className="text-[10px] text-gray-400">נק׳</div>
+                    <div className="text-[10px] text-ink-muted/60">נק׳</div>
                   </div>
                 </button>
               );

@@ -40,10 +40,10 @@ export default function ProgressHub({
   const filledKO = stageCompletion.reduce((s, g) => s + g.filled, 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-border shadow-sm mb-4 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-3.5 bg-transparent border-none cursor-pointer text-right"
+        className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
       >
         <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
         <div className="flex items-center gap-3">

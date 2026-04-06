@@ -1,14 +1,23 @@
 @import "tailwindcss";
 
 @theme {
+  /* Brand */
   --color-primary: #1a365d;
   --color-primary-light: #2b4c7e;
   --color-secondary: #8b1538;
   --color-accent: #d4a843;
+  --color-accent-text: #9a7209;
   --color-success: #16a34a;
+
+  /* Ink (text) */
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+
+  /* Surface */
   --color-bg: #f0f2f5;
   --color-card: #ffffff;
   --color-card-hover: #f8fafc;
+  --color-border: #e2e8f0;
 }
 
 body {
@@ -78,7 +87,14 @@ input:focus, button:focus-visible { outline: none; }
   .card-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 }
 
+/* Save confirmation flash */
+@keyframes saveFlash {
+  0% { border-color: var(--color-accent); }
+  100% { border-color: var(--color-border); }
+}
+.animate-save-flash { animation: saveFlash 0.8s ease-out forwards; }
+
 /* Gradient header */
 .header-gradient {
-  background: linear-gradient(135deg, #1a365d 0%, #2b4c7e 100%);
+  background: linear-gradient(135deg, #1a365d 0%, #2b4c7e 55%, #1e3a5f 100%);
 }

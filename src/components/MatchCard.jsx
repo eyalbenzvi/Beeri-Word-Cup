@@ -1,4 +1,30 @@
+import { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
+
+function focusNextInput(currentInput) {
+  const card = currentInput.closest("[data-match-card]");
+  if (!card) return;
+
+  const inputs = card.querySelectorAll('input[type="number"]');
+  const idx = Array.from(inputs).indexOf(currentInput);
+  if (idx < inputs.length - 1) {
+    inputs[idx + 1].focus();
+    inputs[idx + 1].select();
+    return;
+  }
+
+  const allCards = document.querySelectorAll("[data-match-card]");
+  const cardIdx = Array.from(allCards).indexOf(card);
+  for (let i = cardIdx + 1; i < allCards.length; i++) {
+    const nextInput = allCards[i].querySelector('input[type="number"]');
+    if (nextInput) {
+      nextInput.focus();
+      nextInput.select();
+      nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+  }
+}
 
 export default function MatchCard({
   match,
@@ -11,6 +37,28 @@ export default function MatchCard({
   isKnockout = false,
   importance = "group",
 }) {
+  const homeInputRef = useRef(null);
+  const awayInputRef = useRef(null);
+  const [justSaved, setJustSaved] = useState(false);
+  const saveTimerRef = useRef(null);
+
+  const prevPredRef = useRef(prediction);
+  useEffect(() => {
+    const prev = prevPredRef.current;
+    prevPredRef.current = prediction;
+    if (!editable || !prev) return;
+    const prevH = prev?.homeScore;
+    const prevA = prev?.awayScore;
+    const curH = prediction?.homeScore;
+    const curA = prediction?.awayScore;
+    if (prevH === curH && prevA === curA) return;
+    if (curH != null && curA != null) {
+      clearTimeout(saveTimerRef.current);
+      setJustSaved(true);
+      saveTimerRef.current = setTimeout(() => setJustSaved(false), 800);
+    }
+  }, [prediction, editable]);
+
   const homeTeam = getTeamByCode(match.homeTeam);
   const awayTeam = getTeamByCode(match.awayTeam);
   const homeName = homeTeam?.name || "טרם נקבע";
@@ -22,25 +70,61 @@ export default function MatchCard({
   const showLabel = match.label && match.stage !== "group";
 
   const importanceStyles = {
-    group: "p-3.5",
+    group: "p-4",
     knockout: "p-4",
-    showcase: "p-5 ring-2 ring-accent/50 shadow-md",
+    showcase: "p-4 ring-2 ring-accent/50 shadow-md",
   };
 
   const nameStyles = {
-    group: "text-sm font-semibold",
-    knockout: "text-[15px] font-bold",
-    showcase: "text-base font-bold",
+    group: "text-sm font-medium",
+    knockout: "text-[15px] font-medium",
+    showcase: "text-base font-medium",
   };
+
+  const handleHomeChange = useCallback(
+    (e) => {
+      const raw = e.target.value;
+      const v = raw === "" ? null : parseInt(raw);
+      const p = { ...prediction, homeScore: v };
+      if (isKnockout) delete p.advancingTeam;
+      onPredictionChange?.(p);
+      if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
+        setTimeout(() => {
+          awayInputRef.current?.focus();
+          awayInputRef.current?.select();
+        }, 0);
+      }
+    },
+    [prediction, isKnockout, onPredictionChange],
+  );
+
+  const handleAwayChange = useCallback(
+    (e) => {
+      const raw = e.target.value;
+      const v = raw === "" ? null : parseInt(raw);
+      const p = { ...prediction, awayScore: v };
+      if (isKnockout) delete p.advancingTeam;
+      onPredictionChange?.(p);
+      if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
+        setTimeout(() => {
+          if (awayInputRef.current) focusNextInput(awayInputRef.current);
+        }, 0);
+      }
+    },
+    [prediction, isKnockout, onPredictionChange],
+  );
 
   return (
     <div
+      data-match-card
       className={`bg-white rounded-2xl border mb-0.5 transition-all card-hover ${importanceStyles[importance]} ${
-        hasResult
-          ? "border-primary/25"
-          : hasPrediction && !editable
-            ? "border-green-200/80"
-            : "border-gray-100"
+        justSaved
+          ? "animate-save-flash border-accent"
+          : hasResult
+            ? "border-primary/25"
+            : hasPrediction && !editable
+              ? "border-green-200/80"
+              : "border-border"
       }`}
     >
       {importance === "showcase" && (
@@ -50,12 +134,12 @@ export default function MatchCard({
       {showLabel && (
         <div className="flex justify-between items-center mb-2">
           <span
-            className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-gray-400"}`}
+            className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
           >
             {match.label}
           </span>
           {match.date && (
-            <span className="text-[11px] text-gray-300">{match.date}</span>
+            <span className="text-[11px] text-ink-muted/50">{match.date}</span>
           )}
         </div>
       )}
@@ -66,7 +150,7 @@ export default function MatchCard({
             className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
               points.points > 0
                 ? "bg-green-50 text-green-700"
-                : "bg-gray-50 text-gray-400"
+                : "bg-gray-50 text-ink-muted"
             }`}
           >
             {points.points > 0 ? `+${points.points}` : "0"} נק׳ —{" "}
@@ -78,7 +162,7 @@ export default function MatchCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${homeTeam ? "text-gray-800" : "text-gray-300 italic"}`}
+            className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted/40 italic"}`}
           >
             {homeName}
           </div>
@@ -86,7 +170,7 @@ export default function MatchCard({
 
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
-            <div className="text-xl font-extrabold text-primary tracking-wider">
+            <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
               {actualResult.homeScore} – {actualResult.awayScore}
             </div>
           )}
@@ -95,41 +179,37 @@ export default function MatchCard({
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
                 <input
+                  ref={homeInputRef}
                   type="number"
                   min="0"
                   max="20"
                   inputMode="numeric"
+                  enterKeyHint="next"
                   value={predHome}
-                  onChange={(e) => {
-                    const v =
-                      e.target.value === "" ? null : parseInt(e.target.value);
-                    const p = { ...prediction, homeScore: v };
-                    if (isKnockout) delete p.advancingTeam;
-                    onPredictionChange?.(p);
-                  }}
-                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-lg font-bold transition-all bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                    hasPrediction ? "border-primary/30" : "border-gray-200"
+                  onChange={handleHomeChange}
+                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                    hasPrediction ? "border-primary/30" : "border-border"
                   }`}
                   placeholder="–"
                 />
-                <span className="text-gray-300 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
-                  :
+                <span className="relative text-ink-muted/40 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
+                  {justSaved ? (
+                    <span className="text-green-500 text-[10px]">✓</span>
+                  ) : (
+                    ":"
+                  )}
                 </span>
                 <input
+                  ref={awayInputRef}
                   type="number"
                   min="0"
                   max="20"
                   inputMode="numeric"
+                  enterKeyHint="done"
                   value={predAway}
-                  onChange={(e) => {
-                    const v =
-                      e.target.value === "" ? null : parseInt(e.target.value);
-                    const p = { ...prediction, awayScore: v };
-                    if (isKnockout) delete p.advancingTeam;
-                    onPredictionChange?.(p);
-                  }}
-                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-lg font-bold transition-all bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                    hasPrediction ? "border-primary/30" : "border-gray-200"
+                  onChange={handleAwayChange}
+                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                    hasPrediction ? "border-primary/30" : "border-border"
                   }`}
                   placeholder="–"
                 />
@@ -138,7 +218,7 @@ export default function MatchCard({
           ) : (
             !hasResult && (
               <div
-                className={`text-sm tracking-wider ${hasPrediction ? "font-bold text-gray-600" : "text-gray-300"}`}
+                className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/40"}`}
               >
                 {hasPrediction ? `${predHome} – ${predAway}` : "– : –"}
               </div>
@@ -146,7 +226,7 @@ export default function MatchCard({
           )}
 
           {hasResult && !editable && predHome !== "" && (
-            <div className="text-[11px] text-gray-400 font-medium">
+            <div className="text-[11px] text-ink-muted font-medium tabular-nums">
               ניחוש: {predHome} – {predAway}
             </div>
           )}
@@ -154,7 +234,7 @@ export default function MatchCard({
 
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${awayTeam ? "text-gray-800" : "text-gray-300 italic"}`}
+            className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted/40 italic"}`}
           >
             {awayName}
           </div>
@@ -166,8 +246,8 @@ export default function MatchCard({
         predAway !== "" &&
         parseInt(predHome) === parseInt(predAway) &&
         (editable ? (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="text-[11px] text-gray-400 text-center mb-2 font-medium">
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className="text-[11px] text-ink-muted text-center mb-2 font-medium">
               מי עולה? (בעיטות הכרעה)
             </div>
             <div className="flex gap-2 justify-center">
@@ -183,7 +263,7 @@ export default function MatchCard({
                   className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
                     prediction?.advancingTeam === team
                       ? "bg-primary text-white shadow-md"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-gray-100 text-ink-muted hover:bg-gray-200"
                   }`}
                 >
                   {name}
@@ -192,7 +272,7 @@ export default function MatchCard({
             </div>
           </div>
         ) : prediction?.advancingTeam ? (
-          <div className="mt-1.5 text-[11px] text-gray-400 text-center font-medium">
+          <div className="mt-1.5 text-[11px] text-ink-muted text-center font-medium">
             עולה:{" "}
             {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
           </div>
