@@ -42,14 +42,23 @@ export async function handler(event) {
   const stageName = stageNames[stage] || stage;
   const groupInfo = group ? ` (בית ${group})` : "";
 
+  // ~30% chance the analyst "smells an upset" or predicts a draw
+  const roll = Math.random();
+  let twist = "";
+  if (roll < 0.15) {
+    twist = "\nYour gut feeling: you smell an upset here. The underdog has a real chance. Predict accordingly — but explain WHY with real football logic.";
+  } else if (roll < 0.30) {
+    twist = "\nYour gut feeling: this will be a draw. Both teams will cancel each other out. Predict a draw and explain why.";
+  }
+
   const prompt = `You are an expert football analyst. Analyze this FIFA World Cup 2026 match:
 
 ${homeTeam} vs ${awayTeam} — ${stageName}${groupInfo}
 
 Based on current team strength, FIFA rankings, recent form, historical matchups, and playing style:
 
-1. Give a concise analysis in Hebrew (2-3 sentences max). Be specific about WHY one team is favored.
-2. Predict the most likely score.
+1. Give a concise analysis in Hebrew (2-3 sentences max). Be specific and insightful.
+2. Predict the most likely score.${twist}
 
 IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blocks:
 {"analysis": "הניתוח בעברית כאן", "homeScore": 2, "awayScore": 1}`;
