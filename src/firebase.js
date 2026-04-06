@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyClBCMln44vz46xiloR2EakCIVdOMA0EVs",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "beeri-world-cup.firebaseapp.com",
   projectId: "beeri-world-cup",
   storageBucket: "beeri-world-cup.firebasestorage.app",
