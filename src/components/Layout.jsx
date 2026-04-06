@@ -181,7 +181,7 @@ export default function Layout({ children }) {
 
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <main className="max-w-3xl mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-0 md:pb-8">
+      <main className="max-w-3xl mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-20 md:pb-8">
         {children}
       </main>
 

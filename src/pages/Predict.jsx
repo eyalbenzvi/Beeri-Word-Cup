@@ -546,7 +546,6 @@ export default function Predict() {
       )}
 
       {renderConfirmDialog()}
-      <div className="h-20 md:hidden" />
     </div>
   );
 }

@@ -407,7 +407,6 @@ export default function Admin() {
       {activeTab === 'topscorer' && renderTopScorerTab()}
       {activeTab === 'settings' && renderSettingsTab()}
       {activeTab === 'users' && renderUsersTab()}
-      <div className="h-20 md:hidden" />
     </div>
   );
 }
