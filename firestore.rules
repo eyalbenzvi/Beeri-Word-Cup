@@ -8,22 +8,48 @@ service cloud.firestore {
       return isAuth() &&
         get(/databases/$(database)/documents/gameData/users).data.data[request.auth.uid].isAdmin == true;
     }
+    function isLocked() {
+      return get(/databases/$(database)/documents/gameData/settings).data.data.predictionsLocked == true;
+    }
 
     // gameData collection — single documents
     match /gameData/{docId} {
       allow read: if isAuth();
-      allow write: if isAuth() && docId == 'users';
+
+      // Users document: first creation allowed; updates restricted
+      allow create: if isAuth() && docId == 'users';
+      allow update: if isAuth() && docId == 'users' && (
+        isAdmin() || (
+          // Regular user: only their own key changed in the users map
+          request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly([request.auth.uid]) &&
+          (
+            // New user entry: isAdmin must be false
+            (!(request.auth.uid in resource.data.data) &&
+             request.resource.data.data[request.auth.uid].isAdmin == false) ||
+            // Existing user entry: isAdmin must stay the same
+            (request.auth.uid in resource.data.data &&
+             request.resource.data.data[request.auth.uid].isAdmin == resource.data.data[request.auth.uid].isAdmin)
+          )
+        )
+      );
+
+      // Admin-only documents
       allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing'];
     }
 
     // predictions collection — one document per form
     match /predictions/{formId} {
       allow read: if isAuth();
-      // Users can write their own forms (formId starts with their uid)
-      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*');
+
+      // Users can create their own forms only when predictions not locked
+      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked();
+
+      // Users can update their own forms only when not locked; admins always
       allow update: if isAuth() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        (resource.data.userId == request.auth.uid && !isLocked()) || isAdmin()
       );
+
+      // Users can delete their own forms; admins can delete any
       allow delete: if isAuth() && (
         resource.data.userId == request.auth.uid || isAdmin()
       );

@@ -268,7 +268,7 @@ export function ensureUserInStore(uid, displayName) {
   users[uid] = {
     id: uid,
     displayName: displayName || "משתמש",
-    isAdmin: Object.keys(users).length === 0,
+    isAdmin: false,
     createdAt: now,
     lastLoginAt: now,
   };
