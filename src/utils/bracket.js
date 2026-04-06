@@ -1,4 +1,3 @@
-// Calculate group standings and knockout bracket from predictions
 import { GROUPS } from "../data/teams";
 import {
   generateGroupMatches,
@@ -11,7 +10,6 @@ import {
 
 const groupMatches = generateGroupMatches();
 
-// Map team code → group letter (for deriveActualAdvancing)
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
   for (const team of teams) {
@@ -19,12 +17,10 @@ for (const [groupName, teams] of Object.entries(GROUPS)) {
   }
 }
 
-// Calculate group standings from match predictions
 export function calcGroupStandings(matchPredictions) {
   const standings = {};
 
   for (const [groupName, teams] of Object.entries(GROUPS)) {
-    // Initialize team stats
     const stats = {};
     for (const team of teams) {
       stats[team.code] = {
@@ -41,7 +37,6 @@ export function calcGroupStandings(matchPredictions) {
       };
     }
 
-    // Process group matches
     const gMatches = groupMatches.filter((m) => m.group === groupName);
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
@@ -54,8 +49,9 @@ export function calcGroupStandings(matchPredictions) {
       )
         continue;
 
-      const h = pred.homeScore;
-      const a = pred.awayScore;
+      const h = Number(pred.homeScore);
+      const a = Number(pred.awayScore);
+      if (!Number.isFinite(h) || !Number.isFinite(a)) continue;
       const home = stats[match.homeTeam];
       const away = stats[match.awayTeam];
       if (!home || !away) continue;
@@ -83,7 +79,6 @@ export function calcGroupStandings(matchPredictions) {
       }
     }
 
-    // Build match list for H2H computation
     const groupMatchResults = [];
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
@@ -98,12 +93,11 @@ export function calcGroupStandings(matchPredictions) {
       groupMatchResults.push({
         team1Code: match.homeTeam,
         team2Code: match.awayTeam,
-        team1Score: pred.homeScore,
-        team2Score: pred.awayScore,
+        team1Score: Number(pred.homeScore),
+        team2Score: Number(pred.awayScore),
       });
     }
 
-    // Compute H2H stats for a subset of tied teams
     function computeH2HStats(tiedCodes) {
       const codeSet = new Set(tiedCodes);
       const h2h = {};
@@ -130,17 +124,14 @@ export function calcGroupStandings(matchPredictions) {
       return h2h;
     }
 
-    // FIFA 2026 sort with recursive H2H
     const teamList = Object.values(stats);
 
-    // Recursively sort a group of teams tied on points
     function sortTiedGroup(tiedTeams) {
       if (tiedTeams.length <= 1) return tiedTeams;
 
       const tiedCodes = tiedTeams.map((t) => t.code);
       const h2h = computeH2HStats(tiedCodes);
 
-      // Sort by H2H then overall
       tiedTeams.sort((a, b) => {
         const ha = h2h[a.code],
           hb = h2h[b.code];
@@ -153,13 +144,11 @@ export function calcGroupStandings(matchPredictions) {
         return b.gf - a.gf;
       });
 
-      // Check for sub-groups that are still tied — re-apply H2H recursively
-      // Only recurse if the sub-group is smaller than the current group (to avoid infinite loops)
       const result = [];
       let i = 0;
       while (i < tiedTeams.length) {
         let j = i + 1;
-        // Find consecutive teams that have identical H2H + overall stats
+
         while (j < tiedTeams.length) {
           const a = tiedTeams[i],
             b = tiedTeams[j];
@@ -179,7 +168,6 @@ export function calcGroupStandings(matchPredictions) {
         }
         const subGroup = tiedTeams.slice(i, j);
         if (subGroup.length > 1 && subGroup.length < tiedTeams.length) {
-          // Smaller tied sub-group — recurse with fresh H2H among just these teams
           result.push(...sortTiedGroup(subGroup));
         } else {
           result.push(...subGroup);
@@ -189,7 +177,6 @@ export function calcGroupStandings(matchPredictions) {
       return result;
     }
 
-    // Group teams by equal points
     const pointGroups = {};
     for (const t of teamList) {
       const key = t.pts;
@@ -220,7 +207,6 @@ export function calcGroupStandings(matchPredictions) {
   return standings;
 }
 
-// Get teams by position across all groups
 function getTeamsByPosition(standings, position) {
   const teams = [];
   for (const [group, sorted] of Object.entries(standings)) {
@@ -231,7 +217,6 @@ function getTeamsByPosition(standings, position) {
   return teams;
 }
 
-// Determine which 8 third-place teams qualify (rank by pts > gd > gf)
 function getBestThirdPlaceTeams(standings) {
   const thirdPlace = getTeamsByPosition(standings, 3);
   thirdPlace.sort((a, b) => {
@@ -242,8 +227,6 @@ function getBestThirdPlaceTeams(standings) {
   return thirdPlace.slice(0, 8);
 }
 
-// Assign qualifying 3rd-place teams to R32 match slots using backtracking
-// Each R32 match with a 3rd-place slot has constraints on which groups' 3rd-place teams can play there
 function assignThirdPlaceTeams(qualifyingThird) {
   const slots = [
     { matchId: "R32-2", thirdFrom: ["A", "B", "C", "D", "F"] },
@@ -256,7 +239,6 @@ function assignThirdPlaceTeams(qualifyingThird) {
     { matchId: "R32-15", thirdFrom: ["D", "E", "I", "J", "L"] },
   ];
 
-  // Map qualifying groups to team codes
   const qualTeamsByGroup = {};
   for (const t of qualifyingThird) {
     qualTeamsByGroup[t.group] = t.code;
@@ -264,7 +246,6 @@ function assignThirdPlaceTeams(qualifyingThird) {
 
   const assignments = {};
 
-  // Backtracking solver — guarantees finding a valid assignment
   function solve(slotIndex, assigned) {
     if (slotIndex === slots.length) return true;
 
@@ -285,16 +266,14 @@ function assignThirdPlaceTeams(qualifyingThird) {
   return assignments;
 }
 
-// Resolve a bracket position like "1A" or "2F" to a team code
 function resolvePosition(pos, standings) {
-  const position = parseInt(pos[0]); // 1 or 2
-  const group = pos.slice(1); // A-L
+  const position = parseInt(pos[0]);
+  const group = pos.slice(1);
   const groupStandings = standings[group];
   if (!groupStandings || !groupStandings[position - 1]) return null;
   return groupStandings[position - 1].code;
 }
 
-// Determine match winner from predictions
 function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   const teams = bracketTeams[matchId];
   if (!teams || !teams.home || !teams.away) return null;
@@ -309,36 +288,33 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   )
     return null;
 
-  // In knockout: if draw, use advancingTeam choice; default to home
-  if (pred.homeScore === pred.awayScore) {
+  const hs = Number(pred.homeScore);
+  const as = Number(pred.awayScore);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+
+  if (hs === as) {
     return pred.advancingTeam || teams.home;
   }
-  return pred.homeScore > pred.awayScore ? teams.home : teams.away;
+  return hs > as ? teams.home : teams.away;
 }
 
-// Calculate the full bracket from match predictions
-// Returns { matchId: { home: teamCode, away: teamCode } } for all knockout matches
 export function calcBracketTeams(matchPredictions) {
   const standings = calcGroupStandings(matchPredictions);
   const bracket = {};
 
-  // Check if we have enough group predictions to calculate standings
   const hasGroupPredictions = Object.values(standings).some((group) =>
     group.some((t) => t.played > 0),
   );
   if (!hasGroupPredictions) return bracket;
 
-  // Best 8 third-place teams
   const bestThird = getBestThirdPlaceTeams(standings);
   const thirdAssignments = assignThirdPlaceTeams(bestThird);
 
-  // === R32 ===
   for (const match of R32_MATCHES) {
     let home = null,
       away = null;
 
     if (match.home === "3rd") {
-      // This shouldn't happen based on our data
     } else if (match.home.match(/^[12][A-L]$/)) {
       home = resolvePosition(match.home, standings);
     }
@@ -352,31 +328,26 @@ export function calcBracketTeams(matchPredictions) {
     bracket[match.id] = { home, away };
   }
 
-  // === R16 ===
   for (const match of R16_MATCHES) {
     const home = getMatchWinner(match.homeFrom, matchPredictions, bracket);
     const away = getMatchWinner(match.awayFrom, matchPredictions, bracket);
     bracket[match.id] = { home, away };
   }
 
-  // === QF ===
   for (const match of QF_MATCHES) {
     const home = getMatchWinner(match.homeFrom, matchPredictions, bracket);
     const away = getMatchWinner(match.awayFrom, matchPredictions, bracket);
     bracket[match.id] = { home, away };
   }
 
-  // === SF ===
   for (const match of SF_MATCHES) {
     const home = getMatchWinner(match.homeFrom, matchPredictions, bracket);
     const away = getMatchWinner(match.awayFrom, matchPredictions, bracket);
     bracket[match.id] = { home, away };
   }
 
-  // === 3RD & FINAL ===
   for (const match of FINAL_MATCHES) {
     if (match.id === "3RD-1") {
-      // Losers of semis
       const sf1Teams = bracket["SF-1"];
       const sf2Teams = bracket["SF-2"];
       const sf1Pred = matchPredictions["SF-1"];
@@ -390,14 +361,13 @@ export function calcBracketTeams(matchPredictions) {
         sf1Pred?.homeScore !== null &&
         sf1Pred?.homeScore !== undefined
       ) {
-        if (sf1Pred.homeScore === sf1Pred.awayScore) {
+        const s1h = Number(sf1Pred.homeScore);
+        const s1a = Number(sf1Pred.awayScore);
+        if (s1h === s1a) {
           const winner = sf1Pred.advancingTeam || sf1Teams.home;
           home = winner === sf1Teams.home ? sf1Teams.away : sf1Teams.home;
         } else {
-          home =
-            sf1Pred.homeScore > sf1Pred.awayScore
-              ? sf1Teams.away
-              : sf1Teams.home;
+          home = s1h > s1a ? sf1Teams.away : sf1Teams.home;
         }
       }
       if (
@@ -406,19 +376,17 @@ export function calcBracketTeams(matchPredictions) {
         sf2Pred?.homeScore !== null &&
         sf2Pred?.homeScore !== undefined
       ) {
-        if (sf2Pred.homeScore === sf2Pred.awayScore) {
+        const s2h = Number(sf2Pred.homeScore);
+        const s2a = Number(sf2Pred.awayScore);
+        if (s2h === s2a) {
           const winner = sf2Pred.advancingTeam || sf2Teams.home;
           away = winner === sf2Teams.home ? sf2Teams.away : sf2Teams.home;
         } else {
-          away =
-            sf2Pred.homeScore > sf2Pred.awayScore
-              ? sf2Teams.away
-              : sf2Teams.home;
+          away = s2h > s2a ? sf2Teams.away : sf2Teams.home;
         }
       }
       bracket[match.id] = { home, away };
     } else {
-      // Final: winners of semis
       const home = getMatchWinner(match.homeFrom, matchPredictions, bracket);
       const away = getMatchWinner(match.awayFrom, matchPredictions, bracket);
       bracket[match.id] = { home, away };
@@ -428,7 +396,6 @@ export function calcBracketTeams(matchPredictions) {
   return bracket;
 }
 
-// Derive which teams advance to each round from bracket
 export function deriveAdvancingTeams(bracketTeams) {
   const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
 
@@ -450,13 +417,9 @@ export function deriveAdvancingTeams(bracketTeams) {
   return advancing;
 }
 
-// Like deriveAdvancingTeams, but only includes teams from completed stages.
-// R32 teams only from groups where all 6 matches have actual results.
-// Knockout teams only from matches that have actually been played.
 export function deriveActualAdvancing(bracketTeams, actualResults) {
   const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
 
-  // Determine which groups are fully completed (6 matches each)
   const groupMatchCounts = {};
   for (const matchId of Object.keys(actualResults)) {
     const groupMatch = matchId.match(/^group-([A-L])-/);
@@ -471,8 +434,6 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
       .map(([g]) => g),
   );
 
-  // R32: only award when ALL 12 groups are complete
-  // (because 3rd-place teams' advancement depends on all groups finishing)
   const allGroupsComplete = completedGroups.size >= 12;
   if (allGroupsComplete) {
     for (const [matchId, teams] of Object.entries(bracketTeams)) {
@@ -486,14 +447,9 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     }
   }
 
-  // Knockout rounds: only include teams from matches that have been played
   for (const [matchId, teams] of Object.entries(bracketTeams)) {
     if (matchId.startsWith("R32-") || matchId.startsWith("group-")) continue;
 
-    // The teams in this match advance from the previous round,
-    // but only if the match feeding them has been played.
-    // A team appears in R16 bracket if its R32 match was played.
-    // Check: does the result exist for the match that produced this team?
     let round = null;
     if (matchId.startsWith("R16-")) round = "R16";
     else if (matchId.startsWith("QF-")) round = "QF";
@@ -501,14 +457,9 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     else if (matchId === "F-1") round = "F";
     if (!round) continue;
 
-    // For knockout, the teams here were determined by previous matches.
-    // We only count them as "advancing to this round" if the previous round matches have results.
-    // Simple approach: check if the feeding matches have results.
     const feedingMatchesPlayed = (teamCode) => {
       if (!teamCode) return false;
-      // Find which previous match this team won to get here
-      // The team is in this bracket slot because it won a prior match
-      // Check all matches in the prior round for this team
+
       const priorRound =
         round === "R16"
           ? "R32"
@@ -528,7 +479,7 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
           continue;
         if (result.homeScore === null || result.homeScore === undefined)
           continue;
-        // This match was played - did this team participate?
+
         const bt = bracketTeams[mId];
         if (bt && (bt.home === teamCode || bt.away === teamCode)) return true;
       }
@@ -554,7 +505,6 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
   return advancing;
 }
 
-// Derive champion from final match prediction
 export function deriveChampion(matchPredictions, bracketTeams) {
   const finalTeams = bracketTeams["F-1"];
   if (!finalTeams?.home || !finalTeams?.away) return null;
@@ -569,8 +519,12 @@ export function deriveChampion(matchPredictions, bracketTeams) {
   )
     return null;
 
-  if (pred.homeScore === pred.awayScore) {
+  const fh = Number(pred.homeScore);
+  const fa = Number(pred.awayScore);
+  if (!Number.isFinite(fh) || !Number.isFinite(fa)) return null;
+
+  if (fh === fa) {
     return pred.advancingTeam || finalTeams.home;
   }
-  return pred.homeScore > pred.awayScore ? finalTeams.home : finalTeams.away;
+  return fh > fa ? finalTeams.home : finalTeams.away;
 }

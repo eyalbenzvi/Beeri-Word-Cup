@@ -1,15 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import * as store from '../store';
-import { auth, firebaseSignOut, onAuthStateChanged } from '../firebase';
+import { useState, useEffect, useCallback } from "react";
+import * as store from "../store";
+import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 
-// Hook that re-renders when Firestore data changes (via store-updated events)
 function useStoreUpdates() {
   const [, setTick] = useState(0);
 
   useEffect(() => {
     const handler = () => setTick((t) => t + 1);
-    window.addEventListener('store-updated', handler);
-    return () => window.removeEventListener('store-updated', handler);
+    window.addEventListener("store-updated", handler);
+    return () => window.removeEventListener("store-updated", handler);
   }, []);
 }
 
@@ -22,15 +21,18 @@ export function useCurrentUser() {
   useStoreUpdates();
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
+  const storeReady = store.isStoreReady();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       setFirebaseUser(fbUser);
       setAuthReady(true);
       if (fbUser) {
-        // Sync Firebase Auth user to localStorage for store compatibility
         store.setCurrentUser(fbUser.uid);
-        store.ensureUserInStore(fbUser.uid, fbUser.displayName || fbUser.phoneNumber || 'משתמש');
+        store.ensureUserInStore(
+          fbUser.uid,
+          fbUser.displayName || fbUser.phoneNumber || "משתמש",
+        );
       } else {
         store.logoutUser();
       }
@@ -38,12 +40,23 @@ export function useCurrentUser() {
     return unsubscribe;
   }, []);
 
-  // Get enriched user from Firestore (has isAdmin, etc.)
+  useEffect(() => {
+    if (storeReady && firebaseUser) {
+      store.ensureUserInStore(
+        firebaseUser.uid,
+        firebaseUser.displayName || firebaseUser.phoneNumber || "משתמש",
+      );
+    }
+  }, [storeReady, firebaseUser]);
+
   const user = firebaseUser ? store.getUser(firebaseUser.uid) : null;
 
   const logout = useCallback(async () => {
-    await firebaseSignOut();
-    store.logoutUser();
+    try {
+      await firebaseSignOut();
+    } finally {
+      store.logoutUser();
+    }
   }, []);
 
   return { user, logout, authReady };
@@ -67,8 +80,23 @@ export function useActiveFormId() {
 
 export function useFormData(formId) {
   useStoreUpdates();
-  if (!formId) return { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
-  return store.getForm(formId) || { matches: {}, advancing: {}, champion: null, topScorer: '', status: 'draft' };
+  if (!formId)
+    return {
+      matches: {},
+      advancing: {},
+      champion: null,
+      topScorer: "",
+      status: "draft",
+    };
+  return (
+    store.getForm(formId) || {
+      matches: {},
+      advancing: {},
+      champion: null,
+      topScorer: "",
+      status: "draft",
+    }
+  );
 }
 
 export function useAllPredictions() {

@@ -1,9 +1,6 @@
-// Firestore-based data store
-// All data is shared between all users via Firebase
 import { db } from "./firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
-// Each data type is a single document in the "gameData" collection
 const DOCS = {
   users: "users",
   predictions: "predictions",
@@ -13,13 +10,10 @@ const DOCS = {
   settings: "settings",
 };
 
-// Current user is local-only (each browser has its own login)
 const CURRENT_USER_KEY = "wc2026_currentUser";
-// Currently active form for editing
+
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
 
-// ============ IN-MEMORY CACHE ============
-// Firestore snapshots update this cache in real-time via listeners
 const cache = {
   users: {},
   predictions: {},
@@ -30,29 +24,90 @@ const cache = {
   _ready: {},
 };
 
-// ============ FIRESTORE HELPERS ============
-
 function docRef(docName) {
   return doc(db, "gameData", docName);
 }
 
 async function writeDoc(docName, data) {
   cache[docName] = data;
-  // Notify UI immediately from cache
   window.dispatchEvent(
     new CustomEvent("store-updated", { detail: { key: docName } }),
   );
-  // Persist to Firestore
+  window.dispatchEvent(
+    new CustomEvent("store-saving", { detail: { key: docName } }),
+  );
   try {
     await setDoc(docRef(docName), { data: JSON.parse(JSON.stringify(data)) });
+    window.dispatchEvent(
+      new CustomEvent("store-saved", { detail: { key: docName } }),
+    );
+    return true;
   } catch (err) {
     console.error(`Failed to write ${docName}:`, err);
+    window.dispatchEvent(
+      new CustomEvent("store-write-error", {
+        detail: { key: docName, error: err.message },
+      }),
+    );
+    return false;
   }
 }
 
-// Subscribe to real-time updates from Firestore
-// Called once at app startup
+const pendingWrites = {};
+
+function debouncedWriteDoc(docName, data, delay = 500) {
+  cache[docName] = data;
+  window.dispatchEvent(
+    new CustomEvent("store-updated", { detail: { key: docName } }),
+  );
+  window.dispatchEvent(
+    new CustomEvent("store-saving", { detail: { key: docName } }),
+  );
+  clearTimeout(pendingWrites[docName]);
+  pendingWrites[docName] = setTimeout(() => {
+    delete pendingWrites[docName];
+    setDoc(docRef(docName), { data: JSON.parse(JSON.stringify(data)) })
+      .then(() => {
+        window.dispatchEvent(
+          new CustomEvent("store-saved", { detail: { key: docName } }),
+        );
+      })
+      .catch((err) => {
+        console.error(`Failed to write ${docName}:`, err);
+        window.dispatchEvent(
+          new CustomEvent("store-write-error", {
+            detail: { key: docName, error: err.message },
+          }),
+        );
+      });
+  }, delay);
+}
+
+function flushPendingWrites() {
+  for (const docName of Object.keys(pendingWrites)) {
+    clearTimeout(pendingWrites[docName]);
+    delete pendingWrites[docName];
+    setDoc(docRef(docName), {
+      data: JSON.parse(JSON.stringify(cache[docName])),
+    }).catch(() => {});
+  }
+}
+
+export function hasPendingWrites() {
+  return Object.keys(pendingWrites).length > 0;
+}
+
+let listenersInitialized = false;
+
 export function initRealtimeListeners() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPendingWrites();
+  });
+  window.addEventListener("pagehide", flushPendingWrites);
+
   for (const [key, docName] of Object.entries(DOCS)) {
     onSnapshot(
       docRef(docName),
@@ -86,16 +141,16 @@ export function getUsers() {
 // Called when a user signs in via Firebase Auth (Google or Phone)
 // Creates/updates the user record in Firestore
 export function ensureUserInStore(uid, displayName) {
+  if (!cache._ready.users) return uid;
+
   const users = { ...getUsers() };
   if (users[uid]) {
-    // Update display name if changed
     if (displayName && users[uid].displayName !== displayName) {
       users[uid] = { ...users[uid], displayName };
       writeDoc("users", users);
     }
     return uid;
   }
-  // New user
   users[uid] = {
     id: uid,
     displayName: displayName || "משתמש",
@@ -143,7 +198,7 @@ export function deleteUser(userId) {
   const predictions = { ...getAllPredictions() };
   let removed = false;
   for (const key of Object.keys(predictions)) {
-    if (predictions[key].form?.userId === userId) {
+    if (predictions[key].userId === userId) {
       delete predictions[key];
       removed = true;
     }
@@ -272,30 +327,34 @@ export function updateFormDetails(formId, fields) {
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId], ...fields };
-  writeDoc("predictions", all);
+  debouncedWriteDoc("predictions", all);
 }
 
 export function savePrediction(formId, matchId, prediction) {
+  if (getSettings().predictionsLocked) return;
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId], matches: { ...all[formId].matches } };
   if (all[formId].status !== "draft") return;
   all[formId].matches[matchId] = prediction;
   all[formId].updatedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  debouncedWriteDoc("predictions", all);
 }
 
 export function saveBonusPrediction(formId, field, value) {
+  if (getSettings().predictionsLocked) return;
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId] };
   if (all[formId].status !== "draft") return;
   all[formId][field] = value;
   all[formId].updatedAt = new Date().toISOString();
-  writeDoc("predictions", all);
+  debouncedWriteDoc("predictions", all);
 }
 
 export function submitPredictions(formId) {
+  if (getSettings().predictionsLocked) return;
+  flushPendingWrites();
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId] };
@@ -305,6 +364,7 @@ export function submitPredictions(formId) {
 }
 
 export function reopenForm(formId) {
+  if (getSettings().predictionsLocked) return;
   const all = { ...getAllPredictions() };
   if (!all[formId]) return;
   all[formId] = { ...all[formId] };

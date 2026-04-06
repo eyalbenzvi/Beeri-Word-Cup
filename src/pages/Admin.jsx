@@ -9,15 +9,22 @@ import {
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import {
-  saveMatchResult, deleteMatchResult, updateSettings, exportAllData, importAllData, clearAllData,
-  clearMatchResults, saveActualBonuses, updateUser,
-} from '../store';
-import { generateGroupMatches, generateKnockoutMatches } from '../data/matches';
-import { GROUPS, getTeamByCode } from '../data/teams';
-import { calcBracketTeams } from '../utils/bracket';
-import GroupTable from '../components/GroupTable';
-import GroupSelector from '../components/GroupSelector';
-import StageSelector from '../components/StageSelector';
+  saveMatchResult,
+  deleteMatchResult,
+  updateSettings,
+  exportAllData,
+  importAllData,
+  clearAllData,
+  clearMatchResults,
+  saveActualBonuses,
+  updateUser,
+} from "../store";
+import { generateGroupMatches, generateKnockoutMatches } from "../data/matches";
+import { GROUPS, getTeamByCode } from "../data/teams";
+import { calcBracketTeams } from "../utils/bracket";
+import GroupTable from "../components/GroupTable";
+import GroupSelector from "../components/GroupSelector";
+import StageSelector from "../components/StageSelector";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -48,10 +55,8 @@ export default function Admin() {
   const [topScorerInput, setTopScorerInput] = useState("");
   const fileInputRef = useRef(null);
 
-  // Compute bracket from actual results (same as Predict does for predictions)
   const bracketTeams = useMemo(() => calcBracketTeams(results), [results]);
 
-  // Check if all 12 groups completed (6 matches each = 72 total group matches)
   const completedGroupCount = useMemo(() => {
     const counts = {};
     for (const matchId of Object.keys(results)) {
@@ -120,11 +125,17 @@ export default function Admin() {
 
   const handleSaveResult = (match) => {
     if (editScores.homeScore === "" || editScores.awayScore === "") return;
-    const homeScore = parseInt(editScores.homeScore);
-    const awayScore = parseInt(editScores.awayScore);
+    const homeScore = parseInt(editScores.homeScore, 10);
+    const awayScore = parseInt(editScores.awayScore, 10);
+    if (
+      !Number.isFinite(homeScore) ||
+      !Number.isFinite(awayScore) ||
+      homeScore < 0 ||
+      awayScore < 0
+    )
+      return;
     const isKnockout = match.stage && match.stage !== "group";
     if (isKnockout && homeScore === awayScore) {
-      // Save the draw result with advancingTeam: null so the admin must pick who advances
       saveMatchResult(match.id, {
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
@@ -643,7 +654,9 @@ export default function Admin() {
               <div className="text-xs text-gray-400">טפסים</div>
             </div>
             {u.isAdmin ? (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">מנהל</span>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                מנהל
+              </span>
             ) : (
               <button
                 onClick={() => {

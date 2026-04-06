@@ -50,7 +50,7 @@ export default function Leaderboard() {
     const map = {};
     for (const [formId, predData] of Object.entries(allPredictions)) {
       const s = predData.status;
-      if (s !== "submitted" && s !== "approved" && s !== "pending") continue;
+      if (s !== "submitted" && s !== "approved") continue;
       const matchPreds = predData.matches || {};
       const predBracket = calcBracketTeams(matchPreds);
       map[formId] = {

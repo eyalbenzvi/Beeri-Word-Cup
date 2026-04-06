@@ -1,59 +1,44 @@
-// Scoring system for Beeri World Cup 2026
-// Based on the official Hebrew rules
-
-// Points per stage for match predictions
-// outcome = correct winner/draw (הכרעה)
-// exactScore = ADDITIONAL points for exact scoreline (תוצאה נכונה)
-// advancing = correct team advancing to next round (עליה)
 export const POINTS = {
   group: {
-    // שלב הבתים
     outcome: 1,
-    exactScore: 3, // additional on top of outcome
-    advancing: 2, // per team correctly advancing to R32
+    exactScore: 3,
+    advancing: 2,
   },
   R32: {
-    // שלב ה-32 (שמינית גמר)
     outcome: 3,
     exactScore: 3,
-    advancing: 4, // correct team advancing to R16
+    advancing: 4,
   },
   R16: {
-    // שלב ה-16 (שמינית גמר)
     outcome: 5,
     exactScore: 3,
-    advancing: 6, // correct team advancing to QF
+    advancing: 6,
   },
   QF: {
-    // רבע גמר
     outcome: 7,
     exactScore: 3,
-    advancing: 8, // correct team advancing to SF
+    advancing: 8,
   },
   SF: {
-    // חצי גמר
     outcome: 9,
     exactScore: 3,
-    advancing: 10, // correct team advancing to final
+    advancing: 10,
   },
   "3RD": {
-    // משחק על מקום שלישי
     outcome: 9,
     exactScore: 3,
     advancing: 0,
   },
   F: {
-    // גמר
     outcome: 11,
     exactScore: 3,
-    advancing: 0, // champion bonus is separate
+    advancing: 0,
   },
 };
 
-// Bonus points
 export const BONUSES = {
-  champion: 9, // אלופה
-  topScorer: 8, // מלך השערים
+  champion: 9,
+  topScorer: 8,
 };
 
 function getOutcome(homeScore, awayScore) {
@@ -62,9 +47,6 @@ function getOutcome(homeScore, awayScore) {
   return "draw";
 }
 
-// Calculate points for a single match prediction
-// For knockout: predTeams/actualTeams = {home, away} — only score if same matchup
-// Returns { points, outcomePoints, exactPoints, breakdown, wrongMatchup }
 export function calculateMatchPoints(
   prediction,
   actual,
@@ -101,7 +83,6 @@ export function calculateMatchPoints(
     };
   }
 
-  // For knockout: check if the user predicted the same teams playing
   if (stage !== "group" && predTeams && actualTeams) {
     const sameMatchup =
       predTeams.home &&
@@ -133,7 +114,6 @@ export function calculateMatchPoints(
   let exactPoints = 0;
   const parts = [];
 
-  // Check outcome (הכרעה) — correct winner or draw
   if (getOutcome(predHome, predAway) === getOutcome(actHome, actAway)) {
     outcomePoints = stagePoints.outcome;
     points += outcomePoints;
@@ -249,11 +229,12 @@ export function calculateFullScore(
 
   // 4. Top scorer bonus (מלך השערים)
   // If multiple top scorers, any correct guess gets points
-  if (actualBonuses?.topScorers && userPredictions.topScorer) {
+  if (Array.isArray(actualBonuses?.topScorers) && userPredictions.topScorer) {
+    const userGuess = String(userPredictions.topScorer).toLowerCase().trim();
     const topScorers = actualBonuses.topScorers.map((s) =>
-      s.toLowerCase().trim(),
+      String(s).toLowerCase().trim(),
     );
-    if (topScorers.includes(userPredictions.topScorer.toLowerCase().trim())) {
+    if (userGuess && topScorers.includes(userGuess)) {
       totalPoints += BONUSES.topScorer;
       correctTopScorer = true;
     }
