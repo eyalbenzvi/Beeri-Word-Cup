@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
@@ -9,6 +9,7 @@ export async function handler(event) {
   if (!apiKey) {
     return {
       statusCode: 500,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Missing GEMINI_API_KEY" }),
     };
   }
@@ -54,11 +55,13 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, no code blo
 {"analysis": "הניתוח בעברית כאן", "homeScore": 2, "awayScore": 1}`;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-    const model = genAI.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const ai = new GoogleGenAI({ apiKey });
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+    });
+    const text = response.text.trim();
 
     // Parse the JSON response, handling possible markdown wrapping
     let cleaned = text;
