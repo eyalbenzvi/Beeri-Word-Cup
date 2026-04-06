@@ -224,50 +224,47 @@ export default function Predict() {
 
   const [aiProgress, setAiProgress] = useState(null); // null | { current, total, label }
 
+  const callBatchAPI = async (body) => {
+    const res = await fetch("/.netlify/functions/batch-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || "שגיאת API");
+    return data;
+  };
+
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
     if (!window.confirm("פעולה זו תמלא את כל הניחושים בעזרת AI. ניחושים קיימים יידרסו. להמשיך?")) return;
 
     const allPreds = {};
-    const groupNames = Object.keys(GROUPS);
-    const totalSteps = groupNames.length + 2; // 12 groups + knockout + top scorer
-    let step = 0;
+    // 3 steps: groups (1 call) + knockout rounds (sequential, ~6 calls) + top scorer (1 call)
+    const totalSteps = 3;
 
     try {
-      // 1. Group stage: one API call per group (12 calls)
-      for (const groupName of groupNames) {
-        step++;
-        setAiProgress({ current: step, total: totalSteps, label: `בית ${groupName}` });
+      // 1. ALL group matches in ONE call (72 matches)
+      setAiProgress({ current: 1, total: totalSteps, label: "שלב הבתים (72 משחקים)" });
 
-        const gMatches = groupMatches.filter((m) => m.group === groupName);
-        const matchData = gMatches.map((m) => ({
-          id: m.id,
-          homeTeamName: getTeamByCode(m.homeTeam)?.name || m.homeTeam,
-          awayTeamName: getTeamByCode(m.awayTeam)?.name || m.awayTeam,
-          stage: "group",
-          group: groupName,
-        }));
+      const groupMatchData = groupMatches.map((m) => ({
+        id: m.id,
+        homeTeamName: getTeamByCode(m.homeTeam)?.name || m.homeTeam,
+        awayTeamName: getTeamByCode(m.awayTeam)?.name || m.awayTeam,
+        stage: "group",
+        group: m.group,
+      }));
 
-        const res = await fetch("/.netlify/functions/batch-analysis", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ matches: matchData }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || `שגיאה בבית ${groupName}`);
-
-        for (const r of data.results) {
-          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
-          allPreds[r.id] = pred;
-          savePrediction(activeFormId, r.id, pred);
-        }
+      const groupData = await callBatchAPI({ matches: groupMatchData });
+      for (const r of groupData.results) {
+        const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
+        allPreds[r.id] = pred;
+        savePrediction(activeFormId, r.id, pred);
       }
 
-      // 2. Knockout stage: derive bracket from group results, then predict
-      step++;
-      setAiProgress({ current: step, total: totalSteps, label: "שלב הנוקאאוט" });
+      // 2. Knockout: must be sequential (each round depends on previous bracket)
+      setAiProgress({ current: 2, total: totalSteps, label: "שלב הנוקאאוט" });
 
-      // Build bracket from group predictions to know knockout teams
       for (const stage of knockoutStageOrder) {
         const bracket = calcBracketTeams(allPreds);
         const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
@@ -288,17 +285,9 @@ export default function Predict() {
 
         if (matchData.length === 0) continue;
 
-        const res = await fetch("/.netlify/functions/batch-analysis", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ matches: matchData }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || `שגיאה ב${stage}`);
-
+        const data = await callBatchAPI({ matches: matchData });
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
-          // Handle knockout draws: pick home team as advancing
           if (pred.homeScore === pred.awayScore) {
             const teams = bracket[r.id];
             if (teams?.home) pred.advancingTeam = teams.home;
@@ -309,16 +298,10 @@ export default function Predict() {
       }
 
       // 3. Top scorer
-      step++;
-      setAiProgress({ current: step, total: totalSteps, label: "מלך שערים" });
+      setAiProgress({ current: 3, total: totalSteps, label: "מלך שערים" });
 
-      const tsRes = await fetch("/.netlify/functions/batch-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "topScorer" }),
-      });
-      const tsData = await tsRes.json();
-      if (tsRes.ok && tsData.name) {
+      const tsData = await callBatchAPI({ type: "topScorer" });
+      if (tsData.name) {
         saveBonusPrediction(activeFormId, "topScorer", tsData.name);
       }
 
