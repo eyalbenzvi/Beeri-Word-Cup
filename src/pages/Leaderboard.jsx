@@ -6,11 +6,7 @@ import {
   useUsers,
   useActualBonuses,
 } from "../hooks/useStore";
-import {
-  calculateFullScore,
-  compareTiebreaker,
-  calculateMatchPoints,
-} from "../utils/scoring";
+import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
 import {
   generateGroupMatches,
   generateKnockoutMatches,
@@ -39,9 +35,8 @@ export default function Leaderboard() {
   const actualBonuses = useActualBonuses();
   const [selectedForm, setSelectedForm] = useState(null);
 
-  // Compute bracket from actual results (once, shared)
   const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
-  // Only award advancing points for completed groups/played knockout matches
+
   const actualDerivedAdvancing = useMemo(
     () => deriveActualAdvancing(actualBracket, results),
     [actualBracket, results],
@@ -51,22 +46,31 @@ export default function Leaderboard() {
     [results, actualBracket],
   );
 
-  // Calculate scores for approved forms only
-  const leaderboard = useMemo(() => {
+  const formBracketMap = useMemo(() => {
+    const map = {};
+    for (const [formId, predData] of Object.entries(allPredictions)) {
+      const s = predData.status;
+      if (s !== "submitted" && s !== "approved" && s !== "pending") continue;
+      const matchPreds = predData.matches || {};
+      const predBracket = calcBracketTeams(matchPreds);
+      map[formId] = {
+        predBracket,
+        advancing: deriveAdvancingTeams(predBracket),
+        champion: deriveChampion(matchPreds, predBracket),
+      };
+    }
+    return map;
+  }, [allPredictions]);
+
+  const scoredForms = useMemo(() => {
     return Object.entries(allPredictions)
-      .filter(([, predData]) => {
-        const s = predData.status;
-        return s === "submitted" || s === "approved" || s === "pending";
-      })
+      .filter(([formId]) => formBracketMap[formId])
       .map(([formId, predData]) => {
-        const matchPreds = predData.matches || {};
-        const predBracket = calcBracketTeams(matchPreds);
-        const derivedAdvancing = deriveAdvancingTeams(predBracket);
-        const derivedChampion = deriveChampion(matchPreds, predBracket);
+        const { predBracket, advancing, champion } = formBracketMap[formId];
         const enrichedPredData = {
           ...predData,
-          advancing: derivedAdvancing,
-          champion: derivedChampion,
+          advancing,
+          champion,
         };
         const score = calculateFullScore(
           enrichedPredData,
@@ -76,12 +80,10 @@ export default function Leaderboard() {
           predBracket,
           actualBracket,
         );
-        const userInfo = users[predData.userId] || {};
         return {
           formId,
           userId: predData.userId,
           formName: predData.formName || "טופס ללא שם",
-          userName: userInfo.displayName || predData.userId,
           ...score,
         };
       })
@@ -92,36 +94,38 @@ export default function Leaderboard() {
       });
   }, [
     allPredictions,
+    formBracketMap,
     results,
     actualBonuses,
-    users,
     actualDerivedAdvancing,
     actualDerivedChampion,
     actualBracket,
   ]);
 
-  // Detailed view for selected form
+  const leaderboard = useMemo(() => {
+    return scoredForms.map((entry) => ({
+      ...entry,
+      userName: users[entry.userId]?.displayName || entry.userId,
+    }));
+  }, [scoredForms, users]);
+
   const renderFormDetail = () => {
     if (!selectedForm) return null;
 
     const predData = allPredictions[selectedForm] || {};
-    const matchPreds = predData.matches || {};
-    const predBracket = calcBracketTeams(matchPreds);
-    const derivedAdvancing = deriveAdvancingTeams(predBracket);
-    const derivedChampion = deriveChampion(matchPreds, predBracket);
-    const enrichedPredData = {
-      ...predData,
-      advancing: derivedAdvancing,
-      champion: derivedChampion,
+    const bracketData = formBracketMap[selectedForm];
+    const predBracket = bracketData?.predBracket || {};
+    const derivedChampion = bracketData?.champion || null;
+    const scored = scoredForms.find((e) => e.formId === selectedForm);
+    const score = scored || {
+      totalPoints: 0,
+      exactScoreCount: 0,
+      outcomeCount: 0,
+      correctChampion: false,
+      correctTopScorer: false,
+      advancingPoints: {},
+      matchScores: {},
     };
-    const score = calculateFullScore(
-      enrichedPredData,
-      results,
-      actualDerivedAdvancing,
-      { ...actualBonuses, champion: actualDerivedChampion },
-      predBracket,
-      actualBracket,
-    );
     const playedMatches = Object.keys(results);
 
     const matchesByStage = {};
@@ -132,8 +136,6 @@ export default function Leaderboard() {
       if (!matchesByStage[stage]) matchesByStage[stage] = [];
       matchesByStage[stage].push({ matchId, match, result });
     }
-
-    const userInfo = users[predData.userId] || {};
 
     return (
       <div className="mt-4">
@@ -148,7 +150,7 @@ export default function Leaderboard() {
           {predData.formName || "טופס ללא שם"}
         </h2>
 
-        {/* Score breakdown */}
+        {}
         <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-lg font-bold text-primary">
@@ -170,7 +172,7 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* Advancing points */}
+        {}
         {Object.values(score.advancingPoints).some((v) => v > 0) && (
           <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
             <div className="text-xs font-semibold text-gray-600 mb-1">
@@ -199,7 +201,7 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* Bonus predictions */}
+        {}
         <div className="bg-white rounded-2xl p-3.5 mb-4 border border-gray-100 shadow-sm text-sm">
           <div className="flex justify-between py-1 border-b border-gray-50">
             <span className="text-gray-600">ניחוש אלופה:</span>
@@ -219,7 +221,7 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* Match-by-match results */}
+        {}
         {Object.entries(matchesByStage).map(([stage, matches]) => (
           <div key={stage} className="mb-4">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">
@@ -229,13 +231,13 @@ export default function Leaderboard() {
               const prediction = predData.matches?.[matchId];
               const predTeams = predBracket[matchId] || null;
               const actTeams = actualBracket[matchId] || null;
-              const pts = calculateMatchPoints(
-                prediction,
-                result,
-                stage,
-                predTeams,
-                actTeams,
-              );
+              const pts = score.matchScores?.[matchId] || {
+                points: 0,
+                outcomePoints: 0,
+                exactPoints: 0,
+                breakdown: "",
+                wrongMatchup: false,
+              };
               const derivedMatch =
                 match?.stage !== "group" && actTeams
                   ? {
