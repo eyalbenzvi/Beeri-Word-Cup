@@ -257,7 +257,7 @@ export default function Layout({ children }) {
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול" });
 
   const mobileNavItems = user
-    ? allNavItems.filter((item) => item.id !== "stats" && item.id !== "admin")
+    ? allNavItems.filter((item) => item.id !== "stats")
     : allNavItems;
 
   return (
