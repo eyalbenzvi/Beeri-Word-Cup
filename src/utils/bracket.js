@@ -7,6 +7,7 @@ import {
   SF_MATCHES,
   FINAL_MATCHES,
 } from "../data/matches";
+import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
 
 const groupMatches = generateGroupMatches();
 
@@ -25,6 +26,7 @@ export function calcGroupStandings(matchPredictions) {
     for (const team of teams) {
       stats[team.code] = {
         code: team.code,
+        name: team.name,
         group: groupName,
         played: 0,
         won: 0,
@@ -141,7 +143,8 @@ export function calcGroupStandings(matchPredictions) {
         const gdA = a.gf - a.ga,
           gdB = b.gf - b.ga;
         if (gdB !== gdA) return gdB - gdA;
-        return b.gf - a.gf;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return a.code.localeCompare(b.code);
       });
 
       const result = [];
@@ -161,7 +164,8 @@ export function calcGroupStandings(matchPredictions) {
             ha.gd !== hb.gd ||
             ha.gf !== hb.gf ||
             gdA !== gdB ||
-            a.gf !== b.gf
+            a.gf !== b.gf ||
+            a.code !== b.code
           )
             break;
           j++;
@@ -222,48 +226,30 @@ function getBestThirdPlaceTeams(standings) {
   thirdPlace.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.gd !== a.gd) return b.gd - a.gd;
-    return b.gf - a.gf;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.code.localeCompare(b.code);
   });
   return thirdPlace.slice(0, 8);
 }
 
 function assignThirdPlaceTeams(qualifyingThird) {
-  const slots = [
-    { matchId: "R32-2", thirdFrom: ["A", "B", "C", "D", "F"] },
-    { matchId: "R32-5", thirdFrom: ["C", "D", "F", "G", "H"] },
-    { matchId: "R32-7", thirdFrom: ["C", "E", "F", "H", "I"] },
-    { matchId: "R32-8", thirdFrom: ["E", "H", "I", "J", "K"] },
-    { matchId: "R32-9", thirdFrom: ["B", "E", "F", "I", "J"] },
-    { matchId: "R32-10", thirdFrom: ["A", "E", "H", "I", "J"] },
-    { matchId: "R32-13", thirdFrom: ["E", "F", "G", "I", "J"] },
-    { matchId: "R32-15", thirdFrom: ["D", "E", "I", "J", "L"] },
-  ];
-
   const qualTeamsByGroup = {};
   for (const t of qualifyingThird) {
     qualTeamsByGroup[t.group] = t.code;
   }
 
-  const assignments = {};
+  const qualGroups = Object.keys(qualTeamsByGroup);
+  const annexAssignments = lookupThirdPlaceAssignment(qualGroups);
 
-  function solve(slotIndex, assigned) {
-    if (slotIndex === slots.length) return true;
-
-    const slot = slots[slotIndex];
-    for (const group of slot.thirdFrom) {
-      if (qualTeamsByGroup[group] && !assigned.has(group)) {
-        assigned.add(group);
-        assignments[slot.matchId] = qualTeamsByGroup[group];
-        if (solve(slotIndex + 1, assigned)) return true;
-        assigned.delete(group);
-        delete assignments[slot.matchId];
-      }
+  if (annexAssignments) {
+    const result = {};
+    for (const [slotId, groupLetter] of Object.entries(annexAssignments)) {
+      result[slotId] = qualTeamsByGroup[groupLetter] || null;
     }
-    return false;
+    return result;
   }
 
-  solve(0, new Set());
-  return assignments;
+  return {};
 }
 
 function resolvePosition(pos, standings) {
