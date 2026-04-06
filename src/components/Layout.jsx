@@ -5,10 +5,11 @@ import { useNavigation } from "../hooks/useNavigation";
 const SCORING_DATA = [
   ["בתים", 1, 3, 2],
   ["שלב ה-32", 3, 3, 4],
-  ["רבע גמר", 5, 3, 6],
-  ["חצי גמר", 7, 3, 8],
-  ["מקום שלישי", 7, 3, null],
-  ["גמר", 9, 3, null],
+  ["שמינית גמר", 5, 3, 6],
+  ["רבע גמר", 7, 3, 8],
+  ["חצי גמר", 9, 3, 10],
+  ["מקום שלישי", 9, 3, null],
+  ["גמר", 11, 3, null],
 ];
 
 function MenuSection({ icon, title, active, onToggle, children }) {

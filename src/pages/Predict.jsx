@@ -30,7 +30,6 @@ import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
 import ProgressHub from "../components/ProgressHub";
-import UnfilledQueue from "../components/UnfilledQueue";
 import MatchSearch from "../components/MatchSearch";
 
 const groupMatches = generateGroupMatches();
@@ -886,11 +885,6 @@ export default function Predict() {
             {[
               { id: "matches", label: "⚽ משחקים", badge: null },
               {
-                id: "queue",
-                label: "📋 חסרים",
-                badge: totalMissing > 0 ? totalMissing : null,
-              },
-              {
                 id: "details",
                 label: "📝 פרטים",
                 badge: detailsIncomplete ? "!" : null,
@@ -946,18 +940,6 @@ export default function Predict() {
       )}
 
       {activeTab === "matches" && renderMatchesTab()}
-      {activeTab === "queue" && (
-        <UnfilledQueue
-          groupMatches={groupMatches}
-          knockoutMatches={knockoutMatches}
-          matchPredictions={matchPredictions}
-          bracketTeams={bracketTeams}
-          onJump={(match) => {
-            handleMatchJump(match);
-            setActiveTab("matches");
-          }}
-        />
-      )}
       {activeTab === "details" && renderDetailsTab()}
 
       {showSearch && (

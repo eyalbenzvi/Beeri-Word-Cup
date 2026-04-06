@@ -1,14 +1,4 @@
-import { useState } from "react";
 import { getTeamByCode } from "../data/teams";
-
-const PRESETS = [
-  { label: "0-0", home: 0, away: 0 },
-  { label: "1-0", home: 1, away: 0 },
-  { label: "0-1", home: 0, away: 1 },
-  { label: "1-1", home: 1, away: 1 },
-  { label: "2-1", home: 2, away: 1 },
-  { label: "2-0", home: 2, away: 0 },
-];
 
 export default function MatchCard({
   match,
@@ -21,7 +11,6 @@ export default function MatchCard({
   isKnockout = false,
   importance = "group",
 }) {
-  const [showPresets, setShowPresets] = useState(false);
   const homeTeam = getTeamByCode(match.homeTeam);
   const awayTeam = getTeamByCode(match.awayTeam);
   const homeName = homeTeam?.name || "טרם נקבע";
@@ -145,13 +134,6 @@ export default function MatchCard({
                   placeholder="–"
                 />
               </div>
-              {/* Quick preset toggle */}
-              <button
-                onClick={() => setShowPresets(!showPresets)}
-                className="text-[10px] text-gray-400 bg-transparent border-none cursor-pointer hover:text-primary transition p-0"
-              >
-                {showPresets ? "הסתר" : "מהיר ▾"}
-              </button>
             </div>
           ) : (
             !hasResult && (
@@ -178,34 +160,6 @@ export default function MatchCard({
           </div>
         </div>
       </div>
-
-      {/* Quick presets row */}
-      {editable && showPresets && (
-        <div className="mt-2 pt-2 border-t border-gray-50 flex flex-wrap gap-1.5 justify-center">
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => {
-                const pred = {
-                  ...prediction,
-                  homeScore: p.home,
-                  awayScore: p.away,
-                };
-                if (isKnockout) delete pred.advancingTeam;
-                onPredictionChange?.(pred);
-                setShowPresets(false);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer transition active:scale-95 ${
-                predHome === p.home && predAway === p.away
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {isKnockout &&
         predHome !== "" &&
