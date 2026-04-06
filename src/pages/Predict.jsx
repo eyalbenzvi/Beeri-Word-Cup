@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
-  useCurrentUser, useUserForms, useActiveFormId, useFormData, useSettings,
+  useCurrentUser, useUserForms, useActiveFormId, useFormData, useSettings, useAllPredictions,
 } from '../hooks/useStore';
 import { useNavigation } from '../hooks/useNavigation';
 import {
@@ -48,6 +48,7 @@ export default function Predict() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState('');
   const [showAllForms, setShowAllForms] = useState(false);
+  const allPredictions = useAllPredictions();
 
   // Make sure active form belongs to current user
   const activeForm = activeFormId && formData?.userId === user?.id ? formData : null;
@@ -113,6 +114,16 @@ export default function Predict() {
 
     if (!activeForm.formName?.trim()) {
       errors.push('לא הוכנס שם טופס');
+    } else {
+      const trimmedName = activeForm.formName.trim().toLowerCase();
+      const duplicateName = Object.entries(allPredictions).some(([fid, f]) =>
+        fid !== activeFormId &&
+        f.formName?.trim().toLowerCase() === trimmedName &&
+        (f.status === 'submitted' || f.status === 'approved' || f.status === 'pending')
+      );
+      if (duplicateName) {
+        errors.push('כבר קיים טופס שהוגש עם שם זהה. בחר שם אחר');
+      }
     }
     if (!activeForm.budgetNumber?.trim()) {
       errors.push('לא הוכנס מספר תקציב');
