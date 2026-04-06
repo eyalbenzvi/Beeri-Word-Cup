@@ -58,6 +58,9 @@ function FormCard({ form, championDisplay }) {
           {championDisplay && (
             <div className="text-xs text-yellow-600 mt-0.5">🏆 {championDisplay}</div>
           )}
+          {form.topScorer && (
+            <div className="text-xs text-gray-400 mt-0.5">⚽ {form.topScorer}</div>
+          )}
         </div>
         <span className="text-gray-400 text-sm">{expanded ? '▾' : '▸'}</span>
       </button>
