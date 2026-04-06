@@ -1,0 +1,50 @@
+#!/bin/bash
+# Run all tests for Beeri World Cup
+# Usage: ./tests/run-all.sh
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+LOADER="$DIR/loader.mjs"
+TOTAL_PASS=0
+TOTAL_FAIL=0
+
+echo "==========================================="
+echo "  BEERI WORLD CUP — FULL TEST SUITE"
+echo "==========================================="
+echo ""
+
+run_test() {
+  local name="$1"
+  local file="$2"
+  local needs_loader="$3"
+
+  echo -n "$name: "
+  if [ "$needs_loader" = "yes" ]; then
+    result=$(node --loader "$LOADER" "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+  else
+    result=$(node "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+  fi
+
+  echo "$result"
+
+  p=$(echo "$result" | grep -oP '\d+ passed' | grep -oP '\d+')
+  f=$(echo "$result" | grep -oP '\d+ failed' | grep -oP '\d+')
+  TOTAL_PASS=$((TOTAL_PASS + ${p:-0}))
+  TOTAL_FAIL=$((TOTAL_FAIL + ${f:-0}))
+}
+
+run_test "1. Scoring Logic" "test-scoring.mjs" "no"
+run_test "2. Bracket & Advancement" "test-bracket.mjs" "yes"
+run_test "3. Third Place Table" "test-thirdplace.mjs" "yes"
+run_test "4. FIFA Schedule" "test-schedule.mjs" "yes"
+run_test "5. Edge Cases" "test-edge-cases.mjs" "yes"
+run_test "6. Full Simulation" "test-full-simulation.mjs" "yes"
+run_test "7. Leaderboard E2E" "test-leaderboard-e2e.mjs" "yes"
+run_test "8. Store Logic" "test-store-logic.mjs" "no"
+run_test "9. Load & User Mgmt" "test-load-and-users.mjs" "yes"
+
+echo ""
+echo "==========================================="
+echo "  TOTAL: $TOTAL_PASS passed, $TOTAL_FAIL failed"
+echo "==========================================="
+
+exit $TOTAL_FAIL
