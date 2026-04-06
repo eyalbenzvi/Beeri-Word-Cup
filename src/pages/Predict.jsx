@@ -33,6 +33,37 @@ import MatchSearch from "../components/MatchSearch";
 
 const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
 
+const AI_MESSAGES = [
+  "⚽ סורק דירוגי FIFA...",
+  "📊 מנתח סטטיסטיקות של נבחרות...",
+  "🔍 בודק עימותים היסטוריים...",
+  "🧠 מחשב הסתברויות...",
+  "🌍 מעריך יתרון בית...",
+  "💪 בודק פורם אחרון...",
+  "🎯 מחפש הפתעות אפשריות...",
+  "🏟️ מדמה תרחישי משחק...",
+  "⭐ מזהה dark horses...",
+  "🤔 מתלבט על תיקו פוטנציאלי...",
+  "🔮 מנבא תוצאות...",
+  "📝 מסכם ניתוח...",
+];
+
+function AiProgressMessage({ step }) {
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    setMsgIdx(Math.floor(Math.random() * AI_MESSAGES.length));
+    const interval = setInterval(() => {
+      setMsgIdx((prev) => (prev + 1) % AI_MESSAGES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [step]);
+  return (
+    <div className="text-xs text-ink-muted/70 animate-pulse h-5">
+      {AI_MESSAGES[msgIdx]}
+    </div>
+  );
+}
+
 export default function Predict() {
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
@@ -568,6 +599,34 @@ export default function Predict() {
         />
       )}
 
+      {aiProgress && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
+            <div className="text-5xl mb-4 animate-bounce">🤖</div>
+            <div className="text-lg font-extrabold text-primary mb-2">
+              הבינה המלאכותית מנתחת
+            </div>
+            <div className="text-sm font-bold text-blue-600 mb-4">
+              {aiProgress.label}
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700"
+                style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className="text-xs text-ink-muted mb-4">
+              שלב {aiProgress.current} מתוך {aiProgress.total}
+            </div>
+
+            {/* Rotating fun messages */}
+            <AiProgressMessage step={aiProgress.current} />
+          </div>
+        </div>
+      )}
+
       {status === "draft" && !settings.predictionsLocked && (
         <div className="sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto">
           <button
@@ -575,14 +634,7 @@ export default function Predict() {
             disabled={!!aiProgress}
             className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-blue-600 hover:to-purple-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {aiProgress ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {aiProgress.label} ({aiProgress.current}/{aiProgress.total})
-              </span>
-            ) : (
-              "🤖 מלא הכל עם AI"
-            )}
+            🤖 מלא הכל עם AI
           </button>
           <button
             onClick={handleTrySubmit}
