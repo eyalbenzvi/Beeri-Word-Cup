@@ -60,13 +60,13 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${
                     formStatus === "submitted"
                       ? "bg-green-100 text-green-600"
                       : "bg-primary/10 text-primary"
                   }`}
                 >
-                  {formStatus === "submitted" ? "✓" : (form.formName || "?")[0]}
+                  {formStatus === "submitted" ? "✓" : (form.formIcon || "📋")}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate text-gray-800">
@@ -76,6 +76,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     {Object.keys(form.matches || {}).length}/{totalMatches}{" "}
                     משחקים
                     {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ""}
+                    {form.champion ? ` • 🏆 ${form.champion}` : ""}
                   </div>
                 </div>
                 <span

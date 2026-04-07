@@ -378,6 +378,9 @@ export function ensureUserInStore(uid, displayName) {
     id: uid,
     displayName: displayName || "משתמש",
     isAdmin: false,
+    photoURL: null,
+    email: null,
+    profileCompleted: false,
     createdAt: now,
     lastLoginAt: now,
   };
@@ -389,6 +392,21 @@ export function updateUser(userId, fields) {
   const users = { ...getUsers() };
   if (!users[userId]) return;
   users[userId] = { ...users[userId], ...fields };
+  writeGameDoc("users", users);
+}
+
+export function updateUserProfile(uid, profileFields) {
+  const users = { ...getUsers() };
+  if (!users[uid]) return;
+  const { firstName, lastName, displayName, photoURL, profileCompleted } = profileFields;
+  users[uid] = {
+    ...users[uid],
+    ...(firstName !== undefined && { firstName }),
+    ...(lastName !== undefined && { lastName }),
+    ...(displayName !== undefined && { displayName }),
+    ...(photoURL !== undefined && { photoURL }),
+    ...(profileCompleted !== undefined && { profileCompleted }),
+  };
   writeGameDoc("users", users);
 }
 

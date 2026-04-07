@@ -292,14 +292,21 @@ export default function Leaderboard({
                           : index + 1}
                   </span>
 
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
-                    {entry.formName.charAt(0)}
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0 relative">
+                    {(() => {
+                      const owner = users[entry.userId];
+                      if (owner?.photoURL) {
+                        return <img src={owner.photoURL} alt="" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />;
+                      }
+                      return (owner?.firstName || owner?.displayName || entry.formName || "?").charAt(0).toUpperCase();
+                    })()}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div
                       className={`font-medium text-sm truncate ${isTop3 ? "text-ink" : "text-ink-muted"}`}
                     >
+                      <span className="ml-1">{(allPredictions[entry.formId]?.formIcon) || "📋"}</span>
                       {entry.formName}
                       {entry.userId === user?.id && (
                         <span className="text-[11px] text-primary mr-1 font-bold">

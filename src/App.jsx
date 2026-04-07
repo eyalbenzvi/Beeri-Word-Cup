@@ -8,6 +8,8 @@ import Leaderboard from "./pages/Leaderboard";
 import Results from "./pages/Results";
 import Stats from "./pages/Stats";
 import Admin from "./pages/Admin";
+import Profile from "./pages/Profile";
+import ProfileSetup from "./components/ProfileSetup";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
 
@@ -18,6 +20,7 @@ const PAGES = {
   results: Results,
   stats: Stats,
   admin: Admin,
+  profile: Profile,
 };
 
 function Loading() {
@@ -44,6 +47,11 @@ function AppContent() {
 
   // Logged in but Firestore data or user record still loading
   if (!ready || !user) return <Loading />;
+
+  // Show profile setup for truly new users (profileCompleted === false, not undefined)
+  if (user.profileCompleted === false) {
+    return <ProfileSetup user={user} onComplete={() => {}} />;
+  }
 
   const Page = PAGES[page] || Home;
 
