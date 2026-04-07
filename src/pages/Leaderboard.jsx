@@ -39,7 +39,6 @@ export default function Leaderboard({
     // Don't show other users' form details before predictions are locked
     const formOwner = allPredictions[selectedForm]?.userId;
     if (!settings.predictionsLocked && formOwner !== user?.id) {
-      setSelectedForm(null);
       return null;
     }
 
