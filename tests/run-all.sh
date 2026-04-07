@@ -41,6 +41,7 @@ run_test "6. Full Simulation" "test-full-simulation.mjs" "yes"
 run_test "7. Leaderboard E2E" "test-leaderboard-e2e.mjs" "yes"
 run_test "8. Store Logic" "test-store-logic.mjs" "no"
 run_test "9. Load & User Mgmt" "test-load-and-users.mjs" "yes"
+run_test "10. Functions & API Contract" "test-functions-contract.mjs" "no"
 
 echo ""
 echo "==========================================="
