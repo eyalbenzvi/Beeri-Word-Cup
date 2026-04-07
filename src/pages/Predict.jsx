@@ -302,9 +302,11 @@ export default function Predict() {
 
     const allPreds = {};
     const totalSteps = 3;
+    let currentStep = '';
 
     try {
       // Step 1: Group stage + Top scorer in PARALLEL (both independent)
+      currentStep = 'שלב הבתים';
       setAiProgress({ current: 1, total: totalSteps, label: "שלב הבתים — 72 משחקים" });
 
       const groupMatchData = groupMatches.map((m) => ({
@@ -329,6 +331,7 @@ export default function Predict() {
       savePredictionsBatch(activeFormId, groupBatch);
 
       // Step 2: R32 + R16 — 2 API calls (~4 sec)
+      currentStep = 'שלב ה-32';
       setAiProgress({ current: 2, total: totalSteps, label: "שלב ה-32 — 16 משחקים" });
 
       let bracket = getCachedBracket(allPreds);
@@ -384,6 +387,7 @@ export default function Predict() {
       }
 
       // Step 3: QF + SF + 3RD + F — generated locally (instant)
+      currentStep = 'רבע גמר עד הגמר';
       setAiProgress({ current: 3, total: totalSteps, label: "רבע גמר עד הגמר" });
 
       const localBatch = {};
@@ -422,12 +426,12 @@ export default function Predict() {
       if (err.name === 'AbortError') {
         showToast('מילוי AI בוטל');
       } else {
-        showToast(`שגיאה: ${err.message}`);
+        showToast(`שגיאה ב${currentStep}: ${err.message}`);
       }
     } finally {
       setAiProgress(null);
     }
-  }, [activeFormId, canEdit, showToast]);
+  }, [activeFormId, activeForm, canEdit, showToast]);
 
   const handleMatchJump = useCallback((match) => {
     if (match.stage === "group") {
@@ -720,7 +724,7 @@ export default function Predict() {
       )}
 
       {status === "draft" && !settings.predictionsLocked && (
-        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto ${keyboardOpen ? 'hidden' : ''}`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto transition-all duration-200 ${keyboardOpen ? 'hidden' : ''}`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={handleAIFill}
             disabled={!!aiProgress}

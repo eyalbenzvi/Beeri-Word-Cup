@@ -44,6 +44,7 @@ export default function MenuOverlay({ open, onClose }) {
         <div className="header-gradient text-white p-5 flex items-center justify-between">
           <button
             onClick={onClose}
+            aria-label="סגור תפריט"
             className="text-white/80 bg-transparent border-none cursor-pointer p-0 leading-none"
           >
             <X size={24} />
@@ -79,7 +80,6 @@ export default function MenuOverlay({ open, onClose }) {
               <p>• ניחוש תוצאה מדויקת מזכה בבונוס נוסף.</p>
               <p>• ניחוש נכון של קבוצה עולה בנוקאאוט מזכה בנקודות עליה.</p>
               <p>• בונוסים ניתנים על ניחוש אלופה ומלך שערים.</p>
-              <p>• שערים מבעיטות הכרעה לא נספרים למלך השערים.</p>
               <p>• הטפסים ננעלים לפני שריקת הפתיחה.</p>
             </div>
           </MenuSection>

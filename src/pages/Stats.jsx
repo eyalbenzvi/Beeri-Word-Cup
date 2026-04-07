@@ -457,7 +457,7 @@ function SearchStats({ forms }) {
       {searchResults && (
         <div className="space-y-3">
           {searchResults.map((group, i) => (
-            <div key={i}>
+            <div key={group.title || i}>
               <p className="text-xs font-bold text-gray-600 mb-1">
                 {group.title}
               </p>
@@ -465,7 +465,7 @@ function SearchStats({ forms }) {
                 <div className="space-y-1">
                   {group.items.map((item, j) => (
                     <div
-                      key={j}
+                      key={`${item.formName}-${item.type}-${item.value || j}`}
                       className="flex justify-between text-[11px] bg-gray-50 rounded-lg px-3 py-1.5"
                     >
                       <span className="text-gray-500">{item.type}</span>

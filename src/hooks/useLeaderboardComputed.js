@@ -19,7 +19,7 @@ export function useLeaderboardComputed(
   const prevResultsKey = useRef('');
   const prevBracketRef = useRef(null);
 
-  const resultsKey = Object.keys(results).length + '_' + Object.values(results).map(r => r.homeScore + '-' + r.awayScore).join(',');
+  const resultsKey = useMemo(() => Object.keys(results).length + '_' + Object.values(results).map(r => r.homeScore + '-' + r.awayScore).join(','), [results]);
 
   const actualBracket = useMemo(() => {
     if (resultsKey === prevResultsKey.current && prevBracketRef.current) {
