@@ -19,6 +19,8 @@ import {
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedBracket } from "../utils/bracketCache";
+import { calcBracketTeams } from "../utils/bracket";
+import { predictAllMatches, predictTopScorer } from "../utils/fifaPredictor";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
@@ -86,7 +88,6 @@ export default function Predict() {
   const [submitting, setSubmitting] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
-  const aiAbortRef = useRef(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
@@ -272,167 +273,42 @@ export default function Predict() {
     setShowConfirm(true);
   }, [activeFormId, activeForm, allPredictions]);
 
-  const [aiProgress, setAiProgress] = useState(null); // null | { current, total, label }
-
-  const callBatchAPI = async (body, signal) => {
-    const res = await fetch("/.netlify/functions/batch-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || "שגיאת API");
-    return data;
-  };
-
-  // Generate a reasonable local score for small knockout rounds
-  function localKnockoutScore() {
-    const scores = [[1,0],[2,1],[0,1],[1,2],[2,0],[0,0],[1,1],[3,1],[1,0],[2,1],[0,1],[1,0]];
-    const [h, a] = scores[Math.floor(Math.random() * scores.length)];
-    return { homeScore: h, awayScore: a };
-  }
+  const [aiProgress, setAiProgress] = useState(null);
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
     if (!window.confirm("כל הניחושים הקיימים יימחקו ויוחלפו בניחושי AI. להמשיך?")) return;
 
-    const controller = new AbortController();
-    aiAbortRef.current = controller;
-    const formSnapshot = activeForm ? structuredClone(activeForm) : null;
-
-    const allPreds = {};
     const totalSteps = 3;
-    let currentStep = '';
 
     try {
-      // Step 1: Group stage + Top scorer in PARALLEL (both independent)
-      currentStep = 'שלב הבתים';
-      setAiProgress({ current: 1, total: totalSteps, label: "שלב הבתים — 72 משחקים" });
+      // Step 1: "Analyzing" (fake delay for UX)
+      setAiProgress({ current: 1, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 1200));
 
-      const groupMatchData = groupMatches.map((m) => ({
-        id: m.id,
-        homeTeamName: getTeamByCode(m.homeTeam)?.name || m.homeTeam,
-        awayTeamName: getTeamByCode(m.awayTeam)?.name || m.awayTeam,
-        stage: "group",
-        group: m.group,
-      }));
+      // Generate all predictions locally using FIFA rankings
+      const allPreds = predictAllMatches(groupMatches, knockoutMatches, calcBracketTeams);
 
-      // Fire both in parallel
-      const [groupData, tsData] = await Promise.all([
-        callBatchAPI({ matches: groupMatchData }, controller.signal),
-        callBatchAPI({ type: "topScorer" }, controller.signal).catch(() => null),
-      ]);
+      // Step 2: "Computing bracket"
+      setAiProgress({ current: 2, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 1000));
 
-      const groupBatch = {};
-      for (const r of groupData.results) {
-        groupBatch[r.id] = { homeScore: r.homeScore, awayScore: r.awayScore };
-        allPreds[r.id] = groupBatch[r.id];
-      }
-      savePredictionsBatch(activeFormId, groupBatch);
+      // Save all predictions in one batch
+      savePredictionsBatch(activeFormId, allPreds);
 
-      // Step 2: R32 + R16 — 2 API calls (~4 sec)
-      currentStep = 'שלב ה-32';
-      setAiProgress({ current: 2, total: totalSteps, label: "שלב ה-32 — 16 משחקים" });
+      // Step 3: Top scorer
+      setAiProgress({ current: 3, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 800));
 
-      let bracket = getCachedBracket(allPreds);
-      const r32Data = knockoutMatches.filter((m) => m.stage === "R32")
-        .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
-        .map((m) => ({
-          id: m.id,
-          homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
-          awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
-          stage: "R32",
-        }));
-
-      if (r32Data.length > 0) {
-        const data = await callBatchAPI({ matches: r32Data }, controller.signal);
-        const r32Batch = {};
-        for (const r of data.results) {
-          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
-          if (pred.homeScore === pred.awayScore) {
-            const teams = bracket[r.id];
-            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-          }
-          r32Batch[r.id] = pred;
-          allPreds[r.id] = pred;
-        }
-        savePredictionsBatch(activeFormId, r32Batch);
-      }
-
-      setAiProgress({ current: 2, total: totalSteps, label: "שמינית גמר — 8 משחקים" });
-
-      bracket = getCachedBracket(allPreds);
-      const r16Data = knockoutMatches.filter((m) => m.stage === "R16")
-        .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
-        .map((m) => ({
-          id: m.id,
-          homeTeamName: getTeamByCode(bracket[m.id].home)?.name || bracket[m.id].home,
-          awayTeamName: getTeamByCode(bracket[m.id].away)?.name || bracket[m.id].away,
-          stage: "R16",
-        }));
-
-      if (r16Data.length > 0) {
-        const data = await callBatchAPI({ matches: r16Data }, controller.signal);
-        const r16Batch = {};
-        for (const r of data.results) {
-          const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
-          if (pred.homeScore === pred.awayScore) {
-            const teams = bracket[r.id];
-            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-          }
-          r16Batch[r.id] = pred;
-          allPreds[r.id] = pred;
-        }
-        savePredictionsBatch(activeFormId, r16Batch);
-      }
-
-      // Step 3: QF + SF + 3RD + F — generated locally (instant)
-      currentStep = 'רבע גמר עד הגמר';
-      setAiProgress({ current: 3, total: totalSteps, label: "רבע גמר עד הגמר" });
-
-      const localBatch = {};
-      for (const stage of ["QF", "SF", "3RD", "F"]) {
-        bracket = getCachedBracket(allPreds);
-        const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
-        for (const m of stageMatches) {
-          const teams = bracket[m.id];
-          if (!teams?.home || !teams?.away) continue;
-          const pred = localKnockoutScore();
-          if (pred.homeScore === pred.awayScore) {
-            pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-          }
-          localBatch[m.id] = pred;
-          allPreds[m.id] = pred;
-        }
-      }
-      savePredictionsBatch(activeFormId, localBatch);
-
-      // Top scorer — already fetched in parallel with groups
-      if (tsData?.name) {
-        saveBonusPrediction(activeFormId, "topScorer", tsData.name);
-      }
+      saveBonusPrediction(activeFormId, "topScorer", predictTopScorer());
 
       showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
-      if (formSnapshot && activeFormId) {
-        // Restore all predictions from snapshot
-        for (const [matchId, pred] of Object.entries(formSnapshot.matches || {})) {
-          savePrediction(activeFormId, matchId, pred);
-        }
-        if (formSnapshot.topScorer) {
-          saveBonusPrediction(activeFormId, "topScorer", formSnapshot.topScorer);
-        }
-      }
-      if (err.name === 'AbortError') {
-        showToast('מילוי AI בוטל');
-      } else {
-        showToast(`שגיאה ב${currentStep}: ${err.message}`);
-      }
+      showToast(`שגיאה: ${err.message}`);
     } finally {
       setAiProgress(null);
     }
-  }, [activeFormId, activeForm, canEdit, showToast]);
+  }, [activeFormId, canEdit, showToast]);
 
   const handleMatchJump = useCallback((match) => {
     if (match.stage === "group") {
@@ -711,13 +587,6 @@ export default function Predict() {
 
             {/* Rotating fun messages */}
             <AiProgressMessage step={aiProgress.current} />
-
-            <button
-              onClick={() => aiAbortRef.current?.abort()}
-              className="mt-3 text-xs text-ink-muted/70 underline cursor-pointer bg-transparent border-none"
-            >
-              ביטול
-            </button>
           </div>
         </div>
       )}

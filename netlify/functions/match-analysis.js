@@ -41,26 +41,9 @@ export async function handler(event) {
   const stageName = stageNames[stage] || stage;
   const groupInfo = group ? ` (בית ${group})` : "";
 
-  // ~30% chance the analyst predicts an upset or draw
-  const roll = Math.random();
-  let twist = "";
-  if (roll < 0.15) {
-    twist = "\nYour gut feeling: you smell an upset here. The underdog has a real chance. Predict accordingly — but explain WHY with real football logic.";
-  } else if (roll < 0.30) {
-    twist = "\nYour gut feeling: this will be a draw. Both teams will cancel each other out. Predict a draw and explain why.";
-  }
-
-  const prompt = `You are an expert football analyst. Analyze this FIFA World Cup 2026 match:
-
-${homeTeam} vs ${awayTeam} — ${stageName}${groupInfo}
-
-Based on current team strength, FIFA rankings, recent form, historical matchups, and playing style:
-
-1. Give a concise analysis in Hebrew (2-3 sentences max). Be specific and insightful.
-2. Predict the most likely score.${twist}
-
-Return a JSON object:
-{"analysis": "הניתוח בעברית כאן", "homeScore": 2, "awayScore": 1}`;
+  const prompt = `Football analyst. WC2026: ${homeTeam} vs ${awayTeam}, ${stageName}${groupInfo}.
+2-sentence Hebrew analysis + score prediction.
+JSON only: {"analysis":"...","homeScore":N,"awayScore":N}`;
 
   try {
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
