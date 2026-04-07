@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   useCurrentUser,
   useUserForms,
@@ -10,6 +10,7 @@ import {
 import { useNavigation } from "../hooks/useNavigation";
 import {
   savePrediction,
+  savePredictionsBatch,
   saveBonusPrediction,
   submitPredictions,
   reopenForm,
@@ -84,6 +85,17 @@ export default function Predict() {
   const [submitting, setSubmitting] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
+  const aiAbortRef = useRef(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const handler = () => {
+      setKeyboardOpen(window.visualViewport.height < window.innerHeight * 0.75);
+    };
+    window.visualViewport.addEventListener('resize', handler);
+    return () => window.visualViewport.removeEventListener('resize', handler);
+  }, []);
 
   useEffect(() => {
     if (!activeFormId) return;
@@ -258,11 +270,12 @@ export default function Predict() {
 
   const [aiProgress, setAiProgress] = useState(null); // null | { current, total, label }
 
-  const callBatchAPI = async (body) => {
+  const callBatchAPI = async (body, signal) => {
     const res = await fetch("/.netlify/functions/batch-analysis", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || "שגיאת API");
@@ -279,6 +292,10 @@ export default function Predict() {
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
     if (!window.confirm("כל הניחושים הקיימים יימחקו ויוחלפו בניחושי AI. להמשיך?")) return;
+
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+    const formSnapshot = activeForm ? structuredClone(activeForm) : null;
 
     const allPreds = {};
     const totalSteps = 3;
@@ -297,14 +314,16 @@ export default function Predict() {
 
       // Fire both in parallel
       const [groupData, tsData] = await Promise.all([
-        callBatchAPI({ matches: groupMatchData }),
-        callBatchAPI({ type: "topScorer" }).catch(() => null),
+        callBatchAPI({ matches: groupMatchData }, controller.signal),
+        callBatchAPI({ type: "topScorer" }, controller.signal).catch(() => null),
       ]);
 
+      const groupBatch = {};
       for (const r of groupData.results) {
-        allPreds[r.id] = { homeScore: r.homeScore, awayScore: r.awayScore };
-        savePrediction(activeFormId, r.id, allPreds[r.id]);
+        groupBatch[r.id] = { homeScore: r.homeScore, awayScore: r.awayScore };
+        allPreds[r.id] = groupBatch[r.id];
       }
+      savePredictionsBatch(activeFormId, groupBatch);
 
       // Step 2: R32 + R16 — 2 API calls (~4 sec)
       setAiProgress({ current: 2, total: totalSteps, label: "שלב ה-32 — 16 משחקים" });
@@ -320,16 +339,18 @@ export default function Predict() {
         }));
 
       if (r32Data.length > 0) {
-        const data = await callBatchAPI({ matches: r32Data });
+        const data = await callBatchAPI({ matches: r32Data }, controller.signal);
+        const r32Batch = {};
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
           if (pred.homeScore === pred.awayScore) {
             const teams = bracket[r.id];
             pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
           }
+          r32Batch[r.id] = pred;
           allPreds[r.id] = pred;
-          savePrediction(activeFormId, r.id, pred);
         }
+        savePredictionsBatch(activeFormId, r32Batch);
       }
 
       setAiProgress({ current: 2, total: totalSteps, label: "שמינית גמר — 8 משחקים" });
@@ -345,21 +366,24 @@ export default function Predict() {
         }));
 
       if (r16Data.length > 0) {
-        const data = await callBatchAPI({ matches: r16Data });
+        const data = await callBatchAPI({ matches: r16Data }, controller.signal);
+        const r16Batch = {};
         for (const r of data.results) {
           const pred = { homeScore: r.homeScore, awayScore: r.awayScore };
           if (pred.homeScore === pred.awayScore) {
             const teams = bracket[r.id];
             pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
           }
+          r16Batch[r.id] = pred;
           allPreds[r.id] = pred;
-          savePrediction(activeFormId, r.id, pred);
         }
+        savePredictionsBatch(activeFormId, r16Batch);
       }
 
       // Step 3: QF + SF + 3RD + F — generated locally (instant)
       setAiProgress({ current: 3, total: totalSteps, label: "רבע גמר עד הגמר" });
 
+      const localBatch = {};
       for (const stage of ["QF", "SF", "3RD", "F"]) {
         bracket = getCachedBracket(allPreds);
         const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
@@ -370,10 +394,11 @@ export default function Predict() {
           if (pred.homeScore === pred.awayScore) {
             pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
           }
+          localBatch[m.id] = pred;
           allPreds[m.id] = pred;
-          savePrediction(activeFormId, m.id, pred);
         }
       }
+      savePredictionsBatch(activeFormId, localBatch);
 
       // Top scorer — already fetched in parallel with groups
       if (tsData?.name) {
@@ -382,7 +407,20 @@ export default function Predict() {
 
       showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
-      showToast(`שגיאה: ${err.message}`);
+      if (formSnapshot && activeFormId) {
+        // Restore all predictions from snapshot
+        for (const [matchId, pred] of Object.entries(formSnapshot.matches || {})) {
+          savePrediction(activeFormId, matchId, pred);
+        }
+        if (formSnapshot.topScorer) {
+          saveBonusPrediction(activeFormId, "topScorer", formSnapshot.topScorer);
+        }
+      }
+      if (err.name === 'AbortError') {
+        showToast('מילוי AI בוטל');
+      } else {
+        showToast(`שגיאה: ${err.message}`);
+      }
     } finally {
       setAiProgress(null);
     }
@@ -661,12 +699,19 @@ export default function Predict() {
 
             {/* Rotating fun messages */}
             <AiProgressMessage step={aiProgress.current} />
+
+            <button
+              onClick={() => aiAbortRef.current?.abort()}
+              className="mt-3 text-xs text-ink-muted/70 underline cursor-pointer bg-transparent border-none"
+            >
+              ביטול
+            </button>
           </div>
         </div>
       )}
 
       {status === "draft" && !settings.predictionsLocked && (
-        <div className="sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto">
+        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto ${keyboardOpen ? 'hidden' : ''}`}>
           <button
             onClick={handleAIFill}
             disabled={!!aiProgress}

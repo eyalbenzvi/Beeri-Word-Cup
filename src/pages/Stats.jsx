@@ -19,10 +19,10 @@ function Bar({ label, count, total, color = "bg-primary" }) {
           className={`${color} h-5 rounded-full transition-all duration-500 flex items-center justify-end px-2`}
           style={{ width: `${count > 0 ? Math.max(pct, 8) : 0}%` }}
         >
-          <span className="text-white text-[10px] font-bold">{count}</span>
+          <span className="text-white text-[11px] font-bold">{count}</span>
         </div>
       </div>
-      <span className="w-10 text-left text-gray-400 text-[10px]">
+      <span className="w-10 text-left text-gray-400 text-[11px]">
         {pct.toFixed(0)}%
       </span>
     </div>
@@ -175,7 +175,7 @@ function MatchPredictions({ forms }) {
               <div className="text-lg font-extrabold text-blue-600">
                 {matchStats.homeWin}
               </div>
-              <div className="text-[10px] text-blue-400 font-medium">
+              <div className="text-[11px] text-blue-400 font-medium">
                 1 {home?.name || ""}
               </div>
             </div>
@@ -183,7 +183,7 @@ function MatchPredictions({ forms }) {
               <div className="text-lg font-extrabold text-gray-500">
                 {matchStats.draw}
               </div>
-              <div className="text-[10px] text-gray-400 font-medium">
+              <div className="text-[11px] text-gray-400 font-medium">
                 X תיקו
               </div>
             </div>
@@ -191,7 +191,7 @@ function MatchPredictions({ forms }) {
               <div className="text-lg font-extrabold text-red-500">
                 {matchStats.awayWin}
               </div>
-              <div className="text-[10px] text-red-400 font-medium">
+              <div className="text-[11px] text-red-400 font-medium">
                 2 {away?.name || ""}
               </div>
             </div>
@@ -337,7 +337,7 @@ function GeneralStats({ forms, results }) {
           <div className="text-2xl font-extrabold text-primary">
             {stats.totalForms}
           </div>
-          <div className="text-[10px] text-gray-500 font-medium">
+          <div className="text-[11px] text-gray-500 font-medium">
             טפסים הוגשו
           </div>
         </div>
@@ -345,7 +345,7 @@ function GeneralStats({ forms, results }) {
           <div className="text-2xl font-extrabold text-primary">
             {stats.playedResults}/{stats.totalPossible}
           </div>
-          <div className="text-[10px] text-gray-500 font-medium">
+          <div className="text-[11px] text-gray-500 font-medium">
             משחקים שוחקו
           </div>
         </div>
@@ -353,7 +353,7 @@ function GeneralStats({ forms, results }) {
           <div className="text-2xl font-extrabold text-primary">
             {stats.avgGoals}
           </div>
-          <div className="text-[10px] text-gray-500 font-medium">
+          <div className="text-[11px] text-gray-500 font-medium">
             ממוצע שערים לניחוש
           </div>
         </div>
@@ -361,7 +361,7 @@ function GeneralStats({ forms, results }) {
           <div className="text-2xl font-extrabold text-primary">
             {stats.drawPct}%
           </div>
-          <div className="text-[10px] text-gray-500 font-medium">
+          <div className="text-[11px] text-gray-500 font-medium">
             ניחושי תיקו
           </div>
         </div>
@@ -488,6 +488,7 @@ function SearchStats({ forms }) {
 export default function Stats() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
+  const [activeTab, setActiveTab] = useState("matches");
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
@@ -509,13 +510,42 @@ export default function Stats() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          <GeneralStats forms={submittedForms} results={results} />
-          <ChampionStats forms={submittedForms} />
-          <TopScorerStats forms={submittedForms} />
-          <MatchPredictions forms={submittedForms} />
-          <SearchStats forms={submittedForms} />
-        </div>
+        <>
+          <div className="flex gap-1 mb-4 overflow-x-auto">
+            {[
+              { id: "matches", label: "📊 משחקים" },
+              { id: "teams", label: "🏆 קבוצות" },
+              { id: "forms", label: "📋 טפסים" },
+              { id: "search", label: "🔍 חיפוש" },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border-none cursor-pointer ${activeTab === tab.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            {activeTab === "matches" && (
+              <>
+                <GeneralStats forms={submittedForms} results={results} />
+                <MatchPredictions forms={submittedForms} />
+              </>
+            )}
+            {activeTab === "teams" && (
+              <>
+                <ChampionStats forms={submittedForms} />
+                <TopScorerStats forms={submittedForms} />
+              </>
+            )}
+            {activeTab === "forms" && (
+              <GeneralStats forms={submittedForms} results={results} />
+            )}
+            {activeTab === "search" && (
+              <SearchStats forms={submittedForms} />
+            )}
+          </div>
+        </>
       )}
     </div>
   );

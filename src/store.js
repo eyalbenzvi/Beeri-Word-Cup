@@ -32,6 +32,20 @@ export function logAdminAction(action, details = {}) {
   localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
 }
 
+function writeAuditLog(action, details = {}) {
+  const entry = {
+    action,
+    ...details,
+    userId: getCurrentUser()?.id || "unknown",
+    timestamp: new Date().toISOString(),
+  };
+  // Keep local log
+  logAdminAction(action, details);
+  // Also write to Firestore
+  const auditRef = doc(db, "auditLog", `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  setDoc(auditRef, entry).catch(err => console.error("Audit log write failed:", err));
+}
+
 export function getAuditLog() {
   return auditLog;
 }
@@ -113,6 +127,7 @@ async function writeFormDoc(formId, formData) {
 const pendingWrites = {};
 
 function debouncedWriteForm(formId, formData, delay = 500) {
+  const prevData = cache.predictions[formId];
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
@@ -126,8 +141,19 @@ function debouncedWriteForm(formId, formData, delay = 500) {
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
         emitWriteError("predictions", err);
+        // Rollback to previous data on write failure
+        cache.predictions = { ...cache.predictions, [formId]: prevData };
+        notifyAndEmit("predictions");
       });
   }, delay);
+}
+
+export function clearPendingWritesForForm(formId) {
+  const key = `form:${formId}`;
+  if (pendingWrites[key]) {
+    clearTimeout(pendingWrites[key]);
+    delete pendingWrites[key];
+  }
 }
 
 function flushPendingWrites() {
@@ -179,10 +205,14 @@ let windowListenersAttached = false;
 let currentListenerUserId = null;
 let predictionsUnsub = null;
 let predictionsShowAll = false;
+let gameDocUnsubs = [];
+let predictionsListenerGeneration = 0;
+let retryCount = 0;
 
 function setupPredictionsListener(userId, showAll) {
   if (predictionsUnsub) predictionsUnsub();
   predictionsShowAll = showAll;
+  const myGeneration = ++predictionsListenerGeneration;
 
   const q = showAll
     ? predictionsCollectionRef
@@ -191,6 +221,8 @@ function setupPredictionsListener(userId, showAll) {
   predictionsUnsub = onSnapshot(
     q,
     (snapshot) => {
+      if (myGeneration !== predictionsListenerGeneration) return;
+      retryCount = 0;
       if (showAll) {
         // Full collection: replace entire cache
         const preds = {};
@@ -218,6 +250,12 @@ function setupPredictionsListener(userId, showAll) {
       listenersHadError = true;
       cache._ready.predictions = true;
       notifyAndEmit("predictions");
+      if (retryCount < 3 && currentListenerUserId) {
+        retryCount++;
+        setTimeout(() => {
+          initRealtimeListeners(currentListenerUserId);
+        }, 5000);
+      }
     },
   );
 }
@@ -246,11 +284,16 @@ export function initRealtimeListeners(userId) {
     window.addEventListener("pagehide", flushPendingWrites);
   }
 
+  // Unsubscribe all existing gameDoc listeners before creating new ones
+  gameDocUnsubs.forEach(u => u());
+  gameDocUnsubs = [];
+
   // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {
-    onSnapshot(
+    gameDocUnsubs.push(onSnapshot(
       gameDocRef(docName),
       (snap) => {
+        retryCount = 0;
         if (snap.exists()) cache[key] = snap.data().data;
         cache._ready[key] = true;
         notifyAndEmit(key);
@@ -264,8 +307,14 @@ export function initRealtimeListeners(userId) {
         listenersHadError = true;
         cache._ready[key] = true;
         notifyAndEmit(key);
+        if (retryCount < 3 && currentListenerUserId) {
+          retryCount++;
+          setTimeout(() => {
+            initRealtimeListeners(currentListenerUserId);
+          }, 5000);
+        }
       },
-    );
+    ));
   }
 
   // Start with filtered predictions (own forms only)
@@ -408,6 +457,8 @@ export function logoutUser() {
     predictionsUnsub();
     predictionsUnsub = null;
   }
+  gameDocUnsubs.forEach(u => u());
+  gameDocUnsubs = [];
   currentListenerUserId = null;
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
@@ -518,6 +569,19 @@ export function savePrediction(formId, matchId, prediction) {
   debouncedWriteForm(formId, updated);
 }
 
+export function savePredictionsBatch(formId, matchPredictions) {
+  if (getSettings().predictionsLocked) return;
+  const form = getForm(formId);
+  if (!form || form.status !== "draft") return;
+  const updated = {
+    ...form,
+    matches: { ...form.matches, ...matchPredictions },
+    updatedAt: new Date().toISOString(),
+  };
+  // Use writeFormDoc (not debounced) for immediate batch write
+  writeFormDoc(formId, updated);
+}
+
 export function saveBonusPrediction(formId, field, value) {
   if (getSettings().predictionsLocked) return;
   const form = getForm(formId);
@@ -556,7 +620,7 @@ export function reopenForm(formId) {
 }
 
 export function adminForceSubmitForm(formId) {
-  logAdminAction("force-submit", { formId });
+  writeAuditLog("force-submit", { formId });
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
@@ -570,7 +634,7 @@ export function adminForceSubmitForm(formId) {
 }
 
 export function adminReopenForm(formId) {
-  logAdminAction("reopen-form", { formId });
+  writeAuditLog("reopen-form", { formId });
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
@@ -584,7 +648,7 @@ export function adminReopenForm(formId) {
 }
 
 export async function adminDeleteForm(formId) {
-  logAdminAction("delete-form", { formId });
+  writeAuditLog("delete-form", { formId });
   flushPendingWrites();
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
@@ -626,7 +690,7 @@ export function adminSaveMatchPrediction(formId, matchId, prediction) {
 // ============ MATCH RESULTS (admin) ============
 
 export function clearMatchResults() {
-  logAdminAction("clear-match-results");
+  writeAuditLog("clear-match-results");
   writeGameDoc("matchResults", {});
 }
 
@@ -682,7 +746,7 @@ export function exportAllData() {
 }
 
 export async function clearAllData() {
-  logAdminAction("clear-all-data");
+  writeAuditLog("clear-all-data");
 
   // Delete all form documents
   const snapshot = await getDocs(predictionsCollectionRef);
@@ -709,7 +773,13 @@ export async function clearAllData() {
 }
 
 export async function importAllData(data) {
-  logAdminAction("import-data", { keys: Object.keys(data) });
+  writeAuditLog("import-data", { keys: Object.keys(data) });
+
+  // Validate imported data structure
+  if (!data || typeof data !== 'object') throw new Error("נתונים לא תקינים");
+  if (data.users && typeof data.users !== 'object') throw new Error("מבנה משתמשים לא תקין");
+  if (data.predictions && typeof data.predictions !== 'object') throw new Error("מבנה ניחושים לא תקין");
+  if (data.matchResults && typeof data.matchResults !== 'object') throw new Error("מבנה תוצאות לא תקין");
 
   const batch = writeBatch(db);
 

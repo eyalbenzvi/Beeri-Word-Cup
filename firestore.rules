@@ -38,6 +38,9 @@ service cloud.firestore {
     }
 
     // predictions collection — one document per form
+    // TODO (H25): When Cloud Functions are added, validate tournament start timestamp
+    // to prevent form creation/submission after the tournament has started.
+    // This requires a stored tournament start date in settings.
     match /predictions/{formId} {
       // Before lock: users can only read their own forms. After lock or admin: read all.
       allow read: if isAuth() && (
@@ -45,7 +48,10 @@ service cloud.firestore {
       );
 
       // Users can create their own forms only when predictions not locked
-      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked();
+      // H29: new forms must have correct userId and start as draft
+      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'draft';
 
       // Users can update their own forms only when not locked; admins always
       allow update: if isAuth() && (
@@ -56,6 +62,12 @@ service cloud.firestore {
       allow delete: if isAuth() && (
         resource.data.userId == request.auth.uid || isAdmin()
       );
+    }
+
+    // Audit log — append-only for authenticated users, read for admins
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuth();
     }
   }
 }

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
 import {
   calcBracketTeams,
@@ -13,7 +13,24 @@ export function useLeaderboardComputed(
   users,
   actualBonuses,
 ) {
-  const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
+  // Cache previous results to avoid recomputation when object references change
+  // but underlying data hasn't
+  const prevResultsRef = useRef(null);
+  const prevResultsKey = useRef('');
+  const prevBracketRef = useRef(null);
+
+  const resultsKey = Object.keys(results).length + '_' + Object.values(results).map(r => r.homeScore + '-' + r.awayScore).join(',');
+
+  const actualBracket = useMemo(() => {
+    if (resultsKey === prevResultsKey.current && prevBracketRef.current) {
+      return prevBracketRef.current;
+    }
+    const bracket = calcBracketTeams(results);
+    prevResultsKey.current = resultsKey;
+    prevResultsRef.current = results;
+    prevBracketRef.current = bracket;
+    return bracket;
+  }, [results, resultsKey]);
 
   const actualDerivedAdvancing = useMemo(
     () => deriveActualAdvancing(actualBracket, results),

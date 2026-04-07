@@ -53,7 +53,7 @@ export default function ProgressHub({
         <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold text-primary">מפת השלמה</span>
-          <div className="flex gap-1.5 text-[10px] font-bold">
+          <div className="flex gap-1.5 text-[11px] font-bold">
             <span
               className={`px-2 py-0.5 rounded-full ${filledGroups === totalGroups ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
             >
@@ -93,7 +93,7 @@ export default function ProgressHub({
                     }`}
                   >
                     <span className="text-sm font-bold">{group}</span>
-                    <span className="text-[10px] font-medium mt-0.5">
+                    <span className="text-[11px] font-medium mt-0.5">
                       {filled}/{total}
                     </span>
                     <div className="w-full h-1 bg-gray-200/60 rounded-full mt-1">
@@ -127,7 +127,7 @@ export default function ProgressHub({
                       {label}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                     >
                       {filled}/{total}
                     </span>

@@ -28,6 +28,7 @@ export default function Leaderboard({
   const settings = useSettings();
   const locked = settings.predictionsLocked;
   const [selectedForm, setSelectedForm] = useState(null);
+  const [showCount, setShowCount] = useState(20);
 
   const { formBracketMap, scoredForms, leaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
@@ -239,7 +240,7 @@ export default function Leaderboard({
           </div>
 
           <div className="space-y-1.5">
-            {leaderboard.map((entry, index) => {
+            {leaderboard.slice(0, showCount).map((entry, index) => {
               const isTop3 = index < 3;
               const borderColor =
                 index === 0
@@ -295,7 +296,7 @@ export default function Leaderboard({
                     >
                       {entry.formName}
                       {entry.userId === user?.id && (
-                        <span className="text-[10px] text-primary mr-1 font-bold">
+                        <span className="text-[11px] text-primary mr-1 font-bold">
                           (שלי)
                         </span>
                       )}
@@ -312,11 +313,17 @@ export default function Leaderboard({
                     >
                       {entry.totalPoints}
                     </div>
-                    <div className="text-[10px] text-ink-muted/60" dir="rtl">נק׳</div>
+                    <div className="text-[11px] text-ink-muted/60" dir="rtl">נק׳</div>
                   </div>
                 </button>
               );
             })}
+
+            {showCount < leaderboard.length && (
+              <button onClick={() => setShowCount(s => s + 20)} className="w-full py-2 text-sm text-primary font-bold bg-white rounded-xl border border-border mt-2 cursor-pointer">
+                {"הצג עוד"} {Math.min(20, leaderboard.length - showCount)} {"מתוך"} {leaderboard.length}
+              </button>
+            )}
 
             {leaderboard.length === 0 && (
               <div className="text-center py-12 text-gray-400">

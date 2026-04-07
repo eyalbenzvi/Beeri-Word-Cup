@@ -112,7 +112,7 @@ export default function Layout({ children }) {
             <button
               key={item.id}
               onClick={() => navigate(item.id)}
-              className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[10px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
+              className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[11px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
                 page === item.id ? "text-primary font-bold" : "text-ink-muted"
               }`}
               aria-current={page === item.id ? "page" : undefined}
