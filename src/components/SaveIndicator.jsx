@@ -42,7 +42,7 @@ export default function SaveIndicator() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 mb-3">
         <span className="text-xs font-medium text-red-600">
-          שגיאה: {errorMsg}
+          {errorMsg}
         </span>
         <button
           onClick={() => {

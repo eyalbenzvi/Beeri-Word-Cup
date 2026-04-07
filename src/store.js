@@ -127,7 +127,6 @@ async function writeFormDoc(formId, formData) {
 const pendingWrites = {};
 
 function debouncedWriteForm(formId, formData, delay = 500) {
-  const prevData = cache.predictions[formId];
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
@@ -141,9 +140,6 @@ function debouncedWriteForm(formId, formData, delay = 500) {
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
         emitWriteError("predictions", err);
-        // Rollback to previous data on write failure
-        cache.predictions = { ...cache.predictions, [formId]: prevData };
-        notifyAndEmit("predictions");
       });
   }, delay);
 }
@@ -208,6 +204,7 @@ let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
 let retryCount = 0;
+let retryInProgress = false;
 
 function setupPredictionsListener(userId, showAll) {
   if (predictionsUnsub) predictionsUnsub();
@@ -250,9 +247,12 @@ function setupPredictionsListener(userId, showAll) {
       listenersHadError = true;
       cache._ready.predictions = true;
       notifyAndEmit("predictions");
+      if (retryInProgress) return;
       if (retryCount < 3 && currentListenerUserId) {
         retryCount++;
+        retryInProgress = true;
         setTimeout(() => {
+          retryInProgress = false;
           initRealtimeListeners(currentListenerUserId);
         }, 5000);
       }
@@ -307,9 +307,12 @@ export function initRealtimeListeners(userId) {
         listenersHadError = true;
         cache._ready[key] = true;
         notifyAndEmit(key);
+        if (retryInProgress) return;
         if (retryCount < 3 && currentListenerUserId) {
           retryCount++;
+          retryInProgress = true;
           setTimeout(() => {
+            retryInProgress = false;
             initRealtimeListeners(currentListenerUserId);
           }, 5000);
         }
@@ -450,6 +453,7 @@ export function setCurrentUser(userId) {
 }
 
 export function logoutUser() {
+  flushPendingWrites();
   lastEnsuredUid = null;
   listenersInitialized = false;
   listenersHadError = false;
@@ -650,11 +654,12 @@ export function adminReopenForm(formId) {
 export async function adminDeleteForm(formId) {
   writeAuditLog("delete-form", { formId });
   flushPendingWrites();
+  await deleteDoc(formDocRef(formId));
+  // Only update cache after successful delete
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
   cache.predictions = newPreds;
   notifyAndEmit("predictions");
-  await deleteDoc(formDocRef(formId));
   if (getActiveFormId() === formId) {
     localStorage.removeItem(ACTIVE_FORM_KEY);
     notifyAndEmit("activeForm");

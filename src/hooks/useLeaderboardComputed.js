@@ -57,10 +57,22 @@ export function useLeaderboardComputed(
     return map;
   }, [allPredictions]);
 
+  const formScoreCacheRef = useRef({});
+
   const scoredForms = useMemo(() => {
+    // Limit cache size to 500 entries
+    if (Object.keys(formScoreCacheRef.current).length > 500) {
+      formScoreCacheRef.current = {};
+    }
+
     return Object.entries(allPredictions)
       .filter(([formId]) => formBracketMap[formId])
       .map(([formId, predData]) => {
+        const cacheKey = `${formId}_${predData.updatedAt || ''}_${Object.keys(results).length}`;
+        if (formScoreCacheRef.current[cacheKey]) {
+          return { formId, userId: predData.userId, formName: predData.formName || "טופס ללא שם", ...formScoreCacheRef.current[cacheKey] };
+        }
+
         const { predBracket, advancing, champion } = formBracketMap[formId];
         const enrichedPredData = {
           ...predData,
@@ -75,6 +87,7 @@ export function useLeaderboardComputed(
           predBracket,
           actualBracket,
         );
+        formScoreCacheRef.current[cacheKey] = score;
         return {
           formId,
           userId: predData.userId,

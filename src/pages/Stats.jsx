@@ -100,7 +100,7 @@ function MatchPredictions({ forms }) {
   return (
     <StatCard title="ניחושים למשחק" icon="🔍">
       {/* Stage selector */}
-      <div className="flex overflow-x-auto gap-1.5 mb-3 pb-1 -mx-1 px-1 scrollbar-hide">
+      <div className="flex overflow-x-auto gap-1.5 mb-3 pb-1 -mx-1 px-1">
         {Object.entries(STAGES).map(([key, label]) => (
           <button
             key={key}

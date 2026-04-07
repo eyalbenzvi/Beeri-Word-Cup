@@ -38,7 +38,7 @@ function MatchRow({ match, prediction }) {
       <div className="flex items-center justify-between">
         <span className="flex-1 text-right truncate">{homeName}</span>
         <span className="w-16 text-center font-bold text-gray-700">
-          {hasScore ? `${prediction.homeScore} – ${prediction.awayScore}` : "–"}
+          {hasScore ? <span dir="ltr">{prediction.homeScore} – {prediction.awayScore}</span> : "–"}
         </span>
         <span className="flex-1 text-left truncate">{awayName}</span>
       </div>

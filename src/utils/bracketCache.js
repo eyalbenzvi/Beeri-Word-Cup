@@ -5,13 +5,14 @@ import { calcBracketTeams, deriveChampion } from "../utils/bracket";
 const bracketCache = new Map();
 const championCache = new Map();
 
-function getStableKey(matches) {
-  // Use a simple hash of match count + first/last match scores for cache key
-  const keys = Object.keys(matches);
-  if (keys.length === 0) return "empty";
-  const first = matches[keys[0]];
-  const last = matches[keys[keys.length - 1]];
-  return `${keys.length}:${first?.homeScore}${first?.awayScore}:${last?.homeScore}${last?.awayScore}`;
+function getStableKey(matchPredictions) {
+  const entries = Object.entries(matchPredictions);
+  if (entries.length === 0) return "empty";
+  // Sample every 5th entry for a better key
+  const samples = entries.filter((_, i) => i % 5 === 0)
+    .map(([id, p]) => `${id}:${p?.homeScore ?? ''}-${p?.awayScore ?? ''}`)
+    .join('|');
+  return `${entries.length}_${samples}`;
 }
 
 export function getCachedBracket(matches) {

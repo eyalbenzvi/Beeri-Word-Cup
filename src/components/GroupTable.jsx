@@ -13,7 +13,7 @@ export default function GroupTable({ matchData, group }) {
   return (
     <div className="bg-white rounded-2xl border border-border p-4 mb-3">
       <h4 className="text-xs font-bold text-primary mb-2">טבלת בית {group}</h4>
-      <div className="overflow-x-auto -mx-1">
+      <div className="overflow-x-auto scroll-smooth -mx-1">
       <table className="w-full text-xs min-w-[400px]">
         <thead>
           <tr className="text-gray-400 border-b-2 border-gray-100">

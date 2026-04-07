@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
 import {
   useCurrentUser,
   useUserForms,
@@ -26,7 +26,7 @@ import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
-import AllFormsView from "./AllForms";
+const AllFormsView = React.lazy(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
@@ -253,7 +253,10 @@ export default function Predict() {
       if (duplicateName) {
         errors.push({
           label: "כבר קיים טופס שהוגש עם שם זהה. בחר שם אחר",
-          action: () => setActiveTab("details"),
+          action: () => {
+            setActiveTab("details");
+            setTimeout(() => document.querySelector('[name="formName"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+          },
         });
       }
     }
@@ -462,7 +465,11 @@ export default function Predict() {
   }
 
   if (!activeForm && showAllForms) {
-    return <AllFormsView onBack={() => setShowAllForms(false)} />;
+    return (
+      <Suspense fallback={<div className="text-center py-8 text-gray-400">טוען...</div>}>
+        <AllFormsView onBack={() => setShowAllForms(false)} />
+      </Suspense>
+    );
   }
 
   if (!activeForm) {
@@ -488,10 +495,12 @@ export default function Predict() {
       matchPredictions[m.id]?.awayScore != null,
   ).length;
 
-  const filteredMatches =
+  const filteredMatches = useMemo(() =>
     selectedStage === "group"
       ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
+      : knockoutMatches.filter((m) => m.stage === selectedStage),
+    [selectedStage, selectedGroup]
+  );
 
   return (
     <div>
@@ -554,8 +563,8 @@ export default function Predict() {
 
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
         {[
-          { id: "matches", label: "⚽ משחקים" },
-          { id: "details", label: "📝 פרטים" },
+          { id: "matches", emoji: "⚽", label: "משחקים" },
+          { id: "details", emoji: "📝", label: "פרטים" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -566,7 +575,7 @@ export default function Predict() {
                 : "text-gray-400"
             }`}
           >
-            {tab.label}
+            <span aria-hidden="true">{tab.emoji}</span> {tab.label}
           </button>
         ))}
       </div>
@@ -711,7 +720,7 @@ export default function Predict() {
       )}
 
       {status === "draft" && !settings.predictionsLocked && (
-        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto ${keyboardOpen ? 'hidden' : ''}`}>
+        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto ${keyboardOpen ? 'hidden' : ''}`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={handleAIFill}
             disabled={!!aiProgress}

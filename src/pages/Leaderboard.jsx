@@ -36,6 +36,13 @@ export default function Leaderboard({
   const renderFormDetail = () => {
     if (!selectedForm) return null;
 
+    // Don't show other users' form details before predictions are locked
+    const formOwner = allPredictions[selectedForm]?.userId;
+    if (!settings.predictionsLocked && formOwner !== user?.id) {
+      setSelectedForm(null);
+      return null;
+    }
+
     const predData = allPredictions[selectedForm] || {};
     const bracketData = formBracketMap[selectedForm];
     const predBracket = bracketData?.predBracket || {};
@@ -263,7 +270,7 @@ export default function Leaderboard({
                   } ${
                     forceUnlockView || locked || entry.userId === user?.id
                       ? "cursor-pointer card-hover"
-                      : "cursor-default opacity-80"
+                      : "cursor-default opacity-50"
                   }`}
                 >
                   <span
@@ -321,7 +328,7 @@ export default function Leaderboard({
 
             {showCount < leaderboard.length && (
               <button onClick={() => setShowCount(s => s + 20)} className="w-full py-2 text-sm text-primary font-bold bg-white rounded-xl border border-border mt-2 cursor-pointer">
-                {"הצג עוד"} {Math.min(20, leaderboard.length - showCount)} {"מתוך"} {leaderboard.length}
+                הצג {Math.min(20, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
               </button>
             )}
 

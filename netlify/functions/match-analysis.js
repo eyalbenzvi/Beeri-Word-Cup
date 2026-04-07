@@ -70,6 +70,7 @@ Return a JSON object:
       temperature: 0.9,
       max_tokens: 512,
       response_format: { type: "json_object" },
+      timeout: 8000,
     });
     const text = completion.choices[0]?.message?.content || "";
     const parsed = JSON.parse(text);

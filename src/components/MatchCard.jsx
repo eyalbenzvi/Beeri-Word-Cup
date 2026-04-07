@@ -59,6 +59,7 @@ export default function MatchCard({
       setJustSaved(true);
       saveTimerRef.current = setTimeout(() => setJustSaved(false), 800);
     }
+    return () => clearTimeout(saveTimerRef.current);
   }, [prediction, editable]);
 
   const homeTeam = getTeamByCode(match.homeTeam);
@@ -194,7 +195,7 @@ export default function MatchCard({
                   max="20"
                   inputMode="numeric"
                   enterKeyHint="next"
-                  aria-label={`ניחוש גולים ${homeName}`}
+                  aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'}`}
                   value={predHome}
                   onChange={handleHomeChange}
                   className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
@@ -216,7 +217,7 @@ export default function MatchCard({
                   max="20"
                   inputMode="numeric"
                   enterKeyHint="done"
-                  aria-label={`ניחוש גולים ${awayName}`}
+                  aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'}`}
                   value={predAway}
                   onChange={handleAwayChange}
                   className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${

@@ -62,7 +62,7 @@ export default function MatchAnalysis({
   return (
     <div className="bg-gradient-to-b from-blue-50 to-white border border-blue-200 rounded-xl p-4 mt-2 animate-fade-in">
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-3">
+        <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-3">
           <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-blue-600 font-medium">
             מנתח את המשחק...

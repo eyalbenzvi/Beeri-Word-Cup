@@ -14,7 +14,7 @@ export default function ReviewScreen({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[85vh] flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label="סקירת טופס" className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[85vh] flex flex-col">
         <div className="p-5 pb-3 border-b border-gray-100">
           <div className="text-3xl text-center mb-2">
             {hasErrors ? "⚠️" : "📋"}

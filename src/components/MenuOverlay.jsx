@@ -40,7 +40,7 @@ export default function MenuOverlay({ open, onClose }) {
         className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
       />
-      <div id="menu-overlay" className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
+      <div id="menu-overlay" role="dialog" aria-modal="true" aria-label="תפריט מידע" className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
         <div className="header-gradient text-white p-5 flex items-center justify-between">
           <button
             onClick={onClose}
