@@ -148,7 +148,7 @@ export default function MatchCard({
             {match.label}
           </span>
           {match.date && (
-            <span className="text-[11px] text-ink-muted/50">{match.date}</span>
+            <span className="text-[11px] text-ink-muted/60">{match.date}</span>
           )}
         </div>
       )}
@@ -171,16 +171,16 @@ export default function MatchCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted/40 italic"}`}
+            className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted/60 italic"}`}
           >
-            {homeName}
+            <bdi>{homeName}</bdi>
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
             <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              {actualResult.homeScore} – {actualResult.awayScore}
+              <span dir="ltr">{actualResult.homeScore} – {actualResult.awayScore}</span>
             </div>
           )}
 
@@ -197,12 +197,12 @@ export default function MatchCard({
                   aria-label={`ניחוש גולים ${homeName}`}
                   value={predHome}
                   onChange={handleHomeChange}
-                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                  className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
                     hasPrediction ? "border-primary/30" : "border-border"
                   }`}
                   placeholder="–"
                 />
-                <span className="relative text-ink-muted/40 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
+                <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
                   {justSaved ? (
                     <span className="text-green-500 text-[10px]">✓</span>
                   ) : (
@@ -219,7 +219,7 @@ export default function MatchCard({
                   aria-label={`ניחוש גולים ${awayName}`}
                   value={predAway}
                   onChange={handleAwayChange}
-                  className={`min-w-[52px] min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                  className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
                     hasPrediction ? "border-primary/30" : "border-border"
                   }`}
                   placeholder="–"
@@ -242,25 +242,25 @@ export default function MatchCard({
           ) : (
             !hasResult && (
               <div
-                className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/40"}`}
+                className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/60"}`}
               >
-                {hasPrediction ? `${predHome} – ${predAway}` : "– : –"}
+                {hasPrediction ? <span dir="ltr">{predHome} – {predAway}</span> : "– : –"}
               </div>
             )
           )}
 
           {hasResult && !editable && predHome !== "" && (
             <div className="text-[11px] text-ink-muted font-medium tabular-nums">
-              ניחוש: {predHome} – {predAway}
+              ניחוש: <span dir="ltr">{predHome} – {predAway}</span>
             </div>
           )}
         </div>
 
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted/40 italic"}`}
+            className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted/60 italic"}`}
           >
-            {awayName}
+            <bdi>{awayName}</bdi>
           </div>
         </div>
       </div>

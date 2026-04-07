@@ -25,7 +25,9 @@ export default function GoogleSignInButton({ onSuccess }) {
       ) {
         return;
       } else if (err.code === "auth/popup-blocked") {
-        setError("החלון נחסם. אפשר חלונות קופצים בדפדפן");
+        setError("הדפדפן חסם את חלון ההתחברות. אפשר חלונות קופצים ונסה שוב");
+      } else if (err.code === "auth/network-request-failed") {
+        setError("שגיאת רשת. בדוק את החיבור לאינטרנט");
       } else {
         setError("שגיאה בהתחברות. נסה שוב");
         console.error("Auth error:", err.code, err.message);
@@ -63,7 +65,17 @@ export default function GoogleSignInButton({ onSuccess }) {
         {loading ? "מתחבר..." : "התחבר עם Google"}
       </button>
 
-      {error && <div className="text-sm text-red-500">{error}</div>}
+      {error && (
+        <div className="text-sm text-red-500 flex items-center justify-between gap-2 mt-2">
+          <span>{error}</span>
+          <button
+            onClick={handleSignIn}
+            className="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg border-none cursor-pointer hover:bg-red-100 transition flex-shrink-0"
+          >
+            נסה שוב
+          </button>
+        </div>
+      )}
     </>
   );
 }

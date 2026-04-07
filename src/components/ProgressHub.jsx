@@ -12,8 +12,6 @@ export default function ProgressHub({
   onSelectGroup,
   onSelectStage,
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   const groupCompletion = groupKeys.map((g) => {
     const matches = groupMatches.filter((m) => m.group === g);
     const filled = matches.filter(
@@ -39,11 +37,18 @@ export default function ProgressHub({
   const totalKO = stageCompletion.reduce((s, g) => s + g.total, 0);
   const filledKO = stageCompletion.reduce((s, g) => s + g.filled, 0);
 
+  const totalAll = totalGroups + totalKO;
+  const filledAll = filledGroups + filledKO;
+  const completionRatio = totalAll > 0 ? filledAll / totalAll : 0;
+
+  const [expanded, setExpanded] = useState(completionRatio < 0.5);
+
   return (
     <div className="bg-white rounded-2xl border border-border shadow-sm mb-4 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+        aria-expanded={expanded}
       >
         <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
         <div className="flex items-center gap-3">
@@ -79,7 +84,7 @@ export default function ProgressHub({
                   <button
                     key={group}
                     onClick={() => onSelectGroup(group)}
-                    className={`relative flex flex-col items-center py-2 px-1 rounded-xl border-none cursor-pointer transition active:scale-95 ${
+                    className={`relative flex flex-col items-center py-2.5 px-1.5 min-h-[44px] rounded-xl border-none cursor-pointer transition active:scale-95 ${
                       isDone
                         ? "bg-green-50 text-green-700"
                         : isEmpty

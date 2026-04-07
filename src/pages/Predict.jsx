@@ -17,7 +17,7 @@ import {
 } from "../store";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams } from "../utils/bracket";
+import { getCachedBracket } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
@@ -112,7 +112,7 @@ export default function Predict() {
 
   const matchPredictions = activeForm?.matches || {};
   const bracketTeams = useMemo(
-    () => calcBracketTeams(matchPredictions),
+    () => getCachedBracket(matchPredictions),
     [matchPredictions],
   );
 
@@ -186,7 +186,7 @@ export default function Predict() {
       });
     }
 
-    const bracket = calcBracketTeams(preds);
+    const bracket = getCachedBracket(preds);
     const unresolvedTieMatches = knockoutMatches.filter((m) => {
       const pred = preds[m.id];
       if (!pred || pred.homeScore === null || pred.awayScore === null)
@@ -278,7 +278,7 @@ export default function Predict() {
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
-    if (!window.confirm("פעולה זו תמלא את כל הניחושים בעזרת AI. ניחושים קיימים יידרסו. להמשיך?")) return;
+    if (!window.confirm("כל הניחושים הקיימים יימחקו ויוחלפו בניחושי AI. להמשיך?")) return;
 
     const allPreds = {};
     const totalSteps = 3;
@@ -309,7 +309,7 @@ export default function Predict() {
       // Step 2: R32 + R16 — 2 API calls (~4 sec)
       setAiProgress({ current: 2, total: totalSteps, label: "שלב ה-32 — 16 משחקים" });
 
-      let bracket = calcBracketTeams(allPreds);
+      let bracket = getCachedBracket(allPreds);
       const r32Data = knockoutMatches.filter((m) => m.stage === "R32")
         .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
         .map((m) => ({
@@ -334,7 +334,7 @@ export default function Predict() {
 
       setAiProgress({ current: 2, total: totalSteps, label: "שמינית גמר — 8 משחקים" });
 
-      bracket = calcBracketTeams(allPreds);
+      bracket = getCachedBracket(allPreds);
       const r16Data = knockoutMatches.filter((m) => m.stage === "R16")
         .filter((m) => bracket[m.id]?.home && bracket[m.id]?.away)
         .map((m) => ({
@@ -361,7 +361,7 @@ export default function Predict() {
       setAiProgress({ current: 3, total: totalSteps, label: "רבע גמר עד הגמר" });
 
       for (const stage of ["QF", "SF", "3RD", "F"]) {
-        bracket = calcBracketTeams(allPreds);
+        bracket = getCachedBracket(allPreds);
         const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
         for (const m of stageMatches) {
           const teams = bracket[m.id];
@@ -670,6 +670,7 @@ export default function Predict() {
           <button
             onClick={handleAIFill}
             disabled={!!aiProgress}
+            title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
             className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-blue-600 hover:to-purple-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
           >
             🤖 מלא הכל עם AI

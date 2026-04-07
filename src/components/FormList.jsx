@@ -41,7 +41,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       {forms.length === 0 && !showNewForm && (
         <div className="text-center py-12">
           <div className="text-5xl mb-3">📋</div>
-          <p className="text-gray-400 text-sm">עדיין לא יצרת טפסים</p>
+          <p className="font-bold text-gray-700 text-base mb-1">ברוך הבא! צור טופס ניחושים ראשון</p>
+          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למטה כדי להתחיל לנחש תוצאות משחקים</p>
         </div>
       )}
 
@@ -83,6 +84,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                       ? "bg-green-50 text-green-600"
                       : "bg-gray-50 text-gray-400"
                   }`}
+                  title={formStatus === "submitted" ? "הטופס הוגש ולא ניתן לעריכה" : "הטופס עדיין בעריכה ולא הוגש"}
                 >
                   {formStatus === "submitted" ? "✅ הוגש" : "טיוטה"}
                 </span>
@@ -92,7 +94,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   onClick={() => setActiveFormId(form.formId)}
                   className="flex-1 bg-primary text-white text-sm font-bold py-2.5 rounded-xl hover:bg-primary-light transition border-none cursor-pointer"
                 >
-                  {formStatus === "draft" ? "ערוך" : "צפה"}
+                  {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
                 {formStatus === "submitted" && !settings.predictionsLocked && (
                   <button

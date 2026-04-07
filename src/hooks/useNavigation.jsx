@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const NavigationContext = createContext();
 
@@ -10,8 +10,10 @@ export function NavigationProvider({ children }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
+  const value = useMemo(() => ({ page, navigate }), [page, navigate]);
+
   return (
-    <NavigationContext.Provider value={{ page, navigate }}>
+    <NavigationContext.Provider value={value}>
       {children}
     </NavigationContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useMatchResults } from "../hooks/useStore";
 import { saveMatchResult, deleteMatchResult } from "../store";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
@@ -12,7 +12,7 @@ const ADMIN_STAGES = { all: "הכל", ...STAGES };
 
 export default function AdminResultsTab() {
   const results = useMatchResults();
-  const undoStackRef = useRef([]);
+  const [undoStack, setUndoStack] = useState([]);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [editingMatch, setEditingMatch] = useState(null);
@@ -36,10 +36,10 @@ export default function AdminResultsTab() {
   const saveWithUndo = useCallback(
     (matchId, result) => {
       const prev = results[matchId] ? { ...results[matchId] } : undefined;
-      undoStackRef.current = [
-        ...undoStackRef.current.slice(-19),
+      setUndoStack((stack) => [
+        ...stack.slice(-19),
         { matchId, previousResult: prev },
-      ];
+      ]);
       saveMatchResult(matchId, result);
     },
     [results],
@@ -48,25 +48,26 @@ export default function AdminResultsTab() {
   const deleteWithUndo = useCallback(
     (matchId) => {
       const prev = results[matchId] ? { ...results[matchId] } : undefined;
-      undoStackRef.current = [
-        ...undoStackRef.current.slice(-19),
+      setUndoStack((stack) => [
+        ...stack.slice(-19),
         { matchId, previousResult: prev },
-      ];
+      ]);
       deleteMatchResult(matchId);
     },
     [results],
   );
 
   const undoLast = useCallback(() => {
-    const stack = undoStackRef.current;
-    if (!stack.length) return;
-    const last = stack.pop();
-    if (!last) return;
-    if (last.previousResult === undefined) {
-      deleteMatchResult(last.matchId);
-    } else {
-      saveMatchResult(last.matchId, last.previousResult);
-    }
+    setUndoStack((stack) => {
+      if (!stack.length) return stack;
+      const last = stack[stack.length - 1];
+      if (last.previousResult === undefined) {
+        deleteMatchResult(last.matchId);
+      } else {
+        saveMatchResult(last.matchId, last.previousResult);
+      }
+      return stack.slice(0, -1);
+    });
   }, []);
 
   const filteredMatches = useMemo(() => {
@@ -216,7 +217,8 @@ export default function AdminResultsTab() {
         <button
           type="button"
           onClick={undoLast}
-          className="px-4 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          disabled={undoStack.length === 0}
+          className={`px-4 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 ${undoStack.length === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
           title="בטל את השינוי האחרון בתוצאה בודדת"
         >
           ↩︎ ביטול
@@ -393,7 +395,7 @@ export default function AdminResultsTab() {
               {isKnockout && isTie && derived.home && derived.away && (
                 <div className="mt-2 pt-2 border-t border-gray-100">
                   <div className="text-xs text-gray-500 text-center mb-1.5">
-                    מי עולה? (פנדלים)
+                    מי עולה? (בעיטות הכרעה)
                   </div>
                   {!result?.advancingTeam && (
                     <div className="text-xs text-red-500 text-center mb-1.5 font-medium">

@@ -22,10 +22,11 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
           type="text"
           value={activeForm.budgetNumber || ""}
           disabled={!canEdit}
+          maxLength={20}
           onChange={(e) =>
             updateFormDetails(activeFormId, { budgetNumber: e.target.value })
           }
-          placeholder="מספר תקציב לחיוב..."
+          placeholder="מספר תקציב לחיוב (אופציונלי)"
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
         />
       </div>
@@ -35,7 +36,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
           ⚽ מלך השערים (8 נק׳)
         </h3>
         <p className="text-xs text-gray-400 mb-3">
-          מי יהיה מלך השערים? שערי פנדלים בבעיטות הכרעה לא נספרים.
+          מי יהיה מלך השערים? שערים מבעיטות הכרעה לא נספרים.
         </p>
         <input
           type="text"
@@ -45,6 +46,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
             saveBonusPrediction(activeFormId, "topScorer", e.target.value)
           }
           placeholder="הכנס שם שחקן..."
+          title="ניחוש מלך השערים — 8 נקודות בונוס"
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
         />
       </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import ScoringTable from "./ScoringTable";
 
@@ -21,6 +21,16 @@ function MenuSection({ icon, title, active, onToggle, children }) {
 
 export default function MenuOverlay({ open, onClose }) {
   const [activeSection, setActiveSection] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
   if (!open) return null;
   const toggle = (id) => setActiveSection(activeSection === id ? null : id);
 
@@ -30,7 +40,7 @@ export default function MenuOverlay({ open, onClose }) {
         className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in">
+      <div id="menu-overlay" className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
         <div className="header-gradient text-white p-5 flex items-center justify-between">
           <button
             onClick={onClose}
@@ -50,7 +60,7 @@ export default function MenuOverlay({ open, onClose }) {
           >
             <ScoringTable />
             <p className="text-[11px] text-ink-muted mt-3 leading-relaxed">
-              ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערי פנדלים בבעיטות הכרעה
+              ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערים מבעיטות הכרעה
               לא נספרים למלך השערים.
             </p>
           </MenuSection>
@@ -69,7 +79,7 @@ export default function MenuOverlay({ open, onClose }) {
               <p>• ניחוש תוצאה מדויקת מזכה בבונוס נוסף.</p>
               <p>• ניחוש נכון של קבוצה עולה בנוקאאוט מזכה בנקודות עליה.</p>
               <p>• בונוסים ניתנים על ניחוש אלופה ומלך שערים.</p>
-              <p>• שערי פנדלים בבעיטות הכרעה לא נספרים למלך השערים.</p>
+              <p>• שערים מבעיטות הכרעה לא נספרים למלך השערים.</p>
               <p>• הטפסים ננעלים לפני שריקת הפתיחה.</p>
             </div>
           </MenuSection>

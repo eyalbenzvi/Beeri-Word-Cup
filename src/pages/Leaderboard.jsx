@@ -76,19 +76,19 @@ export default function Leaderboard({
         <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-xl font-extrabold text-primary tabular-nums">
-              {score.totalPoints}
+              <span dir="ltr">{score.totalPoints}</span>
             </div>
             <div className="text-ink-muted">סה״כ</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-xl font-extrabold text-green-600 tabular-nums">
-              {score.exactScoreCount}
+              <span dir="ltr">{score.exactScoreCount}</span>
             </div>
             <div className="text-ink-muted">תוצאות מדויקות</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
             <div className="text-xl font-extrabold text-blue-600 tabular-nums">
-              {score.outcomeCount}
+              <span dir="ltr">{score.outcomeCount}</span>
             </div>
             <div className="text-ink-muted">הכרעות</div>
           </div>
@@ -114,7 +114,7 @@ export default function Leaderboard({
                     key={round}
                     className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
                   >
-                    {label}: +{pts}
+                    {label}: <span dir="ltr">+{pts}</span>
                   </span>
                 );
               })}
@@ -195,7 +195,7 @@ export default function Leaderboard({
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
                       {prediction
-                        ? ` (${prediction.homeScore}-${prediction.awayScore})`
+                        ? <>{" "}<span dir="ltr">({prediction.homeScore}-{prediction.awayScore})</span></>
                         : ""}
                     </div>
                   )}
@@ -265,8 +265,8 @@ export default function Leaderboard({
                       : "cursor-default opacity-80"
                   }`}
                 >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums ${
+                  <span
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums text-center inline-block flex-shrink-0 ${
                       index === 0
                         ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-white shadow-sm"
                         : index === 1
@@ -283,7 +283,7 @@ export default function Leaderboard({
                         : index === 2
                           ? "🥉"
                           : index + 1}
-                  </div>
+                  </span>
 
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {entry.formName.charAt(0)}
@@ -301,18 +301,18 @@ export default function Leaderboard({
                       )}
                     </div>
                     <div className="text-[11px] text-ink-muted/70 tabular-nums">
-                      {entry.exactScoreCount} מדויקים • {entry.outcomeCount}{" "}
+                      <span dir="ltr">{entry.exactScoreCount}</span> מדויקים • <span dir="ltr">{entry.outcomeCount}</span>{" "}
                       הכרעות
                     </div>
                   </div>
 
-                  <div className="text-left min-w-[50px]">
+                  <div className="text-left min-w-[50px]" dir="ltr">
                     <div
                       className={`text-xl font-extrabold tabular-nums ${isTop3 ? "text-primary" : "text-ink-muted"}`}
                     >
                       {entry.totalPoints}
                     </div>
-                    <div className="text-[10px] text-ink-muted/60">נק׳</div>
+                    <div className="text-[10px] text-ink-muted/60" dir="rtl">נק׳</div>
                   </div>
                 </button>
               );

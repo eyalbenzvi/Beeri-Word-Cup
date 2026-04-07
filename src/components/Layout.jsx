@@ -37,6 +37,8 @@ export default function Layout({ children }) {
               onClick={() => setMenuOpen(true)}
               className="text-white/90 bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-white"
               aria-label="תפריט"
+              aria-expanded={menuOpen}
+              aria-controls="menu-overlay"
             >
               <Menu size={22} />
             </button>
@@ -64,6 +66,7 @@ export default function Layout({ children }) {
                     ? "bg-white/20 text-white"
                     : "text-white/60 hover:text-white hover:bg-white/10"
                 }`}
+                aria-current={page === item.id ? "page" : undefined}
               >
                 {item.label}
               </button>
@@ -103,7 +106,7 @@ export default function Layout({ children }) {
       </main>
 
       {/* Bottom nav — mobile, ALL items, no "עוד" */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border/50 z-50 safe-area-bottom md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border/50 z-50 safe-area-bottom md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="max-w-lg mx-auto flex">
           {allNavItems.map((item) => (
             <button
@@ -112,6 +115,7 @@ export default function Layout({ children }) {
               className={`flex-1 flex flex-col items-center min-h-[48px] justify-center text-[10px] bg-transparent border-none cursor-pointer transition-colors duration-150 ${
                 page === item.id ? "text-primary font-bold" : "text-ink-muted"
               }`}
+              aria-current={page === item.id ? "page" : undefined}
             >
               <span className={`text-lg mb-0.5 transition-transform duration-150 ${page === item.id ? "scale-110" : ""}`}>
                 {item.emoji}

@@ -11,21 +11,22 @@ export default function GroupTable({ matchData, group }) {
   if (!hasData) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-4 mb-3 overflow-x-auto">
+    <div className="bg-white rounded-2xl border border-border p-4 mb-3">
       <h4 className="text-xs font-bold text-primary mb-2">טבלת בית {group}</h4>
-      <table className="w-full text-xs">
+      <div className="overflow-x-auto -mx-1">
+      <table className="w-full text-xs min-w-[400px]">
         <thead>
           <tr className="text-gray-400 border-b-2 border-gray-100">
-            <th className="text-right py-1.5 pr-1 w-5 font-semibold">#</th>
-            <th className="text-right py-1.5 font-semibold">קבוצה</th>
-            <th className="text-center py-1.5 w-6 font-semibold">מש׳</th>
-            <th className="text-center py-1.5 w-6 font-semibold">נ</th>
-            <th className="text-center py-1.5 w-6 font-semibold">ת</th>
-            <th className="text-center py-1.5 w-6 font-semibold">ה</th>
-            <th className="text-center py-1.5 w-8 font-semibold">שע+</th>
-            <th className="text-center py-1.5 w-8 font-semibold">שע-</th>
-            <th className="text-center py-1.5 w-8 font-semibold">הפ</th>
-            <th className="text-center py-1.5 w-8 font-bold">נק׳</th>
+            <th scope="col" className="text-right py-1.5 pr-1 w-5 font-semibold">#</th>
+            <th scope="col" className="text-right py-1.5 font-semibold">קבוצה</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="משחקים">מש׳</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="ניצחונות">נ</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="תיקו">ת</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="הפסדים">ה</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים בעד">שע+</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים נגד">שע-</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="הפרש שערים">הפ</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="נקודות">נק׳</th>
           </tr>
         </thead>
         <tbody>
@@ -75,6 +76,7 @@ export default function GroupTable({ matchData, group }) {
           })}
         </tbody>
       </table>
+      </div>
       <div className="flex gap-4 mt-2 text-[10px] text-gray-400">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-sm bg-green-100" /> עולה

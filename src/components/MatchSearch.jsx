@@ -17,6 +17,11 @@ export default function MatchSearch({
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
   const allMatches = useMemo(
     () => [...groupMatches, ...knockoutMatches],
     [groupMatches, knockoutMatches],

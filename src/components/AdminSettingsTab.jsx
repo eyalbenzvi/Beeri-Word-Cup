@@ -67,7 +67,7 @@ export default function AdminSettingsTab({
         }).join("\n");
         if (!window.confirm(`ייבוא ידרוס את הנתונים הקיימים.\n\nתוכן הקובץ:\n${preview}\n\nלהמשיך?`)) return;
         importAllData(data);
-        alert("הנתונים יובאו בהצלחה!");
+        alert("כל הנתונים הקיימים הוחלפו בנתונים שיובאו בהצלחה");
       } catch {
         alert("קובץ לא תקין — שגיאה בפרסור JSON");
       }

@@ -13,7 +13,12 @@ import {
 
 // ============ AUDIT LOG ============
 const AUDIT_LOG_KEY = "wc2026_audit_log";
-const auditLog = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || "[]");
+let auditLog;
+try {
+  auditLog = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || "[]");
+} catch {
+  auditLog = [];
+}
 
 export function logAdminAction(action, details = {}) {
   const entry = {
@@ -58,6 +63,13 @@ const cache = {
 
 // ============ FIRESTORE HELPERS ============
 
+function withTimeout(promise, ms = 10000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+  ]);
+}
+
 function gameDocRef(docName) {
   return doc(db, "gameData", docName);
 }
@@ -73,7 +85,7 @@ async function writeGameDoc(docName, data) {
   notifyAndEmit(docName);
   emitSaving(docName);
   try {
-    await setDoc(gameDocRef(docName), { data: structuredClone(data) });
+    await withTimeout(setDoc(gameDocRef(docName), { data: structuredClone(data) }), 10000);
     emitSaved(docName);
     return true;
   } catch (err) {
@@ -88,7 +100,7 @@ async function writeFormDoc(formId, formData) {
   notifyAndEmit("predictions");
   emitSaving("predictions");
   try {
-    await setDoc(formDocRef(formId), structuredClone(formData));
+    await withTimeout(setDoc(formDocRef(formId), structuredClone(formData)), 10000);
     emitSaved("predictions");
     return true;
   } catch (err) {
@@ -107,6 +119,7 @@ function debouncedWriteForm(formId, formData, delay = 500) {
   const key = `form:${formId}`;
   clearTimeout(pendingWrites[key]);
   pendingWrites[key] = setTimeout(() => {
+    if (cache.settings?.predictionsLocked) { delete pendingWrites[key]; return; }
     delete pendingWrites[key];
     setDoc(formDocRef(formId), structuredClone(formData))
       .then(() => emitSaved("predictions"))
@@ -389,6 +402,13 @@ export function setCurrentUser(userId) {
 
 export function logoutUser() {
   lastEnsuredUid = null;
+  listenersInitialized = false;
+  listenersHadError = false;
+  if (predictionsUnsub) {
+    predictionsUnsub();
+    predictionsUnsub = null;
+  }
+  currentListenerUserId = null;
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");

@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
+import ScoringTable from "../components/ScoringTable";
 
 export default function Home() {
   const settings = useSettings();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
+  const [showScoring, setShowScoring] = useState(false);
 
   return (
     <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
@@ -53,6 +56,19 @@ export default function Home() {
         )}
       </div>
 
+      <button
+        onClick={() => setShowScoring(!showScoring)}
+        className="text-sm font-bold text-primary bg-transparent border-none cursor-pointer hover:underline transition mb-3 mx-auto block"
+      >
+        {showScoring ? "📊 הסתר שיטת ניקוד" : "📊 שיטת הניקוד"}
+      </button>
+
+      {showScoring && (
+        <div className="mb-3">
+          <ScoringTable />
+        </div>
+      )}
+
       <div
         className={`rounded-2xl shadow-sm border p-3 ${
           settings.predictionsLocked
@@ -65,7 +81,11 @@ export default function Home() {
             className={`w-2.5 h-2.5 rounded-full ${
               settings.predictionsLocked ? "bg-amber-400" : "bg-green-400"
             } animate-pulse`}
+            aria-hidden="true"
           />
+          <span className="sr-only">
+            {settings.predictionsLocked ? "סטטוס: הגשת טפסים נעולה" : "סטטוס: הגשת טפסים פתוחה"}
+          </span>
           <span
             className={`text-sm font-bold ${
               settings.predictionsLocked ? "text-amber-700" : "text-green-700"

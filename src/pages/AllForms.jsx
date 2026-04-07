@@ -44,7 +44,7 @@ function MatchRow({ match, prediction }) {
       </div>
       {isTie && (
         <div className="text-[10px] text-gray-400 text-center mt-0.5">
-          פנדלים: {getTeamByCode(prediction.advancingTeam)?.name}
+          בעיטות הכרעה: {getTeamByCode(prediction.advancingTeam)?.name}
         </div>
       )}
     </div>

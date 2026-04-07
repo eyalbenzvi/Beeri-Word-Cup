@@ -71,7 +71,8 @@ button:active:not(:disabled) {
 
 /* Focus — keep ring for accessibility, remove default outline */
 input:focus { outline: none; }
-button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 8px; }
+:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+button:focus-visible { border-radius: 8px; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
@@ -80,6 +81,7 @@ button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2
 /* Safe area */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 }
 
 /* Card hover on desktop */
@@ -96,6 +98,19 @@ button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2
 .animate-save-flash { animation: saveFlash 0.8s ease-out forwards; }
 
 /* Gradient header */
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .header-gradient {
   background: linear-gradient(135deg, #1a365d 0%, #2b4c7e 55%, #1e3a5f 100%);
 }

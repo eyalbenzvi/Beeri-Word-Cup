@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useCurrentUser,
   useMatchResults,
@@ -25,6 +25,25 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [topScorerInput, setTopScorerInput] = useState("");
 
+  const formsCount = useMemo(
+    () => Object.keys(allPredictions).length,
+    [allPredictions],
+  );
+  const usersCount = useMemo(
+    () => Object.keys(users).length,
+    [users],
+  );
+  const resultsCount = useMemo(
+    () => Object.keys(results).length,
+    [results],
+  );
+
+  const tabBadges = useMemo(() => ({
+    forms: formsCount || null,
+    users: usersCount || null,
+    results: resultsCount || null,
+  }), [formsCount, usersCount, resultsCount]);
+
   if (!user?.isAdmin) {
     return (
       <div className="text-center py-12">
@@ -40,7 +59,13 @@ export default function Admin() {
   return (
     <div>
       <h1 className="text-xl font-bold text-primary mb-4">⚙️ לוח ניהול</h1>
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+      <div
+        className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto scroll-smooth"
+        style={{
+          maskImage: 'linear-gradient(to left, transparent, black 24px, black calc(100% - 24px), transparent)',
+          WebkitMaskImage: 'linear-gradient(to left, transparent, black 24px, black calc(100% - 24px), transparent)',
+        }}
+      >
         {[
           { id: "dashboard", label: "סקירה" },
           { id: "forms", label: "טפסים" },
@@ -60,6 +85,11 @@ export default function Admin() {
             }`}
           >
             {tab.label}
+            {tabBadges[tab.id] != null && (
+              <span className="mr-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary/15 text-primary">
+                {tabBadges[tab.id]}
+              </span>
+            )}
           </button>
         ))}
       </div>
