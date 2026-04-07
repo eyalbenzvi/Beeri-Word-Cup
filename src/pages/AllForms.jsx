@@ -17,6 +17,7 @@ import { getCachedChampion } from "../utils/bracketCache";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
+const EMPTY_MATCHES = {};
 
 
 function MatchRow({ match, prediction }) {
@@ -54,7 +55,7 @@ function MatchRow({ match, prediction }) {
 function FormCard({ form, championDisplay, locked, isOwnForm }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = locked || isOwnForm;
-  const predictions = form.matches || {};
+  const predictions = form.matches || EMPTY_MATCHES;
   const bracketTeams = useMemo(
     () => calcBracketTeams(predictions),
     [predictions],
@@ -172,7 +173,7 @@ export default function AllFormsView({ onBack }) {
     return Object.entries(allPredictions)
       .filter(([, form]) => normalizeStatus(form.status) === "submitted")
       .map(([formId, form]) => {
-        const predictions = form.matches || {};
+        const predictions = form.matches || EMPTY_MATCHES;
         const championCode = getCachedChampion(predictions);
         const championTeam = championCode ? getTeamByCode(championCode) : null;
         return {

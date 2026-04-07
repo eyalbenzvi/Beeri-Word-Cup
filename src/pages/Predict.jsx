@@ -33,6 +33,7 @@ import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
 
 const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
+const EMPTY_MATCHES = {};
 
 const STAGE_LABELS = { R32: "שלב ה-32", R16: "שמינית גמר", QF: "רבע גמר", SF: "חצי גמר", "3RD": "מקום שלישי", F: "גמר" };
 function getStageLabel(stage) { return STAGE_LABELS[stage] || stage; }
@@ -122,7 +123,7 @@ export default function Predict() {
   const status = normalizeStatus(activeForm?.status);
   const canEdit = status === "draft" && !settings.predictionsLocked;
 
-  const matchPredictions = activeForm?.matches || {};
+  const matchPredictions = activeForm?.matches || EMPTY_MATCHES;
   const bracketTeams = useMemo(
     () => getCachedBracket(matchPredictions),
     [matchPredictions],

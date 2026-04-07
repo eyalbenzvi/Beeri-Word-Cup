@@ -109,6 +109,43 @@ for (let i = 0; i < Math.max(0, 10 - jsxFiles.length); i++) {
   assert(true, `setState render check ${i}: padding`);
 }
 
+// ========== 3b. DANGEROUS useMemo PATTERNS ==========
+console.log("--- 3b. Dangerous useMemo patterns ---");
+
+for (const file of jsxFiles) {
+  const content = allContents[file];
+  const name = shortName(file);
+
+  // Pattern 1: useMemo with || {} as dependency — creates new ref each render
+  // e.g. const x = useMemo(() => ..., [someObj?.prop || {}])
+  const memoWithInlineObj = content.match(/useMemo\([\s\S]*?\[\s*[^\]]*\|\|\s*\{\s*\}[^\]]*\]/g);
+  assert(!memoWithInlineObj, `${name}: no useMemo with || {} in deps (creates new ref each render)`);
+
+  // Pattern 2: useMemo that writes to refs (side effects in memo)
+  const memoBlocks = content.match(/useMemo\(\(\)\s*=>\s*\{[\s\S]*?\},\s*\[/g) || [];
+  for (const block of memoBlocks) {
+    const writesRef = block.match(/\.current\s*=/);
+    assert(!writesRef, `${name}: useMemo should not write to refs (side effect in memo)`);
+  }
+
+  // Pattern 3: variable used as useMemo/useCallback dep that's created inline with || {}
+  // Look for: const x = a?.b || {}; ... useMemo(..., [x])
+  // Only flag if the var appears inside [...deps...] brackets after useMemo/useCallback
+  const inlineDefaults = content.match(/const\s+(\w+)\s*=\s*\w+\??\.\w+\s*\|\|\s*\{\s*\}/g) || [];
+  for (const match of inlineDefaults) {
+    const varName = match.match(/const\s+(\w+)/)?.[1];
+    if (varName) {
+      // Extract all useMemo/useCallback dep arrays: [...vars...]
+      const depArrays = content.match(/use(?:Memo|Callback)\([\s\S]*?,\s*\[([^\]]*)\]/g) || [];
+      const usedInDeps = depArrays.some(da => {
+        const deps = da.match(/\[([^\]]*)\]/)?.[1] || '';
+        return deps.split(',').some(d => d.trim() === varName);
+      });
+      assert(!usedInDeps, `${name}: '${varName}' created with || {} then used as hook dep — render loop risk`);
+    }
+  }
+}
+
 // ========== 4. MISSING HOOK DEPENDENCIES ==========
 console.log("--- 4. Missing hook dependencies ---");
 
