@@ -1,15 +1,12 @@
-import { useState } from "react";
 import { useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
-import ScoringTable from "../components/ScoringTable";
 
 export default function Home() {
   const settings = useSettings();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
-  const [showScoring, setShowScoring] = useState(false);
 
   return (
     <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
@@ -55,19 +52,6 @@ export default function Home() {
           </>
         )}
       </div>
-
-      <button
-        onClick={() => setShowScoring(!showScoring)}
-        className="text-sm font-bold text-primary bg-transparent border-none cursor-pointer hover:underline transition mb-3 mx-auto block"
-      >
-        {showScoring ? "📊 הסתר שיטת ניקוד" : "📊 שיטת הניקוד"}
-      </button>
-
-      {showScoring && (
-        <div className="mb-3">
-          <ScoringTable />
-        </div>
-      )}
 
       <div
         className={`rounded-2xl shadow-sm border p-3 ${
