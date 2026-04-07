@@ -58,7 +58,7 @@ export const R32_MATCHES = [
     away: "3rd",
     label: "1E vs 3rd place",
     date: "Jun 28",
-    thirdFrom: "E/F/G/I/J",
+    thirdFrom: "F/G/H/I/J",
   },
   {
     id: "R32-3",
