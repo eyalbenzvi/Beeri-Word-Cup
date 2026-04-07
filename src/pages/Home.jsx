@@ -22,7 +22,7 @@ export default function Home() {
           onClick={() => navigate("predict")}
           className="w-full bg-primary text-white font-extrabold py-4 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mb-3"
         >
-          מלא ניחושים עכשיו
+          צור את הטופס המנצח שלך
         </button>
       )}
 

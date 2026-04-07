@@ -14,17 +14,21 @@ import GroupSelector from "./GroupSelector";
 
 function AdminExportReports({ leaderboard, users, allPredictions }) {
   const downloadCsv = () => {
-    const header = "מקום,שם טופס,משתמש,נקודות,מדויקים,הכרעות\n";
-    const lines = leaderboard.map((e, i) =>
-      [
+    const header = "מקום,שם טופס,משתמש,תקציב,אלופה,מלך שערים,נקודות,מדויקים,הכרעות\n";
+    const lines = leaderboard.map((e, i) => {
+      const pred = allPredictions[e.formId] || {};
+      return [
         i + 1,
         `"${(e.formName || "").replace(/"/g, '""')}"`,
         `"${(e.userName || "").replace(/"/g, '""')}"`,
+        `"${pred.budgetNumber || ""}"`,
+        `"${pred.champion || ""}"`,
+        `"${pred.topScorer || ""}"`,
         e.totalPoints,
         e.exactScoreCount,
         e.outcomeCount,
-      ].join(","),
-    );
+      ].join(",");
+    });
     const blob = new Blob(["\uFEFF" + header + lines.join("\n")], {
       type: "text/csv;charset=utf-8",
     });

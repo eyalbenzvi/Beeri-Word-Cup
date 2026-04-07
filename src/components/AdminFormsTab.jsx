@@ -5,6 +5,7 @@ import {
   adminDeleteForm,
   adminUpdateForm,
   adminSaveMatchPrediction,
+  adminApprovePrediction,
 } from "../store";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
@@ -299,7 +300,8 @@ export default function AdminFormsTab({ users, allPredictions }) {
         if (
           statusFilter === "submitted" &&
           r.status !== "submitted" &&
-          r.status !== "approved"
+          r.status !== "approved" &&
+          r.status !== "pending"
         )
           return false;
         if (!query.trim()) return true;
@@ -376,6 +378,15 @@ export default function AdminFormsTab({ users, allPredictions }) {
               >
                 עריכה
               </button>
+              {r.status === "pending" && (
+                <button
+                  type="button"
+                  onClick={() => adminApprovePrediction(r.formId)}
+                  className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer"
+                >
+                  ✅ אשר
+                </button>
+              )}
               {r.status === "draft" && (
                 <button
                   type="button"

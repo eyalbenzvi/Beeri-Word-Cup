@@ -188,20 +188,26 @@ export default function MatchCard({
           {editable ? (
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
-                <input
-                  ref={homeInputRef}
-                  type="number"
-                  min="0"
-                  max="20"
-                  inputMode="numeric"
-                  aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-20)`}
-                  value={predHome}
-                  onChange={handleHomeChange}
-                  className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                    hasPrediction ? "border-primary/30" : "border-border"
-                  }`}
-                  placeholder="–"
-                />
+                <div className="flex flex-col items-center gap-0.5">
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
+                  <input
+                    ref={homeInputRef}
+                    type="number"
+                    min="0"
+                    max="20"
+                    inputMode="numeric"
+                    aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-20)`}
+                    value={predHome}
+                    onChange={handleHomeChange}
+                    className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                      hasPrediction ? "border-primary/30" : "border-border"
+                    }`}
+                    placeholder="–"
+                  />
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
+                </div>
                 <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
                   {justSaved ? (
                     <span className="text-green-500 text-[10px]">✓</span>
@@ -209,21 +215,27 @@ export default function MatchCard({
                     ":"
                   )}
                 </span>
-                <input
-                  ref={awayInputRef}
-                  type="number"
-                  min="0"
-                  max="20"
-                  inputMode="numeric"
-                  enterKeyHint="done"
-                  aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-20)`}
-                  value={predAway}
-                  onChange={handleAwayChange}
-                  className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                    hasPrediction ? "border-primary/30" : "border-border"
-                  }`}
-                  placeholder="–"
-                />
+                <div className="flex flex-col items-center gap-0.5">
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
+                  <input
+                    ref={awayInputRef}
+                    type="number"
+                    min="0"
+                    max="20"
+                    inputMode="numeric"
+                    enterKeyHint="done"
+                    aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-20)`}
+                    value={predAway}
+                    onChange={handleAwayChange}
+                    className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+                      hasPrediction ? "border-primary/30" : "border-border"
+                    }`}
+                    placeholder="–"
+                  />
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
+                </div>
               </div>
               {homeTeam && awayTeam && (
                 <button
@@ -233,9 +245,9 @@ export default function MatchCard({
                       ? "bg-blue-100 text-blue-700"
                       : "bg-gray-50 text-ink-muted hover:bg-blue-50 hover:text-blue-600"
                   }`}
-                  title="ניתוח AI"
+                  title="עזרת מומחה לניחוש"
                 >
-                  ✨ ניתוח AI
+                  ✨ עזרת מומחה
                 </button>
               )}
             </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useAllPredictions, useMatchResults } from "../hooks/useStore";
+import { useAllPredictions, useMatchResults, useSettings } from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedChampion } from "../utils/bracketCache";
@@ -488,7 +488,18 @@ function SearchStats({ forms }) {
 export default function Stats() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
+  const settings = useSettings();
   const [activeTab, setActiveTab] = useState("matches");
+
+  if (!settings.predictionsLocked) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4">🔒</div>
+        <h2 className="text-lg font-bold text-primary mb-2">סטטיסטיקות</h2>
+        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר נעילת הניחושים</p>
+      </div>
+    );
+  }
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)

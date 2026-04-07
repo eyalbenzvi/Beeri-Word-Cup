@@ -5,7 +5,7 @@ import MenuOverlay from "./MenuOverlay";
 import { Menu } from "lucide-react";
 
 export default function Layout({ children }) {
-  const { user, logout } = useCurrentUser();
+  const { user } = useCurrentUser();
   const { page, navigate } = useNavigation();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -95,12 +95,6 @@ export default function Layout({ children }) {
                 <span className="text-xs font-medium hidden lg:inline text-white/90 max-w-[80px] truncate">
                   {user.displayName || "משתמש"}
                 </span>
-              </button>
-              <button
-                onClick={logout}
-                className="text-xs bg-white/10 px-2.5 py-1 rounded-lg hover:bg-white/20 transition cursor-pointer border-none text-white/80 font-medium"
-              >
-                יציאה
               </button>
             </div>
           ) : (

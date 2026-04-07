@@ -9,8 +9,8 @@ function MenuSection({ icon, title, active, onToggle, children }) {
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
       >
-        <span className="text-ink-muted text-xs">{active ? "▲" : "▼"}</span>
-        <span className="text-sm font-bold text-primary">
+        <span className="text-ink-muted text-sm">{active ? "▲" : "▼"}</span>
+        <span className="text-base font-bold text-primary">
           {icon} {title}
         </span>
       </button>
@@ -60,7 +60,7 @@ export default function MenuOverlay({ open, onClose }) {
             onToggle={() => toggle("scoring")}
           >
             <ScoringTable />
-            <p className="text-[11px] text-ink-muted mt-3 leading-relaxed">
+            <p className="text-sm text-ink-muted mt-3 leading-relaxed">
               ניקוד הנוקאאוט מבוסס על תוצאת 90 דקות. שערים מבעיטות הכרעה
               לא נספרים למלך השערים.
             </p>
@@ -72,7 +72,7 @@ export default function MenuOverlay({ open, onClose }) {
             active={activeSection === "rules"}
             onToggle={() => toggle("rules")}
           >
-            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
+            <div className="text-right text-sm text-ink-muted space-y-2 leading-relaxed">
               <p>• כל משתתף ממלא טופס ניחושים לכל משחקי המונדיאל.</p>
               <p>• ניתן להגיש יותר מטופס אחד.</p>
               <p>• ניקוד מחושב אוטומטית לפי תוצאות בפועל.</p>
@@ -90,7 +90,7 @@ export default function MenuOverlay({ open, onClose }) {
             active={activeSection === "about"}
             onToggle={() => toggle("about")}
           >
-            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
+            <div className="text-right text-sm text-ink-muted space-y-2 leading-relaxed">
               <p>טורניר הניחושים של קיבוץ בארי למונדיאל 2026.</p>
               <p>ארה״ב 🇺🇸 • מקסיקו 🇲🇽 • קנדה 🇨🇦</p>
               <p>11 ביוני – 19 ביולי 2026</p>
@@ -104,7 +104,7 @@ export default function MenuOverlay({ open, onClose }) {
             active={activeSection === "support"}
             onToggle={() => toggle("support")}
           >
-            <div className="text-right text-xs text-ink-muted space-y-2 leading-relaxed">
+            <div className="text-right text-sm text-ink-muted space-y-2 leading-relaxed">
               <p>נתקלת בבעיה? יש לך שאלה?</p>
               <a
                 href="https://wa.me/972547918413?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%A2%D7%96%D7%A8%D7%94%20%D7%91%D7%98%D7%95%D7%A8%D7%A0%D7%99%D7%A8%20%D7%94%D7%A0%D7%99%D7%97%D7%95%D7%A9%D7%99%D7%9D"

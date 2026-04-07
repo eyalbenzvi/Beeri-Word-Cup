@@ -12,6 +12,7 @@ import {
   savePrediction,
   savePredictionsBatch,
   saveBonusPrediction,
+  updateFormDetails,
   submitPredictions,
   reopenForm,
   setActiveFormId,
@@ -28,6 +29,7 @@ import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
+import FormIconPicker from "../components/FormIconPicker";
 const AllFormsView = React.lazy(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
@@ -79,6 +81,10 @@ export default function Predict() {
   const activeFormId = useActiveFormId();
   const formData = useFormData(activeFormId);
   const settings = useSettings();
+
+  useEffect(() => {
+    setActiveFormId(null);
+  }, []);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [activeTab, setActiveTab] = useState("matches");
@@ -146,6 +152,7 @@ export default function Predict() {
     setValidationErrors([]);
     showToast("הטופס הוגש בהצלחה! 🎉");
     setSubmitting(false);
+    setActiveFormId(null); // return to form list
   }, [activeFormId, submitting, showToast]);
 
   const handleTrySubmit = useCallback(() => {
@@ -233,14 +240,18 @@ export default function Predict() {
     if (!activeForm.topScorer?.trim()) {
       errors.push({
         label: "לא הוכנס מלך שערים",
-        action: () => setActiveTab("details"),
+        action: () => {
+          setTimeout(() => document.getElementById('field-topScorer')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        },
       });
     }
 
     if (!activeForm.formName?.trim()) {
       errors.push({
         label: "לא הוכנס שם טופס",
-        action: () => setActiveTab("details"),
+        action: () => {
+          setTimeout(() => document.getElementById('field-formName')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        },
       });
     } else {
       const trimmedName = activeForm.formName.trim().toLowerCase();
@@ -256,16 +267,17 @@ export default function Predict() {
         errors.push({
           label: "כבר קיים טופס שהוגש עם שם זהה. בחר שם אחר",
           action: () => {
-            setActiveTab("details");
-            setTimeout(() => document.querySelector('[name="formName"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+            setTimeout(() => document.getElementById('field-formName')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
           },
         });
       }
     }
-    if (!activeForm.budgetNumber?.trim()) {
+    if (!activeForm.budgetNumber || !/^\d+$/.test(activeForm.budgetNumber) || parseInt(activeForm.budgetNumber) < 100 || parseInt(activeForm.budgetNumber) > 9999) {
       errors.push({
-        label: "לא הוכנס מספר תקציב",
-        action: () => setActiveTab("details"),
+        label: "מספר תקציב חייב להיות מספר שלם בין 100 ל-9999",
+        action: () => {
+          setTimeout(() => document.getElementById('field-budget')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        },
       });
     }
 
@@ -440,53 +452,76 @@ export default function Predict() {
         </div>
       )}
 
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
-        {[
-          { id: "matches", emoji: "⚽", label: "משחקים" },
-          { id: "details", emoji: "📝", label: "פרטים" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition border-none cursor-pointer ${
-              activeTab === tab.id
-                ? "bg-white text-primary shadow-sm"
-                : "text-gray-400"
-            }`}
-          >
-            <span aria-hidden="true">{tab.emoji}</span> {tab.label}
-          </button>
-        ))}
+      <div id="form-details-section" className="bg-white rounded-2xl p-3 border border-border shadow-sm mb-3">
+        <div className="grid grid-cols-3 gap-2">
+          <div id="field-formName">
+            <label className="text-[11px] font-semibold text-ink-muted">שם הטופס</label>
+            <input
+              value={activeForm.formName || ""}
+              onChange={(e) => updateFormDetails(activeFormId, { formName: e.target.value })}
+              placeholder="שם הטופס"
+              name="formName"
+              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+              disabled={!canEdit}
+            />
+          </div>
+          <div id="field-budget">
+            <label className="text-[11px] font-semibold text-ink-muted">תקציב (חובה)</label>
+            <input
+              value={activeForm.budgetNumber || ""}
+              onChange={(e) => updateFormDetails(activeFormId, { budgetNumber: e.target.value })}
+              inputMode="numeric"
+              placeholder="100-9999"
+              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+              disabled={!canEdit}
+            />
+          </div>
+          <div id="field-topScorer">
+            <label className="text-[11px] font-semibold text-ink-muted">מלך שערים</label>
+            <input
+              value={activeForm.topScorer || ""}
+              onChange={(e) => saveBonusPrediction(activeFormId, "topScorer", e.target.value)}
+              placeholder="שם שחקן"
+              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+              disabled={!canEdit}
+            />
+          </div>
+        </div>
+        <div className="mt-2">
+          <label className="text-[11px] font-semibold text-ink-muted">אייקון</label>
+          <FormIconPicker
+            value={activeForm.formIcon || "📋"}
+            onChange={(icon) => canEdit && updateFormDetails(activeFormId, { formIcon: icon })}
+          />
+        </div>
       </div>
 
-      {activeTab === "matches" && (
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] text-gray-400 font-medium truncate">
-            {activeForm.formName} ›{" "}
-            {selectedStage === "group"
-              ? `שלב בתים › בית ${selectedGroup}`
-              : (() => {
-                  const stageNames = {
-                    R32: "שלב ה-32",
-                    R16: "שמינית גמר",
-                    QF: "רבע גמר",
-                    SF: "חצי גמר",
-                    "3RD": "מקום שלישי",
-                    F: "גמר",
-                  };
-                  return stageNames[selectedStage] || selectedStage;
-                })()}
-          </div>
-          <button
-            onClick={() => setShowSearch(true)}
-            className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-lg border-none cursor-pointer hover:bg-primary/20 transition"
-          >
-            🔍 חפש
-          </button>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[11px] text-gray-400 font-medium truncate">
+          {activeForm.formName} ›{" "}
+          {selectedStage === "group"
+            ? `שלב בתים › בית ${selectedGroup}`
+            : (() => {
+                const stageNames = {
+                  R32: "שלב ה-32",
+                  R16: "שמינית גמר",
+                  QF: "רבע גמר",
+                  SF: "חצי גמר",
+                  "3RD": "מקום שלישי",
+                  F: "גמר",
+                };
+                return stageNames[selectedStage] || selectedStage;
+              })()}
         </div>
-      )}
+        <button
+          onClick={() => setShowSearch(true)}
+          className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-lg border-none cursor-pointer hover:bg-primary/20 transition"
+        >
+          🔍 חפש
+        </button>
+      </div>
 
-      {activeTab === "matches" && (
+      {(
         <>
           <div className="sticky top-[56px] z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
             <StageSelector
@@ -501,6 +536,25 @@ export default function Predict() {
               />
             )}
           </div>
+
+          {status === "draft" && !settings.predictionsLocked && (
+            <div className="mb-4 space-y-2 md:max-w-md md:mx-auto">
+              <button
+                onClick={handleAIFill}
+                disabled={!!aiProgress}
+                title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-blue-600 hover:to-purple-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                🤖 מלא הכל עם AI
+              </button>
+              <button
+                onClick={handleTrySubmit}
+                className="w-full bg-green-500 text-white font-bold py-3.5 rounded-2xl shadow-lg hover:bg-green-600 transition text-base border-none cursor-pointer"
+              >
+                הגש טופס
+              </button>
+            </div>
+          )}
 
           {selectedStage === "group" && (
             <GroupTable matchData={matchPredictions} group={selectedGroup} />
@@ -591,24 +645,6 @@ export default function Predict() {
         </div>
       )}
 
-      {status === "draft" && !settings.predictionsLocked && (
-        <div className={`sticky bottom-16 md:bottom-4 mt-6 pb-2 space-y-2 md:max-w-md md:mx-auto transition-all duration-200 ${keyboardOpen ? 'hidden' : ''}`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <button
-            onClick={handleAIFill}
-            disabled={!!aiProgress}
-            title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-blue-600 hover:to-purple-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            🤖 מלא הכל עם AI
-          </button>
-          <button
-            onClick={handleTrySubmit}
-            className="w-full bg-green-500 text-white font-bold py-3.5 rounded-2xl shadow-lg hover:bg-green-600 transition text-base border-none cursor-pointer"
-          >
-            הגש טופס
-          </button>
-        </div>
-      )}
 
       {showConfirm && (
         <ReviewScreen

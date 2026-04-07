@@ -11,6 +11,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
+import { compareTiebreaker } from "../utils/scoring";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -246,14 +247,22 @@ export default function Leaderboard({
           </div>
 
           <div className="space-y-1.5">
-            {leaderboard.slice(0, showCount).map((entry, index) => {
-              const isTop3 = index < 3;
+            {(() => {
+              let currentRank = 1;
+              return leaderboard.slice(0, showCount).map((entry, index) => {
+              if (index > 0) {
+                const prev = leaderboard[index - 1];
+                if (entry.totalPoints !== prev.totalPoints || compareTiebreaker(entry, prev) !== 0) {
+                  currentRank = index + 1;
+                }
+              }
+              const isTop3 = currentRank <= 3;
               const borderColor =
-                index === 0
+                currentRank === 1
                   ? "border-yellow-300"
-                  : index === 1
+                  : currentRank === 2
                     ? "border-gray-300"
-                    : index === 2
+                    : currentRank === 3
                       ? "border-amber-400"
                       : "border-border";
               return (
@@ -274,22 +283,22 @@ export default function Leaderboard({
                 >
                   <span
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold tabular-nums text-center inline-block flex-shrink-0 ${
-                      index === 0
+                      currentRank === 1
                         ? "bg-gradient-to-br from-yellow-300 to-yellow-500 text-white shadow-sm"
-                        : index === 1
+                        : currentRank === 2
                           ? "bg-gradient-to-br from-gray-300 to-gray-500 text-white"
-                          : index === 2
+                          : currentRank === 3
                             ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white"
                             : "bg-gray-100 text-ink-muted"
                     }`}
                   >
-                    {index === 0
+                    {currentRank === 1
                       ? "🥇"
-                      : index === 1
+                      : currentRank === 2
                         ? "🥈"
-                        : index === 2
+                        : currentRank === 3
                           ? "🥉"
-                          : index + 1}
+                          : currentRank}
                   </span>
 
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0 relative">
@@ -330,7 +339,8 @@ export default function Leaderboard({
                   </div>
                 </button>
               );
-            })}
+            });
+            })()}
 
             {showCount < leaderboard.length && (
               <button onClick={() => setShowCount(s => s + 20)} className="w-full py-2 text-sm text-primary font-bold bg-white rounded-xl border border-border mt-2 cursor-pointer">

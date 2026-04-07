@@ -34,9 +34,14 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
 
   return (
     <div>
-      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
-        הניחושים שלך
-      </h1>
+      <div className="sticky top-[56px] z-10 bg-bg pb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-extrabold text-primary tracking-tight">הטפסים שלך</h1>
+          <button onClick={() => setShowNewForm(true)} className="bg-primary text-white font-bold px-4 py-2 rounded-xl text-sm border-none cursor-pointer shadow-sm">
+            + טופס חדש
+          </button>
+        </div>
+      </div>
 
       {forms.length === 0 && !showNewForm && (
         <div className="text-center py-12">
@@ -83,11 +88,13 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${
                     formStatus === "submitted"
                       ? "bg-green-50 text-green-600"
-                      : "bg-gray-50 text-gray-400"
+                      : form.status === "pending"
+                        ? "bg-amber-50 text-amber-600"
+                        : "bg-gray-50 text-gray-400"
                   }`}
-                  title={formStatus === "submitted" ? "הטופס הוגש ולא ניתן לעריכה" : "הטופס עדיין בעריכה ולא הוגש"}
+                  title={formStatus === "submitted" ? "הטופס הוגש ולא ניתן לעריכה" : form.status === "pending" ? "הטופס ממתין לאישור מנהל" : "הטופס עדיין בעריכה ולא הוגש"}
                 >
-                  {formStatus === "submitted" ? "✅ הוגש" : "טיוטה"}
+                  {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין לאישור" : "טיוטה"}
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
@@ -129,7 +136,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         👀 צפייה בטפסים של כולם
       </button>
 
-      {showNewForm ? (
+      {showNewForm && (
         <div className="bg-white rounded-2xl p-5 border-2 border-primary/30 shadow-sm">
           <h3 className="font-bold text-sm text-primary mb-3">טופס חדש</h3>
           <input
@@ -158,13 +165,6 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          onClick={() => setShowNewForm(true)}
-          className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-sm"
-        >
-          + טופס חדש
-        </button>
       )}
     </div>
   );

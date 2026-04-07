@@ -4,5 +4,5 @@ export function randomScore() {
 }
 
 export function normalizeStatus(s) {
-  return s === "pending" || s === "approved" ? "submitted" : s || "draft";
+  return s === "approved" ? "submitted" : s || "draft";
 }

@@ -26,17 +26,28 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
             onChange={(icon) => canEdit && updateFormDetails(activeFormId, { formIcon: icon })}
           />
         </div>
-        <input
-          type="text"
-          value={activeForm.budgetNumber || ""}
-          disabled={!canEdit}
-          maxLength={20}
-          onChange={(e) =>
-            updateFormDetails(activeFormId, { budgetNumber: e.target.value })
-          }
-          placeholder="מספר תקציב לחיוב (אופציונלי)"
-          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
-        />
+        {(() => {
+          const budgetValue = activeForm.budgetNumber || "";
+          const budgetError = budgetValue && (!/^\d+$/.test(budgetValue) || parseInt(budgetValue) < 100 || parseInt(budgetValue) > 9999);
+          return (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={budgetValue}
+                disabled={!canEdit}
+                maxLength={20}
+                onChange={(e) =>
+                  updateFormDetails(activeFormId, { budgetNumber: e.target.value })
+                }
+                placeholder="מספר תקציב (100-9999)"
+                className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
+              />
+              {budgetError && <p className="text-xs text-red-500 mt-1">מספר תקציב חייב להיות מספר שלם בין 100 ל-9999</p>}
+            </>
+          );
+        })()}
       </div>
 
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">

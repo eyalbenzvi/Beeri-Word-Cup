@@ -623,10 +623,17 @@ export function submitPredictions(formId) {
   if (!form) return;
   const updated = {
     ...form,
-    status: "submitted",
+    status: "pending",
     submittedAt: new Date().toISOString(),
   };
   writeFormDoc(formId, updated);
+}
+
+export function adminApprovePrediction(formId) {
+  writeAuditLog("approve-form", { formId });
+  const form = getForm(formId);
+  if (!form || form.status !== "pending") return;
+  writeFormDoc(formId, { ...form, status: "submitted", approvedAt: new Date().toISOString() });
 }
 
 export function reopenForm(formId) {
