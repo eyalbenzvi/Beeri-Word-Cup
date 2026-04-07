@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
 import {
   calcBracketTeams,
@@ -13,24 +13,7 @@ export function useLeaderboardComputed(
   users,
   actualBonuses,
 ) {
-  // Cache previous results to avoid recomputation when object references change
-  // but underlying data hasn't
-  const prevResultsRef = useRef(null);
-  const prevResultsKey = useRef('');
-  const prevBracketRef = useRef(null);
-
-  const resultsKey = useMemo(() => Object.keys(results).length + '_' + Object.values(results).map(r => r.homeScore + '-' + r.awayScore).join(','), [results]);
-
-  const actualBracket = useMemo(() => {
-    if (resultsKey === prevResultsKey.current && prevBracketRef.current) {
-      return prevBracketRef.current;
-    }
-    const bracket = calcBracketTeams(results);
-    prevResultsKey.current = resultsKey;
-    prevResultsRef.current = results;
-    prevBracketRef.current = bracket;
-    return bracket;
-  }, [results, resultsKey]);
+  const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
 
   const actualDerivedAdvancing = useMemo(
     () => deriveActualAdvancing(actualBracket, results),
@@ -57,22 +40,10 @@ export function useLeaderboardComputed(
     return map;
   }, [allPredictions]);
 
-  const formScoreCacheRef = useRef({});
-
   const scoredForms = useMemo(() => {
-    // Limit cache size to 500 entries
-    if (Object.keys(formScoreCacheRef.current).length > 500) {
-      formScoreCacheRef.current = {};
-    }
-
     return Object.entries(allPredictions)
       .filter(([formId]) => formBracketMap[formId])
       .map(([formId, predData]) => {
-        const cacheKey = `${formId}_${predData.updatedAt || ''}_${Object.keys(results).length}`;
-        if (formScoreCacheRef.current[cacheKey]) {
-          return { formId, userId: predData.userId, formName: predData.formName || "טופס ללא שם", ...formScoreCacheRef.current[cacheKey] };
-        }
-
         const { predBracket, advancing, champion } = formBracketMap[formId];
         const enrichedPredData = {
           ...predData,
@@ -87,7 +58,6 @@ export function useLeaderboardComputed(
           predBracket,
           actualBracket,
         );
-        formScoreCacheRef.current[cacheKey] = score;
         return {
           formId,
           userId: predData.userId,
