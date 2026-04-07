@@ -499,12 +499,10 @@ export default function Predict() {
       matchPredictions[m.id]?.awayScore != null,
   ).length;
 
-  const filteredMatches = useMemo(() =>
+  const filteredMatches =
     selectedStage === "group"
       ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage),
-    [selectedStage, selectedGroup]
-  );
+      : knockoutMatches.filter((m) => m.stage === selectedStage);
 
   return (
     <div>
