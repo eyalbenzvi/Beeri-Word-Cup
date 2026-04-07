@@ -54,7 +54,6 @@ async function callGroq(prompt, temperature = 1.0) {
     temperature,
     max_tokens: 4096,
     response_format: { type: "json_object" },
-    timeout: 8000,
   });
   return completion.choices[0]?.message?.content || "";
 }
