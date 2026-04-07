@@ -180,7 +180,7 @@ export default function Profile() {
           <h3 className="font-bold text-sm text-primary mb-3">📋 הטפסים שלי</h3>
           <div className="space-y-2">
             {forms.map((form) => {
-              const icon = form.formIcon || "📋";
+              const icon = "📋";
               const champion = form.champion
                 ? getTeamByCode(form.champion)?.name || form.champion
                 : null;

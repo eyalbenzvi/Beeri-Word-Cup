@@ -315,7 +315,7 @@ export default function Leaderboard({
                     <div
                       className={`font-medium text-sm truncate ${isTop3 ? "text-ink" : "text-ink-muted"}`}
                     >
-                      <span className="ml-1">{(allPredictions[entry.formId]?.formIcon) || "📋"}</span>
+                      <span className="ml-1">📋</span>
                       {entry.formName}
                       {entry.userId === user?.id && (
                         <span className="text-[11px] text-primary mr-1 font-bold">

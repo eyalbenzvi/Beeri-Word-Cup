@@ -1,5 +1,4 @@
 import { saveBonusPrediction, updateFormDetails } from "../store";
-import FormIconPicker from "./FormIconPicker";
 
 export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
   return (
@@ -19,13 +18,6 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
           placeholder="שם הטופס..."
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3 ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
         />
-        <div className="mb-3">
-          <label className="block text-xs font-semibold text-ink-muted mb-2">אייקון הטופס</label>
-          <FormIconPicker
-            value={activeForm.formIcon || "📋"}
-            onChange={(icon) => canEdit && updateFormDetails(activeFormId, { formIcon: icon })}
-          />
-        </div>
         {(() => {
           const budgetValue = activeForm.budgetNumber || "";
           const budgetError = budgetValue && (!/^\d+$/.test(budgetValue) || parseInt(budgetValue) < 100 || parseInt(budgetValue) > 9999);

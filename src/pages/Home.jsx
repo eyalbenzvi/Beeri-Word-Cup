@@ -1,10 +1,12 @@
-import { useSettings } from "../hooks/useStore";
+import { useSettings, useCurrentUser } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
+import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
 
 export default function Home() {
   const settings = useSettings();
+  const { user } = useCurrentUser();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
 
@@ -19,7 +21,12 @@ export default function Home() {
 
       {!settings.predictionsLocked && (
         <button
-          onClick={() => navigate("predict")}
+          onClick={() => {
+            if (user) {
+              try { createForm(user.id); } catch {}
+            }
+            navigate("predict");
+          }}
           className="w-full bg-primary text-white font-extrabold py-4 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mb-3"
         >
           צור את הטופס המנצח שלך

@@ -29,7 +29,6 @@ import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
-import FormIconPicker from "../components/FormIconPicker";
 const AllFormsView = React.lazy(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
@@ -486,13 +485,6 @@ export default function Predict() {
               disabled={!canEdit}
             />
           </div>
-        </div>
-        <div className="mt-2">
-          <label className="text-[11px] font-semibold text-ink-muted">אייקון</label>
-          <FormIconPicker
-            value={activeForm.formIcon || "📋"}
-            onChange={(icon) => canEdit && updateFormDetails(activeFormId, { formIcon: icon })}
-          />
         </div>
       </div>
 

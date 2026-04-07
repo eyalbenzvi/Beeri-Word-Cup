@@ -80,10 +80,10 @@ const leaderboardFile = read(`${SRC}/pages/Leaderboard.jsx`);
 assert(leaderboardFile.includes('formIcon') || leaderboardFile.includes('📋'), "Leaderboard: shows formIcon");
 assert(leaderboardFile.includes('photoURL'), "Leaderboard: shows avatar");
 
-// ---- 6. FormDetailsTab: icon picker ----
-console.log("--- 6. FormDetailsTab icon picker ---");
+// ---- 6. FormDetailsTab ----
+console.log("--- 6. FormDetailsTab ---");
 const fdtFile = read(`${SRC}/components/FormDetailsTab.jsx`);
-assert(fdtFile.includes('FormIconPicker') || fdtFile.includes('formIcon'), "FormDetailsTab: has icon picker/display");
+assert(fdtFile.includes('formName') || fdtFile.includes('שם הטופס'), "FormDetailsTab: has form name field");
 
 // ---- 7. New user flow ----
 console.log("--- 7. New user creation ---");

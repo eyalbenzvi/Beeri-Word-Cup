@@ -71,7 +71,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                       : "bg-primary/10 text-primary"
                   }`}
                 >
-                  {formStatus === "submitted" ? "✓" : (form.formIcon || "📋")}
+                  {formStatus === "submitted" ? "✓" : "📋"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate text-gray-800">
