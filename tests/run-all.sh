@@ -45,6 +45,7 @@ run_test "10. Functions & API Contract" "test-functions-contract.mjs" "no"
 run_test "11. Comprehensive Bug Detection" "test-comprehensive-bugs.mjs" "no"
 run_test "12. Profile Features" "test-profile-features.mjs" "no"
 run_test "13. External Cross-Validation (300 trials)" "test-external-crossval.mjs" "yes"
+run_test "14. Excel Cross-Validation (FIFA bracket)" "test-excel-crossval.mjs" "yes"
 
 echo ""
 echo "==========================================="
