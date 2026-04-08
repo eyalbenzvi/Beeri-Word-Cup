@@ -49,16 +49,20 @@ for (const [group, teams] of Object.entries(st2)) {
 
 // ---- 3. Two teams tied on points, H2H decides ----
 console.log("--- 3. Two-team H2H tiebreaker ---");
-// Group A: MEX(0) RSA(1) KOR(2) CZE(3)
-// Matches: [0]MEX-CZE, [1]RSA-KOR, [2]CZE-KOR, [3]MEX-RSA, [4]KOR-MEX, [5]CZE-RSA
+// Group A: MEX(seed1) RSA(seed2) KOR(seed3) CZE(seed4)
+// FIFA order: [0]MEX-RSA, [1]KOR-CZE, [2]CZE-RSA, [3]MEX-KOR, [4]CZE-MEX, [5]RSA-KOR
 const gA = getGroupMatches("A");
 const h2h2 = fillAllGroups({
-  [gA[0].id]: { homeScore: 2, awayScore: 0 }, // MEX 2-0 CZE
-  [gA[1].id]: { homeScore: 2, awayScore: 0 }, // RSA 2-0 KOR
-  [gA[2].id]: { homeScore: 0, awayScore: 1 }, // CZE 0-1 KOR
-  [gA[3].id]: { homeScore: 1, awayScore: 0 }, // MEX 1-0 RSA (MEX beats RSA in H2H)
-  [gA[4].id]: { homeScore: 0, awayScore: 1 }, // KOR 0-1 MEX
-  [gA[5].id]: { homeScore: 0, awayScore: 1 }, // CZE 0-1 RSA
+  [gA[0].id]: { homeScore: 1, awayScore: 0 }, // MEX 1-0 RSA (MEX beats RSA)
+  [gA[1].id]: { homeScore: 0, awayScore: 2 }, // KOR 0-2 CZE → CZE? No, MEX should win all
+  // Let me make MEX win all, RSA win 2, KOR win 1, CZE win 0:
+  // MEX beats RSA, KOR, CZE. RSA beats KOR, CZE. KOR beats CZE.
+  [gA[0].id]: { homeScore: 1, awayScore: 0 }, // MEX 1-0 RSA → MEX W
+  [gA[1].id]: { homeScore: 1, awayScore: 0 }, // KOR 1-0 CZE → KOR W
+  [gA[2].id]: { homeScore: 0, awayScore: 1 }, // CZE 0-1 RSA → RSA W
+  [gA[3].id]: { homeScore: 2, awayScore: 0 }, // MEX 2-0 KOR → MEX W
+  [gA[4].id]: { homeScore: 0, awayScore: 1 }, // CZE 0-1 MEX → MEX W
+  [gA[5].id]: { homeScore: 2, awayScore: 0 }, // RSA 2-0 KOR → RSA W
 });
 // MEX: W3 = 9pts, RSA: W2 L1 = 6pts, KOR: W1 L2 = 3pts, CZE: L3 = 0pts
 const stH2H = calcGroupStandings(h2h2);
@@ -70,13 +74,14 @@ assert(stH2H.A[3].code === "CZE" && stH2H.A[3].pts === 0, "CZE 4th with 0pts");
 // ---- 4. Three teams tied on points ----
 console.log("--- 4. Three-team tie (cycle: A>B>C>A) ---");
 // MEX beats RSA, RSA beats KOR, KOR beats MEX (cycle) -- all beat CZE
+// [0]MEX-RSA, [1]KOR-CZE, [2]CZE-RSA, [3]MEX-KOR, [4]CZE-MEX, [5]RSA-KOR
 const h2h3 = fillAllGroups({
-  [gA[0].id]: { homeScore: 2, awayScore: 0 }, // MEX 2-0 CZE
-  [gA[1].id]: { homeScore: 1, awayScore: 0 }, // RSA 1-0 KOR (RSA beats KOR)
-  [gA[2].id]: { homeScore: 0, awayScore: 1 }, // CZE 0-1 KOR (KOR beats CZE)
-  [gA[3].id]: { homeScore: 1, awayScore: 0 }, // MEX 1-0 RSA (MEX beats RSA)
-  [gA[4].id]: { homeScore: 2, awayScore: 0 }, // KOR 2-0 MEX (KOR beats MEX)
-  [gA[5].id]: { homeScore: 0, awayScore: 3 }, // CZE 0-3 RSA (RSA beats CZE)
+  [gA[0].id]: { homeScore: 1, awayScore: 0 }, // MEX 1-0 RSA (MEX beats RSA)
+  [gA[1].id]: { homeScore: 1, awayScore: 0 }, // KOR 1-0 CZE (KOR beats CZE)
+  [gA[2].id]: { homeScore: 0, awayScore: 3 }, // CZE 0-3 RSA (RSA beats CZE)
+  [gA[3].id]: { homeScore: 0, awayScore: 2 }, // MEX 0-2 KOR (KOR beats MEX)
+  [gA[4].id]: { homeScore: 0, awayScore: 2 }, // CZE 0-2 MEX (MEX beats CZE)
+  [gA[5].id]: { homeScore: 1, awayScore: 0 }, // RSA 1-0 KOR (RSA beats KOR)
 });
 // MEX: W2 L1, pts=6, GF=3 GA=2 GD=+1
 // RSA: W2 L1, pts=6, GF=4 GA=1 GD=+3

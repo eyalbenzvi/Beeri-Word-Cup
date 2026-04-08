@@ -75,18 +75,30 @@ assert(FINAL_MATCHES[1].homeFrom==="SF-1"&&FINAL_MATCHES[1].awayFrom==="SF-2", "
 console.log("--- 8. Group standings ---");
 const preds = {};
 const gaM = groupMatches.filter(m => m.group === "A");
-preds[gaM[0].id] = {homeScore:2,awayScore:0}; // MEX 2-0 CZE
-preds[gaM[1].id] = {homeScore:1,awayScore:0}; // RSA 1-0 KOR
-preds[gaM[2].id] = {homeScore:0,awayScore:1}; // CZE 0-1 KOR
-preds[gaM[3].id] = {homeScore:1,awayScore:0}; // MEX 1-0 RSA
-preds[gaM[4].id] = {homeScore:0,awayScore:2}; // KOR 0-2 MEX
-preds[gaM[5].id] = {homeScore:0,awayScore:3}; // CZE 0-3 RSA
+// New FIFA order: [0]MEX-RSA, [1]KOR-CZE, [2]CZE-RSA, [3]MEX-KOR, [4]CZE-MEX, [5]RSA-KOR
+preds[gaM[0].id] = {homeScore:1,awayScore:0}; // MEX 1-0 RSA
+preds[gaM[1].id] = {homeScore:1,awayScore:0}; // KOR 1-0 CZE
+preds[gaM[2].id] = {homeScore:0,awayScore:3}; // CZE 0-3 RSA
+preds[gaM[3].id] = {homeScore:2,awayScore:0}; // MEX 2-0 KOR
+preds[gaM[4].id] = {homeScore:0,awayScore:2}; // CZE 0-2 MEX
+preds[gaM[5].id] = {homeScore:0,awayScore:1}; // RSA 0-1 KOR
+// MEX: W3=9pts, RSA: W1 L2=3+3=6? No: RSA beat CZE 3-0, lost to MEX 0-1, beat... wait
+// MEX: beat RSA(1-0), beat KOR(2-0), beat CZE(2-0) = 9pts
+// RSA: lost MEX(0-1), beat CZE(3-0), lost KOR(0-1) = 3pts
+// KOR: beat CZE(1-0), lost MEX(0-2), beat RSA(1-0) = 6pts
+// CZE: lost KOR(0-1), lost RSA(0-3), lost MEX(0-2) = 0pts
+preds[gaM[0].id] = {homeScore:1,awayScore:0}; // MEX 1-0 RSA → MEX W
+preds[gaM[1].id] = {homeScore:1,awayScore:0}; // KOR 1-0 CZE → KOR W
+preds[gaM[2].id] = {homeScore:0,awayScore:3}; // CZE 0-3 RSA → RSA W
+preds[gaM[3].id] = {homeScore:2,awayScore:0}; // MEX 2-0 KOR → MEX W
+preds[gaM[4].id] = {homeScore:0,awayScore:2}; // CZE 0-2 MEX → MEX W
+preds[gaM[5].id] = {homeScore:0,awayScore:1}; // RSA 0-1 KOR → KOR W
 for (const m of groupMatches) if (!preds[m.id]) preds[m.id] = {homeScore:1,awayScore:0};
 
 const st = calcGroupStandings(preds);
 assert(st.A[0].code==="MEX"&&st.A[0].pts===9, `1st MEX 9pts`);
-assert(st.A[1].code==="RSA"&&st.A[1].pts===6, `2nd RSA 6pts`);
-assert(st.A[2].code==="KOR"&&st.A[2].pts===3, `3rd KOR 3pts`);
+assert(st.A[1].code==="KOR"&&st.A[1].pts===6, `2nd KOR 6pts`);
+assert(st.A[2].code==="RSA"&&st.A[2].pts===3, `3rd RSA 3pts`);
 assert(st.A[3].code==="CZE"&&st.A[3].pts===0, `4th CZE 0pts`);
 
 console.log("--- 9. Full bracket + champion ---");
