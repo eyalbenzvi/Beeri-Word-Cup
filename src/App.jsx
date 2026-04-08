@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -38,6 +39,7 @@ function AppContent() {
   const ready = useStoreReady();
   const { page } = useNavigation();
   const { user, authReady, isLoggedIn } = useCurrentUser();
+  const [profileDone, setProfileDone] = useState(false);
 
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading />;
@@ -49,8 +51,8 @@ function AppContent() {
   if (!ready || !user) return <Loading />;
 
   // Show profile setup for truly new users (profileCompleted === false, not undefined)
-  if (user.profileCompleted === false) {
-    return <ProfileSetup user={user} onComplete={() => {}} />;
+  if (user.profileCompleted === false && !profileDone) {
+    return <ProfileSetup user={user} onComplete={() => setProfileDone(true)} />;
   }
 
   const Page = PAGES[page] || Home;

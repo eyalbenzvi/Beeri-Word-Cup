@@ -22,7 +22,6 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const photoURL = user.photoURL || null;
   const displayName = user.displayName || "משתמש";
   const initials = (user.firstName || displayName || "?").charAt(0).toUpperCase();
   const email = user.email || "";
@@ -68,18 +67,9 @@ export default function Profile() {
 
       <div className="bg-white rounded-2xl p-6 border border-border shadow-sm text-center mb-4">
         <div className="flex justify-center mb-3">
-          {photoURL ? (
-            <img
-              src={photoURL}
-              alt="תמונת פרופיל"
-              className="w-20 h-20 rounded-full object-cover border-4 border-primary/20"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center text-3xl font-bold">
-              {initials}
-            </div>
-          )}
+          <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center text-3xl font-bold">
+            {initials}
+          </div>
         </div>
 
         {editing ? (

@@ -8,7 +8,6 @@ export default function ProfileSetup({ user, onComplete }) {
   const [lastName, setLastName] = useState(parts.slice(1).join(" ") || "");
   const [nickname, setNickname] = useState(parts[0] || "");
 
-  const photoURL = user.photoURL || null;
   const initials = (firstName || googleName || "?").charAt(0).toUpperCase();
 
   const handleSave = () => {
@@ -16,7 +15,6 @@ export default function ProfileSetup({ user, onComplete }) {
       firstName,
       lastName,
       displayName: nickname || firstName || googleName,
-      photoURL: photoURL,
       profileCompleted: true,
     });
     onComplete();
@@ -37,18 +35,9 @@ export default function ProfileSetup({ user, onComplete }) {
         <p className="text-sm text-ink-muted mb-6">בוא נגדיר את הפרופיל שלך</p>
 
         <div className="flex justify-center mb-6">
-          {photoURL ? (
-            <img
-              src={photoURL}
-              alt="תמונת פרופיל"
-              className="w-20 h-20 rounded-full object-cover border-4 border-primary/20"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center text-3xl font-bold">
-              {initials}
-            </div>
-          )}
+          <div className="w-20 h-20 rounded-full bg-primary/20 text-primary flex items-center justify-center text-3xl font-bold">
+            {initials}
+          </div>
         </div>
 
         <div className="space-y-3 text-right">

@@ -80,18 +80,9 @@ export default function Layout({ children }) {
                 className="bg-transparent border-none cursor-pointer p-0 flex items-center gap-1.5"
                 aria-label="פרופיל"
               >
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt=""
-                    className="w-7 h-7 rounded-full object-cover border-2 border-white/30"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold backdrop-blur-sm text-white">
-                    {(user.firstName || user.displayName || "?").charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold backdrop-blur-sm text-white">
+                  {(user.firstName || user.displayName || "?").charAt(0).toUpperCase()}
+                </div>
                 <span className="text-xs font-medium hidden lg:inline text-white/90 max-w-[80px] truncate">
                   {user.displayName || "משתמש"}
                 </span>

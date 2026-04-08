@@ -44,6 +44,7 @@ export function useCurrentUser() {
     store.ensureUserInStore(
       firebaseUser.uid,
       firebaseUser.displayName || firebaseUser.phoneNumber || "משתמש",
+      firebaseUser.email || null,
     );
   }, [storeReady, firebaseUser]);
 

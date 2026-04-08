@@ -358,7 +358,7 @@ export function getUsers() {
 
 let lastEnsuredUid = null;
 
-export function ensureUserInStore(uid, displayName) {
+export function ensureUserInStore(uid, displayName, email) {
   if (!cache._ready.users) return uid;
   // Prevent repeated writes for the same user in the same session
   if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
@@ -368,9 +368,10 @@ export function ensureUserInStore(uid, displayName) {
   const now = new Date().toISOString();
   if (users[uid]) {
     const needsUpdate =
-      displayName && users[uid].displayName !== displayName;
-    if (!needsUpdate) return uid; // nothing to update
-    users[uid] = { ...users[uid], displayName };
+      (displayName && users[uid].displayName !== displayName) ||
+      (email && !users[uid].email);
+    if (!needsUpdate) return uid;
+    users[uid] = { ...users[uid], displayName, ...(email && !users[uid].email && { email }) };
     writeGameDoc("users", users);
     return uid;
   }
@@ -378,8 +379,7 @@ export function ensureUserInStore(uid, displayName) {
     id: uid,
     displayName: displayName || "משתמש",
     isAdmin: false,
-    photoURL: null,
-    email: null,
+    email: email || null,
     profileCompleted: false,
     createdAt: now,
     lastLoginAt: now,
@@ -398,13 +398,12 @@ export function updateUser(userId, fields) {
 export function updateUserProfile(uid, profileFields) {
   const users = { ...getUsers() };
   if (!users[uid]) return;
-  const { firstName, lastName, displayName, photoURL, profileCompleted } = profileFields;
+  const { firstName, lastName, displayName, profileCompleted } = profileFields;
   users[uid] = {
     ...users[uid],
     ...(firstName !== undefined && { firstName }),
     ...(lastName !== undefined && { lastName }),
     ...(displayName !== undefined && { displayName }),
-    ...(photoURL !== undefined && { photoURL }),
     ...(profileCompleted !== undefined && { profileCompleted }),
   };
   writeGameDoc("users", users);

@@ -284,7 +284,7 @@ export default function MatchCard({
         (editable ? (
           <div className="mt-3 pt-3 border-t border-border">
             <div className="text-[11px] text-ink-muted text-center mb-2 font-medium">
-              מי עולה? (בעיטות הכרעה)
+              {match.stage === "F" ? "מי האלופה? (בעיטות הכרעה)" : "מי עולה? (בעיטות הכרעה)"}
             </div>
             <div className="flex gap-2 justify-center">
               {[
@@ -309,7 +309,7 @@ export default function MatchCard({
           </div>
         ) : prediction?.advancingTeam ? (
           <div className="mt-1.5 text-[11px] text-ink-muted text-center font-medium">
-            עולה:{" "}
+            {match.stage === "F" ? "אלופה:" : "עולה:"}{" "}
             {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
           </div>
         ) : null)}

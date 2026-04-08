@@ -302,13 +302,7 @@ export default function Leaderboard({
                   </span>
 
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0 relative">
-                    {(() => {
-                      const owner = users[entry.userId];
-                      if (owner?.photoURL) {
-                        return <img src={owner.photoURL} alt="" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />;
-                      }
-                      return (owner?.firstName || owner?.displayName || entry.formName || "?").charAt(0).toUpperCase();
-                    })()}
+                    {(users[entry.userId]?.firstName || users[entry.userId]?.displayName || entry.formName || "?").charAt(0).toUpperCase()}
                   </div>
 
                   <div className="flex-1 min-w-0">
