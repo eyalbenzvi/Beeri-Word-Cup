@@ -2,7 +2,9 @@ import { db } from "./firebase";
 import {
   doc,
   setDoc,
+  updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   writeBatch,
   collection,
@@ -42,8 +44,14 @@ function writeAuditLog(action, details = {}) {
   // Keep local log
   logAdminAction(action, details);
   // Also write to Firestore
-  const auditRef = doc(db, "auditLog", `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
-  setDoc(auditRef, entry).catch(err => console.error("Audit log write failed:", err));
+  const auditRef = doc(
+    db,
+    "auditLog",
+    `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  );
+  setDoc(auditRef, entry).catch((err) =>
+    console.error("Audit log write failed:", err),
+  );
 }
 
 export function getAuditLog() {
@@ -80,7 +88,9 @@ const cache = {
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), ms),
+    ),
   ]);
 }
 
@@ -95,11 +105,35 @@ function formDocRef(formId) {
 const predictionsCollectionRef = collection(db, "predictions");
 
 async function writeGameDoc(docName, data) {
+  // Safety guard: block writes that would dramatically shrink shared data
+  if (docName === "users" || docName === "matchResults") {
+    const currentCount = Object.keys(cache[docName] || {}).length;
+    const newCount = Object.keys(data || {}).length;
+    if (currentCount > 2 && newCount < currentCount * 0.5) {
+      console.error(
+        `[SAFETY] Blocked write to ${docName}: would shrink from ${currentCount} to ${newCount} entries.`,
+      );
+      writeAuditLog("blocked-dangerous-write", {
+        docName,
+        currentCount,
+        newCount,
+      });
+      return false;
+    }
+  }
+  if (docName === "users") {
+    const currentCount = Object.keys(cache[docName] || {}).length;
+    const newCount = Object.keys(data || {}).length;
+    writeAuditLog("users-bulk-write", { currentCount, newCount });
+  }
   cache[docName] = data;
   notifyAndEmit(docName);
   emitSaving(docName);
   try {
-    await withTimeout(setDoc(gameDocRef(docName), { data: structuredClone(data) }), 10000);
+    await withTimeout(
+      setDoc(gameDocRef(docName), { data: structuredClone(data) }),
+      10000,
+    );
     emitSaved(docName);
     return true;
   } catch (err) {
@@ -109,12 +143,87 @@ async function writeGameDoc(docName, data) {
   }
 }
 
+// Safe single-user field update via dot-notation (no full-doc overwrite)
+async function updateUserField(uid, fields) {
+  const updatePayload = {};
+  for (const [key, value] of Object.entries(fields)) {
+    updatePayload[`data.${uid}.${key}`] = value;
+  }
+  cache.users = {
+    ...cache.users,
+    [uid]: { ...cache.users[uid], ...fields },
+  };
+  notifyAndEmit("users");
+  emitSaving("users");
+  try {
+    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    emitSaved("users");
+    return true;
+  } catch (err) {
+    console.error(`Failed to update user ${uid}:`, err);
+    emitWriteError("users", err);
+    return false;
+  }
+}
+
+// Safe new-user creation via dot-notation (no full-doc overwrite)
+async function createUserField(uid, userData) {
+  const updatePayload = { [`data.${uid}`]: userData };
+  cache.users = { ...cache.users, [uid]: userData };
+  notifyAndEmit("users");
+  emitSaving("users");
+  writeAuditLog("user-create", {
+    targetUser: uid,
+    userCountAfter: Object.keys(cache.users).length,
+  });
+  try {
+    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    emitSaved("users");
+    return true;
+  } catch (err) {
+    if (err.code === "not-found") {
+      // Document doesn't exist yet (first user ever) — create it
+      await withTimeout(
+        setDoc(gameDocRef("users"), { data: { [uid]: userData } }),
+        10000,
+      );
+      emitSaved("users");
+      return true;
+    }
+    console.error(`Failed to create user ${uid}:`, err);
+    emitWriteError("users", err);
+    return false;
+  }
+}
+
+// Safe user removal via deleteField (no full-doc overwrite)
+async function removeUserField(uid) {
+  const updatePayload = { [`data.${uid}`]: deleteField() };
+  const newUsers = { ...cache.users };
+  delete newUsers[uid];
+  cache.users = newUsers;
+  notifyAndEmit("users");
+  emitSaving("users");
+  try {
+    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    emitSaved("users");
+    return true;
+  } catch (err) {
+    console.error(`Failed to remove user ${uid}:`, err);
+    emitWriteError("users", err);
+    return false;
+  }
+}
+
 async function writeFormDoc(formId, formData) {
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
   try {
-    await withTimeout(setDoc(formDocRef(formId), structuredClone(formData)), 10000);
+    await withTimeout(
+      setDoc(formDocRef(formId), structuredClone(formData)),
+      10000,
+    );
     emitSaved("predictions");
     return true;
   } catch (err) {
@@ -133,7 +242,10 @@ function debouncedWriteForm(formId, formData, delay = 500) {
   const key = `form:${formId}`;
   clearTimeout(pendingWrites[key]);
   pendingWrites[key] = setTimeout(() => {
-    if (cache.settings?.predictionsLocked) { delete pendingWrites[key]; return; }
+    if (cache.settings?.predictionsLocked) {
+      delete pendingWrites[key];
+      return;
+    }
     delete pendingWrites[key];
     setDoc(formDocRef(formId), structuredClone(formData))
       .then(() => emitSaved("predictions"))
@@ -245,7 +357,6 @@ function setupPredictionsListener(userId, showAll) {
     (err) => {
       console.error("Listener error for predictions:", err);
       listenersHadError = true;
-      cache._ready.predictions = true;
       notifyAndEmit("predictions");
       if (retryInProgress) return;
       if (retryCount < 3 && currentListenerUserId) {
@@ -285,39 +396,40 @@ export function initRealtimeListeners(userId) {
   }
 
   // Unsubscribe all existing gameDoc listeners before creating new ones
-  gameDocUnsubs.forEach(u => u());
+  gameDocUnsubs.forEach((u) => u());
   gameDocUnsubs = [];
 
   // Listen to gameData single documents
   for (const [key, docName] of Object.entries(DOCS)) {
-    gameDocUnsubs.push(onSnapshot(
-      gameDocRef(docName),
-      (snap) => {
-        retryCount = 0;
-        if (snap.exists()) cache[key] = snap.data().data;
-        cache._ready[key] = true;
-        notifyAndEmit(key);
-        // When settings or users load, check if we should upgrade to all predictions
-        if (key === "settings" || key === "users") {
-          maybeUpgradePredictionsListener();
-        }
-      },
-      (err) => {
-        console.error(`Listener error for ${docName}:`, err);
-        listenersHadError = true;
-        cache._ready[key] = true;
-        notifyAndEmit(key);
-        if (retryInProgress) return;
-        if (retryCount < 3 && currentListenerUserId) {
-          retryCount++;
-          retryInProgress = true;
-          setTimeout(() => {
-            retryInProgress = false;
-            initRealtimeListeners(currentListenerUserId);
-          }, 5000);
-        }
-      },
-    ));
+    gameDocUnsubs.push(
+      onSnapshot(
+        gameDocRef(docName),
+        (snap) => {
+          retryCount = 0;
+          if (snap.exists()) cache[key] = snap.data().data;
+          cache._ready[key] = true;
+          notifyAndEmit(key);
+          // When settings or users load, check if we should upgrade to all predictions
+          if (key === "settings" || key === "users") {
+            maybeUpgradePredictionsListener();
+          }
+        },
+        (err) => {
+          console.error(`Listener error for ${docName}:`, err);
+          listenersHadError = true;
+          notifyAndEmit(key);
+          if (retryInProgress) return;
+          if (retryCount < 3 && currentListenerUserId) {
+            retryCount++;
+            retryInProgress = true;
+            setTimeout(() => {
+              retryInProgress = false;
+              initRealtimeListeners(currentListenerUserId);
+            }, 5000);
+          }
+        },
+      ),
+    );
   }
 
   // Start with filtered predictions (own forms only)
@@ -326,8 +438,7 @@ export function initRealtimeListeners(userId) {
 
 export function isStoreReady() {
   return (
-    Object.keys(DOCS).every((k) => cache._ready[k]) &&
-    cache._ready.predictions
+    Object.keys(DOCS).every((k) => cache._ready[k]) && cache._ready.predictions
   );
 }
 
@@ -364,18 +475,21 @@ export function ensureUserInStore(uid, displayName, email) {
   if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
   lastEnsuredUid = uid;
 
-  const users = { ...getUsers() };
-  const now = new Date().toISOString();
-  if (users[uid]) {
+  const existing = getUsers()[uid];
+  if (existing) {
     const needsUpdate =
-      (displayName && users[uid].displayName !== displayName) ||
-      (email && !users[uid].email);
+      (displayName && existing.displayName !== displayName) ||
+      (email && !existing.email);
     if (!needsUpdate) return uid;
-    users[uid] = { ...users[uid], displayName, ...(email && !users[uid].email && { email }) };
-    writeGameDoc("users", users);
+    const fields = {};
+    if (displayName && existing.displayName !== displayName)
+      fields.displayName = displayName;
+    if (email && !existing.email) fields.email = email;
+    updateUserField(uid, fields);
     return uid;
   }
-  users[uid] = {
+  const now = new Date().toISOString();
+  createUserField(uid, {
     id: uid,
     displayName: displayName || "משתמש",
     isAdmin: false,
@@ -383,66 +497,70 @@ export function ensureUserInStore(uid, displayName, email) {
     profileCompleted: false,
     createdAt: now,
     lastLoginAt: now,
-  };
-  writeGameDoc("users", users);
+  });
   return uid;
 }
 
 export function updateUser(userId, fields) {
-  const users = { ...getUsers() };
-  if (!users[userId]) return;
-  users[userId] = { ...users[userId], ...fields };
-  writeGameDoc("users", users);
+  if (!getUsers()[userId]) return;
+  updateUserField(userId, fields);
 }
 
 export function updateUserProfile(uid, profileFields) {
-  const users = { ...getUsers() };
-  if (!users[uid]) return;
+  if (!getUsers()[uid]) return;
   const { firstName, lastName, displayName, profileCompleted } = profileFields;
-  users[uid] = {
-    ...users[uid],
-    ...(firstName !== undefined && { firstName }),
-    ...(lastName !== undefined && { lastName }),
-    ...(displayName !== undefined && { displayName }),
-    ...(profileCompleted !== undefined && { profileCompleted }),
-  };
-  writeGameDoc("users", users);
+  const fields = {};
+  if (firstName !== undefined) fields.firstName = firstName;
+  if (lastName !== undefined) fields.lastName = lastName;
+  if (displayName !== undefined) fields.displayName = displayName;
+  if (profileCompleted !== undefined)
+    fields.profileCompleted = profileCompleted;
+  if (Object.keys(fields).length > 0) {
+    updateUserField(uid, fields);
+  }
 }
 
 export function touchUserLogin(uid) {
-  const users = { ...getUsers() };
-  if (!users[uid]) return;
-  users[uid] = { ...users[uid], lastLoginAt: new Date().toISOString() };
-  writeGameDoc("users", users);
+  if (!getUsers()[uid]) return;
+  updateUserField(uid, { lastLoginAt: new Date().toISOString() });
 }
 
 export function demoteAdmin(userId) {
-  const users = { ...getUsers() };
+  const users = getUsers();
   if (!users[userId] || !users[userId].isAdmin) return;
   const adminCount = Object.values(users).filter((u) => u.isAdmin).length;
   if (adminCount <= 1) return;
-  users[userId] = { ...users[userId], isAdmin: false };
-  writeGameDoc("users", users);
+  updateUserField(userId, { isAdmin: false });
 }
 
 export async function deleteUser(userId) {
-  const users = { ...getUsers() };
-  delete users[userId];
+  const userCountBefore = Object.keys(getUsers()).length;
 
-  // Delete user's forms
+  // Find user's forms to delete
   const formsToDelete = Object.keys(cache.predictions).filter(
     (fid) => cache.predictions[fid]?.userId === userId,
   );
 
-  cache.users = users;
+  // Update local cache
+  const newUsers = { ...cache.users };
+  delete newUsers[userId];
+  cache.users = newUsers;
   for (const fid of formsToDelete) {
     delete cache.predictions[fid];
   }
   cache.predictions = { ...cache.predictions };
   notifyListeners();
 
+  writeAuditLog("user-delete", {
+    targetUser: userId,
+    userCountBefore,
+    userCountAfter: Object.keys(newUsers).length,
+    formsDeleted: formsToDelete.length,
+  });
+
+  // Use batch: remove user field + delete form docs
   const batch = writeBatch(db);
-  batch.set(gameDocRef("users"), { data: structuredClone(users) });
+  batch.update(gameDocRef("users"), { [`data.${userId}`]: deleteField() });
   for (const fid of formsToDelete) {
     batch.delete(formDocRef(fid));
   }
@@ -478,9 +596,17 @@ export function logoutUser() {
     predictionsUnsub();
     predictionsUnsub = null;
   }
-  gameDocUnsubs.forEach(u => u());
+  gameDocUnsubs.forEach((u) => u());
   gameDocUnsubs = [];
   currentListenerUserId = null;
+  // Reset cache to prevent stale data after re-login
+  cache.users = {};
+  cache.predictions = {};
+  cache.matchResults = {};
+  cache.actualAdvancing = {};
+  cache.actualBonuses = { champion: null, topScorers: [] };
+  cache.settings = { predictionsLocked: false };
+  cache._ready = {};
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");
@@ -632,7 +758,11 @@ export function adminApprovePrediction(formId) {
   writeAuditLog("approve-form", { formId });
   const form = getForm(formId);
   if (!form || form.status !== "pending") return;
-  writeFormDoc(formId, { ...form, status: "submitted", approvedAt: new Date().toISOString() });
+  writeFormDoc(formId, {
+    ...form,
+    status: "submitted",
+    approvedAt: new Date().toISOString(),
+  });
 }
 
 export function reopenForm(formId) {
@@ -805,10 +935,13 @@ export async function importAllData(data) {
   writeAuditLog("import-data", { keys: Object.keys(data) });
 
   // Validate imported data structure
-  if (!data || typeof data !== 'object') throw new Error("נתונים לא תקינים");
-  if (data.users && typeof data.users !== 'object') throw new Error("מבנה משתמשים לא תקין");
-  if (data.predictions && typeof data.predictions !== 'object') throw new Error("מבנה ניחושים לא תקין");
-  if (data.matchResults && typeof data.matchResults !== 'object') throw new Error("מבנה תוצאות לא תקין");
+  if (!data || typeof data !== "object") throw new Error("נתונים לא תקינים");
+  if (data.users && typeof data.users !== "object")
+    throw new Error("מבנה משתמשים לא תקין");
+  if (data.predictions && typeof data.predictions !== "object")
+    throw new Error("מבנה ניחושים לא תקין");
+  if (data.matchResults && typeof data.matchResults !== "object")
+    throw new Error("מבנה תוצאות לא תקין");
 
   const batch = writeBatch(db);
 
