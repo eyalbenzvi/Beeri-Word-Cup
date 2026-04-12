@@ -19,6 +19,7 @@ export function useStoreReady() {
 
 export function useCurrentUser() {
   useStoreValue(store.isStoreReady);
+  useStoreValue(store.getUsers); // subscribe to user changes so we re-render when a new user is created
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
   const storeReady = store.isStoreReady();

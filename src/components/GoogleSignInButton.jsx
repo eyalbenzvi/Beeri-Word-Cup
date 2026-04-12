@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useToast } from "./Toast";
 import { signInWithGoogle } from "../firebase";
-import { ensureUserInStore } from "../store";
 
 export default function GoogleSignInButton({ onSuccess }) {
   const showToast = useToast();
@@ -15,7 +14,6 @@ export default function GoogleSignInButton({ onSuccess }) {
       const user = await signInWithGoogle();
       const displayName =
         user.displayName || user.email?.split("@")[0] || "משתמש";
-      ensureUserInStore(user.uid, displayName);
       showToast(`ברוך הבא, ${displayName}!`);
       onSuccess?.();
     } catch (err) {
