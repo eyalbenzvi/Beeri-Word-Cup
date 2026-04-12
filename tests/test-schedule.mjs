@@ -37,14 +37,15 @@ for (const m of groupMatches) {
   assert(gc.includes(m.awayTeam), `${m.id}: ${m.awayTeam} not in ${m.group}`);
 }
 
-console.log("--- 6. Dates order ---");
-const dOrd = ["Jun 28","Jun 29","Jun 30","Jul 1","Jul 2","Jul 3","Jul 4","Jul 5","Jul 6","Jul 7","Jul 9","Jul 10","Jul 11","Jul 14","Jul 15","Jul 18","Jul 19"];
+console.log("--- 6. Dates order (Israel time) ---");
+// Dates are now in Israel time (IDT, UTC+3) — late US matches roll to next day
+const dOrd = ["Jun 29","Jun 30","Jul 1","Jul 2","Jul 3","Jul 4","Jul 5","Jul 6","Jul 7","Jul 8","Jul 9","Jul 10","Jul 11","Jul 12","Jul 14","Jul 15","Jul 19"];
 const di = d => dOrd.indexOf(d);
-for (const r of R32_MATCHES) for (const l of R16_MATCHES) assert(di(r.date)<di(l.date), `R32 ${r.date} before R16 ${l.date}`);
-for (const r of R16_MATCHES) for (const q of QF_MATCHES) assert(di(r.date)<di(q.date), `R16 before QF`);
-for (const q of QF_MATCHES) for (const s of SF_MATCHES) assert(di(q.date)<di(s.date), `QF before SF`);
+for (const r of R32_MATCHES) for (const l of R16_MATCHES) assert(di(r.date)<=di(l.date), `R32 ${r.date} before/same R16 ${l.date}`);
+for (const r of R16_MATCHES) for (const q of QF_MATCHES) assert(di(r.date)<=di(q.date), `R16 before/same QF`);
+for (const q of QF_MATCHES) for (const s of SF_MATCHES) assert(di(q.date)<=di(s.date), `QF before/same SF`);
 assert(FINAL_MATCHES[1].date==="Jul 19", "Final Jul 19");
-assert(FINAL_MATCHES[0].date==="Jul 18", "3rd place Jul 18");
+assert(FINAL_MATCHES[0].date==="Jul 19", "3rd place Jul 19");
 
 console.log("--- 7. FIFA numbers ---");
 const allK = [...R32_MATCHES,...R16_MATCHES,...QF_MATCHES,...SF_MATCHES,...FINAL_MATCHES];
