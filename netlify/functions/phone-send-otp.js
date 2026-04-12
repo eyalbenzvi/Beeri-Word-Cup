@@ -42,24 +42,42 @@ export async function handler(event) {
   const hmacData = `${cleanPhone}:${code}:${expiresAt}`;
   const verificationToken = crypto.createHmac("sha256", OTP_SECRET).update(hmacData).digest("hex");
 
-  // Send SMS via Inforu
+  // Send SMS via Inforu (XML API — primary documented endpoint)
   const smsMessage = `קוד האימות שלך לטורניר בארי: ${code}`;
   const sender = INFORU_SENDER || "Beeri";
 
-  const inforuUrl = new URL("https://api.inforu.co.il/inforufrontend/WebInterface/SendMessageByNumber.aspx");
-  inforuUrl.searchParams.set("UserName", INFORU_USERNAME);
-  inforuUrl.searchParams.set("ApiToken", INFORU_API_TOKEN);
-  inforuUrl.searchParams.set("CellNumber", cleanPhone);
-  inforuUrl.searchParams.set("MessageString", smsMessage);
-  inforuUrl.searchParams.set("SenderName", sender);
+  const xml = `<Inforu>
+<User>
+<Username>${INFORU_USERNAME}</Username>
+<ApiToken>${INFORU_API_TOKEN}</ApiToken>
+</User>
+<Content Type="sms">
+<Message>${smsMessage}</Message>
+</Content>
+<Recipients>
+<PhoneNumber>${cleanPhone}</PhoneNumber>
+</Recipients>
+<Settings>
+<Sender>${sender}</Sender>
+</Settings>
+</Inforu>`;
 
   try {
-    const smsRes = await fetch(inforuUrl.toString());
+    const inforuUrl = `https://api.inforu.co.il/SendMessageXml.ashx?InforuXML=${encodeURIComponent(xml)}`;
+    const smsRes = await fetch(inforuUrl);
     const smsBody = await smsRes.text();
-    // Inforu returns status code 1 for success
-    if (!smsBody.includes("1") && !smsRes.ok) {
-      console.error("Inforu SMS error:", smsBody);
-      return { statusCode: 502, headers: CORS_HEADERS, body: JSON.stringify({ error: "שליחת SMS נכשלה. נסה שוב" }) };
+    console.log("Inforu response:", smsRes.status, smsBody);
+
+    // Inforu returns XML with Status=1 for success, negative for errors
+    if (smsBody.includes("<Status>1</Status>") || smsBody.includes("<Status> 1 </Status>")) {
+      // Success
+    } else {
+      console.error("Inforu SMS failed:", smsBody);
+      return {
+        statusCode: 502,
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ error: `שליחת SMS נכשלה: ${smsBody.slice(0, 200)}` }),
+      };
     }
   } catch (err) {
     console.error("Inforu fetch error:", err);
