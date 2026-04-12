@@ -47,7 +47,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         <div className="text-center py-12">
           <div className="text-5xl mb-3">📋</div>
           <p className="font-bold text-gray-700 text-base mb-1">ברוך הבא! צור טופס ניחושים ראשון</p>
-          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למטה כדי להתחיל לנחש תוצאות משחקים</p>
+          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למעלה כדי להתחיל לנחש תוצאות משחקים</p>
         </div>
       )}
 

@@ -70,7 +70,7 @@ export default function MatchCard({
   const predAway = prediction?.awayScore ?? "";
   const hasResult = actualResult && actualResult.homeScore !== null;
   const hasPrediction = predHome !== "" && predAway !== "";
-  const showLabel = match.label && match.stage !== "group";
+  const showLabel = match.label && match.stage !== "group" && !/^W\d+\s+vs\s+W\d+$/.test(match.label);
 
   const importanceStyles = {
     group: "p-4",
