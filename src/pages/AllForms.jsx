@@ -263,11 +263,11 @@ export default function AllFormsView({ onBack }) {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-center">
               <div className="text-2xl mb-1">🔒</div>
               <div className="text-sm font-semibold text-amber-700">
-                הטורניר עדיין לא נעול
+                הניחושים עדיין לא גלויים
               </div>
               <div className="text-xs text-amber-600 mt-1">
-                ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר נעילת
-                הטורניר
+                ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר תחילת
+                המשחקים
               </div>
             </div>
           )}

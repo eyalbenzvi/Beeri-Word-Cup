@@ -496,7 +496,7 @@ export default function Stats() {
       <div className="text-center py-16">
         <div className="text-5xl mb-4">🔒</div>
         <h2 className="text-lg font-bold text-primary mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר נעילת הניחושים</p>
+        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר תחילת המשחקים</p>
       </div>
     );
   }

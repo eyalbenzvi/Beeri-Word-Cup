@@ -1,6 +1,49 @@
 import { GROUPS } from "./teams";
 
-// FIFA official group match schedule (from WCup_2026_4.2.3_en.xlsx)
+// FIFA official match schedule (from WCup_2026_4.2.3_en.xlsx)
+// Times are local host-city times
+// Venue mapping by FIFA match number (verified against Excel source)
+export const MATCH_VENUES = {
+  1: "Mexico City", 2: "Guadalajara", 3: "Toronto", 4: "Los Angeles",
+  5: "Boston", 6: "Vancouver", 7: "New York/New Jersey", 8: "San Francisco Bay Area",
+  9: "Philadelphia", 10: "Houston", 11: "Dallas", 12: "Monterrey",
+  13: "Miami", 14: "Atlanta", 15: "Los Angeles", 16: "Seattle",
+  17: "New York/New Jersey", 18: "Boston", 19: "Kansas City", 20: "San Francisco Bay Area",
+  21: "Toronto", 22: "Dallas", 23: "Houston", 24: "Mexico City",
+  25: "Atlanta", 26: "Los Angeles", 27: "Vancouver", 28: "Guadalajara",
+  29: "Philadelphia", 30: "Boston", 31: "San Francisco Bay Area", 32: "Seattle",
+  33: "Toronto", 34: "Kansas City", 35: "Houston", 36: "Monterrey",
+  37: "Miami", 38: "Atlanta", 39: "Los Angeles", 40: "Vancouver",
+  41: "New York/New Jersey", 42: "Philadelphia", 43: "Dallas", 44: "San Francisco Bay Area",
+  45: "Boston", 46: "Toronto", 47: "Houston", 48: "Guadalajara",
+  49: "Miami", 50: "Atlanta", 51: "Vancouver", 52: "Seattle",
+  53: "Mexico City", 54: "Monterrey", 55: "Philadelphia", 56: "New York/New Jersey",
+  57: "Dallas", 58: "Kansas City", 59: "Los Angeles", 60: "San Francisco Bay Area",
+  61: "Boston", 62: "Toronto", 63: "Seattle", 64: "Vancouver",
+  65: "Houston", 66: "Guadalajara", 67: "New York/New Jersey", 68: "Philadelphia",
+  69: "Kansas City", 70: "Dallas", 71: "Miami", 72: "Atlanta",
+  73: "Los Angeles", 74: "Boston", 75: "Monterrey", 76: "Houston",
+  77: "New York/New Jersey", 78: "Dallas", 79: "Mexico City", 80: "Atlanta",
+  81: "San Francisco Bay Area", 82: "Seattle", 83: "Toronto", 84: "Los Angeles",
+  85: "Vancouver", 86: "Miami", 87: "Kansas City", 88: "Dallas",
+  89: "Philadelphia", 90: "Houston", 91: "New York/New Jersey", 92: "Mexico City",
+  93: "Dallas", 94: "Seattle", 95: "Atlanta", 96: "Vancouver",
+  97: "Boston", 98: "Los Angeles", 99: "Miami", 100: "Kansas City",
+  101: "Dallas", 102: "Atlanta", 103: "Miami", 104: "New York/New Jersey",
+};
+
+// Knockout match times (local host-city, from Excel)
+const KNOCKOUT_TIMES = {
+  73: "15:00", 74: "16:30", 75: "21:00", 76: "13:00",
+  77: "17:00", 78: "13:00", 79: "21:00", 80: "12:00",
+  81: "20:00", 82: "16:00", 83: "19:00", 84: "15:00",
+  85: "23:00", 86: "18:00", 87: "21:30", 88: "14:00",
+  89: "17:00", 90: "13:00", 91: "16:00", 92: "20:00",
+  93: "15:00", 94: "20:00", 95: "12:00", 96: "16:00",
+  97: "16:00", 98: "15:00", 99: "17:00", 100: "21:00",
+  101: "15:00", 102: "15:00", 103: "17:00", 104: "15:00",
+};
+
 // Position format: X1=seed1, X2=seed2, X3=seed3, X4=seed4 in each group
 const GROUP_MATCH_SCHEDULE = [
   { fifaMatch: 1, group: "A", home: 1, away: 2, matchday: 1, date: "Jun 11", time: "15:00" },
@@ -92,6 +135,7 @@ export function generateGroupMatches() {
       fifaMatch: m.fifaMatch,
       date: m.date,
       time: m.time,
+      venue: MATCH_VENUES[m.fifaMatch] || null,
       homeTeam: teams[m.home - 1].code,
       awayTeam: teams[m.away - 1].code,
       homeScore: null,
@@ -419,6 +463,8 @@ export function generateKnockoutMatches() {
     fifaMatch: template.fifaMatch,
     label: template.label,
     date: template.date,
+    time: KNOCKOUT_TIMES[template.fifaMatch] || null,
+    venue: MATCH_VENUES[template.fifaMatch] || null,
     home: template.home || null,
     away: template.away || null,
     homeFrom: template.homeFrom || null,
