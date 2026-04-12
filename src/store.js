@@ -665,12 +665,12 @@ export function createForm(userId, formName) {
   if (userForms.length >= MAX_FORMS_PER_USER) {
     throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
   }
-  const nextIndex = userForms.length + 1;
-  const formId = `${userId}__${nextIndex}`;
+  const formId = `${userId}__${Date.now()}`;
+  const displayIndex = userForms.length + 1;
 
   const formData = {
     userId,
-    formName: formName || `טופס ${nextIndex}`,
+    formName: formName || `טופס ${displayIndex}`,
     budgetNumber: "",
     ...DEFAULT_FORM,
     createdAt: new Date().toISOString(),

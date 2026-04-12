@@ -62,7 +62,7 @@ export default function WelcomeScreen() {
                 />
               </div>
               <p className="text-[10px] text-ink-muted/50 mt-2">
-                11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+                12 ביוני 2026 · 00:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
               </p>
             </>
           )}

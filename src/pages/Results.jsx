@@ -75,14 +75,16 @@ export default function Results() {
                 result ? "border-primary/20 shadow-sm" : "border-border"
               }`}
             >
-              {isKnockout && match.label && (
+              {match.date && (
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-xs text-gray-400 font-medium">
-                    {match.label}
+                  {isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label) ? (
+                    <span className="text-xs text-gray-400 font-medium">
+                      {match.label}
+                    </span>
+                  ) : <span />}
+                  <span className="text-xs text-gray-300">
+                    {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
                   </span>
-                  {match.date && (
-                    <span className="text-xs text-gray-300">{match.date}</span>
-                  )}
                 </div>
               )}
               {result ? (

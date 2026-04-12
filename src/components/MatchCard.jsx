@@ -141,16 +141,18 @@ export default function MatchCard({
         <div className="h-1 w-full rounded-full bg-gradient-to-l from-secondary via-accent to-primary mb-3 -mt-1" />
       )}
 
-      {showLabel && (
+      {(showLabel || match.date) && (
         <div className="flex justify-between items-center mb-2">
-          <span
-            className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
-          >
-            {match.label}
+          {showLabel ? (
+            <span
+              className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
+            >
+              {match.label}
+            </span>
+          ) : <span />}
+          <span className="text-[11px] text-ink-muted/60">
+            {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
           </span>
-          {match.date && (
-            <span className="text-[11px] text-ink-muted/60">{match.date}</span>
-          )}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useNavigation } from "../hooks/useNavigation";
 import {
   updateSettings,
@@ -7,6 +7,7 @@ import {
   clearAllData,
   clearMatchResults,
 } from "../store";
+import { TOP_SCORER_PLAYERS } from "../data/players";
 
 export default function AdminSettingsTab({
   settings,
@@ -16,6 +17,8 @@ export default function AdminSettingsTab({
 }) {
   const { navigate } = useNavigation();
   const fileInputRef = useRef(null);
+  const playerFileRef = useRef(null);
+  const [playerCount, setPlayerCount] = useState(settings.topScorerPlayers?.length || 0);
 
   const downloadBackup = (label = "backup") => {
     const data = exportAllData();
@@ -120,6 +123,60 @@ export default function AdminSettingsTab({
             </div>
             <div className="text-xs text-gray-500">תוצאות</div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <h3 className="font-semibold text-sm mb-3">רשימת מלך שערים</h3>
+        <div className="text-xs text-gray-400 mb-3">
+          {settings.topScorerPlayers?.length > 0
+            ? `רשימה מותאמת: ${settings.topScorerPlayers.length} שחקנים`
+            : `רשימה ברירת מחדל: ${TOP_SCORER_PLAYERS.length} שחקנים`}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              updateSettings({ topScorerPlayers: TOP_SCORER_PLAYERS });
+              setPlayerCount(TOP_SCORER_PLAYERS.length);
+              alert("רשימת השחקנים אופסה לברירת המחדל");
+            }}
+            className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
+          >
+            אפס לברירת מחדל
+          </button>
+          <button
+            onClick={() => playerFileRef.current?.click()}
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition"
+          >
+            טען רשימה מקובץ
+          </button>
+          <input
+            ref={playerFileRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                try {
+                  const data = JSON.parse(ev.target.result);
+                  if (!Array.isArray(data) || !data[0]?.team || !data[0]?.name) {
+                    alert("פורמט לא תקין — נדרש מערך של { team, name }");
+                    return;
+                  }
+                  updateSettings({ topScorerPlayers: data });
+                  setPlayerCount(data.length);
+                  alert(`נטענו ${data.length} שחקנים`);
+                } catch {
+                  alert("שגיאה בקריאת הקובץ");
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = "";
+            }}
+          />
         </div>
       </div>
 

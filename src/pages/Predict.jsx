@@ -34,6 +34,7 @@ import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
+import PlayerAutocomplete from "../components/PlayerAutocomplete";
 
 const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
 const EMPTY_MATCHES = {};
@@ -416,7 +417,7 @@ export default function Predict() {
           )}
           {settings.predictionsLocked && (
             <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">
-              🔒 נעול
+              🔒 ההגשה נסגרה
             </span>
           )}
         </div>
@@ -477,11 +478,9 @@ export default function Predict() {
           </div>
           <div id="field-topScorer">
             <label className="text-[11px] font-semibold text-ink-muted">מלך שערים</label>
-            <input
+            <PlayerAutocomplete
               value={activeForm.topScorer || ""}
-              onChange={(e) => saveBonusPrediction(activeFormId, "topScorer", e.target.value)}
-              placeholder="שם שחקן"
-              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+              onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
               disabled={!canEdit}
             />
           </div>

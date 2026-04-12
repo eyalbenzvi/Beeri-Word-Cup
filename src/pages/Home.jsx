@@ -54,7 +54,7 @@ export default function Home() {
               />
             </div>
             <p className="text-[10px] text-ink-muted/50 mt-2">
-              11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+              12 ביוני 2026 · 00:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
             </p>
           </>
         )}
@@ -75,7 +75,7 @@ export default function Home() {
             aria-hidden="true"
           />
           <span className="sr-only">
-            {settings.predictionsLocked ? "סטטוס: הגשת טפסים נעולה" : "סטטוס: הגשת טפסים פתוחה"}
+            {settings.predictionsLocked ? "סטטוס: המשחקים התחילו — ההגשה נסגרה" : "סטטוס: ניתן להגיש ולערוך טפסים"}
           </span>
           <span
             className={`text-sm font-bold ${
@@ -83,8 +83,8 @@ export default function Home() {
             }`}
           >
             {settings.predictionsLocked
-              ? "הגשת טפסים נעולה"
-              : "הגשת טפסים פתוחה"}
+              ? "המשחקים התחילו — ההגשה נסגרה"
+              : "ניתן להגיש ולערוך טפסים"}
           </span>
         </div>
       </div>
