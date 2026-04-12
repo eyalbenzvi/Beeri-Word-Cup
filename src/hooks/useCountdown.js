@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const KICKOFF = new Date("2026-06-11T21:00:00Z").getTime();
+const KICKOFF = new Date("2026-06-11T19:00:00Z").getTime();
 
 export function useCountdown() {
   const [now, setNow] = useState(Date.now());
