@@ -85,6 +85,22 @@ const cache = {
 
 // ============ FIRESTORE HELPERS ============
 
+const BATCH_LIMIT = 400; // Firestore limit is 500, use 400 for safety margin
+
+// Splits operations across multiple batches when exceeding Firestore's 500 op limit
+export async function commitInBatches(operations) {
+  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+    const chunk = operations.slice(i, i + BATCH_LIMIT);
+    const batch = writeBatch(db);
+    for (const op of chunk) {
+      if (op.type === "set") batch.set(op.ref, op.data);
+      else if (op.type === "update") batch.update(op.ref, op.data);
+      else if (op.type === "delete") batch.delete(op.ref);
+    }
+    await batch.commit();
+  }
+}
+
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
@@ -92,6 +108,15 @@ function withTimeout(promise, ms = 10000) {
       setTimeout(() => reject(new Error("timeout")), ms),
     ),
   ]);
+}
+
+// Lightweight clone using JSON parse/stringify — faster than structuredClone for plain data
+function safeClone(obj) {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return structuredClone(obj);
+  }
 }
 
 function gameDocRef(docName) {
@@ -131,7 +156,7 @@ async function writeGameDoc(docName, data) {
   emitSaving(docName);
   try {
     await withTimeout(
-      setDoc(gameDocRef(docName), { data: structuredClone(data) }),
+      setDoc(gameDocRef(docName), { data: safeClone(data) }),
       10000,
     );
     emitSaved(docName);
@@ -166,8 +191,21 @@ async function updateUserField(uid, fields) {
   }
 }
 
+// Firestore document size limit is 1MB. Warn when approaching.
+const MAX_USERS_WARNING = 1500;
+const MAX_USERS_HARD_LIMIT = 2000;
+
 // Safe new-user creation via dot-notation (no full-doc overwrite)
 async function createUserField(uid, userData) {
+  const currentCount = Object.keys(cache.users).length;
+  if (currentCount >= MAX_USERS_HARD_LIMIT) {
+    console.error(`[SAFETY] Cannot create user: ${currentCount} users already at hard limit of ${MAX_USERS_HARD_LIMIT}`);
+    writeAuditLog("blocked-user-create", { currentCount, uid });
+    return false;
+  }
+  if (currentCount >= MAX_USERS_WARNING) {
+    console.warn(`[WARNING] User count (${currentCount}) approaching Firestore 1MB document limit.`);
+  }
   const updatePayload = { [`data.${uid}`]: userData };
   cache.users = { ...cache.users, [uid]: userData };
   notifyAndEmit("users");
@@ -221,7 +259,7 @@ async function writeFormDoc(formId, formData) {
   emitSaving("predictions");
   try {
     await withTimeout(
-      setDoc(formDocRef(formId), structuredClone(formData)),
+      setDoc(formDocRef(formId), safeClone(formData)),
       10000,
     );
     emitSaved("predictions");
@@ -247,7 +285,7 @@ function debouncedWriteForm(formId, formData, delay = 500) {
       return;
     }
     delete pendingWrites[key];
-    setDoc(formDocRef(formId), structuredClone(formData))
+    setDoc(formDocRef(formId), safeClone(formData))
       .then(() => emitSaved("predictions"))
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
@@ -271,7 +309,7 @@ function flushPendingWrites() {
     try {
       if (key.startsWith("form:")) {
         const formId = key.slice(5);
-        const data = structuredClone(cache.predictions[formId]);
+        const data = safeClone(cache.predictions[formId]);
         if (data) {
           setDoc(formDocRef(formId), data).catch((err) =>
             console.error(`Failed to flush ${key}:`, err),
@@ -352,6 +390,7 @@ function setupPredictionsListener(userId, showAll) {
         cache.predictions = preds;
       }
       cache._ready.predictions = true;
+      rebuildUserFormIndex();
       notifyAndEmit("predictions");
     },
     (err) => {
@@ -371,13 +410,19 @@ function setupPredictionsListener(userId, showAll) {
   );
 }
 
+let upgradeTimer = null;
 function maybeUpgradePredictionsListener() {
   if (predictionsShowAll || !currentListenerUserId) return;
-  const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
-  const isLocked = cache.settings?.predictionsLocked === true;
-  if (isUserAdmin || isLocked) {
-    setupPredictionsListener(currentListenerUserId, true);
-  }
+  // Debounce: settings and users may fire in quick succession
+  clearTimeout(upgradeTimer);
+  upgradeTimer = setTimeout(() => {
+    if (predictionsShowAll || !currentListenerUserId) return;
+    const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
+    const isLocked = cache.settings?.predictionsLocked === true;
+    if (isUserAdmin || isLocked) {
+      setupPredictionsListener(currentListenerUserId, true);
+    }
+  }, 100);
 }
 
 export function initRealtimeListeners(userId) {
@@ -445,14 +490,30 @@ export function isStoreReady() {
 // ============ SUBSCRIPTIONS ============
 
 const listeners = new Set();
+const keyedListeners = new Map(); // key -> Set<listener>
 
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-function notifyListeners() {
+// Subscribe only to changes for a specific key (e.g., "predictions", "users")
+export function subscribeToKey(key, listener) {
+  if (!keyedListeners.has(key)) keyedListeners.set(key, new Set());
+  keyedListeners.get(key).add(listener);
+  return () => {
+    const set = keyedListeners.get(key);
+    if (set) { set.delete(listener); if (set.size === 0) keyedListeners.delete(key); }
+  };
+}
+
+function notifyListeners(event) {
   for (const listener of listeners) listener();
+  // Also notify keyed listeners
+  const key = event?.detail?.key;
+  if (key && keyedListeners.has(key)) {
+    for (const listener of keyedListeners.get(key)) listener();
+  }
 }
 
 window.addEventListener("store-updated", notifyListeners);
@@ -607,6 +668,7 @@ export function logoutUser() {
   cache.actualBonuses = { champion: null, topScorers: [] };
   cache.settings = { predictionsLocked: false };
   cache._ready = {};
+  rebuildUserFormIndex();
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");
@@ -629,6 +691,32 @@ export function setActiveFormId(formId) {
 
 // ============ PREDICTIONS (PER-FORM DOCUMENTS) ============
 
+// userId -> Set<formId> index for O(1) user form lookup
+const userFormIndex = {};
+
+function rebuildUserFormIndex() {
+  for (const key of Object.keys(userFormIndex)) delete userFormIndex[key];
+  for (const [formId, data] of Object.entries(cache.predictions || {})) {
+    const uid = data.userId;
+    if (uid) {
+      if (!userFormIndex[uid]) userFormIndex[uid] = new Set();
+      userFormIndex[uid].add(formId);
+    }
+  }
+}
+
+function indexAddForm(formId, userId) {
+  if (!userId) return;
+  if (!userFormIndex[userId]) userFormIndex[userId] = new Set();
+  userFormIndex[userId].add(formId);
+}
+
+function indexRemoveForm(formId, userId) {
+  if (!userId || !userFormIndex[userId]) return;
+  userFormIndex[userId].delete(formId);
+  if (userFormIndex[userId].size === 0) delete userFormIndex[userId];
+}
+
 export function getAllPredictions() {
   return cache.predictions || EMPTY_OBJ;
 }
@@ -643,11 +731,12 @@ const DEFAULT_FORM = {
 
 export function getFormsForUser(userId) {
   const all = getAllPredictions();
+  const formIds = userFormIndex[userId];
+  if (!formIds || formIds.size === 0) return [];
   const forms = [];
-  for (const [formId, data] of Object.entries(all)) {
-    if (data.userId === userId) {
-      forms.push({ formId, ...data });
-    }
+  for (const formId of formIds) {
+    const data = all[formId];
+    if (data) forms.push({ formId, ...data });
   }
   forms.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   return forms;
@@ -675,6 +764,7 @@ export function createForm(userId, formName) {
     ...DEFAULT_FORM,
     createdAt: new Date().toISOString(),
   };
+  indexAddForm(formId, userId);
   writeFormDoc(formId, formData);
   setActiveFormId(formId);
   return formId;
@@ -684,6 +774,7 @@ export async function deleteForm(formId) {
   const form = getForm(formId);
   if (!form || (form.status !== "draft" && form.status !== "pending")) return;
 
+  indexRemoveForm(formId, form.userId);
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
   cache.predictions = newPreds;
@@ -907,18 +998,16 @@ export function exportAllData() {
 export async function clearAllData() {
   writeAuditLog("clear-all-data");
 
-  // Delete all form documents
+  // Delete all form documents using batched operations
   const snapshot = await getDocs(predictionsCollectionRef);
-  const batch = writeBatch(db);
-  snapshot.forEach((docSnap) => batch.delete(docSnap.ref));
-  batch.set(gameDocRef("users"), { data: {} });
-  batch.set(gameDocRef("matchResults"), { data: {} });
-  batch.set(gameDocRef("actualAdvancing"), { data: {} });
-  batch.set(gameDocRef("actualBonuses"), {
-    data: { champion: null, topScorers: [] },
-  });
-  batch.set(gameDocRef("settings"), { data: { predictionsLocked: false } });
-  await batch.commit();
+  const ops = [];
+  snapshot.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  ops.push({ type: "set", ref: gameDocRef("users"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("matchResults"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("actualAdvancing"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("actualBonuses"), data: { data: { champion: null, topScorers: [] } } });
+  ops.push({ type: "set", ref: gameDocRef("settings"), data: { data: { predictionsLocked: false } } });
+  await commitInBatches(ops);
 
   cache.users = {};
   cache.predictions = {};
@@ -943,7 +1032,7 @@ export async function importAllData(data) {
   if (data.matchResults && typeof data.matchResults !== "object")
     throw new Error("מבנה תוצאות לא תקין");
 
-  const batch = writeBatch(db);
+  const ops = [];
 
   // Write gameData docs
   const gameKeys = [
@@ -956,7 +1045,7 @@ export async function importAllData(data) {
   for (const key of gameKeys) {
     if (data[key]) {
       cache[key] = data[key];
-      batch.set(gameDocRef(key), { data: structuredClone(data[key]) });
+      ops.push({ type: "set", ref: gameDocRef(key), data: { data: structuredClone(data[key]) } });
     }
   }
 
@@ -964,15 +1053,15 @@ export async function importAllData(data) {
   if (data.predictions) {
     // First delete existing forms
     const existing = await getDocs(predictionsCollectionRef);
-    existing.forEach((docSnap) => batch.delete(docSnap.ref));
+    existing.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
 
     // Then create new ones
     for (const [formId, formData] of Object.entries(data.predictions)) {
-      batch.set(formDocRef(formId), structuredClone(formData));
+      ops.push({ type: "set", ref: formDocRef(formId), data: structuredClone(formData) });
     }
     cache.predictions = data.predictions;
   }
 
   notifyListeners();
-  await batch.commit();
+  await commitInBatches(ops);
 }

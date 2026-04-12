@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import MatchAnalysis from "./MatchAnalysis";
 
@@ -14,20 +14,24 @@ function focusNextInput(currentInput) {
     return;
   }
 
-  const allCards = document.querySelectorAll("[data-match-card]");
-  const cardIdx = Array.from(allCards).indexOf(card);
-  for (let i = cardIdx + 1; i < allCards.length; i++) {
-    const nextInput = allCards[i].querySelector('input[type="number"]');
-    if (nextInput) {
-      nextInput.focus();
-      nextInput.select();
-      nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+  // Use nextElementSibling traversal instead of querying all cards in DOM
+  let nextCard = card.parentElement?.nextElementSibling;
+  while (nextCard) {
+    const cardEl = nextCard.querySelector("[data-match-card]") || (nextCard.hasAttribute("data-match-card") ? nextCard : null);
+    if (cardEl) {
+      const nextInput = cardEl.querySelector('input[type="number"]');
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+        nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
+    nextCard = nextCard.nextElementSibling;
   }
 }
 
-export default function MatchCard({
+function MatchCard({
   match,
   prediction,
   actualResult,
@@ -335,3 +339,22 @@ export default function MatchCard({
     </div>
   );
 }
+
+export default React.memo(MatchCard, (prev, next) => {
+  return (
+    prev.match?.id === next.match?.id &&
+    prev.match?.homeTeam === next.match?.homeTeam &&
+    prev.match?.awayTeam === next.match?.awayTeam &&
+    prev.prediction?.homeScore === next.prediction?.homeScore &&
+    prev.prediction?.awayScore === next.prediction?.awayScore &&
+    prev.prediction?.advancingTeam === next.prediction?.advancingTeam &&
+    prev.editable === next.editable &&
+    prev.isKnockout === next.isKnockout &&
+    prev.importance === next.importance &&
+    prev.showPoints === next.showPoints &&
+    prev.actualResult?.homeScore === next.actualResult?.homeScore &&
+    prev.actualResult?.awayScore === next.actualResult?.awayScore &&
+    prev.points?.points === next.points?.points &&
+    prev.onPredictionChange === next.onPredictionChange
+  );
+});
