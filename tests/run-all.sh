@@ -47,6 +47,7 @@ run_test "12. Profile Features" "test-profile-features.mjs" "no"
 run_test "13. External Cross-Validation (300 trials)" "test-external-crossval.mjs" "yes"
 run_test "14. Excel Cross-Validation (FIFA bracket)" "test-excel-crossval.mjs" "yes"
 run_test "15. Python Cross-Validation (100 trials)" "test-python-crossval.mjs" "yes"
+run_test "16. Phone Auth & OTP Security" "test-phone-auth.mjs" "no"
 
 echo ""
 echo "==========================================="
