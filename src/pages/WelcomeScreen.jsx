@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
 import { Menu } from "lucide-react";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
 
   return (
     <div className="h-dvh bg-bg flex flex-col overflow-hidden">
@@ -68,8 +70,28 @@ export default function WelcomeScreen() {
           )}
         </div>
 
-        <div className="pt-1">
-          <GoogleSignInButton />
+        <div className="pt-1 space-y-3">
+          {authMethod === "google" ? (
+            <>
+              <GoogleSignInButton />
+              <button
+                onClick={() => setAuthMethod("phone")}
+                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+              >
+                📱 התחבר עם מספר טלפון
+              </button>
+            </>
+          ) : (
+            <>
+              <PhoneSignIn />
+              <button
+                onClick={() => setAuthMethod("google")}
+                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+              >
+                ← חזור להתחברות עם Google
+              </button>
+            </>
+          )}
         </div>
       </div>
       </div>

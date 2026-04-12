@@ -6,10 +6,9 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  signInWithCustomToken,
   signOut,
   onAuthStateChanged,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -60,34 +59,13 @@ export async function signInWithGoogle() {
   }
 }
 
+export async function signInWithPhoneOtp(customToken) {
+  const result = await signInWithCustomToken(auth, customToken);
+  return result.user;
+}
+
 export async function firebaseSignOut() {
   await signOut(auth);
-}
-
-let recaptchaVerifier = null;
-
-function setupRecaptcha() {
-  if (!recaptchaVerifier) {
-    recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-      size: "invisible",
-    });
-  }
-  return recaptchaVerifier;
-}
-
-export async function signInWithPhone(phoneNumber) {
-  const verifier = setupRecaptcha();
-  const confirmationResult = await signInWithPhoneNumber(
-    auth,
-    phoneNumber,
-    verifier,
-  );
-  return confirmationResult;
-}
-
-export async function confirmPhoneCode(confirmationResult, code) {
-  const result = await confirmationResult.confirm(code);
-  return result.user;
 }
 
 export { onAuthStateChanged };
