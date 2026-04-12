@@ -8,11 +8,12 @@ const championCache = new Map();
 function getStableKey(matchPredictions) {
   const entries = Object.entries(matchPredictions);
   if (entries.length === 0) return "empty";
-  // Sample every 5th entry for a better key
-  const samples = entries.filter((_, i) => i % 5 === 0)
-    .map(([id, p]) => `${id}:${p?.homeScore ?? ''}-${p?.awayScore ?? ''}`)
+  // Use ALL entries for a collision-free key (sorted for determinism)
+  const parts = entries
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, p]) => `${id}:${p?.homeScore ?? ''}-${p?.awayScore ?? ''}${p?.advancingTeam ? '>' + p.advancingTeam : ''}`)
     .join('|');
-  return `${entries.length}_${samples}`;
+  return parts;
 }
 
 export function getCachedBracket(matches) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useCurrentUser,
   useMatchResults,
@@ -33,6 +33,20 @@ export default function Leaderboard({
 
   const { formBracketMap, scoredForms, leaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
+
+  // Pre-compute ranks once so we don't recalculate in render
+  const rankedLeaderboard = useMemo(() => {
+    let currentRank = 1;
+    return leaderboard.map((entry, index) => {
+      if (index > 0) {
+        const prev = leaderboard[index - 1];
+        if (entry.totalPoints !== prev.totalPoints || compareTiebreaker(entry, prev) !== 0) {
+          currentRank = index + 1;
+        }
+      }
+      return { ...entry, rank: currentRank };
+    });
+  }, [leaderboard]);
 
   const renderFormDetail = () => {
     if (!selectedForm) return null;
@@ -247,15 +261,8 @@ export default function Leaderboard({
           </div>
 
           <div className="space-y-1.5">
-            {(() => {
-              let currentRank = 1;
-              return leaderboard.slice(0, showCount).map((entry, index) => {
-              if (index > 0) {
-                const prev = leaderboard[index - 1];
-                if (entry.totalPoints !== prev.totalPoints || compareTiebreaker(entry, prev) !== 0) {
-                  currentRank = index + 1;
-                }
-              }
+            {rankedLeaderboard.slice(0, showCount).map((entry) => {
+              const currentRank = entry.rank;
               const isTop3 = currentRank <= 3;
               const borderColor =
                 currentRank === 1
@@ -333,8 +340,7 @@ export default function Leaderboard({
                   </div>
                 </button>
               );
-            });
-            })()}
+            })}
 
             {showCount < leaderboard.length && (
               <button onClick={() => setShowCount(s => s + 20)} className="w-full py-2 text-sm text-primary font-bold bg-white rounded-xl border border-border mt-2 cursor-pointer">

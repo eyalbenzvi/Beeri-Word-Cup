@@ -48,6 +48,9 @@ run_test "13. External Cross-Validation (300 trials)" "test-external-crossval.mj
 run_test "14. Excel Cross-Validation (FIFA bracket)" "test-excel-crossval.mjs" "yes"
 run_test "15. Python Cross-Validation (100 trials)" "test-python-crossval.mjs" "yes"
 run_test "16. Phone Auth & OTP Security" "test-phone-auth.mjs" "no"
+run_test "17. Bracket Cache Fix" "test-bracket-cache.mjs" "yes"
+run_test "18. Batch Limit Fix" "test-batch-limit.mjs" "no"
+run_test "19. Performance Fixes (Comprehensive)" "test-performance-fixes.mjs" "yes"
 
 echo ""
 echo "==========================================="

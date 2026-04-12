@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, createRef } from "react";
 import {
   useCurrentUser,
   useUserForms,
@@ -144,6 +144,19 @@ export default function Predict() {
     },
     [activeFormId, canEdit],
   );
+
+  // Stable per-match callback refs to avoid inline arrow functions in map
+  const matchCallbacksRef = useRef({});
+  const getMatchCallback = useCallback((matchId) => {
+    if (!matchCallbacksRef.current[matchId]) {
+      matchCallbacksRef.current[matchId] = (pred) => handlePredictionChange(matchId, pred);
+    }
+    return matchCallbacksRef.current[matchId];
+  }, [handlePredictionChange]);
+  // Reset callbacks when handler changes
+  useEffect(() => {
+    matchCallbacksRef.current = {};
+  }, [handlePredictionChange]);
 
   const handleSubmit = useCallback(() => {
     if (!activeFormId || submitting) return;
@@ -593,9 +606,7 @@ export default function Predict() {
                           ? "knockout"
                           : "group"
                     }
-                    onPredictionChange={(pred) =>
-                      handlePredictionChange(match.id, pred)
-                    }
+                    onPredictionChange={getMatchCallback(match.id)}
                   />
                 </div>
               );
