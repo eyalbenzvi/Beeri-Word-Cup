@@ -112,7 +112,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     פתח לעריכה
                   </button>
                 )}
-                {formStatus === "draft" && (
+                {(formStatus === "draft" || form.status === "pending") && (
                   <button
                     onClick={() => {
                       if (window.confirm(`למחוק את "${form.formName}"?`))

@@ -682,7 +682,7 @@ export function createForm(userId, formName) {
 
 export async function deleteForm(formId) {
   const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
+  if (!form || (form.status !== "draft" && form.status !== "pending")) return;
 
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
