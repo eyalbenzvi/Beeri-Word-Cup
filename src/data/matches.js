@@ -1,7 +1,7 @@
 import { GROUPS } from "./teams";
 
 // FIFA official match schedule (from WCup_2026_4.2.3_en.xlsx)
-// Times are local host-city times
+// All times are Israel time (IDT, UTC+3)
 // Venue mapping by FIFA match number (verified against Excel source)
 export const MATCH_VENUES = {
   1: "Mexico City", 2: "Guadalajara", 3: "Toronto", 4: "Los Angeles",
@@ -32,92 +32,93 @@ export const MATCH_VENUES = {
   101: "Dallas", 102: "Atlanta", 103: "Miami", 104: "New York/New Jersey",
 };
 
-// Knockout match times (local host-city, from Excel)
+// Knockout match times (Israel time IDT, UTC+3)
 const KNOCKOUT_TIMES = {
-  73: "15:00", 74: "16:30", 75: "21:00", 76: "13:00",
-  77: "17:00", 78: "13:00", 79: "21:00", 80: "12:00",
-  81: "20:00", 82: "16:00", 83: "19:00", 84: "15:00",
-  85: "23:00", 86: "18:00", 87: "21:30", 88: "14:00",
-  89: "17:00", 90: "13:00", 91: "16:00", 92: "20:00",
-  93: "15:00", 94: "20:00", 95: "12:00", 96: "16:00",
-  97: "16:00", 98: "15:00", 99: "17:00", 100: "21:00",
-  101: "15:00", 102: "15:00", 103: "17:00", 104: "15:00",
+  73: "01:00", 74: "23:30", 75: "06:00", 76: "21:00",
+  77: "00:00", 78: "21:00", 79: "06:00", 80: "19:00",
+  81: "06:00", 82: "02:00", 83: "02:00", 84: "01:00",
+  85: "09:00", 86: "01:00", 87: "05:30", 88: "22:00",
+  89: "00:00", 90: "21:00", 91: "23:00", 92: "05:00",
+  93: "23:00", 94: "06:00", 95: "19:00", 96: "02:00",
+  97: "23:00", 98: "01:00", 99: "00:00", 100: "05:00",
+  101: "23:00", 102: "22:00", 103: "00:00", 104: "22:00",
 };
 
 // Position format: X1=seed1, X2=seed2, X3=seed3, X4=seed4 in each group
+// Times converted to Israel time (IDT, UTC+3) from local host-city times
 const GROUP_MATCH_SCHEDULE = [
-  { fifaMatch: 1, group: "A", home: 1, away: 2, matchday: 1, date: "Jun 11", time: "15:00" },
-  { fifaMatch: 2, group: "A", home: 3, away: 4, matchday: 1, date: "Jun 11", time: "22:00" },
-  { fifaMatch: 3, group: "B", home: 1, away: 2, matchday: 1, date: "Jun 12", time: "15:00" },
-  { fifaMatch: 4, group: "D", home: 1, away: 2, matchday: 1, date: "Jun 12", time: "21:00" },
-  { fifaMatch: 5, group: "C", home: 3, away: 4, matchday: 1, date: "Jun 13", time: "21:00" },
-  { fifaMatch: 6, group: "D", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "00:00" },
-  { fifaMatch: 7, group: "C", home: 1, away: 2, matchday: 1, date: "Jun 13", time: "18:00" },
-  { fifaMatch: 8, group: "B", home: 3, away: 4, matchday: 1, date: "Jun 13", time: "15:00" },
-  { fifaMatch: 9, group: "E", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "19:00" },
-  { fifaMatch: 10, group: "E", home: 1, away: 2, matchday: 1, date: "Jun 14", time: "13:00" },
-  { fifaMatch: 11, group: "F", home: 1, away: 2, matchday: 1, date: "Jun 14", time: "16:00" },
-  { fifaMatch: 12, group: "F", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "22:00" },
-  { fifaMatch: 13, group: "H", home: 3, away: 4, matchday: 1, date: "Jun 15", time: "18:00" },
-  { fifaMatch: 14, group: "H", home: 1, away: 2, matchday: 1, date: "Jun 15", time: "12:00" },
-  { fifaMatch: 15, group: "G", home: 3, away: 4, matchday: 1, date: "Jun 15", time: "21:00" },
-  { fifaMatch: 16, group: "G", home: 1, away: 2, matchday: 1, date: "Jun 15", time: "15:00" },
-  { fifaMatch: 17, group: "I", home: 1, away: 2, matchday: 1, date: "Jun 16", time: "15:00" },
-  { fifaMatch: 18, group: "I", home: 3, away: 4, matchday: 1, date: "Jun 16", time: "18:00" },
-  { fifaMatch: 19, group: "J", home: 1, away: 2, matchday: 1, date: "Jun 16", time: "21:00" },
-  { fifaMatch: 20, group: "J", home: 3, away: 4, matchday: 1, date: "Jun 17", time: "00:00" },
-  { fifaMatch: 21, group: "L", home: 3, away: 4, matchday: 1, date: "Jun 17", time: "19:00" },
-  { fifaMatch: 22, group: "L", home: 1, away: 2, matchday: 1, date: "Jun 17", time: "16:00" },
-  { fifaMatch: 23, group: "K", home: 1, away: 2, matchday: 1, date: "Jun 17", time: "13:00" },
-  { fifaMatch: 24, group: "K", home: 3, away: 4, matchday: 1, date: "Jun 17", time: "22:00" },
-  { fifaMatch: 25, group: "A", home: 4, away: 2, matchday: 2, date: "Jun 18", time: "12:00" },
-  { fifaMatch: 26, group: "B", home: 4, away: 2, matchday: 2, date: "Jun 18", time: "15:00" },
-  { fifaMatch: 27, group: "B", home: 1, away: 3, matchday: 2, date: "Jun 18", time: "18:00" },
-  { fifaMatch: 28, group: "A", home: 1, away: 3, matchday: 2, date: "Jun 18", time: "21:00" },
-  { fifaMatch: 29, group: "C", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "21:00" },
-  { fifaMatch: 30, group: "C", home: 4, away: 2, matchday: 2, date: "Jun 19", time: "18:00" },
-  { fifaMatch: 31, group: "D", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "00:00" },
-  { fifaMatch: 32, group: "D", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "15:00" },
-  { fifaMatch: 33, group: "E", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "16:00" },
-  { fifaMatch: 34, group: "E", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "20:00" },
-  { fifaMatch: 35, group: "F", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "13:00" },
-  { fifaMatch: 36, group: "F", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "00:00" },
-  { fifaMatch: 37, group: "H", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "18:00" },
-  { fifaMatch: 38, group: "H", home: 1, away: 3, matchday: 2, date: "Jun 21", time: "12:00" },
-  { fifaMatch: 39, group: "G", home: 1, away: 3, matchday: 2, date: "Jun 21", time: "15:00" },
-  { fifaMatch: 40, group: "G", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "21:00" },
-  { fifaMatch: 41, group: "I", home: 4, away: 2, matchday: 2, date: "Jun 22", time: "20:00" },
-  { fifaMatch: 42, group: "I", home: 1, away: 3, matchday: 2, date: "Jun 22", time: "17:00" },
-  { fifaMatch: 43, group: "J", home: 1, away: 3, matchday: 2, date: "Jun 22", time: "13:00" },
-  { fifaMatch: 44, group: "J", home: 4, away: 2, matchday: 2, date: "Jun 22", time: "23:00" },
-  { fifaMatch: 45, group: "L", home: 1, away: 3, matchday: 2, date: "Jun 23", time: "16:00" },
-  { fifaMatch: 46, group: "L", home: 4, away: 2, matchday: 2, date: "Jun 23", time: "19:00" },
-  { fifaMatch: 47, group: "K", home: 1, away: 3, matchday: 2, date: "Jun 23", time: "13:00" },
-  { fifaMatch: 48, group: "K", home: 4, away: 2, matchday: 2, date: "Jun 23", time: "22:00" },
-  { fifaMatch: 49, group: "C", home: 4, away: 1, matchday: 3, date: "Jun 24", time: "18:00" },
-  { fifaMatch: 50, group: "C", home: 2, away: 3, matchday: 3, date: "Jun 24", time: "18:00" },
-  { fifaMatch: 51, group: "B", home: 4, away: 1, matchday: 3, date: "Jun 24", time: "15:00" },
-  { fifaMatch: 52, group: "B", home: 2, away: 3, matchday: 3, date: "Jun 24", time: "15:00" },
-  { fifaMatch: 53, group: "A", home: 4, away: 1, matchday: 3, date: "Jun 24", time: "21:00" },
-  { fifaMatch: 54, group: "A", home: 2, away: 3, matchday: 3, date: "Jun 24", time: "21:00" },
-  { fifaMatch: 55, group: "E", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "16:00" },
-  { fifaMatch: 56, group: "E", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "16:00" },
-  { fifaMatch: 57, group: "F", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "19:00" },
-  { fifaMatch: 58, group: "F", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "19:00" },
-  { fifaMatch: 59, group: "D", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "22:00" },
-  { fifaMatch: 60, group: "D", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "22:00" },
-  { fifaMatch: 61, group: "I", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "15:00" },
-  { fifaMatch: 62, group: "I", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "15:00" },
-  { fifaMatch: 63, group: "G", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "23:00" },
-  { fifaMatch: 64, group: "G", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "23:00" },
-  { fifaMatch: 65, group: "H", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "20:00" },
-  { fifaMatch: 66, group: "H", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "20:00" },
-  { fifaMatch: 67, group: "L", home: 4, away: 1, matchday: 3, date: "Jun 27", time: "17:00" },
-  { fifaMatch: 68, group: "L", home: 2, away: 3, matchday: 3, date: "Jun 27", time: "17:00" },
-  { fifaMatch: 69, group: "J", home: 2, away: 3, matchday: 3, date: "Jun 27", time: "22:00" },
-  { fifaMatch: 70, group: "J", home: 4, away: 1, matchday: 3, date: "Jun 27", time: "22:00" },
-  { fifaMatch: 71, group: "K", home: 4, away: 1, matchday: 3, date: "Jun 27", time: "19:30" },
-  { fifaMatch: 72, group: "K", home: 2, away: 3, matchday: 3, date: "Jun 27", time: "19:30" },
+  { fifaMatch: 1, group: "A", home: 1, away: 2, matchday: 1, date: "Jun 12", time: "00:00" },
+  { fifaMatch: 2, group: "A", home: 3, away: 4, matchday: 1, date: "Jun 12", time: "07:00" },
+  { fifaMatch: 3, group: "B", home: 1, away: 2, matchday: 1, date: "Jun 12", time: "22:00" },
+  { fifaMatch: 4, group: "D", home: 1, away: 2, matchday: 1, date: "Jun 13", time: "07:00" },
+  { fifaMatch: 5, group: "C", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "04:00" },
+  { fifaMatch: 6, group: "D", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "10:00" },
+  { fifaMatch: 7, group: "C", home: 1, away: 2, matchday: 1, date: "Jun 14", time: "01:00" },
+  { fifaMatch: 8, group: "B", home: 3, away: 4, matchday: 1, date: "Jun 14", time: "01:00" },
+  { fifaMatch: 9, group: "E", home: 3, away: 4, matchday: 1, date: "Jun 15", time: "02:00" },
+  { fifaMatch: 10, group: "E", home: 1, away: 2, matchday: 1, date: "Jun 14", time: "21:00" },
+  { fifaMatch: 11, group: "F", home: 1, away: 2, matchday: 1, date: "Jun 15", time: "00:00" },
+  { fifaMatch: 12, group: "F", home: 3, away: 4, matchday: 1, date: "Jun 15", time: "07:00" },
+  { fifaMatch: 13, group: "H", home: 3, away: 4, matchday: 1, date: "Jun 16", time: "01:00" },
+  { fifaMatch: 14, group: "H", home: 1, away: 2, matchday: 1, date: "Jun 15", time: "19:00" },
+  { fifaMatch: 15, group: "G", home: 3, away: 4, matchday: 1, date: "Jun 16", time: "07:00" },
+  { fifaMatch: 16, group: "G", home: 1, away: 2, matchday: 1, date: "Jun 16", time: "01:00" },
+  { fifaMatch: 17, group: "I", home: 1, away: 2, matchday: 1, date: "Jun 16", time: "22:00" },
+  { fifaMatch: 18, group: "I", home: 3, away: 4, matchday: 1, date: "Jun 17", time: "01:00" },
+  { fifaMatch: 19, group: "J", home: 1, away: 2, matchday: 1, date: "Jun 17", time: "05:00" },
+  { fifaMatch: 20, group: "J", home: 3, away: 4, matchday: 1, date: "Jun 17", time: "10:00" },
+  { fifaMatch: 21, group: "L", home: 3, away: 4, matchday: 1, date: "Jun 18", time: "02:00" },
+  { fifaMatch: 22, group: "L", home: 1, away: 2, matchday: 1, date: "Jun 18", time: "00:00" },
+  { fifaMatch: 23, group: "K", home: 1, away: 2, matchday: 1, date: "Jun 17", time: "21:00" },
+  { fifaMatch: 24, group: "K", home: 3, away: 4, matchday: 1, date: "Jun 18", time: "07:00" },
+  { fifaMatch: 25, group: "A", home: 4, away: 2, matchday: 2, date: "Jun 18", time: "19:00" },
+  { fifaMatch: 26, group: "B", home: 4, away: 2, matchday: 2, date: "Jun 19", time: "01:00" },
+  { fifaMatch: 27, group: "B", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "04:00" },
+  { fifaMatch: 28, group: "A", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "06:00" },
+  { fifaMatch: 29, group: "C", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "04:00" },
+  { fifaMatch: 30, group: "C", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "01:00" },
+  { fifaMatch: 31, group: "D", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "10:00" },
+  { fifaMatch: 32, group: "D", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "01:00" },
+  { fifaMatch: 33, group: "E", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "23:00" },
+  { fifaMatch: 34, group: "E", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "04:00" },
+  { fifaMatch: 35, group: "F", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "21:00" },
+  { fifaMatch: 36, group: "F", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "09:00" },
+  { fifaMatch: 37, group: "H", home: 4, away: 2, matchday: 2, date: "Jun 22", time: "01:00" },
+  { fifaMatch: 38, group: "H", home: 1, away: 3, matchday: 2, date: "Jun 21", time: "19:00" },
+  { fifaMatch: 39, group: "G", home: 1, away: 3, matchday: 2, date: "Jun 22", time: "01:00" },
+  { fifaMatch: 40, group: "G", home: 4, away: 2, matchday: 2, date: "Jun 22", time: "07:00" },
+  { fifaMatch: 41, group: "I", home: 4, away: 2, matchday: 2, date: "Jun 23", time: "03:00" },
+  { fifaMatch: 42, group: "I", home: 1, away: 3, matchday: 2, date: "Jun 23", time: "00:00" },
+  { fifaMatch: 43, group: "J", home: 1, away: 3, matchday: 2, date: "Jun 22", time: "21:00" },
+  { fifaMatch: 44, group: "J", home: 4, away: 2, matchday: 2, date: "Jun 23", time: "09:00" },
+  { fifaMatch: 45, group: "L", home: 1, away: 3, matchday: 2, date: "Jun 23", time: "23:00" },
+  { fifaMatch: 46, group: "L", home: 4, away: 2, matchday: 2, date: "Jun 24", time: "02:00" },
+  { fifaMatch: 47, group: "K", home: 1, away: 3, matchday: 2, date: "Jun 23", time: "21:00" },
+  { fifaMatch: 48, group: "K", home: 4, away: 2, matchday: 2, date: "Jun 24", time: "07:00" },
+  { fifaMatch: 49, group: "C", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "01:00" },
+  { fifaMatch: 50, group: "C", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "01:00" },
+  { fifaMatch: 51, group: "B", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "01:00" },
+  { fifaMatch: 52, group: "B", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "01:00" },
+  { fifaMatch: 53, group: "A", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "06:00" },
+  { fifaMatch: 54, group: "A", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "06:00" },
+  { fifaMatch: 55, group: "E", home: 2, away: 3, matchday: 3, date: "Jun 25", time: "23:00" },
+  { fifaMatch: 56, group: "E", home: 4, away: 1, matchday: 3, date: "Jun 25", time: "23:00" },
+  { fifaMatch: 57, group: "F", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "03:00" },
+  { fifaMatch: 58, group: "F", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "03:00" },
+  { fifaMatch: 59, group: "D", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "08:00" },
+  { fifaMatch: 60, group: "D", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "08:00" },
+  { fifaMatch: 61, group: "I", home: 4, away: 1, matchday: 3, date: "Jun 26", time: "22:00" },
+  { fifaMatch: 62, group: "I", home: 2, away: 3, matchday: 3, date: "Jun 26", time: "22:00" },
+  { fifaMatch: 63, group: "G", home: 2, away: 3, matchday: 3, date: "Jun 27", time: "09:00" },
+  { fifaMatch: 64, group: "G", home: 4, away: 1, matchday: 3, date: "Jun 27", time: "09:00" },
+  { fifaMatch: 65, group: "H", home: 2, away: 3, matchday: 3, date: "Jun 27", time: "04:00" },
+  { fifaMatch: 66, group: "H", home: 4, away: 1, matchday: 3, date: "Jun 27", time: "05:00" },
+  { fifaMatch: 67, group: "L", home: 4, away: 1, matchday: 3, date: "Jun 28", time: "00:00" },
+  { fifaMatch: 68, group: "L", home: 2, away: 3, matchday: 3, date: "Jun 28", time: "00:00" },
+  { fifaMatch: 69, group: "J", home: 2, away: 3, matchday: 3, date: "Jun 28", time: "06:00" },
+  { fifaMatch: 70, group: "J", home: 4, away: 1, matchday: 3, date: "Jun 28", time: "06:00" },
+  { fifaMatch: 71, group: "K", home: 4, away: 1, matchday: 3, date: "Jun 28", time: "02:30" },
+  { fifaMatch: 72, group: "K", home: 2, away: 3, matchday: 3, date: "Jun 28", time: "02:30" },
 ];
 
 export function generateGroupMatches() {
@@ -149,7 +150,7 @@ export function generateGroupMatches() {
 // Based on official FIFA 2026 bracket
 // Source: https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/knockout-stage-match-schedule-bracket
 
-// Round of 32: 16 matches
+// Round of 32: 16 matches (dates in Israel time)
 // 8 fixed matches (runner-up vs runner-up or winner vs runner-up)
 // 8 matches where a group winner plays a qualifying 3rd-place team
 // (3rd-place opponent depends on which 8 of 12 third-placed teams qualify - 495 scenarios)
@@ -161,7 +162,7 @@ export const R32_MATCHES = [
     home: "2A",
     away: "2B",
     label: "2A vs 2B",
-    date: "Jun 28",
+    date: "Jun 29",
   },
   {
     id: "R32-2",
@@ -169,7 +170,7 @@ export const R32_MATCHES = [
     home: "1E",
     away: "3rd",
     label: "1E vs 3rd place",
-    date: "Jun 28",
+    date: "Jun 29",
     thirdFrom: "A/B/C/D/F",
   },
   {
@@ -178,7 +179,7 @@ export const R32_MATCHES = [
     home: "1F",
     away: "2C",
     label: "1F vs 2C",
-    date: "Jun 29",
+    date: "Jun 30",
   },
   {
     id: "R32-4",
@@ -194,7 +195,7 @@ export const R32_MATCHES = [
     home: "1I",
     away: "3rd",
     label: "1I vs 3rd place",
-    date: "Jun 30",
+    date: "Jul 1",
     thirdFrom: "C/D/F/G/H",
   },
   {
@@ -211,7 +212,7 @@ export const R32_MATCHES = [
     home: "1A",
     away: "3rd",
     label: "1A vs 3rd place",
-    date: "Jun 30",
+    date: "Jul 1",
     thirdFrom: "C/E/F/H/I",
   },
   {
@@ -231,7 +232,7 @@ export const R32_MATCHES = [
     home: "1D",
     away: "3rd",
     label: "1D vs 3rd place",
-    date: "Jul 1",
+    date: "Jul 2",
     thirdFrom: "B/E/F/I/J",
   },
   {
@@ -240,7 +241,7 @@ export const R32_MATCHES = [
     home: "1G",
     away: "3rd",
     label: "1G vs 3rd place",
-    date: "Jul 1",
+    date: "Jul 2",
     thirdFrom: "A/E/H/I/J",
   },
   {
@@ -249,7 +250,7 @@ export const R32_MATCHES = [
     home: "2K",
     away: "2L",
     label: "2K vs 2L",
-    date: "Jul 1",
+    date: "Jul 3",
   },
   {
     id: "R32-12",
@@ -257,7 +258,7 @@ export const R32_MATCHES = [
     home: "1H",
     away: "2J",
     label: "1H vs 2J",
-    date: "Jul 1",
+    date: "Jul 3",
   },
   {
     id: "R32-13",
@@ -265,7 +266,7 @@ export const R32_MATCHES = [
     home: "1B",
     away: "3rd",
     label: "1B vs 3rd place",
-    date: "Jul 2",
+    date: "Jul 3",
     thirdFrom: "E/F/G/I/J",
   },
   {
@@ -274,7 +275,7 @@ export const R32_MATCHES = [
     home: "1J",
     away: "2H",
     label: "1J vs 2H",
-    date: "Jul 2",
+    date: "Jul 4",
   },
   {
     id: "R32-15",
@@ -282,7 +283,7 @@ export const R32_MATCHES = [
     home: "1K",
     away: "3rd",
     label: "1K vs 3rd place",
-    date: "Jul 3",
+    date: "Jul 4",
     thirdFrom: "D/E/I/J/L",
   },
   {
@@ -304,7 +305,7 @@ export const R16_MATCHES = [
     homeFrom: "R32-2",
     awayFrom: "R32-5",
     label: "W74 vs W77",
-    date: "Jul 4",
+    date: "Jul 5",
   },
   {
     id: "R16-2",
@@ -328,7 +329,7 @@ export const R16_MATCHES = [
     homeFrom: "R32-7",
     awayFrom: "R32-8",
     label: "W79 vs W80",
-    date: "Jul 5",
+    date: "Jul 6",
   },
   // RIGHT SIDE
   {
@@ -345,7 +346,7 @@ export const R16_MATCHES = [
     homeFrom: "R32-9",
     awayFrom: "R32-10",
     label: "W81 vs W82",
-    date: "Jul 6",
+    date: "Jul 7",
   },
   {
     id: "R16-7",
@@ -361,7 +362,7 @@ export const R16_MATCHES = [
     homeFrom: "R32-13",
     awayFrom: "R32-15",
     label: "W85 vs W87",
-    date: "Jul 7",
+    date: "Jul 8",
   },
 ];
 
@@ -382,7 +383,7 @@ export const QF_MATCHES = [
     homeFrom: "R16-3",
     awayFrom: "R16-4",
     label: "W91 vs W92",
-    date: "Jul 10",
+    date: "Jul 12",
   },
   // RIGHT SIDE
   {
@@ -391,7 +392,7 @@ export const QF_MATCHES = [
     homeFrom: "R16-5",
     awayFrom: "R16-6",
     label: "W93 vs W94",
-    date: "Jul 10",
+    date: "Jul 11",
   },
   {
     id: "QF-4",
@@ -399,7 +400,7 @@ export const QF_MATCHES = [
     homeFrom: "R16-7",
     awayFrom: "R16-8",
     label: "W95 vs W96",
-    date: "Jul 11",
+    date: "Jul 12",
   },
 ];
 
@@ -431,7 +432,7 @@ export const FINAL_MATCHES = [
     homeFrom: "SF-1 loser",
     awayFrom: "SF-2 loser",
     label: "3rd Place Match",
-    date: "Jul 18",
+    date: "Jul 19",
   },
   {
     id: "F-1",
