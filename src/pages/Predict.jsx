@@ -21,7 +21,7 @@ import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedBracket } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
-import { predictAllMatches, predictTopScorer } from "../utils/fifaPredictor";
+import { predictAllMatches } from "../utils/fifaPredictor";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
@@ -35,6 +35,7 @@ import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
+import { TOP_SCORER_PLAYERS } from "../data/players";
 
 const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
 const EMPTY_MATCHES = {};
@@ -244,6 +245,17 @@ export default function Predict() {
           setTimeout(() => document.getElementById('field-topScorer')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
         },
       });
+    } else {
+      const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
+      const isValid = playerList.some((p) => p.name === activeForm.topScorer.trim());
+      if (!isValid) {
+        errors.push({
+          label: "מלך שערים חייב להיבחר מהרשימה",
+          action: () => {
+            setTimeout(() => document.getElementById('field-topScorer')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+          },
+        });
+      }
     }
 
     if (!activeForm.formName?.trim()) {
@@ -312,7 +324,9 @@ export default function Predict() {
       setAiProgress({ current: 3, total: totalSteps });
       await new Promise((r) => setTimeout(r, 800));
 
-      saveBonusPrediction(activeFormId, "topScorer", predictTopScorer());
+      const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
+      const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
+      saveBonusPrediction(activeFormId, "topScorer", randomPlayer.name);
 
       showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
