@@ -44,17 +44,17 @@ export default function Home() {
               שריקת הפתיחה בעוד
             </p>
             <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
-              <CountdownUnit value={countdown.seconds} label="שניות" />
-              <CountdownUnit value={countdown.minutes} label="דקות" />
-              <CountdownUnit value={countdown.hours} label="שעות" />
               <CountdownUnit
                 value={countdown.days}
                 label="ימים"
                 accent="bg-primary-light"
               />
+              <CountdownUnit value={countdown.hours} label="שעות" />
+              <CountdownUnit value={countdown.minutes} label="דקות" />
+              <CountdownUnit value={countdown.seconds} label="שניות" />
             </div>
             <p className="text-[10px] text-ink-muted/50 mt-2">
-              12 ביוני 2026 · 00:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+              11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
             </p>
           </>
         )}
