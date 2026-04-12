@@ -4,6 +4,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   RecaptchaVerifier,
@@ -25,9 +27,37 @@ export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
 
+// Handle pending redirect result on page load (for mobile redirect flow)
+getRedirectResult(auth).catch(() => {});
+
+// Detect in-app browsers (WhatsApp, Facebook, Instagram, etc.)
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|Instagram|WhatsApp|Line|wv|WebView/i.test(ua);
+}
+
 export async function signInWithGoogle() {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result.user;
+  // In-app browsers don't support popups — use redirect
+  if (isInAppBrowser()) {
+    await signInWithRedirect(auth, googleProvider);
+    return null; // auth completes on redirect back via getRedirectResult
+  }
+
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  } catch (err) {
+    // Popup blocked or failed on mobile — fall back to redirect
+    if (
+      err.code === "auth/popup-blocked" ||
+      err.code === "auth/operation-not-supported-in-this-environment" ||
+      err.code === "auth/missing-initial-state"
+    ) {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function firebaseSignOut() {
