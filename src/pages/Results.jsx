@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMatchResults } from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { getFilteredMatches } from "../utils/matchFiltering";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
@@ -11,10 +12,7 @@ export default function Results() {
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
 
-  const filteredMatches =
-    selectedStage === "group"
-      ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
+  const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
 
   const playedCount = Object.keys(results).length;
   const totalMatches = groupMatches.length + knockoutMatches.length;

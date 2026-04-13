@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
@@ -17,6 +17,15 @@ export default function Profile() {
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [nickname, setNickname] = useState(user?.displayName || "");
+
+  // Sync local state with Firestore user data (only when not editing)
+  useEffect(() => {
+    if (!editing) {
+      setFirstName(user?.firstName || "");
+      setLastName(user?.lastName || "");
+      setNickname(user?.displayName || "");
+    }
+  }, [user?.firstName, user?.lastName, user?.displayName, editing]);
 
   const { scoredForms, leaderboard } = useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 

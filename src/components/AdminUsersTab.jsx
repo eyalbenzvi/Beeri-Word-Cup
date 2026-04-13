@@ -1,9 +1,21 @@
-import { useMemo } from "react";
-import { updateUser, demoteAdmin, deleteUser } from "../store";
+import { useMemo, useState } from "react";
+import { updateUser, demoteAdmin, deleteUser, setAdminClaim } from "../store";
 import { useCurrentUser } from "../hooks/useStore";
 
 export default function AdminUsersTab({ users, allPredictions }) {
   const { user: currentUser } = useCurrentUser();
+  const [pendingClaim, setPendingClaim] = useState(null);
+
+  async function handleAdminToggle(uid, displayName, action) {
+    const label = action === "promote" ? "להפוך למנהל" : "להסיר הרשאות מנהל מ";
+    if (!window.confirm(`${label}${action === "demote" ? "־" : " את "}${displayName}?`)) return;
+    setPendingClaim(uid);
+    const result = await setAdminClaim(uid, action);
+    setPendingClaim(null);
+    if (result.error) {
+      alert(`שגיאה: ${result.error}`);
+    }
+  }
 
   // Precompute userId → forms[] map once (O(N) instead of O(N×M))
   const userFormsMap = useMemo(() => {
@@ -78,30 +90,22 @@ export default function AdminUsersTab({ users, allPredictions }) {
                 {uid !== currentUser?.id && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (
-                        window.confirm(`להסיר הרשאות מנהל מ־${u.displayName}?`)
-                      ) {
-                        demoteAdmin(uid);
-                      }
-                    }}
-                    className="text-[10px] text-gray-500 underline"
+                    disabled={pendingClaim === uid}
+                    onClick={() => handleAdminToggle(uid, u.displayName, "demote")}
+                    className="text-[10px] text-gray-500 underline disabled:opacity-50"
                   >
-                    הסר מנהל
+                    {pendingClaim === uid ? "..." : "הסר מנהל"}
                   </button>
                 )}
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`להפוך את ${u.displayName} למנהל?`)) {
-                    updateUser(uid, { isAdmin: true });
-                  }
-                }}
-                className="text-[11px] bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer"
+                disabled={pendingClaim === uid}
+                onClick={() => handleAdminToggle(uid, u.displayName, "promote")}
+                className="text-[11px] bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer disabled:opacity-50"
               >
-                הפוך למנהל
+                {pendingClaim === uid ? "..." : "הפוך למנהל"}
               </button>
             )}
             <button

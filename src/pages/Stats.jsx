@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useAllPredictions, useMatchResults, useSettings } from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 
@@ -46,10 +47,7 @@ function MatchPredictions({ forms }) {
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [selectedMatch, setSelectedMatch] = useState(null);
 
-  const filteredMatches =
-    selectedStage === "group"
-      ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
+  const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
 
   const matchStats = useMemo(() => {
     if (!selectedMatch) return null;
