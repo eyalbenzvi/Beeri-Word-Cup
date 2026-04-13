@@ -6,3 +6,10 @@ export function randomScore() {
 export function normalizeStatus(s) {
   return s === "approved" ? "submitted" : s || "draft";
 }
+
+/** Check if a prediction has valid (non-null, non-undefined, non-empty) scores */
+export function isScoreValid(pred) {
+  return pred != null &&
+    pred.homeScore != null && pred.homeScore !== "" &&
+    pred.awayScore != null && pred.awayScore !== "";
+}

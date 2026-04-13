@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
+import { ConfirmProvider } from "./components/ConfirmModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import WelcomeScreen from "./pages/WelcomeScreen";
@@ -75,7 +76,9 @@ function App() {
     <ErrorBoundary>
       <NavigationProvider>
         <ToastProvider>
-          <AppContent />
+          <ConfirmProvider>
+            <AppContent />
+          </ConfirmProvider>
         </ToastProvider>
       </NavigationProvider>
     </ErrorBoundary>

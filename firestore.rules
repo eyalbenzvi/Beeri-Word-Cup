@@ -58,16 +58,20 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid && !isLocked()) || isAdmin()
       );
 
-      // Users can delete their own forms; admins can delete any
+      // Users can delete their own forms only when not locked; admins can delete any
       allow delete: if isAuth() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        (resource.data.userId == request.auth.uid && !isLocked()) || isAdmin()
       );
     }
 
     // Audit log — append-only for authenticated users, read for admins
+    // Validates: userId must match auth, action and timestamp required
     match /auditLog/{logId} {
       allow read: if isAdmin();
-      allow create: if isAuth();
+      allow create: if isAuth()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.timestamp is string;
     }
   }
 }

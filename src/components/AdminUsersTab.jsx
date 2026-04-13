@@ -1,14 +1,26 @@
+import { useMemo } from "react";
 import { updateUser, demoteAdmin, deleteUser } from "../store";
 import { useCurrentUser } from "../hooks/useStore";
 
 export default function AdminUsersTab({ users, allPredictions }) {
   const { user: currentUser } = useCurrentUser();
+
+  // Precompute userId → forms[] map once (O(N) instead of O(N×M))
+  const userFormsMap = useMemo(() => {
+    const map = {};
+    for (const [formId, p] of Object.entries(allPredictions)) {
+      const uid = p.userId;
+      if (!uid) continue;
+      if (!map[uid]) map[uid] = [];
+      map[uid].push([formId, p]);
+    }
+    return map;
+  }, [allPredictions]);
+
   return (
     <div className="space-y-2">
       {Object.entries(users).map(([uid, u]) => {
-        const userForms = Object.entries(allPredictions).filter(
-          ([, p]) => p.userId === uid,
-        );
+        const userForms = userFormsMap[uid] || [];
         const submittedCount = userForms.filter(([, p]) =>
           ["submitted", "approved", "pending"].includes(p.status),
         ).length;

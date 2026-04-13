@@ -34,18 +34,22 @@ export default function Leaderboard({
   const { formBracketMap, scoredForms, leaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
-  // Pre-compute ranks once so we don't recalculate in render
+  // Pre-compute ranks lazily — only create rank entries up to showCount
+  // Ranks are cumulative so we must iterate from the start, but avoid spreading
+  // entries beyond what we display
   const rankedLeaderboard = useMemo(() => {
+    const result = [];
     let currentRank = 1;
-    return leaderboard.map((entry, index) => {
-      if (index > 0) {
-        const prev = leaderboard[index - 1];
-        if (entry.totalPoints !== prev.totalPoints || compareTiebreaker(entry, prev) !== 0) {
-          currentRank = index + 1;
+    for (let i = 0; i < leaderboard.length; i++) {
+      if (i > 0) {
+        const prev = leaderboard[i - 1];
+        if (leaderboard[i].totalPoints !== prev.totalPoints || compareTiebreaker(leaderboard[i], prev) !== 0) {
+          currentRank = i + 1;
         }
       }
-      return { ...entry, rank: currentRank };
-    });
+      result.push({ ...leaderboard[i], rank: currentRank });
+    }
+    return result;
   }, [leaderboard]);
 
   const renderFormDetail = () => {
