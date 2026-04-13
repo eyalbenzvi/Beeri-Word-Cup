@@ -107,6 +107,21 @@ export default function Predict() {
     [matchPredictions],
   );
 
+  // All useMemo hooks must be above early returns to preserve hook call order
+  const predictedGroupMatches = useMemo(() => groupMatches.filter(
+    (m) =>
+      matchPredictions[m.id]?.homeScore != null &&
+      matchPredictions[m.id]?.awayScore != null,
+  ).length, [matchPredictions]);
+  const predictedKnockout = useMemo(() => knockoutMatches.filter(
+    (m) =>
+      matchPredictions[m.id]?.homeScore != null &&
+      matchPredictions[m.id]?.awayScore != null,
+  ).length, [matchPredictions]);
+  const filteredMatches = useMemo(
+    () => getFilteredMatches(selectedStage, selectedGroup),
+    [selectedStage, selectedGroup]);
+
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
       if (!activeFormId || !canEdit) return;
@@ -260,21 +275,6 @@ export default function Predict() {
   }
 
   // === FORM EDITING VIEW ===
-  const predictedGroupMatches = useMemo(() => groupMatches.filter(
-    (m) =>
-      matchPredictions[m.id]?.homeScore != null &&
-      matchPredictions[m.id]?.awayScore != null,
-  ).length, [matchPredictions]);
-  const predictedKnockout = useMemo(() => knockoutMatches.filter(
-    (m) =>
-      matchPredictions[m.id]?.homeScore != null &&
-      matchPredictions[m.id]?.awayScore != null,
-  ).length, [matchPredictions]);
-
-  const filteredMatches = useMemo(
-    () => getFilteredMatches(selectedStage, selectedGroup),
-    [selectedStage, selectedGroup]);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
