@@ -3,12 +3,14 @@ import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
+import { useToast } from "../components/Toast";
 
 export default function Home() {
   const settings = useSettings();
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
+  const showToast = useToast();
 
   return (
     <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
@@ -23,7 +25,7 @@ export default function Home() {
         <button
           onClick={() => {
             if (user) {
-              try { createForm(user.id); } catch {}
+              try { createForm(user.id); } catch (err) { showToast(err.message, "error"); }
             }
             navigate("predict");
           }}

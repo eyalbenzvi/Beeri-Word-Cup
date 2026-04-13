@@ -274,17 +274,16 @@ async function writeFormDoc(formId, formData) {
 const pendingWrites = {};
 
 function debouncedWriteForm(formId, formData, delay = 500) {
+  // Block writes immediately if predictions are locked
+  if (cache.settings?.predictionsLocked) return;
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
   const key = `form:${formId}`;
   clearTimeout(pendingWrites[key]);
   pendingWrites[key] = setTimeout(() => {
-    if (cache.settings?.predictionsLocked) {
-      delete pendingWrites[key];
-      return;
-    }
     delete pendingWrites[key];
+    if (cache.settings?.predictionsLocked) return; // double-check at write time
     setDoc(formDocRef(formId), safeClone(formData))
       .then(() => emitSaved("predictions"))
       .catch((err) => {
@@ -516,7 +515,25 @@ function notifyListeners(event) {
   }
 }
 
-window.addEventListener("store-updated", notifyListeners);
+// Registered once at module load — notifyListeners dispatched via notifyAndEmit
+if (!window.__storeListenerRegistered) {
+  window.__storeListenerRegistered = true;
+  window.addEventListener("store-updated", notifyListeners);
+}
+
+// Cross-tab sync: notify other tabs when active form changes
+let broadcastChannel = null;
+try {
+  broadcastChannel = new BroadcastChannel("beeri-wc-sync");
+  broadcastChannel.onmessage = (event) => {
+    if (event.data?.type === "activeForm-changed") {
+      // Another tab changed the active form — re-read from localStorage
+      notifyAndEmit("activeForm");
+    }
+  };
+} catch {
+  // BroadcastChannel not supported — graceful fallback (no cross-tab sync)
+}
 
 // ============ USERS ============
 
@@ -687,6 +704,7 @@ export function getActiveFormId() {
 export function setActiveFormId(formId) {
   localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
   notifyAndEmit("activeForm");
+  try { broadcastChannel?.postMessage({ type: "activeForm-changed" }); } catch {}
 }
 
 // ============ PREDICTIONS (PER-FORM DOCUMENTS) ============
@@ -774,6 +792,7 @@ export async function deleteForm(formId) {
   const form = getForm(formId);
   if (!form || (form.status !== "draft" && form.status !== "pending")) return;
 
+  clearPendingWritesForForm(formId);
   indexRemoveForm(formId, form.userId);
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];

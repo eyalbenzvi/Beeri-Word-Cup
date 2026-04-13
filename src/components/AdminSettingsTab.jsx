@@ -8,6 +8,8 @@ import {
   clearMatchResults,
 } from "../store";
 import { TOP_SCORER_PLAYERS } from "../data/players";
+import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmModal";
 
 export default function AdminSettingsTab({
   settings,
@@ -19,6 +21,8 @@ export default function AdminSettingsTab({
   const fileInputRef = useRef(null);
   const playerFileRef = useRef(null);
   const [playerCount, setPlayerCount] = useState(settings.topScorerPlayers?.length || 0);
+  const showToast = useToast();
+  const confirm = useConfirm();
 
   const downloadBackup = (label = "backup") => {
     const data = exportAllData();
@@ -55,12 +59,12 @@ export default function AdminSettingsTab({
         const validKeys = ["users", "predictions", "matchResults", "settings", "actualBonuses", "actualAdvancing"];
         const dataKeys = Object.keys(data);
         if (dataKeys.length === 0 || !dataKeys.some(k => validKeys.includes(k))) {
-          alert("קובץ לא תקין — חסרים שדות נדרשים (users, predictions, וכו')");
+          showToast("קובץ לא תקין — חסרים שדות נדרשים", "error");
           return;
         }
         const invalidKeys = dataKeys.filter(k => !validKeys.includes(k));
         if (invalidKeys.length > 0) {
-          alert(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`);
+          showToast(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`, "error");
           return;
         }
         // Confirm with preview
@@ -70,9 +74,9 @@ export default function AdminSettingsTab({
         }).join("\n");
         if (!window.confirm(`ייבוא ידרוס את הנתונים הקיימים.\n\nתוכן הקובץ:\n${preview}\n\nלהמשיך?`)) return;
         importAllData(data);
-        alert("כל הנתונים הקיימים הוחלפו בנתונים שיובאו בהצלחה");
+        showToast("כל הנתונים הוחלפו בהצלחה");
       } catch {
-        alert("קובץ לא תקין — שגיאה בפרסור JSON");
+        showToast("קובץ לא תקין — שגיאה בפרסור JSON", "error");
       }
     };
     reader.readAsText(file);
@@ -138,7 +142,7 @@ export default function AdminSettingsTab({
             onClick={() => {
               updateSettings({ topScorerPlayers: TOP_SCORER_PLAYERS });
               setPlayerCount(TOP_SCORER_PLAYERS.length);
-              alert("רשימת השחקנים אופסה לברירת המחדל");
+              showToast("רשימת השחקנים אופסה לברירת המחדל");
             }}
             className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
           >
@@ -163,14 +167,14 @@ export default function AdminSettingsTab({
                 try {
                   const data = JSON.parse(ev.target.result);
                   if (!Array.isArray(data) || !data[0]?.team || !data[0]?.name) {
-                    alert("פורמט לא תקין — נדרש מערך של { team, name }");
+                    showToast("פורמט לא תקין — נדרש מערך של { team, name }", "error");
                     return;
                   }
                   updateSettings({ topScorerPlayers: data });
                   setPlayerCount(data.length);
-                  alert(`נטענו ${data.length} שחקנים`);
+                  showToast(`נטענו ${data.length} שחקנים`);
                 } catch {
-                  alert("שגיאה בקריאת הקובץ");
+                  showToast("שגיאה בקריאת הקובץ", "error");
                 }
               };
               reader.readAsText(file);

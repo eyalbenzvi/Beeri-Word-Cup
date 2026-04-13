@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, createRef } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
 import {
   useCurrentUser,
   useUserForms,
@@ -37,11 +37,9 @@ import MatchSearch from "../components/MatchSearch";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 
-const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
+import { KNOCKOUT_STAGE_ORDER as knockoutStageOrder, getStageLabel, STAGE_LABELS } from "../utils/constants";
 const EMPTY_MATCHES = {};
-
-const STAGE_LABELS = { R32: "שלב ה-32", R16: "שמינית גמר", QF: "רבע גמר", SF: "חצי גמר", "3RD": "מקום שלישי", F: "גמר" };
-function getStageLabel(stage) { return STAGE_LABELS[stage] || stage; }
+const SCROLL_DELAY = 100; // ms to wait for DOM before scrollIntoView
 
 const AI_MESSAGES = [
   "⚽ סורק דירוגי FIFA...",
@@ -193,7 +191,7 @@ export default function Predict() {
             document
               .getElementById(`match-${firstMissing.id}`)
               ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
+          }, SCROLL_DELAY);
         },
       });
     }
@@ -216,7 +214,7 @@ export default function Predict() {
             document
               .getElementById(`match-${firstMissing.id}`)
               ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
+          }, SCROLL_DELAY);
         },
       });
     }
@@ -246,7 +244,7 @@ export default function Predict() {
             document
               .getElementById(`match-${firstTie.id}`)
               ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
+          }, SCROLL_DELAY);
         },
       });
     }
@@ -361,7 +359,7 @@ export default function Predict() {
       document
         .getElementById(`match-${match.id}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
+    }, SCROLL_DELAY);
   }, []);
 
   if (!user) {
@@ -519,17 +517,7 @@ export default function Predict() {
           {activeForm.formName} ›{" "}
           {selectedStage === "group"
             ? `שלב בתים › בית ${selectedGroup}`
-            : (() => {
-                const stageNames = {
-                  R32: "שלב ה-32",
-                  R16: "שמינית גמר",
-                  QF: "רבע גמר",
-                  SF: "חצי גמר",
-                  "3RD": "מקום שלישי",
-                  F: "גמר",
-                };
-                return stageNames[selectedStage] || selectedStage;
-              })()}
+            : getStageLabel(selectedStage)}
         </div>
         <button
           onClick={() => setShowSearch(true)}

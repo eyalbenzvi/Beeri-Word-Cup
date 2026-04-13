@@ -8,6 +8,7 @@ import {
   FINAL_MATCHES,
 } from "../data/matches";
 import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
+import { isScoreValid } from "./helpers";
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -40,14 +41,7 @@ export function calcGroupStandings(matchPredictions) {
     const gMatches = groupMatches.filter((m) => m.group === groupName);
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
-      if (
-        !pred ||
-        pred.homeScore === null ||
-        pred.homeScore === undefined ||
-        pred.awayScore === null ||
-        pred.awayScore === undefined
-      )
-        continue;
+      if (!isScoreValid(pred)) continue;
 
       const h = Number(pred.homeScore);
       const a = Number(pred.awayScore);
@@ -82,14 +76,7 @@ export function calcGroupStandings(matchPredictions) {
     const groupMatchResults = [];
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
-      if (
-        !pred ||
-        pred.homeScore === null ||
-        pred.homeScore === undefined ||
-        pred.awayScore === null ||
-        pred.awayScore === undefined
-      )
-        continue;
+      if (!isScoreValid(pred)) continue;
       groupMatchResults.push({
         team1Code: match.homeTeam,
         team2Code: match.awayTeam,
@@ -263,21 +250,18 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   if (!teams || !teams.home || !teams.away) return null;
 
   const pred = matchPredictions[matchId];
-  if (
-    !pred ||
-    pred.homeScore === null ||
-    pred.homeScore === undefined ||
-    pred.awayScore === null ||
-    pred.awayScore === undefined
-  )
-    return null;
+  if (!isScoreValid(pred)) return null;
 
   const hs = Number(pred.homeScore);
   const as = Number(pred.awayScore);
   if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
 
   if (hs === as) {
-    return pred.advancingTeam || teams.home;
+    // Validate advancingTeam is one of the actual match teams
+    if (pred.advancingTeam === teams.home || pred.advancingTeam === teams.away) {
+      return pred.advancingTeam;
+    }
+    return teams.home; // default fallback
   }
   return hs > as ? teams.home : teams.away;
 }

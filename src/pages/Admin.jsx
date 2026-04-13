@@ -8,6 +8,7 @@ import {
   useActualBonuses,
 } from "../hooks/useStore";
 import { saveActualBonuses } from "../store";
+import { useToast } from "../components/Toast";
 import AdminResultsTab from "../components/AdminResultsTab";
 import AdminSettingsTab from "../components/AdminSettingsTab";
 import AdminUsersTab from "../components/AdminUsersTab";
@@ -24,6 +25,7 @@ export default function Admin() {
   const actualBonuses = useActualBonuses();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [topScorerInput, setTopScorerInput] = useState("");
+  const showToast = useToast();
 
   const formsCount = useMemo(
     () => Object.keys(allPredictions).length,
@@ -134,7 +136,7 @@ export default function Admin() {
                   const current = actualBonuses.topScorers || [];
                   const name = topScorerInput.trim();
                   if (current.some(n => n.toLowerCase() === name.toLowerCase())) {
-                    alert(`"${name}" כבר ברשימה`);
+                    showToast(`"${name}" כבר ברשימה`, "error");
                     return;
                   }
                   saveActualBonuses({

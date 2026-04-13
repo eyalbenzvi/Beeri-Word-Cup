@@ -187,7 +187,7 @@ function MatchCard({
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
             <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              <span dir="ltr">{actualResult.homeScore} – {actualResult.awayScore}</span>
+              <span dir="ltr">{actualResult.awayScore} – {actualResult.homeScore}</span>
             </div>
           )}
 
@@ -195,7 +195,7 @@ function MatchCard({
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
@@ -211,7 +211,7 @@ function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
                 <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
@@ -222,7 +222,7 @@ function MatchCard({
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
@@ -239,7 +239,7 @@ function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
               </div>
@@ -262,14 +262,14 @@ function MatchCard({
               <div
                 className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/60"}`}
               >
-                {hasPrediction ? <span dir="ltr">{predHome} – {predAway}</span> : "– : –"}
+                {hasPrediction ? <span dir="ltr">{predAway} – {predHome}</span> : "– : –"}
               </div>
             )
           )}
 
           {hasResult && !editable && predHome !== "" && (
             <div className="text-[11px] text-ink-muted font-medium tabular-nums">
-              ניחוש: <span dir="ltr">{predHome} – {predAway}</span>
+              ניחוש: <span dir="ltr">{predAway} – {predHome}</span>
             </div>
           )}
         </div>
