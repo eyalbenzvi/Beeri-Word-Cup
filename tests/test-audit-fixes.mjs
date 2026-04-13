@@ -595,6 +595,348 @@ console.log("--- 2.1b: Lock check prevents cache update ---");
 }
 
 // ============================================================
+// FIX 3.6b: Firestore rule — immutable userId on update
+// Potential bugs: admin blocked from updating other fields, userId silently changed
+// ============================================================
+console.log("--- 3.6b: Immutable userId on form update ---");
+
+{
+  function canUpdateForm(existingUserId, newUserId, callerUid, isAdmin, isLocked) {
+    // Simulates Firestore update rule
+    const ownerAllowed = existingUserId === callerUid && !isLocked;
+    const adminAllowed = isAdmin;
+    const authorized = ownerAllowed || adminAllowed;
+    const userIdUnchanged = newUserId === existingUserId;
+    return authorized && userIdUnchanged;
+  }
+
+  // Owner updates own form — userId stays same → allowed
+  assert(canUpdateForm("u1", "u1", "u1", false, false), "Owner can update own form (userId unchanged)");
+  // Owner tries to change userId → blocked
+  assert(!canUpdateForm("u1", "u2", "u1", false, false), "Owner CANNOT change userId");
+  // Admin updates someone's form — userId stays same → allowed
+  assert(canUpdateForm("u1", "u1", "admin", true, false), "Admin can update form (userId unchanged)");
+  // Admin tries to change userId → blocked
+  assert(!canUpdateForm("u1", "u2", "admin", true, false), "Admin CANNOT change userId (immutable)");
+  // Admin can update even when locked — but userId must stay same
+  assert(canUpdateForm("u1", "u1", "admin", true, true), "Admin can update locked form");
+  assert(!canUpdateForm("u1", "u2", "admin", true, true), "Admin CANNOT change userId on locked form");
+  // Owner blocked when locked
+  assert(!canUpdateForm("u1", "u1", "u1", false, true), "Owner blocked when predictions locked");
+}
+
+// Client-side adminUpdateForm strips userId
+console.log("--- 3.6c: adminUpdateForm strips userId from fields ---");
+
+{
+  function simulateAdminUpdateForm(form, fields) {
+    const { userId: _drop, ...safeFields } = fields;
+    return { ...form, ...safeFields, updatedAt: "now" };
+  }
+
+  const form = { userId: "u1", formName: "Test", status: "draft" };
+
+  // Fields include userId — should be stripped
+  const updated = simulateAdminUpdateForm(form, { userId: "hacker", adminNote: "fixed" });
+  assert(updated.userId === "u1", "userId NOT overwritten by admin fields");
+  assert(updated.adminNote === "fixed", "Other fields applied normally");
+
+  // Fields without userId — should work normally
+  const updated2 = simulateAdminUpdateForm(form, { status: "submitted" });
+  assert(updated2.userId === "u1", "userId preserved when not in fields");
+  assert(updated2.status === "submitted", "Status updated normally");
+}
+
+// ============================================================
+// FIX 2.9: BroadcastChannel lifecycle
+// Potential bugs: double close, reopen after logout, null reference
+// ============================================================
+console.log("--- 2.9: BroadcastChannel lifecycle ---");
+
+{
+  let channelOpen = false;
+  let channelRef = null;
+
+  function openChannel() {
+    if (channelRef) return; // already open
+    channelRef = { close() { channelOpen = false; } };
+    channelOpen = true;
+  }
+  function closeChannel() {
+    try { channelRef?.close(); } catch { /* already closed */ }
+    channelRef = null;
+  }
+
+  // Initial open
+  openChannel();
+  assert(channelOpen, "Channel opens successfully");
+  assert(channelRef !== null, "Channel ref exists");
+
+  // Double open — should be no-op
+  openChannel();
+  assert(channelOpen, "Double open is safe");
+
+  // Close
+  closeChannel();
+  assert(!channelOpen, "Channel closed");
+  assert(channelRef === null, "Channel ref cleared");
+
+  // Double close — should be safe
+  closeChannel();
+  assert(channelRef === null, "Double close is safe (no error)");
+
+  // Reopen after close (login after logout)
+  openChannel();
+  assert(channelOpen, "Channel reopens after close");
+  assert(channelRef !== null, "Channel ref restored");
+}
+
+// ============================================================
+// FIX 2.9b: upgradeTimer cleared on logout
+// ============================================================
+console.log("--- 2.9b: upgradeTimer cleared on logout ---");
+
+{
+  let timerFired = false;
+  let upgradeTimer = null;
+
+  function maybeUpgrade() {
+    clearTimeout(upgradeTimer);
+    upgradeTimer = setTimeout(() => { timerFired = true; }, 50);
+  }
+
+  function simulateLogout() {
+    clearTimeout(upgradeTimer);
+    upgradeTimer = null;
+  }
+
+  // Start upgrade timer
+  maybeUpgrade();
+  assert(upgradeTimer !== null, "Timer scheduled");
+
+  // Logout before timer fires
+  simulateLogout();
+  assert(upgradeTimer === null, "Timer cleared on logout");
+
+  // Wait and verify timer didn't fire
+  await new Promise(r => setTimeout(r, 100));
+  assert(!timerFired, "Cleared timer never fires after logout");
+}
+
+// ============================================================
+// FIX 2.10: Profile state sync with user changes
+// ============================================================
+console.log("--- 2.10: Profile state sync ---");
+
+{
+  // Simulate the sync logic
+  let editing = false;
+  let localFirstName = "Old";
+  let localLastName = "Name";
+
+  function syncFromUser(user) {
+    if (!editing) {
+      localFirstName = user?.firstName || "";
+      localLastName = user?.lastName || "";
+    }
+  }
+
+  // Not editing: sync should update
+  syncFromUser({ firstName: "New", lastName: "User" });
+  assert(localFirstName === "New", "firstName synced when not editing");
+  assert(localLastName === "User", "lastName synced when not editing");
+
+  // Editing: sync should NOT update
+  editing = true;
+  localFirstName = "My Edit";
+  syncFromUser({ firstName: "External Change", lastName: "External" });
+  assert(localFirstName === "My Edit", "firstName preserved during editing");
+
+  // Stop editing: should allow sync again
+  editing = false;
+  syncFromUser({ firstName: "Latest", lastName: "Data" });
+  assert(localFirstName === "Latest", "firstName syncs after editing stops");
+
+  // Null user: should set empty strings
+  syncFromUser(null);
+  assert(localFirstName === "", "null user sets empty firstName");
+  assert(localLastName === "", "null user sets empty lastName");
+}
+
+// ============================================================
+// FIX 3.1: requireAdmin guard
+// ============================================================
+console.log("--- 3.1: requireAdmin guard ---");
+
+{
+  let currentUser = null;
+  function requireAdmin() {
+    if (!currentUser?.isAdmin) return false;
+    return true;
+  }
+
+  // No user → blocked
+  currentUser = null;
+  assert(!requireAdmin(), "No user: admin blocked");
+
+  // Regular user → blocked
+  currentUser = { id: "u1", isAdmin: false };
+  assert(!requireAdmin(), "Regular user: admin blocked");
+
+  // Admin user → allowed
+  currentUser = { id: "u1", isAdmin: true };
+  assert(requireAdmin(), "Admin user: admin allowed");
+
+  // User with undefined isAdmin → blocked
+  currentUser = { id: "u1" };
+  assert(!requireAdmin(), "Missing isAdmin: admin blocked");
+}
+
+// ============================================================
+// FIX 3.2: Custom Claims — isAdmin rule with fallback
+// ============================================================
+console.log("--- 3.2: isAdmin rule with Custom Claims fallback ---");
+
+{
+  function isAdmin(tokenAdmin, firestoreIsAdmin) {
+    return tokenAdmin === true || firestoreIsAdmin === true;
+  }
+
+  // Both sources say admin
+  assert(isAdmin(true, true), "Token+Firestore admin");
+  // Only token says admin (Custom Claims set, Firestore not yet updated)
+  assert(isAdmin(true, false), "Token admin, Firestore not — allowed (claim takes priority)");
+  // Only Firestore says admin (migration period, claim not yet set)
+  assert(isAdmin(false, true), "Token not admin, Firestore admin — allowed (fallback)");
+  // Neither
+  assert(!isAdmin(false, false), "Neither source: not admin");
+  assert(!isAdmin(undefined, false), "Undefined token: not admin");
+  assert(!isAdmin(null, null), "Null sources: not admin");
+}
+
+// ============================================================
+// FIX 4.5: getFilteredMatches
+// ============================================================
+console.log("--- 4.5: getFilteredMatches ---");
+
+{
+  const groupMatches = [
+    { id: "g1", stage: "group", group: "A" },
+    { id: "g2", stage: "group", group: "A" },
+    { id: "g3", stage: "group", group: "B" },
+  ];
+  const knockoutMatches = [
+    { id: "k1", stage: "R32" },
+    { id: "k2", stage: "R32" },
+    { id: "k3", stage: "R16" },
+  ];
+
+  function getFilteredMatches(stage, group) {
+    return stage === "group"
+      ? groupMatches.filter((m) => m.group === group)
+      : knockoutMatches.filter((m) => m.stage === stage);
+  }
+
+  const groupA = getFilteredMatches("group", "A");
+  assert(groupA.length === 2, "Group A has 2 matches");
+  assert(groupA.every(m => m.group === "A"), "All matches are group A");
+
+  const groupB = getFilteredMatches("group", "B");
+  assert(groupB.length === 1, "Group B has 1 match");
+
+  const r32 = getFilteredMatches("R32");
+  assert(r32.length === 2, "R32 has 2 matches");
+
+  const r16 = getFilteredMatches("R16");
+  assert(r16.length === 1, "R16 has 1 match");
+
+  const qf = getFilteredMatches("QF");
+  assert(qf.length === 0, "QF has 0 matches (none defined)");
+
+  // Nonexistent group
+  const groupZ = getFilteredMatches("group", "Z");
+  assert(groupZ.length === 0, "Group Z has 0 matches");
+}
+
+// ============================================================
+// FIX 4.1: formValidation — pure logic (no DOM)
+// ============================================================
+console.log("--- 4.1: formValidation pure logic ---");
+
+{
+  // Simulate validateForm logic (subset)
+  function validateBudget(budgetNumber) {
+    if (!budgetNumber || !/^\d+$/.test(budgetNumber) || parseInt(budgetNumber) < 100 || parseInt(budgetNumber) > 9999) {
+      return { key: "invalidBudget", label: "invalid budget" };
+    }
+    return null;
+  }
+
+  assert(validateBudget("500") === null, "Budget 500 valid");
+  assert(validateBudget("100") === null, "Budget 100 valid (min)");
+  assert(validateBudget("9999") === null, "Budget 9999 valid (max)");
+  assert(validateBudget("99")?.key === "invalidBudget", "Budget 99 invalid (below min)");
+  assert(validateBudget("10000")?.key === "invalidBudget", "Budget 10000 invalid (above max)");
+  assert(validateBudget("")?.key === "invalidBudget", "Empty budget invalid");
+  assert(validateBudget(null)?.key === "invalidBudget", "Null budget invalid");
+  assert(validateBudget("abc")?.key === "invalidBudget", "Non-numeric budget invalid");
+  assert(validateBudget("12.5")?.key === "invalidBudget", "Decimal budget invalid");
+  assert(validateBudget("000100") === null, "Leading zeros: parseInt gives 100, passes");
+
+  function validateDuplicateName(name, activeFormId, allPredictions) {
+    if (!name?.trim()) return true; // empty — separate check
+    const trimmed = name.trim().toLowerCase();
+    return Object.entries(allPredictions).some(
+      ([fid, f]) => fid !== activeFormId && f.formName?.trim().toLowerCase() === trimmed &&
+        ["submitted", "approved", "pending"].includes(f.status)
+    );
+  }
+
+  const preds = {
+    "u1__1": { formName: "My Form", status: "submitted" },
+    "u1__2": { formName: "Other Form", status: "draft" },
+  };
+
+  assert(validateDuplicateName("My Form", "u1__3", preds), "Duplicate submitted name detected");
+  assert(!validateDuplicateName("My Form", "u1__1", preds), "Same form ID: not a duplicate");
+  assert(!validateDuplicateName("Other Form", "u1__3", preds), "Draft name: not a duplicate");
+  assert(!validateDuplicateName("Unique Name", "u1__3", preds), "Unique name: no duplicate");
+  assert(validateDuplicateName("  MY FORM  ", "u1__3", preds), "Case+whitespace insensitive");
+}
+
+// ============================================================
+// FIX 4.3/4.4: MatchCard bracketEntry prop
+// ============================================================
+console.log("--- 4.3/4.4: MatchCard bracketEntry resolution ---");
+
+{
+  function resolveTeams(match, bracketEntry) {
+    const homeCode = bracketEntry?.home || match.homeTeam;
+    const awayCode = bracketEntry?.away || match.awayTeam;
+    return { homeCode, awayCode };
+  }
+
+  // Group match: no bracketEntry
+  const group = resolveTeams({ homeTeam: "BRA", awayTeam: "FRA" }, undefined);
+  assert(group.homeCode === "BRA", "Group match: uses match.homeTeam");
+  assert(group.awayCode === "FRA", "Group match: uses match.awayTeam");
+
+  // Knockout match: bracketEntry overrides
+  const ko = resolveTeams({ homeTeam: "1A", awayTeam: "2B" }, { home: "BRA", away: "FRA" });
+  assert(ko.homeCode === "BRA", "Knockout: bracketEntry.home used");
+  assert(ko.awayCode === "FRA", "Knockout: bracketEntry.away used");
+
+  // Knockout match: partial bracketEntry (one team resolved, one not)
+  const partial = resolveTeams({ homeTeam: "1A", awayTeam: "2B" }, { home: "BRA", away: null });
+  assert(partial.homeCode === "BRA", "Partial bracket: resolved home");
+  assert(partial.awayCode === "2B", "Partial bracket: fallback to match.awayTeam");
+
+  // Null bracketEntry
+  const nullEntry = resolveTeams({ homeTeam: "1A", awayTeam: "2B" }, null);
+  assert(nullEntry.homeCode === "1A", "Null bracketEntry: fallback to match data");
+}
+
+// ============================================================
 // FINAL SUMMARY
 // ============================================================
 console.log(`\n=== AUDIT FIX RESULTS: ${passed} passed, ${failed} failed ===`);

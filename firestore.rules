@@ -5,8 +5,11 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isAdmin() {
-      return isAuth() &&
-        get(/databases/$(database)/documents/gameData/users).data.data[request.auth.uid].isAdmin == true;
+      // Prefer Custom Claims (set server-side, tamper-proof); fall back to Firestore users doc
+      return isAuth() && (
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/gameData/users).data.data[request.auth.uid].isAdmin == true
+      );
     }
     function isLocked() {
       return get(/databases/$(database)/documents/gameData/settings).data.data.predictionsLocked == true;
@@ -54,9 +57,10 @@ service cloud.firestore {
         && request.resource.data.status == 'draft';
 
       // Users can update their own forms only when not locked; admins always
+      // userId is immutable — no one (including admins) can reassign form ownership
       allow update: if isAuth() && (
         (resource.data.userId == request.auth.uid && !isLocked()) || isAdmin()
-      );
+      ) && request.resource.data.userId == resource.data.userId;
 
       // Users can delete their own forms only when not locked; admins can delete any
       allow delete: if isAuth() && (

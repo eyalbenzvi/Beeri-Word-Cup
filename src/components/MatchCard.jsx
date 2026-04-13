@@ -33,6 +33,7 @@ function focusNextInput(currentInput) {
 
 function MatchCard({
   match,
+  bracketEntry,
   prediction,
   actualResult,
   onPredictionChange,
@@ -66,8 +67,11 @@ function MatchCard({
     return () => clearTimeout(saveTimerRef.current);
   }, [prediction, editable]);
 
-  const homeTeam = getTeamByCode(match.homeTeam);
-  const awayTeam = getTeamByCode(match.awayTeam);
+  // Use bracket-derived teams for knockout matches, falling back to match data
+  const homeCode = (bracketEntry?.home) || match.homeTeam;
+  const awayCode = (bracketEntry?.away) || match.awayTeam;
+  const homeTeam = getTeamByCode(homeCode);
+  const awayTeam = getTeamByCode(awayCode);
   const homeName = homeTeam?.name || "טרם נקבע";
   const awayName = awayTeam?.name || "טרם נקבע";
   const predHome = prediction?.homeScore ?? "";
@@ -340,21 +344,32 @@ function MatchCard({
   );
 }
 
+// Custom memo comparator — update when adding new props that affect rendering
 export default React.memo(MatchCard, (prev, next) => {
-  return (
-    prev.match?.id === next.match?.id &&
-    prev.match?.homeTeam === next.match?.homeTeam &&
-    prev.match?.awayTeam === next.match?.awayTeam &&
-    prev.prediction?.homeScore === next.prediction?.homeScore &&
-    prev.prediction?.awayScore === next.prediction?.awayScore &&
-    prev.prediction?.advancingTeam === next.prediction?.advancingTeam &&
-    prev.editable === next.editable &&
-    prev.isKnockout === next.isKnockout &&
-    prev.importance === next.importance &&
-    prev.showPoints === next.showPoints &&
-    prev.actualResult?.homeScore === next.actualResult?.homeScore &&
-    prev.actualResult?.awayScore === next.actualResult?.awayScore &&
-    prev.points?.points === next.points?.points &&
-    prev.onPredictionChange === next.onPredictionChange
-  );
+  // Match identity & bracket-derived teams
+  if (prev.match?.id !== next.match?.id) return false;
+  if (prev.bracketEntry?.home !== next.bracketEntry?.home ||
+      prev.bracketEntry?.away !== next.bracketEntry?.away) return false;
+
+  // Prediction state
+  if (prev.prediction?.homeScore !== next.prediction?.homeScore ||
+      prev.prediction?.awayScore !== next.prediction?.awayScore ||
+      prev.prediction?.advancingTeam !== next.prediction?.advancingTeam) return false;
+
+  // Actual result
+  if (prev.actualResult?.homeScore !== next.actualResult?.homeScore ||
+      prev.actualResult?.awayScore !== next.actualResult?.awayScore) return false;
+
+  // Scalar props
+  if (prev.editable !== next.editable ||
+      prev.isKnockout !== next.isKnockout ||
+      prev.importance !== next.importance ||
+      prev.showPoints !== next.showPoints) return false;
+
+  // Points & callback
+  if (prev.points?.points !== next.points?.points ||
+      prev.points?.breakdown !== next.points?.breakdown) return false;
+  if (prev.onPredictionChange !== next.onPredictionChange) return false;
+
+  return true;
 });

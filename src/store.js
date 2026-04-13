@@ -439,6 +439,9 @@ export function initRealtimeListeners(userId) {
     window.addEventListener("pagehide", flushPendingWrites);
   }
 
+  // Reopen cross-tab sync channel (closed during logout)
+  openBroadcastChannel();
+
   // Unsubscribe all existing gameDoc listeners before creating new ones
   gameDocUnsubs.forEach((u) => u());
   gameDocUnsubs = [];
@@ -523,17 +526,25 @@ if (!window.__storeListenerRegistered) {
 
 // Cross-tab sync: notify other tabs when active form changes
 let broadcastChannel = null;
-try {
-  broadcastChannel = new BroadcastChannel("beeri-wc-sync");
-  broadcastChannel.onmessage = (event) => {
-    if (event.data?.type === "activeForm-changed") {
-      // Another tab changed the active form — re-read from localStorage
-      notifyAndEmit("activeForm");
-    }
-  };
-} catch {
-  // BroadcastChannel not supported — graceful fallback (no cross-tab sync)
+function openBroadcastChannel() {
+  if (broadcastChannel) return; // already open
+  try {
+    broadcastChannel = new BroadcastChannel("beeri-wc-sync");
+    broadcastChannel.onmessage = (event) => {
+      if (event.data?.type === "activeForm-changed") {
+        // Another tab changed the active form — re-read from localStorage
+        notifyAndEmit("activeForm");
+      }
+    };
+  } catch {
+    // BroadcastChannel not supported — graceful fallback (no cross-tab sync)
+  }
 }
+function closeBroadcastChannel() {
+  try { broadcastChannel?.close(); } catch { /* already closed */ }
+  broadcastChannel = null;
+}
+openBroadcastChannel();
 
 // ============ USERS ============
 
@@ -611,7 +622,39 @@ export function demoteAdmin(userId) {
   updateUserField(userId, { isAdmin: false });
 }
 
+/**
+ * Set admin custom claim via server-side Netlify function.
+ * This sets Firebase Custom Claims (tamper-proof) and updates Firestore.
+ * Returns { success, error } object.
+ */
+export async function setAdminClaim(targetUid, action) {
+  if (!requireAdmin()) return { error: "Not admin" };
+  try {
+    const { auth: firebaseAuth } = await import("./firebase.js");
+    const idToken = await firebaseAuth.currentUser?.getIdToken();
+    if (!idToken) return { error: "Not authenticated" };
+
+    const res = await fetch("/.netlify/functions/set-admin-claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ targetUid, action }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { error: data?.error || `Error ${res.status}` };
+    }
+    return { success: true };
+  } catch (err) {
+    console.error("setAdminClaim error:", err);
+    return { error: err.message };
+  }
+}
+
 export async function deleteUser(userId) {
+  if (!requireAdmin()) return;
   const userCountBefore = Object.keys(getUsers()).length;
 
   // Find user's forms to delete
@@ -660,6 +703,16 @@ export function getCurrentUser() {
   }
 }
 
+// Defense-in-depth: client-side admin guard (Firestore rules are the real security layer)
+function requireAdmin() {
+  const u = getCurrentUser();
+  if (!u?.isAdmin) {
+    console.warn("Admin operation blocked: user is not admin");
+    return false;
+  }
+  return true;
+}
+
 export function setCurrentUser(userId) {
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userId));
   notifyAndEmit("currentUser");
@@ -670,6 +723,9 @@ export function logoutUser() {
   lastEnsuredUid = null;
   listenersInitialized = false;
   listenersHadError = false;
+  clearTimeout(upgradeTimer);
+  upgradeTimer = null;
+  closeBroadcastChannel();
   if (predictionsUnsub) {
     predictionsUnsub();
     predictionsUnsub = null;
@@ -865,6 +921,7 @@ export function submitPredictions(formId) {
 }
 
 export function adminApprovePrediction(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("approve-form", { formId });
   const form = getForm(formId);
   if (!form || form.status !== "pending") return;
@@ -888,6 +945,7 @@ export function reopenForm(formId) {
 }
 
 export function adminForceSubmitForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("force-submit", { formId });
   flushPendingWrites();
   const form = getForm(formId);
@@ -902,6 +960,7 @@ export function adminForceSubmitForm(formId) {
 }
 
 export function adminReopenForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("reopen-form", { formId });
   flushPendingWrites();
   const form = getForm(formId);
@@ -916,6 +975,7 @@ export function adminReopenForm(formId) {
 }
 
 export async function adminDeleteForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("delete-form", { formId });
   flushPendingWrites();
   await deleteDoc(formDocRef(formId));
@@ -931,12 +991,15 @@ export async function adminDeleteForm(formId) {
 }
 
 export function adminUpdateForm(formId, fields) {
+  if (!requireAdmin()) return;
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
+  // userId is immutable — never allow reassignment even by admin
+  const { userId: _drop, ...safeFields } = fields;
   const updated = {
     ...form,
-    ...fields,
+    ...safeFields,
     updatedAt: new Date().toISOString(),
   };
   if (fields.adminNote != null) {
@@ -946,6 +1009,7 @@ export function adminUpdateForm(formId, fields) {
 }
 
 export function adminSaveMatchPrediction(formId, matchId, prediction) {
+  if (!requireAdmin()) return;
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
@@ -959,6 +1023,7 @@ export function adminSaveMatchPrediction(formId, matchId, prediction) {
 // ============ MATCH RESULTS (admin) ============
 
 export function clearMatchResults() {
+  if (!requireAdmin()) return;
   writeAuditLog("clear-match-results");
   writeGameDoc("matchResults", {});
 }
@@ -968,12 +1033,14 @@ export function getMatchResults() {
 }
 
 export function saveMatchResult(matchId, result) {
+  if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
   results[matchId] = { ...result, updatedAt: new Date().toISOString() };
   writeGameDoc("matchResults", results);
 }
 
 export function deleteMatchResult(matchId) {
+  if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
   delete results[matchId];
   writeGameDoc("matchResults", results);
@@ -986,6 +1053,7 @@ export function getActualBonuses() {
 }
 
 export function saveActualBonuses(bonuses) {
+  if (!requireAdmin()) return;
   writeGameDoc("actualBonuses", bonuses);
 }
 
@@ -996,6 +1064,7 @@ export function getSettings() {
 }
 
 export function updateSettings(newSettings) {
+  if (!requireAdmin()) return;
   const settings = { ...getSettings(), ...newSettings };
   writeGameDoc("settings", settings);
 }
@@ -1015,6 +1084,7 @@ export function exportAllData() {
 }
 
 export async function clearAllData() {
+  if (!requireAdmin()) return;
   writeAuditLog("clear-all-data");
 
   // Delete all form documents using batched operations
@@ -1040,6 +1110,7 @@ export async function clearAllData() {
 }
 
 export async function importAllData(data) {
+  if (!requireAdmin()) return;
   writeAuditLog("import-data", { keys: Object.keys(data) });
 
   // Validate imported data structure
