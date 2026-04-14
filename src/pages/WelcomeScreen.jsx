@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
 import GoogleSignInButton from "../components/GoogleSignInButton";
@@ -10,15 +10,6 @@ export default function WelcomeScreen() {
   const countdown = useCountdown();
   const [menuOpen, setMenuOpen] = useState(false);
   const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
-  const [authError, setAuthError] = useState(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      setAuthError("ההתחברות נכשלה. נסה שוב.");
-    };
-    window.addEventListener("auth-redirect-error", handler);
-    return () => window.removeEventListener("auth-redirect-error", handler);
-  }, []);
 
   return (
     <div className="h-dvh bg-bg flex flex-col overflow-hidden">
@@ -78,12 +69,6 @@ export default function WelcomeScreen() {
             </>
           )}
         </div>
-
-        {authError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-medium">
-            {authError}
-          </div>
-        )}
 
         <div className="pt-1 space-y-3">
           {authMethod === "google" ? (

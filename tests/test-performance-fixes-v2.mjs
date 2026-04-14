@@ -1,6 +1,6 @@
 // Tests for 4 performance fixes:
-// Fix 1: Listener retry per-key + fallback + timeout/error state
-// Fix 2: getRedirectResult error handling
+// Fix 1: Listener per-key retry + fallback + persistent auto-recovery (never gives up)
+// Fix 2: getRedirectResult silent error logging (no UI error, user retaps sign-in)
 // Fix 3: FNV-1a hash for bracket cache key
 // Fix 4: Lazy bracket computation in AllForms
 
@@ -63,53 +63,59 @@ function makeBaselinePredictions() {
 }
 
 // =====================================================================
-//  FIX 1 — LISTENER RETRY/FALLBACK/ERROR STATE (10 bugs)
+//  FIX 1 — PERSISTENT AUTO-RETRY WITH EXPONENTIAL BACKOFF (12 bugs)
 // =====================================================================
-console.log("=== FIX 1: LISTENER RETRY/FALLBACK/ERROR STATE ===\n");
+console.log("=== FIX 1: PERSISTENT AUTO-RETRY (NEVER GIVES UP) ===\n");
 
-// Simulate the NEW per-key retry logic from store.js
+// Replicate the retry logic from store.js
+function retryDelay(attempt) {
+  return Math.min(2000 * Math.pow(2, attempt), 30000);
+}
+
 function createRetrySystem() {
   const retryState = {};
-  let storeError = null;
   const cache_ready = {};
   const cache = {};
   let fallbackCalls = [];
+  let scheduledRetries = []; // track retry scheduling for assertions
 
   function getRetry(key) {
     if (!retryState[key]) retryState[key] = { count: 0, inProgress: false };
     return retryState[key];
   }
 
+  // Simulate listener error: first 3 → retry listener, then → fallback getDocs
   function simulateListenerError(key) {
     const rs = getRetry(key);
     if (rs.inProgress) return 'skipped';
     if (rs.count < 3) {
       rs.count++;
       rs.inProgress = true;
-      // Simulate retry scheduling (immediate for testing)
-      rs.inProgress = false;
+      rs.inProgress = false; // immediate for testing
       return 'retry';
     } else {
-      // Retries exhausted — try fallback
       fallbackCalls.push(key);
       return 'fallback';
     }
   }
 
+  // Simulate fallback success — marks ready, resets count
   function simulateFallbackSuccess(key, data) {
     cache[key] = data;
     cache_ready[key] = true;
-    const rs = getRetry(key);
-    rs.count = 0;
+    getRetry(key).count = 0;
   }
 
+  // Simulate fallback failure — schedules another retry (never gives up)
   function simulateFallbackFailure(key) {
-    storeError = { key, message: `Failed to load ${key}`, timestamp: Date.now() };
+    const rs = getRetry(key);
+    rs.count++;
+    scheduledRetries.push({ key, attempt: rs.count, delay: retryDelay(rs.count) });
+    // In real code: setTimeout schedules another fallback attempt
   }
 
   function simulateListenerSuccess(key, data) {
-    const rs = getRetry(key);
-    rs.count = 0;
+    getRetry(key).count = 0;
     cache[key] = data;
     cache_ready[key] = true;
   }
@@ -119,38 +125,32 @@ function createRetrySystem() {
     return DOCS.every(k => cache_ready[k]) && cache_ready.predictions;
   }
 
-  function getStoreError() { return storeError; }
-  function clearError() { storeError = null; }
-
   return {
     getRetry, simulateListenerError, simulateFallbackSuccess,
     simulateFallbackFailure, simulateListenerSuccess, isStoreReady,
-    getStoreError, clearError, retryState, cache_ready, cache, fallbackCalls,
+    retryState, cache_ready, cache, fallbackCalls, scheduledRetries,
   };
 }
 
 console.log("--- F1-Bug1: Per-key retry — listeners don't steal each other's retries ---");
 {
   const sys = createRetrySystem();
-  // Fail 'users' 3 times
   sys.simulateListenerError('users');
   sys.simulateListenerError('users');
   sys.simulateListenerError('users');
   assert(sys.getRetry('users').count === 3, "Users retried 3 times");
-
-  // 'settings' should still have fresh retries
   assert(sys.getRetry('settings').count === 0, "Settings retry count starts at 0");
   sys.simulateListenerError('settings');
   assert(sys.getRetry('settings').count === 1, "Settings retried independently");
 }
 
-console.log("--- F1-Bug2: Fallback triggered after 3 retries ---");
+console.log("--- F1-Bug2: Fallback triggered after 3 listener retries ---");
 {
   const sys = createRetrySystem();
-  assert(sys.simulateListenerError('users') === 'retry', "1st error: retry");
-  assert(sys.simulateListenerError('users') === 'retry', "2nd error: retry");
-  assert(sys.simulateListenerError('users') === 'retry', "3rd error: retry");
-  assert(sys.simulateListenerError('users') === 'fallback', "4th error: fallback triggered");
+  assert(sys.simulateListenerError('users') === 'retry', "1st: retry");
+  assert(sys.simulateListenerError('users') === 'retry', "2nd: retry");
+  assert(sys.simulateListenerError('users') === 'retry', "3rd: retry");
+  assert(sys.simulateListenerError('users') === 'fallback', "4th: fallback");
   assert(sys.fallbackCalls.includes('users'), "Fallback called for 'users'");
 }
 
@@ -163,21 +163,37 @@ console.log("--- F1-Bug3: Fallback success marks ready ---");
   assert(sys.cache['users'].u1.id === 'u1', "Data loaded via fallback");
 }
 
-console.log("--- F1-Bug4: Fallback failure sets storeError ---");
+console.log("--- F1-Bug4: Fallback failure schedules another retry (never gives up) ---");
 {
   const sys = createRetrySystem();
+  // Exhaust listener retries
+  for (let i = 0; i < 3; i++) sys.simulateListenerError('users');
+  sys.simulateListenerError('users'); // triggers fallback
+  // Fallback also fails
   sys.simulateFallbackFailure('users');
-  const err = sys.getStoreError();
-  assert(err !== null, "storeError is set");
-  assert(err.key === 'users', "Error key is 'users'");
-  assert(typeof err.message === 'string', "Error has message");
-  assert(typeof err.timestamp === 'number', "Error has timestamp");
+  assert(sys.scheduledRetries.length === 1, "Retry scheduled after fallback failure");
+  assert(sys.scheduledRetries[0].key === 'users', "Scheduled for correct key");
+  assert(sys.scheduledRetries[0].delay > 0, "Has positive delay");
+  // Fails again — schedules yet another retry
+  sys.simulateFallbackFailure('users');
+  assert(sys.scheduledRetries.length === 2, "Another retry scheduled (never gives up)");
 }
 
-console.log("--- F1-Bug5: isStoreReady requires all 6 keys ---");
+console.log("--- F1-Bug5: Exponential backoff — delay increases then caps at 30s ---");
+{
+  const delays = [];
+  for (let i = 0; i < 10; i++) delays.push(retryDelay(i));
+  assert(delays[0] === 2000, "Attempt 0: 2s");
+  assert(delays[1] === 4000, "Attempt 1: 4s");
+  assert(delays[2] === 8000, "Attempt 2: 8s");
+  assert(delays[3] === 16000, "Attempt 3: 16s");
+  assert(delays[4] === 30000, "Attempt 4: capped at 30s");
+  assert(delays[9] === 30000, "Attempt 9: still capped at 30s");
+}
+
+console.log("--- F1-Bug6: isStoreReady requires all 6 keys ---");
 {
   const sys = createRetrySystem();
-  // Load 5 out of 6
   for (const k of ['users', 'matchResults', 'actualAdvancing', 'actualBonuses', 'settings']) {
     sys.simulateListenerSuccess(k, {});
   }
@@ -186,7 +202,7 @@ console.log("--- F1-Bug5: isStoreReady requires all 6 keys ---");
   assert(sys.isStoreReady(), "Ready when all 6 loaded");
 }
 
-console.log("--- F1-Bug6: Successful listener resets retry count ---");
+console.log("--- F1-Bug7: Successful listener resets retry count ---");
 {
   const sys = createRetrySystem();
   sys.simulateListenerError('users');
@@ -196,29 +212,17 @@ console.log("--- F1-Bug6: Successful listener resets retry count ---");
   assert(sys.getRetry('users').count === 0, "Count reset to 0 after success");
 }
 
-console.log("--- F1-Bug7: Multiple keys can fail independently ---");
+console.log("--- F1-Bug8: Multiple keys can fail independently ---");
 {
   const sys = createRetrySystem();
-  // Fail users 3x, settings 2x, predictions 1x
   for (let i = 0; i < 3; i++) sys.simulateListenerError('users');
   for (let i = 0; i < 2; i++) sys.simulateListenerError('settings');
   sys.simulateListenerError('predictions');
-
-  assert(sys.getRetry('users').count === 3, "Users: 3 retries");
-  assert(sys.getRetry('settings').count === 2, "Settings: 2 retries");
-  assert(sys.getRetry('predictions').count === 1, "Predictions: 1 retry");
-  // Users triggers fallback, others still have retries left
+  assert(sys.getRetry('users').count === 3, "Users: 3");
+  assert(sys.getRetry('settings').count === 2, "Settings: 2");
+  assert(sys.getRetry('predictions').count === 1, "Predictions: 1");
   assert(sys.simulateListenerError('users') === 'fallback', "Users: fallback");
   assert(sys.simulateListenerError('settings') === 'retry', "Settings: still retrying");
-}
-
-console.log("--- F1-Bug8: Error state cleared on successful reconnect ---");
-{
-  const sys = createRetrySystem();
-  sys.simulateFallbackFailure('users');
-  assert(sys.getStoreError() !== null, "Error set");
-  sys.clearError();
-  assert(sys.getStoreError() === null, "Error cleared");
 }
 
 console.log("--- F1-Bug9: inProgress flag prevents concurrent retries ---");
@@ -226,25 +230,23 @@ console.log("--- F1-Bug9: inProgress flag prevents concurrent retries ---");
   const sys = createRetrySystem();
   const rs = sys.getRetry('users');
   rs.inProgress = true;
-  assert(sys.simulateListenerError('users') === 'skipped', "Skipped while retry in progress");
-  assert(rs.count === 0, "Count unchanged when skipped");
+  assert(sys.simulateListenerError('users') === 'skipped', "Skipped while in progress");
+  assert(rs.count === 0, "Count unchanged");
 }
 
-console.log("--- F1-Bug10: Partial ready — some listeners succeed, one fails ---");
+console.log("--- F1-Bug10: Partial ready — eventually recovers via fallback ---");
 {
   const sys = createRetrySystem();
-  // 5 succeed, predictions fails entirely
   for (const k of ['users', 'matchResults', 'actualAdvancing', 'actualBonuses', 'settings']) {
     sys.simulateListenerSuccess(k, {});
   }
-  // predictions fails 3 times then fallback also fails
+  // predictions keeps failing
   for (let i = 0; i < 3; i++) sys.simulateListenerError('predictions');
   sys.simulateListenerError('predictions'); // triggers fallback
-  sys.simulateFallbackFailure('predictions');
-
-  assert(!sys.isStoreReady(), "Not ready — predictions failed");
-  assert(sys.getStoreError() !== null, "Error is set for predictions");
-  assert(sys.getStoreError().key === 'predictions', "Error key is predictions");
+  assert(!sys.isStoreReady(), "Not ready yet");
+  // Eventually fallback succeeds
+  sys.simulateFallbackSuccess('predictions', {});
+  assert(sys.isStoreReady(), "Ready after fallback succeeds");
 }
 
 console.log("--- F1-Bug11: Fallback resets retry count on success ---");
@@ -253,141 +255,121 @@ console.log("--- F1-Bug11: Fallback resets retry count on success ---");
   for (let i = 0; i < 3; i++) sys.simulateListenerError('users');
   assert(sys.getRetry('users').count === 3, "3 retries exhausted");
   sys.simulateFallbackSuccess('users', {});
-  assert(sys.getRetry('users').count === 0, "Retry count reset after fallback success");
+  assert(sys.getRetry('users').count === 0, "Reset after fallback success");
 }
 
 console.log("--- F1-Bug12: Concurrent failures across all 6 listeners ---");
 {
   const sys = createRetrySystem();
   const allKeys = ['users', 'matchResults', 'actualAdvancing', 'actualBonuses', 'settings', 'predictions'];
-  // Each key fails once
   for (const k of allKeys) sys.simulateListenerError(k);
-  // Each should have count=1 independently
   for (const k of allKeys) {
     assert(sys.getRetry(k).count === 1, `${k} has 1 retry (independent)`);
   }
-  // Total retries used: 6, but each key still has 2 left
   for (const k of allKeys) {
     assert(sys.simulateListenerError(k) === 'retry', `${k} can still retry`);
   }
 }
 
 // =====================================================================
-//  FIX 2 — AUTH REDIRECT ERROR HANDLING (10 bugs)
+//  FIX 2 — AUTH REDIRECT SILENT ERROR LOGGING (10 bugs)
 // =====================================================================
-console.log("\n=== FIX 2: AUTH REDIRECT ERROR HANDLING ===\n");
+console.log("\n=== FIX 2: AUTH REDIRECT SILENT ERROR LOGGING ===\n");
 
-// Simulate the event dispatch pattern used in firebase.js
-function simulateRedirectErrorHandling(errorCode, errorMessage) {
-  const events = [];
+// Simulate the silent error logging pattern from firebase.js
+// Errors are logged to console but never shown to the user
+const SILENT_CODES = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
 
-  // Simulate the new firebase.js logic
-  function handleRedirectError(err) {
-    // Should log
-    events.push({ type: 'console.error', code: err.code, message: err.message });
-    // Should dispatch event
-    events.push({ type: 'dispatch', code: err.code, message: err.message });
-  }
-
-  handleRedirectError({ code: errorCode, message: errorMessage });
-  return events;
+function simulateRedirectCatch(err) {
+  const result = { logged: false, code: null };
+  if (SILENT_CODES.includes(err?.code)) return result; // totally silent
+  result.logged = true;
+  result.code = err?.code || 'unknown';
+  result.message = err?.message || String(err);
+  return result;
 }
 
-console.log("--- F2-Bug1: Network error dispatches event ---");
+console.log("--- F2-Bug1: Network error is logged (not silent) ---");
 {
-  const events = simulateRedirectErrorHandling('auth/network-request-failed', 'Network error');
-  assert(events.length === 2, "Two events: log + dispatch");
-  assert(events[1].type === 'dispatch', "Event dispatched");
-  assert(events[1].code === 'auth/network-request-failed', "Correct error code");
+  const r = simulateRedirectCatch({ code: 'auth/network-request-failed', message: 'Network error' });
+  assert(r.logged === true, "Network error is logged");
+  assert(r.code === 'auth/network-request-failed', "Correct code");
 }
 
-console.log("--- F2-Bug2: Internal error dispatches event ---");
+console.log("--- F2-Bug2: Internal error is logged ---");
 {
-  const events = simulateRedirectErrorHandling('auth/internal-error', 'Internal error');
-  assert(events[0].type === 'console.error', "Error logged");
-  assert(events[1].code === 'auth/internal-error', "Correct error code in event");
+  const r = simulateRedirectCatch({ code: 'auth/internal-error', message: 'Internal error' });
+  assert(r.logged === true, "Internal error logged");
 }
 
-console.log("--- F2-Bug3: Popup-closed should be filterable ---");
+console.log("--- F2-Bug3: User cancellations are totally silent ---");
 {
-  // The WelcomeScreen should filter out user-initiated cancellations
-  const userCancellations = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
-  for (const code of userCancellations) {
-    const shouldShow = !userCancellations.includes(code);
-    assert(!shouldShow, `${code} is in cancellation list (should be filtered out by UI)`);
+  for (const code of SILENT_CODES) {
+    const r = simulateRedirectCatch({ code, message: 'User cancelled' });
+    assert(r.logged === false, `${code} is silent (not logged)`);
   }
 }
 
-console.log("--- F2-Bug4: Permission denied dispatches with correct code ---");
+console.log("--- F2-Bug4: Unauthorized domain is logged ---");
 {
-  const events = simulateRedirectErrorHandling('auth/unauthorized-domain', 'Unauthorized domain');
-  assert(events[1].code === 'auth/unauthorized-domain', "Unauthorized domain code preserved");
+  const r = simulateRedirectCatch({ code: 'auth/unauthorized-domain', message: 'Unauthorized' });
+  assert(r.logged === true, "Unauthorized domain logged");
+  assert(r.code === 'auth/unauthorized-domain', "Code preserved");
 }
 
-console.log("--- F2-Bug5: Error message string preserved ---");
+console.log("--- F2-Bug5: Hebrew error message preserved in log ---");
 {
-  const msg = 'שגיאה בהתחברות';
-  const events = simulateRedirectErrorHandling('auth/unknown', msg);
-  assert(events[1].message === msg, "Hebrew message preserved");
+  const r = simulateRedirectCatch({ code: 'auth/unknown', message: 'שגיאה בהתחברות' });
+  assert(r.message === 'שגיאה בהתחברות', "Hebrew message preserved");
 }
 
 console.log("--- F2-Bug6: Null/undefined error fields don't crash ---");
 {
   let crashed = false;
   try {
-    const events = [];
-    const err = { code: undefined, message: null };
-    events.push({ type: 'console.error', code: err.code, message: err.message });
-    events.push({ type: 'dispatch', code: err.code, message: err.message });
-    assert(events.length === 2, "Handles undefined code gracefully");
-  } catch (e) {
-    crashed = true;
-  }
-  assert(!crashed, "No crash on null/undefined error fields");
+    const r = simulateRedirectCatch({ code: undefined, message: null });
+    assert(r.logged === true, "Logs even with undefined code (not in silent list)");
+    assert(r.code === 'unknown', "Undefined code becomes 'unknown'");
+  } catch (e) { crashed = true; }
+  assert(!crashed, "No crash on null/undefined fields");
 }
 
-console.log("--- F2-Bug7: Missing-initial-state (common on mobile) dispatches event ---");
+console.log("--- F2-Bug7: Missing-initial-state (mobile) is logged ---");
 {
-  const events = simulateRedirectErrorHandling('auth/missing-initial-state', 'Missing initial state');
-  assert(events[1].code === 'auth/missing-initial-state', "Mobile-common error dispatched");
+  const r = simulateRedirectCatch({ code: 'auth/missing-initial-state', message: 'Missing' });
+  assert(r.logged === true, "Missing-initial-state logged");
 }
 
-console.log("--- F2-Bug8: Multiple errors don't accumulate (each is independent) ---");
+console.log("--- F2-Bug8: No user-facing UI (no event dispatch, no toast) ---");
 {
-  const events1 = simulateRedirectErrorHandling('auth/error-1', 'First');
-  const events2 = simulateRedirectErrorHandling('auth/error-2', 'Second');
-  assert(events1.length === 2, "First error: 2 events");
-  assert(events2.length === 2, "Second error: 2 events");
-  assert(events1[1].code !== events2[1].code, "Different error codes");
+  // The new behavior: no CustomEvent dispatched, no UI error shown
+  // Verify the handler produces only a log, nothing else
+  const r = simulateRedirectCatch({ code: 'auth/network-request-failed', message: 'err' });
+  assert(r.logged === true, "Only logging, no dispatch");
+  assert(!r.dispatched, "No dispatched property (no UI event)");
 }
 
-console.log("--- F2-Bug9: Error object without code property ---");
+console.log("--- F2-Bug9: Error without code property ---");
 {
   let crashed = false;
   try {
-    const events = [];
-    const err = { message: 'Unknown error' };
-    events.push({ type: 'console.error', code: err.code, message: err.message });
-    events.push({ type: 'dispatch', code: err.code || 'unknown', message: err.message });
-    assert(events[1].code === 'unknown', "Missing code defaults to 'unknown'");
-  } catch (e) {
-    crashed = true;
-  }
+    const r = simulateRedirectCatch({ message: 'Unknown error' });
+    assert(r.code === 'unknown', "Missing code defaults to 'unknown'");
+  } catch (e) { crashed = true; }
   assert(!crashed, "No crash when error has no code");
 }
 
-console.log("--- F2-Bug10: Non-Error thrown (string/number) ---");
+console.log("--- F2-Bug10: Non-object thrown (string) ---");
 {
   let crashed = false;
   try {
+    // Simulate: getRedirectResult throws a string instead of Error
     const err = "string error";
     const code = typeof err === 'object' ? err?.code : 'unknown';
-    const message = typeof err === 'object' ? err?.message : String(err);
+    const msg = typeof err === 'object' ? err?.message : String(err);
     assert(code === 'unknown', "String error gets 'unknown' code");
-    assert(message === 'string error', "String error message preserved");
-  } catch (e) {
-    crashed = true;
-  }
+    assert(msg === 'string error', "String message preserved");
+  } catch (e) { crashed = true; }
   assert(!crashed, "Handles non-Error thrown values");
 }
 

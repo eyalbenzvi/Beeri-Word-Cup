@@ -354,14 +354,18 @@ let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
 const retryState = {}; // key -> { count, inProgress }
-let storeError = null; // null | { key, message, timestamp }
 
 function getRetryState(key) {
   if (!retryState[key]) retryState[key] = { count: 0, inProgress: false };
   return retryState[key];
 }
 
-// Fallback: one-shot read when realtime listener fails after retries
+// Compute backoff delay: 2s, 4s, 8s, 16s, 30s, 30s, 30s, ...
+function retryDelay(attempt) {
+  return Math.min(2000 * Math.pow(2, attempt), 30000);
+}
+
+// Fallback: one-shot read when realtime listener fails, then schedule next retry
 async function fallbackLoadGameDoc(key, docName) {
   try {
     const snap = await withTimeout(getDoc(gameDocRef(docName)), 10000);
@@ -374,8 +378,8 @@ async function fallbackLoadGameDoc(key, docName) {
     }
   } catch (err) {
     console.error(`Fallback load failed for ${docName}:`, err);
-    storeError = { key, message: `Failed to load ${key}: ${err.message}`, timestamp: Date.now() };
-    notifyAndEmit(key);
+    // Schedule another retry with increasing backoff — never give up
+    scheduleRetry(key, () => fallbackLoadGameDoc(key, docName));
   }
 }
 
@@ -395,9 +399,21 @@ async function fallbackLoadPredictions(userId) {
     notifyAndEmit("predictions");
   } catch (err) {
     console.error("Fallback load failed for predictions:", err);
-    storeError = { key: "predictions", message: `Failed to load predictions: ${err.message}`, timestamp: Date.now() };
-    notifyAndEmit("predictions");
+    scheduleRetry("predictions", () => fallbackLoadPredictions(userId));
   }
+}
+
+function scheduleRetry(key, retryFn) {
+  if (!currentListenerUserId) return;
+  const rs = getRetryState(key);
+  if (rs.inProgress) return;
+  rs.count++;
+  rs.inProgress = true;
+  const delay = retryDelay(rs.count);
+  setTimeout(() => {
+    rs.inProgress = false;
+    if (currentListenerUserId && !cache._ready[key]) retryFn();
+  }, delay);
 }
 
 function setupPredictionsListener(userId, showAll) {
@@ -413,7 +429,7 @@ function setupPredictionsListener(userId, showAll) {
     q,
     (snapshot) => {
       if (myGeneration !== predictionsListenerGeneration) return;
-      retryCount = 0;
+      getRetryState("predictions").count = 0;
       if (showAll) {
         // Full collection: replace entire cache
         const preds = {};
@@ -482,9 +498,22 @@ export function initRealtimeListeners(userId) {
   if (!windowListenersAttached) {
     windowListenersAttached = true;
     window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") flushPendingWrites();
+      if (document.visibilityState === "hidden") {
+        flushPendingWrites();
+      } else if (document.visibilityState === "visible" && !isStoreReady() && currentListenerUserId) {
+        // Tab became visible and store isn't ready — retry loading
+        listenersHadError = true;
+        initRealtimeListeners(currentListenerUserId);
+      }
     });
     window.addEventListener("pagehide", flushPendingWrites);
+    // When network comes back online, retry if store isn't ready
+    window.addEventListener("online", () => {
+      if (!isStoreReady() && currentListenerUserId) {
+        listenersHadError = true;
+        initRealtimeListeners(currentListenerUserId);
+      }
+    });
   }
 
   // Reopen cross-tab sync channel (closed during logout)
@@ -538,10 +567,6 @@ export function isStoreReady() {
   return (
     Object.keys(DOCS).every((k) => cache._ready[k]) && cache._ready.predictions
   );
-}
-
-export function getStoreError() {
-  return storeError;
 }
 
 // ============ SUBSCRIPTIONS ============
@@ -778,7 +803,6 @@ export function logoutUser() {
   lastEnsuredUid = null;
   listenersInitialized = false;
   listenersHadError = false;
-  storeError = null;
   for (const key of Object.keys(retryState)) delete retryState[key];
   clearTimeout(upgradeTimer);
   upgradeTimer = null;
