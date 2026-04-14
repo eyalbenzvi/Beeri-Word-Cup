@@ -129,7 +129,3 @@ export function useActualBonuses() {
 export function useSettings() {
   return useStoreValue(store.getSettings);
 }
-
-export function useStoreError() {
-  return useStoreValue(store.getStoreError);
-}

@@ -27,14 +27,12 @@ export const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Handle pending redirect result on page load (for mobile redirect flow)
+// Log errors for debugging but don't bother the user — they can tap sign-in again
 getRedirectResult(auth).catch((err) => {
-  // User-initiated cancellations are not errors
   const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
-  if (silent.includes(err?.code)) return;
-  console.error("Redirect sign-in failed:", err?.code, err?.message);
-  window.dispatchEvent(new CustomEvent("auth-redirect-error", {
-    detail: { code: err?.code || "unknown", message: err?.message || String(err) },
-  }));
+  if (!silent.includes(err?.code)) {
+    console.error("Redirect sign-in failed:", err?.code, err?.message);
+  }
 });
 
 // Detect in-app browsers (WhatsApp, Facebook, Instagram, etc.)
