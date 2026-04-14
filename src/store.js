@@ -1,6 +1,7 @@
 import { db } from "./firebase";
 import {
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -352,8 +353,52 @@ let predictionsUnsub = null;
 let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
-let retryCount = 0;
-let retryInProgress = false;
+const retryState = {}; // key -> { count, inProgress }
+let storeError = null; // null | { key, message, timestamp }
+
+function getRetryState(key) {
+  if (!retryState[key]) retryState[key] = { count: 0, inProgress: false };
+  return retryState[key];
+}
+
+// Fallback: one-shot read when realtime listener fails after retries
+async function fallbackLoadGameDoc(key, docName) {
+  try {
+    const snap = await withTimeout(getDoc(gameDocRef(docName)), 10000);
+    if (snap.exists()) cache[key] = snap.data().data;
+    cache._ready[key] = true;
+    getRetryState(key).count = 0;
+    notifyAndEmit(key);
+    if (key === "settings" || key === "users") {
+      maybeUpgradePredictionsListener();
+    }
+  } catch (err) {
+    console.error(`Fallback load failed for ${docName}:`, err);
+    storeError = { key, message: `Failed to load ${key}: ${err.message}`, timestamp: Date.now() };
+    notifyAndEmit(key);
+  }
+}
+
+async function fallbackLoadPredictions(userId) {
+  try {
+    const q = query(predictionsCollectionRef, where("userId", "==", userId));
+    const snapshot = await withTimeout(getDocs(q), 15000);
+    const preds = { ...cache.predictions };
+    for (const k of Object.keys(preds)) {
+      if (preds[k]?.userId === userId) delete preds[k];
+    }
+    snapshot.forEach((docSnap) => { preds[docSnap.id] = docSnap.data(); });
+    cache.predictions = preds;
+    cache._ready.predictions = true;
+    getRetryState("predictions").count = 0;
+    rebuildUserFormIndex();
+    notifyAndEmit("predictions");
+  } catch (err) {
+    console.error("Fallback load failed for predictions:", err);
+    storeError = { key: "predictions", message: `Failed to load predictions: ${err.message}`, timestamp: Date.now() };
+    notifyAndEmit("predictions");
+  }
+}
 
 function setupPredictionsListener(userId, showAll) {
   if (predictionsUnsub) predictionsUnsub();
@@ -396,14 +441,17 @@ function setupPredictionsListener(userId, showAll) {
       console.error("Listener error for predictions:", err);
       listenersHadError = true;
       notifyAndEmit("predictions");
-      if (retryInProgress) return;
-      if (retryCount < 3 && currentListenerUserId) {
-        retryCount++;
-        retryInProgress = true;
+      const rs = getRetryState("predictions");
+      if (rs.inProgress) return;
+      if (rs.count < 3 && currentListenerUserId) {
+        rs.count++;
+        rs.inProgress = true;
         setTimeout(() => {
-          retryInProgress = false;
-          initRealtimeListeners(currentListenerUserId);
+          rs.inProgress = false;
+          setupPredictionsListener(currentListenerUserId, predictionsShowAll);
         }, 5000);
+      } else if (currentListenerUserId) {
+        fallbackLoadPredictions(currentListenerUserId);
       }
     },
   );
@@ -452,7 +500,7 @@ export function initRealtimeListeners(userId) {
       onSnapshot(
         gameDocRef(docName),
         (snap) => {
-          retryCount = 0;
+          getRetryState(key).count = 0;
           if (snap.exists()) cache[key] = snap.data().data;
           cache._ready[key] = true;
           notifyAndEmit(key);
@@ -465,14 +513,17 @@ export function initRealtimeListeners(userId) {
           console.error(`Listener error for ${docName}:`, err);
           listenersHadError = true;
           notifyAndEmit(key);
-          if (retryInProgress) return;
-          if (retryCount < 3 && currentListenerUserId) {
-            retryCount++;
-            retryInProgress = true;
+          const rs = getRetryState(key);
+          if (rs.inProgress) return;
+          if (rs.count < 3 && currentListenerUserId) {
+            rs.count++;
+            rs.inProgress = true;
             setTimeout(() => {
-              retryInProgress = false;
+              rs.inProgress = false;
               initRealtimeListeners(currentListenerUserId);
             }, 5000);
+          } else {
+            fallbackLoadGameDoc(key, docName);
           }
         },
       ),
@@ -487,6 +538,10 @@ export function isStoreReady() {
   return (
     Object.keys(DOCS).every((k) => cache._ready[k]) && cache._ready.predictions
   );
+}
+
+export function getStoreError() {
+  return storeError;
 }
 
 // ============ SUBSCRIPTIONS ============
@@ -723,6 +778,8 @@ export function logoutUser() {
   lastEnsuredUid = null;
   listenersInitialized = false;
   listenersHadError = false;
+  storeError = null;
+  for (const key of Object.keys(retryState)) delete retryState[key];
   clearTimeout(upgradeTimer);
   upgradeTimer = null;
   closeBroadcastChannel();

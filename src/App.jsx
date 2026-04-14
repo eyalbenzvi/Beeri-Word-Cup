@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmModal";
@@ -6,7 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import WelcomeScreen from "./pages/WelcomeScreen";
 import ProfileSetup from "./components/ProfileSetup";
-import { useStoreReady, useCurrentUser } from "./hooks/useStore";
+import { useStoreReady, useCurrentUser, useStoreError } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
 
 // Lazy-load pages that aren't needed on initial render
@@ -38,17 +38,51 @@ function Loading() {
   );
 }
 
+function LoadError() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+      <div className="text-center max-w-sm">
+        <div className="text-5xl mb-4">😕</div>
+        <h1 className="text-xl font-extrabold text-primary mb-2">
+          לא הצלחנו לטעון את הנתונים
+        </h1>
+        <p className="text-sm text-gray-500 mb-4">
+          ייתכן שיש בעיית חיבור לאינטרנט. נסה לרענן את הדף.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-primary text-white font-bold px-6 py-3 rounded-2xl hover:bg-primary-light transition border-none cursor-pointer shadow-sm"
+        >
+          נסה שוב
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const ready = useStoreReady();
+  const storeError = useStoreError();
   const { page } = useNavigation();
   const { user, authReady, isLoggedIn } = useCurrentUser();
   const [profileDone, setProfileDone] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+
+  // Timeout: if store isn't ready after 25 seconds, show error
+  useEffect(() => {
+    if (ready || !isLoggedIn) return;
+    const t = setTimeout(() => setTimedOut(true), 25000);
+    return () => clearTimeout(t);
+  }, [ready, isLoggedIn]);
 
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading />;
 
   // Not logged in at all — show welcome/login screen
   if (!isLoggedIn) return <WelcomeScreen />;
+
+  // Store error or timeout — show error screen with retry
+  if (storeError || timedOut) return <LoadError />;
 
   // Logged in but Firestore data or user record still loading
   if (!ready || !user) return <Loading />;

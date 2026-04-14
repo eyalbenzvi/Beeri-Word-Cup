@@ -12,8 +12,7 @@ import {
   STAGES,
 } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams } from "../utils/bracket";
-import { getCachedChampion } from "../utils/bracketCache";
+import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -56,9 +55,10 @@ function FormCard({ form, championDisplay, locked, isOwnForm }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
+  // Lazy: only compute bracket when the card is expanded (not for all 250 forms on load)
   const bracketTeams = useMemo(
-    () => calcBracketTeams(predictions),
-    [predictions],
+    () => expanded ? getCachedBracket(predictions) : null,
+    [predictions, expanded],
   );
 
   return (
