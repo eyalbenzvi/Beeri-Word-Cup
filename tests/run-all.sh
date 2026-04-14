@@ -52,6 +52,7 @@ run_test "17. Bracket Cache Fix" "test-bracket-cache.mjs" "yes"
 run_test "18. Batch Limit Fix" "test-batch-limit.mjs" "no"
 run_test "19. Performance Fixes (Comprehensive)" "test-performance-fixes.mjs" "yes"
 run_test "20. Audit Fix Regression Tests" "test-audit-fixes.mjs" "no"
+run_test "21. Performance Fixes V2 (Listener/Auth/Hash/Lazy)" "test-performance-fixes-v2.mjs" "yes"
 
 echo ""
 echo "==========================================="

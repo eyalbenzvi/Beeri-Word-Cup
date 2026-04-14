@@ -7,13 +7,31 @@ const championCache = new Map();
 
 function getStableKey(matchPredictions) {
   const entries = Object.entries(matchPredictions);
-  if (entries.length === 0) return "empty";
-  // Use ALL entries for a collision-free key (sorted for determinism)
-  const parts = entries
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([id, p]) => `${id}:${p?.homeScore ?? ''}-${p?.awayScore ?? ''}${p?.advancingTeam ? '>' + p.advancingTeam : ''}`)
-    .join('|');
-  return parts;
+  if (entries.length === 0) return 0;
+  // Sort for determinism (JS object property order can vary)
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  // FNV-1a hash — fast numeric key, no string allocation
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < entries.length; i++) {
+    const id = entries[i][0];
+    const p = entries[i][1];
+    for (let j = 0; j < id.length; j++) {
+      hash ^= id.charCodeAt(j);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    const h = p?.homeScore ?? -1;
+    const a = p?.awayScore ?? -1;
+    hash ^= ((typeof h === 'number' ? h : -1) << 16) | ((typeof a === 'number' ? a : -1) & 0xffff);
+    hash = Math.imul(hash, 0x01000193);
+    if (p?.advancingTeam) {
+      const at = p.advancingTeam;
+      for (let j = 0; j < at.length; j++) {
+        hash ^= at.charCodeAt(j);
+        hash = Math.imul(hash, 0x01000193);
+      }
+    }
+  }
+  return hash;
 }
 
 export function getCachedBracket(matches) {
@@ -22,7 +40,7 @@ export function getCachedBracket(matches) {
   const result = calcBracketTeams(matches);
   bracketCache.set(key, result);
   // Keep cache bounded
-  if (bracketCache.size > 500) {
+  if (bracketCache.size > 1000) {
     const firstKey = bracketCache.keys().next().value;
     bracketCache.delete(firstKey);
   }
@@ -35,7 +53,7 @@ export function getCachedChampion(matches) {
   const bracket = getCachedBracket(matches);
   const champ = deriveChampion(matches, bracket);
   championCache.set(key, champ);
-  if (championCache.size > 500) {
+  if (championCache.size > 1000) {
     const firstKey = championCache.keys().next().value;
     championCache.delete(firstKey);
   }
