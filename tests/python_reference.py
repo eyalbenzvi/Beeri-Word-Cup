@@ -12,6 +12,17 @@ Based on FIFA Competition Regulations 2026:
 import json, random, sys
 from itertools import combinations
 
+# FIFA/Coca-Cola World Ranking (last-resort tiebreaker per 2026 regulations)
+FIFA_RANKING = {
+    "FRA": 1, "ESP": 2, "ARG": 3, "ENG": 4, "POR": 5, "BRA": 6, "NED": 7, "MAR": 8,
+    "BEL": 9, "GER": 10, "CRO": 11, "COL": 13, "SEN": 14, "MEX": 15, "USA": 16,
+    "URU": 17, "JPN": 18, "SUI": 19, "IRN": 21, "TUR": 22, "ECU": 23, "AUT": 24,
+    "KOR": 25, "AUS": 27, "ALG": 28, "EGY": 29, "CAN": 30, "NOR": 31, "PAN": 33,
+    "CIV": 34, "SWE": 38, "PAR": 40, "CZE": 41, "SCO": 43, "TUN": 44, "COD": 46,
+    "UZB": 50, "QAT": 55, "IRQ": 57, "RSA": 60, "KSA": 61, "JOR": 63, "BIH": 65,
+    "CPV": 69, "GHA": 74, "CUR": 82, "HAI": 83, "NZL": 85,
+}
+
 # ============ GROUPS (from FIFA official draw) ============
 GROUPS = {
     "A": ["MEX","RSA","KOR","CZE"],
@@ -122,7 +133,7 @@ def calc_group_standings(group_name, match_results):
                 result.extend(sort_tied(sub))  # Recursive H2H (FIFA rule d)
             elif len(sub) > 1:
                 # H2H exhausted — fall to overall stats (FIFA rules e-h)
-                result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], t["code"])))
+                result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], FIFA_RANKING.get(t["code"], 999))))
             else:
                 result.extend(sub)
             i = j
@@ -153,7 +164,7 @@ def get_best_third(all_standings):
             t["group"] = group
             thirds.append(t)
 
-    thirds.sort(key=lambda t: (-t["pts"], -(t["gf"]-t["ga"]), -t["gf"], t["code"]))
+    thirds.sort(key=lambda t: (-t["pts"], -(t["gf"]-t["ga"]), -t["gf"], FIFA_RANKING.get(t["code"], 999)))
     return thirds[:8]
 
 # ============ THIRD-PLACE ASSIGNMENT ============
@@ -339,7 +350,7 @@ process.stdout.write(JSON.stringify(r));"""
                         if len(sub) > 1 and len(sub) < len(tied):
                             result.extend(sort_tied_local(sub))
                         elif len(sub) > 1:
-                            result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], t["code"])))
+                            result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], FIFA_RANKING.get(t["code"], 999))))
                         else:
                             result.extend(sub)
                         i = j
