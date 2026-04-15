@@ -51,7 +51,7 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, championDisplay, locked, isOwnForm }) {
+function FormCard({ form, championDisplay, locked, isOwnForm, userName }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
@@ -74,6 +74,9 @@ function FormCard({ form, championDisplay, locked, isOwnForm }) {
           <div className="font-semibold text-sm truncate">
             {form.formName || "טופס ללא שם"}
           </div>
+          {userName && (
+            <div className="text-xs text-gray-400 truncate">{userName}</div>
+          )}
           {canExpand ? (
             <>
               {championDisplay && (
@@ -272,15 +275,22 @@ export default function AllFormsView({ onBack }) {
             </div>
           )}
           <div className="space-y-2">
-            {filteredForms.map((form) => (
-              <FormCard
-                key={form.formId}
-                form={form}
-                championDisplay={form.championName}
-                locked={locked}
-                isOwnForm={form.userId === user?.id}
-              />
-            ))}
+            {filteredForms.map((form) => {
+              const u = users[form.userId];
+              const userName = u?.firstName
+                ? (u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName)
+                : u?.displayName || null;
+              return (
+                <FormCard
+                  key={form.formId}
+                  form={form}
+                  championDisplay={form.championName}
+                  locked={locked}
+                  isOwnForm={form.userId === user?.id}
+                  userName={userName}
+                />
+              );
+            })}
             {filteredForms.length === 0 && (
               <div className="text-center py-6 text-gray-400 text-sm">
                 לא נמצאו טפסים תואמים
