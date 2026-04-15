@@ -328,6 +328,15 @@ export default function Leaderboard({
                         </span>
                       )}
                     </div>
+                    {(() => {
+                      const u = users[entry.userId];
+                      const name = u?.firstName
+                        ? (u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName)
+                        : u?.displayName || null;
+                      return name ? (
+                        <div className="text-[11px] text-ink-muted/70 truncate">{name}</div>
+                      ) : null;
+                    })()}
                     <div className="text-[11px] text-ink-muted/70 tabular-nums">
                       <span dir="ltr">{entry.exactScoreCount}</span> מדויקים • <span dir="ltr">{entry.outcomeCount}</span>{" "}
                       הכרעות
