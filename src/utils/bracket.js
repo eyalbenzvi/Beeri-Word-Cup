@@ -17,6 +17,17 @@ for (const [groupName, teams] of Object.entries(GROUPS)) {
   }
 }
 
+// FIFA/Coca-Cola World Ranking (used as last-resort tiebreaker per 2026 regulations)
+const FIFA_RANKING = {
+  FRA: 1, ESP: 2, ARG: 3, ENG: 4, POR: 5, BRA: 6, NED: 7, MAR: 8,
+  BEL: 9, GER: 10, CRO: 11, COL: 13, SEN: 14, MEX: 15, USA: 16,
+  URU: 17, JPN: 18, SUI: 19, IRN: 21, TUR: 22, ECU: 23, AUT: 24,
+  KOR: 25, AUS: 27, ALG: 28, EGY: 29, CAN: 30, NOR: 31, PAN: 33,
+  CIV: 34, SWE: 38, PAR: 40, CZE: 41, SCO: 43, TUN: 44, COD: 46,
+  UZB: 50, QAT: 55, IRQ: 57, RSA: 60, KSA: 61, JOR: 63, BIH: 65,
+  CPV: 69, GHA: 74, CUR: 82, HAI: 83, NZL: 85,
+};
+
 export function calcGroupStandings(matchPredictions) {
   const standings = {};
 
@@ -151,7 +162,10 @@ export function calcGroupStandings(matchPredictions) {
               gdB = b.gf - b.ga;
             if (gdB !== gdA) return gdB - gdA;
             if (b.gf !== a.gf) return b.gf - a.gf;
-            return a.code.localeCompare(b.code);
+            // FIFA ranking as last resort (2026 regulations, replaces drawing of lots)
+            const rankA = FIFA_RANKING[a.code] || 999;
+            const rankB = FIFA_RANKING[b.code] || 999;
+            return rankA - rankB;
           });
           result.push(...subGroup);
         } else {
@@ -208,7 +222,9 @@ function getBestThirdPlaceTeams(standings) {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.gd !== a.gd) return b.gd - a.gd;
     if (b.gf !== a.gf) return b.gf - a.gf;
-    return a.code.localeCompare(b.code);
+    const rankA = FIFA_RANKING[a.code] || 999;
+    const rankB = FIFA_RANKING[b.code] || 999;
+    return rankA - rankB;
   });
   return thirdPlace.slice(0, 8);
 }

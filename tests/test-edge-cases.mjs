@@ -28,10 +28,17 @@ for (const [group, teams] of Object.entries(st1)) {
     assert(t.pts === 3, `Group ${group} ${t.code}: all draws should give 3pts, got ${t.pts}`);
     assert(t.gf === 0 && t.ga === 0, `Group ${group} ${t.code}: GF/GA should be 0`);
   }
-  // With identical stats, tiebreaker falls to alphabetical
+  // With identical stats, tiebreaker falls to FIFA ranking (2026 regulations)
+  const FIFA_RANK = {
+    FRA:1,ESP:2,ARG:3,ENG:4,POR:5,BRA:6,NED:7,MAR:8,BEL:9,GER:10,CRO:11,
+    COL:13,SEN:14,MEX:15,USA:16,URU:17,JPN:18,SUI:19,IRN:21,TUR:22,ECU:23,
+    AUT:24,KOR:25,AUS:27,ALG:28,EGY:29,CAN:30,NOR:31,PAN:33,CIV:34,SWE:38,
+    PAR:40,CZE:41,SCO:43,TUN:44,COD:46,UZB:50,QAT:55,IRQ:57,RSA:60,KSA:61,
+    JOR:63,BIH:65,CPV:69,GHA:74,CUR:82,HAI:83,NZL:85,
+  };
   for (let i = 0; i < teams.length - 1; i++) {
-    assert(teams[i].code < teams[i + 1].code,
-      `Group ${group}: ${teams[i].code} should be before ${teams[i + 1].code} (alphabetical)`);
+    assert((FIFA_RANK[teams[i].code] || 999) < (FIFA_RANK[teams[i + 1].code] || 999),
+      `Group ${group}: ${teams[i].code}(rank ${FIFA_RANK[teams[i].code]}) should be before ${teams[i + 1].code}(rank ${FIFA_RANK[teams[i + 1].code]}) (FIFA ranking)`);
   }
 }
 
