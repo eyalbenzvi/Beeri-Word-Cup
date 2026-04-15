@@ -119,45 +119,41 @@ export function calcGroupStandings(matchPredictions) {
       const tiedCodes = tiedTeams.map((t) => t.code);
       const h2h = computeH2HStats(tiedCodes);
 
+      // Step 1: Sort by H2H criteria only (FIFA rules a-c)
       tiedTeams.sort((a, b) => {
         const ha = h2h[a.code],
           hb = h2h[b.code];
         if (hb.pts !== ha.pts) return hb.pts - ha.pts;
         if (hb.gd !== ha.gd) return hb.gd - ha.gd;
         if (hb.gf !== ha.gf) return hb.gf - ha.gf;
-        const gdA = a.gf - a.ga,
-          gdB = b.gf - b.ga;
-        if (gdB !== gdA) return gdB - gdA;
-        if (b.gf !== a.gf) return b.gf - a.gf;
-        return a.code.localeCompare(b.code);
+        return 0;
       });
 
+      // Step 2: Group consecutive teams still tied on H2H
       const result = [];
       let i = 0;
       while (i < tiedTeams.length) {
         let j = i + 1;
-
         while (j < tiedTeams.length) {
-          const a = tiedTeams[i],
-            b = tiedTeams[j];
-          const ha = h2h[a.code],
-            hb = h2h[b.code];
-          const gdA = a.gf - a.ga,
-            gdB = b.gf - b.ga;
-          if (
-            ha.pts !== hb.pts ||
-            ha.gd !== hb.gd ||
-            ha.gf !== hb.gf ||
-            gdA !== gdB ||
-            a.gf !== b.gf ||
-            a.code !== b.code
-          )
-            break;
+          const ha = h2h[tiedTeams[i].code],
+            hb = h2h[tiedTeams[j].code];
+          if (ha.pts !== hb.pts || ha.gd !== hb.gd || ha.gf !== hb.gf) break;
           j++;
         }
         const subGroup = tiedTeams.slice(i, j);
         if (subGroup.length > 1 && subGroup.length < tiedTeams.length) {
+          // Step 3 (FIFA rule d): Re-apply H2H among just these teams
           result.push(...sortTiedGroup(subGroup));
+        } else if (subGroup.length > 1) {
+          // H2H exhausted (same group size) — fall to overall stats (FIFA rules e-h)
+          subGroup.sort((a, b) => {
+            const gdA = a.gf - a.ga,
+              gdB = b.gf - b.ga;
+            if (gdB !== gdA) return gdB - gdA;
+            if (b.gf !== a.gf) return b.gf - a.gf;
+            return a.code.localeCompare(b.code);
+          });
+          result.push(...subGroup);
         } else {
           result.push(...subGroup);
         }
