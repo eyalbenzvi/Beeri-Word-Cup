@@ -101,18 +101,32 @@ def calc_group_standings(group_name, match_results):
         codes = [t["code"] for t in tied_teams]
         h2h = h2h_stats(codes)
 
-        def sort_key(t):
-            c = t["code"]
-            return (
-                -h2h[c]["pts"],
-                -h2h[c]["gd"],
-                -h2h[c]["gf"],
-                -(t["gf"] - t["ga"]),
-                -t["gf"],
-                c  # alphabetical
-            )
+        # Sort by H2H criteria only first (FIFA rules a-c)
+        h2h_sorted = sorted(tied_teams, key=lambda t: (
+            -h2h[t["code"]]["pts"], -h2h[t["code"]]["gd"], -h2h[t["code"]]["gf"]
+        ))
 
-        return sorted(tied_teams, key=sort_key)
+        # Group consecutive teams still tied on H2H, then recurse or fall to overall
+        result = []
+        i = 0
+        while i < len(h2h_sorted):
+            j = i + 1
+            while j < len(h2h_sorted):
+                a, b = h2h_sorted[i]["code"], h2h_sorted[j]["code"]
+                if (h2h[a]["pts"] != h2h[b]["pts"] or h2h[a]["gd"] != h2h[b]["gd"]
+                        or h2h[a]["gf"] != h2h[b]["gf"]):
+                    break
+                j += 1
+            sub = h2h_sorted[i:j]
+            if len(sub) > 1 and len(sub) < len(tied_teams):
+                result.extend(sort_tied(sub))  # Recursive H2H (FIFA rule d)
+            elif len(sub) > 1:
+                # H2H exhausted — fall to overall stats (FIFA rules e-h)
+                result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], t["code"])))
+            else:
+                result.extend(sub)
+            i = j
+        return result
 
     # Sort by points first, then apply tiebreakers within groups of equal points
     team_list = list(stats.values())
@@ -308,10 +322,28 @@ process.stdout.write(JSON.stringify(r));"""
                     if len(tied) <= 1: return tied
                     codes = [t["code"] for t in tied]
                     h2h = h2h_stats_local(codes)
-                    def sk(t):
-                        c = t["code"]
-                        return (-h2h[c]["pts"], -h2h[c]["gd"], -h2h[c]["gf"], -(t["gf"]-t["ga"]), -t["gf"], c)
-                    return sorted(tied, key=sk)
+                    h2h_sorted = sorted(tied, key=lambda t: (
+                        -h2h[t["code"]]["pts"], -h2h[t["code"]]["gd"], -h2h[t["code"]]["gf"]
+                    ))
+                    result = []
+                    i = 0
+                    while i < len(h2h_sorted):
+                        j = i + 1
+                        while j < len(h2h_sorted):
+                            a, b = h2h_sorted[i]["code"], h2h_sorted[j]["code"]
+                            if (h2h[a]["pts"] != h2h[b]["pts"] or h2h[a]["gd"] != h2h[b]["gd"]
+                                    or h2h[a]["gf"] != h2h[b]["gf"]):
+                                break
+                            j += 1
+                        sub = h2h_sorted[i:j]
+                        if len(sub) > 1 and len(sub) < len(tied):
+                            result.extend(sort_tied_local(sub))
+                        elif len(sub) > 1:
+                            result.extend(sorted(sub, key=lambda t: (-(t["gf"]-t["ga"]), -t["gf"], t["code"])))
+                        else:
+                            result.extend(sub)
+                        i = j
+                    return result
 
                 team_list = sorted(list(stats.values()), key=lambda t: -t["pts"])
                 final = []
