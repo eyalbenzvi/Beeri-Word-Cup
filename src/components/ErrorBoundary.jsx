@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { captureClientError } from "../sentry";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,6 +13,13 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("ErrorBoundary caught:", error, info.componentStack);
+    try {
+      captureClientError(error, {
+        componentStack: info?.componentStack || null,
+      });
+    } catch {
+      // דיווח לעולם לא ישבור את הרינדור
+    }
   }
 
   render() {

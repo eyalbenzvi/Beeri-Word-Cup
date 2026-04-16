@@ -10,6 +10,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
+import { captureClientError } from "./sentry";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -32,6 +33,7 @@ getRedirectResult(auth).catch((err) => {
   const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
   if (!silent.includes(err?.code)) {
     console.error("Redirect sign-in failed:", err?.code, err?.message);
+    captureClientError(err, { source: "getRedirectResult", code: err?.code });
   }
 });
 

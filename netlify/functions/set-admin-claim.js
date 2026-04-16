@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { withSentry } from "./_sentry.js";
 
 let adminInitialized = false;
 
@@ -22,7 +23,7 @@ function getCorsHeaders(event) {
   };
 }
 
-export async function handler(event) {
+async function setAdminClaimHandler(event) {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: getCorsHeaders(event), body: "" };
   }
@@ -101,3 +102,5 @@ export async function handler(event) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: "Server error" }) };
   }
 }
+
+export const handler = withSentry(setAdminClaimHandler, "set-admin-claim");

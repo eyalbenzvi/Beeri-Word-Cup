@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { withSentry } from "./_sentry.js";
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173").split(",");
 
@@ -28,7 +29,7 @@ function checkRateLimit(key, max) {
   return true;
 }
 
-export async function handler(event) {
+async function phoneSendOtpHandler(event) {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: getCorsHeaders(event) };
   }
@@ -124,3 +125,5 @@ export async function handler(event) {
     }),
   };
 }
+
+export const handler = withSentry(phoneSendOtpHandler, "phone-send-otp");

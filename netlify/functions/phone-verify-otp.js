@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import admin from "firebase-admin";
+import { withSentry } from "./_sentry.js";
 
 let adminInitialized = false;
 
@@ -37,7 +38,7 @@ function invalidateToken(token) {
   verifyAttempts[token] = MAX_VERIFY_ATTEMPTS + 1; // prevent reuse
 }
 
-export async function handler(event) {
+async function phoneVerifyOtpHandler(event) {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: getCorsHeaders(event) };
   }
@@ -104,3 +105,5 @@ export async function handler(event) {
     return { statusCode: 500, headers: getCorsHeaders(event), body: JSON.stringify({ error: "שגיאה ביצירת הסשן" }) };
   }
 }
+
+export const handler = withSentry(phoneVerifyOtpHandler, "phone-verify-otp");

@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
+import { withSentry } from "./_sentry.js";
 
-export async function handler(event) {
+async function matchAnalysisHandler(event) {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -88,3 +89,5 @@ JSON only: {"analysis":"...","homeScore":N,"awayScore":N}`;
     };
   }
 }
+
+export const handler = withSentry(matchAnalysisHandler, "match-analysis");
