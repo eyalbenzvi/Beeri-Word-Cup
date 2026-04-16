@@ -638,7 +638,7 @@ export function getUsers() {
 
 let lastEnsuredUid = null;
 
-export function ensureUserInStore(uid, displayName, email) {
+export async function ensureUserInStore(uid, displayName, email) {
   if (!cache._ready.users) return uid;
   // Prevent repeated writes for the same user in the same session
   if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
@@ -659,32 +659,36 @@ export function ensureUserInStore(uid, displayName, email) {
   }
 
   // User not in cache. Two possibilities:
-  // A) Cache miss — user exists in Firestore but listeners haven't populated cache yet.
-  //    Using createUserField would replace the ENTIRE data.${uid} object, wiping
-  //    fields like isAdmin, firstName, lastName.
-  // B) Genuinely new user — not in Firestore either.
-  //
-  // If other users exist in cache, there are active listeners and this is likely
-  // case (A). Use updateUserField (per-field dot-notation) to preserve existing data.
-  // If cache is completely empty, this may be case (B) — use createUserField which
-  // handles the not-found fallback for the very first user document.
+  //   A) Cache desync — user exists in Firestore. Per-field update preserves
+  //      isAdmin/firstName/lastName/etc.
+  //   B) Genuinely new user (or recreated after deletion) — not in Firestore.
+  //      A per-field update would be REJECTED by Firestore rules: new entries
+  //      require `isAdmin == false` in the resulting document. Without that,
+  //      the SDK reverts the optimistic cache and the user vanishes — App.jsx
+  //      then renders an infinite Loading screen because user becomes null.
+  // Disambiguate with a one-shot read (cheap, only on login) before writing.
+  let firestoreUser = null;
+  try {
+    const snap = await withTimeout(getDoc(gameDocRef("users")), 10000);
+    if (snap.exists()) firestoreUser = snap.data().data?.[uid] || null;
+  } catch (err) {
+    console.error("Failed to verify user in Firestore:", err);
+    lastEnsuredUid = null; // allow retry on next call
+    return uid;
+  }
+
   const now = new Date().toISOString();
-  const hasOtherUsers = Object.keys(cache.users).length > 0;
-  if (hasOtherUsers) {
-    // Case A: other users loaded → listeners are working → this user likely exists
-    // in Firestore. Use per-field update to avoid overwriting existing data.
+  if (firestoreUser) {
+    // Case A: per-field update preserves existing fields (isAdmin, names, etc.).
     const fields = { id: uid, lastLoginAt: now };
-    if (displayName) fields.displayName = displayName;
-    if (email) fields.email = email;
-    cache.users = {
-      ...cache.users,
-      [uid]: { isAdmin: false, profileCompleted: false, createdAt: now, ...fields },
-    };
+    if (displayName && firestoreUser.displayName !== displayName)
+      fields.displayName = displayName;
+    if (email && !firestoreUser.email) fields.email = email;
+    cache.users = { ...cache.users, [uid]: { ...firestoreUser, ...fields } };
     notifyAndEmit("users");
     updateUserField(uid, fields);
   } else {
-    // Case B: no other users in cache → likely genuinely new user or first-ever.
-    // createUserField handles the not-found fallback for first document creation.
+    // Case B: write full record so isAdmin: false satisfies the create-rule.
     createUserField(uid, {
       id: uid,
       displayName: displayName || "משתמש",
