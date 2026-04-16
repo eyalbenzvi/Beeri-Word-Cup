@@ -1,6 +1,7 @@
 import { db } from "./firebase";
 import {
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -85,6 +86,22 @@ const cache = {
 
 // ============ FIRESTORE HELPERS ============
 
+const BATCH_LIMIT = 400; // Firestore limit is 500, use 400 for safety margin
+
+// Splits operations across multiple batches when exceeding Firestore's 500 op limit
+export async function commitInBatches(operations) {
+  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+    const chunk = operations.slice(i, i + BATCH_LIMIT);
+    const batch = writeBatch(db);
+    for (const op of chunk) {
+      if (op.type === "set") batch.set(op.ref, op.data);
+      else if (op.type === "update") batch.update(op.ref, op.data);
+      else if (op.type === "delete") batch.delete(op.ref);
+    }
+    await batch.commit();
+  }
+}
+
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
@@ -92,6 +109,15 @@ function withTimeout(promise, ms = 10000) {
       setTimeout(() => reject(new Error("timeout")), ms),
     ),
   ]);
+}
+
+// Lightweight clone using JSON parse/stringify — faster than structuredClone for plain data
+function safeClone(obj) {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return structuredClone(obj);
+  }
 }
 
 function gameDocRef(docName) {
@@ -131,7 +157,7 @@ async function writeGameDoc(docName, data) {
   emitSaving(docName);
   try {
     await withTimeout(
-      setDoc(gameDocRef(docName), { data: structuredClone(data) }),
+      setDoc(gameDocRef(docName), { data: safeClone(data) }),
       10000,
     );
     emitSaved(docName);
@@ -166,8 +192,21 @@ async function updateUserField(uid, fields) {
   }
 }
 
+// Firestore document size limit is 1MB. Warn when approaching.
+const MAX_USERS_WARNING = 1500;
+const MAX_USERS_HARD_LIMIT = 2000;
+
 // Safe new-user creation via dot-notation (no full-doc overwrite)
 async function createUserField(uid, userData) {
+  const currentCount = Object.keys(cache.users).length;
+  if (currentCount >= MAX_USERS_HARD_LIMIT) {
+    console.error(`[SAFETY] Cannot create user: ${currentCount} users already at hard limit of ${MAX_USERS_HARD_LIMIT}`);
+    writeAuditLog("blocked-user-create", { currentCount, uid });
+    return false;
+  }
+  if (currentCount >= MAX_USERS_WARNING) {
+    console.warn(`[WARNING] User count (${currentCount}) approaching Firestore 1MB document limit.`);
+  }
   const updatePayload = { [`data.${uid}`]: userData };
   cache.users = { ...cache.users, [uid]: userData };
   notifyAndEmit("users");
@@ -221,7 +260,7 @@ async function writeFormDoc(formId, formData) {
   emitSaving("predictions");
   try {
     await withTimeout(
-      setDoc(formDocRef(formId), structuredClone(formData)),
+      setDoc(formDocRef(formId), safeClone(formData)),
       10000,
     );
     emitSaved("predictions");
@@ -236,18 +275,17 @@ async function writeFormDoc(formId, formData) {
 const pendingWrites = {};
 
 function debouncedWriteForm(formId, formData, delay = 500) {
+  // Block writes immediately if predictions are locked
+  if (cache.settings?.predictionsLocked) return;
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
   const key = `form:${formId}`;
   clearTimeout(pendingWrites[key]);
   pendingWrites[key] = setTimeout(() => {
-    if (cache.settings?.predictionsLocked) {
-      delete pendingWrites[key];
-      return;
-    }
     delete pendingWrites[key];
-    setDoc(formDocRef(formId), structuredClone(formData))
+    if (cache.settings?.predictionsLocked) return; // double-check at write time
+    setDoc(formDocRef(formId), safeClone(formData))
       .then(() => emitSaved("predictions"))
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
@@ -271,7 +309,7 @@ function flushPendingWrites() {
     try {
       if (key.startsWith("form:")) {
         const formId = key.slice(5);
-        const data = structuredClone(cache.predictions[formId]);
+        const data = safeClone(cache.predictions[formId]);
         if (data) {
           setDoc(formDocRef(formId), data).catch((err) =>
             console.error(`Failed to flush ${key}:`, err),
@@ -315,8 +353,68 @@ let predictionsUnsub = null;
 let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
-let retryCount = 0;
-let retryInProgress = false;
+const retryState = {}; // key -> { count, inProgress }
+
+function getRetryState(key) {
+  if (!retryState[key]) retryState[key] = { count: 0, inProgress: false };
+  return retryState[key];
+}
+
+// Compute backoff delay: 2s, 4s, 8s, 16s, 30s, 30s, 30s, ...
+function retryDelay(attempt) {
+  return Math.min(2000 * Math.pow(2, attempt), 30000);
+}
+
+// Fallback: one-shot read when realtime listener fails, then schedule next retry
+async function fallbackLoadGameDoc(key, docName) {
+  try {
+    const snap = await withTimeout(getDoc(gameDocRef(docName)), 10000);
+    if (snap.exists()) cache[key] = snap.data().data;
+    cache._ready[key] = true;
+    getRetryState(key).count = 0;
+    notifyAndEmit(key);
+    if (key === "settings" || key === "users") {
+      maybeUpgradePredictionsListener();
+    }
+  } catch (err) {
+    console.error(`Fallback load failed for ${docName}:`, err);
+    // Schedule another retry with increasing backoff — never give up
+    scheduleRetry(key, () => fallbackLoadGameDoc(key, docName));
+  }
+}
+
+async function fallbackLoadPredictions(userId) {
+  try {
+    const q = query(predictionsCollectionRef, where("userId", "==", userId));
+    const snapshot = await withTimeout(getDocs(q), 15000);
+    const preds = { ...cache.predictions };
+    for (const k of Object.keys(preds)) {
+      if (preds[k]?.userId === userId) delete preds[k];
+    }
+    snapshot.forEach((docSnap) => { preds[docSnap.id] = docSnap.data(); });
+    cache.predictions = preds;
+    cache._ready.predictions = true;
+    getRetryState("predictions").count = 0;
+    rebuildUserFormIndex();
+    notifyAndEmit("predictions");
+  } catch (err) {
+    console.error("Fallback load failed for predictions:", err);
+    scheduleRetry("predictions", () => fallbackLoadPredictions(userId));
+  }
+}
+
+function scheduleRetry(key, retryFn) {
+  if (!currentListenerUserId) return;
+  const rs = getRetryState(key);
+  if (rs.inProgress) return;
+  rs.count++;
+  rs.inProgress = true;
+  const delay = retryDelay(rs.count);
+  setTimeout(() => {
+    rs.inProgress = false;
+    if (currentListenerUserId && !cache._ready[key]) retryFn();
+  }, delay);
+}
 
 function setupPredictionsListener(userId, showAll) {
   if (predictionsUnsub) predictionsUnsub();
@@ -331,7 +429,7 @@ function setupPredictionsListener(userId, showAll) {
     q,
     (snapshot) => {
       if (myGeneration !== predictionsListenerGeneration) return;
-      retryCount = 0;
+      getRetryState("predictions").count = 0;
       if (showAll) {
         // Full collection: replace entire cache
         const preds = {};
@@ -352,32 +450,42 @@ function setupPredictionsListener(userId, showAll) {
         cache.predictions = preds;
       }
       cache._ready.predictions = true;
+      rebuildUserFormIndex();
       notifyAndEmit("predictions");
     },
     (err) => {
       console.error("Listener error for predictions:", err);
       listenersHadError = true;
       notifyAndEmit("predictions");
-      if (retryInProgress) return;
-      if (retryCount < 3 && currentListenerUserId) {
-        retryCount++;
-        retryInProgress = true;
+      const rs = getRetryState("predictions");
+      if (rs.inProgress) return;
+      if (rs.count < 3 && currentListenerUserId) {
+        rs.count++;
+        rs.inProgress = true;
         setTimeout(() => {
-          retryInProgress = false;
-          initRealtimeListeners(currentListenerUserId);
+          rs.inProgress = false;
+          setupPredictionsListener(currentListenerUserId, predictionsShowAll);
         }, 5000);
+      } else if (currentListenerUserId) {
+        fallbackLoadPredictions(currentListenerUserId);
       }
     },
   );
 }
 
+let upgradeTimer = null;
 function maybeUpgradePredictionsListener() {
   if (predictionsShowAll || !currentListenerUserId) return;
-  const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
-  const isLocked = cache.settings?.predictionsLocked === true;
-  if (isUserAdmin || isLocked) {
-    setupPredictionsListener(currentListenerUserId, true);
-  }
+  // Debounce: settings and users may fire in quick succession
+  clearTimeout(upgradeTimer);
+  upgradeTimer = setTimeout(() => {
+    if (predictionsShowAll || !currentListenerUserId) return;
+    const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
+    const isLocked = cache.settings?.predictionsLocked === true;
+    if (isUserAdmin || isLocked) {
+      setupPredictionsListener(currentListenerUserId, true);
+    }
+  }, 100);
 }
 
 export function initRealtimeListeners(userId) {
@@ -390,10 +498,26 @@ export function initRealtimeListeners(userId) {
   if (!windowListenersAttached) {
     windowListenersAttached = true;
     window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") flushPendingWrites();
+      if (document.visibilityState === "hidden") {
+        flushPendingWrites();
+      } else if (document.visibilityState === "visible" && !isStoreReady() && currentListenerUserId) {
+        // Tab became visible and store isn't ready — retry loading
+        listenersHadError = true;
+        initRealtimeListeners(currentListenerUserId);
+      }
     });
     window.addEventListener("pagehide", flushPendingWrites);
+    // When network comes back online, retry if store isn't ready
+    window.addEventListener("online", () => {
+      if (!isStoreReady() && currentListenerUserId) {
+        listenersHadError = true;
+        initRealtimeListeners(currentListenerUserId);
+      }
+    });
   }
+
+  // Reopen cross-tab sync channel (closed during logout)
+  openBroadcastChannel();
 
   // Unsubscribe all existing gameDoc listeners before creating new ones
   gameDocUnsubs.forEach((u) => u());
@@ -405,7 +529,7 @@ export function initRealtimeListeners(userId) {
       onSnapshot(
         gameDocRef(docName),
         (snap) => {
-          retryCount = 0;
+          getRetryState(key).count = 0;
           if (snap.exists()) cache[key] = snap.data().data;
           cache._ready[key] = true;
           notifyAndEmit(key);
@@ -418,14 +542,17 @@ export function initRealtimeListeners(userId) {
           console.error(`Listener error for ${docName}:`, err);
           listenersHadError = true;
           notifyAndEmit(key);
-          if (retryInProgress) return;
-          if (retryCount < 3 && currentListenerUserId) {
-            retryCount++;
-            retryInProgress = true;
+          const rs = getRetryState(key);
+          if (rs.inProgress) return;
+          if (rs.count < 3 && currentListenerUserId) {
+            rs.count++;
+            rs.inProgress = true;
             setTimeout(() => {
-              retryInProgress = false;
+              rs.inProgress = false;
               initRealtimeListeners(currentListenerUserId);
             }, 5000);
+          } else {
+            fallbackLoadGameDoc(key, docName);
           }
         },
       ),
@@ -445,17 +572,59 @@ export function isStoreReady() {
 // ============ SUBSCRIPTIONS ============
 
 const listeners = new Set();
+const keyedListeners = new Map(); // key -> Set<listener>
 
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-function notifyListeners() {
-  for (const listener of listeners) listener();
+// Subscribe only to changes for a specific key (e.g., "predictions", "users")
+export function subscribeToKey(key, listener) {
+  if (!keyedListeners.has(key)) keyedListeners.set(key, new Set());
+  keyedListeners.get(key).add(listener);
+  return () => {
+    const set = keyedListeners.get(key);
+    if (set) { set.delete(listener); if (set.size === 0) keyedListeners.delete(key); }
+  };
 }
 
-window.addEventListener("store-updated", notifyListeners);
+function notifyListeners(event) {
+  for (const listener of listeners) listener();
+  // Also notify keyed listeners
+  const key = event?.detail?.key;
+  if (key && keyedListeners.has(key)) {
+    for (const listener of keyedListeners.get(key)) listener();
+  }
+}
+
+// Registered once at module load — notifyListeners dispatched via notifyAndEmit
+if (!window.__storeListenerRegistered) {
+  window.__storeListenerRegistered = true;
+  window.addEventListener("store-updated", notifyListeners);
+}
+
+// Cross-tab sync: notify other tabs when active form changes
+let broadcastChannel = null;
+function openBroadcastChannel() {
+  if (broadcastChannel) return; // already open
+  try {
+    broadcastChannel = new BroadcastChannel("beeri-wc-sync");
+    broadcastChannel.onmessage = (event) => {
+      if (event.data?.type === "activeForm-changed") {
+        // Another tab changed the active form — re-read from localStorage
+        notifyAndEmit("activeForm");
+      }
+    };
+  } catch {
+    // BroadcastChannel not supported — graceful fallback (no cross-tab sync)
+  }
+}
+function closeBroadcastChannel() {
+  try { broadcastChannel?.close(); } catch { /* already closed */ }
+  broadcastChannel = null;
+}
+openBroadcastChannel();
 
 // ============ USERS ============
 
@@ -488,16 +657,44 @@ export function ensureUserInStore(uid, displayName, email) {
     updateUserField(uid, fields);
     return uid;
   }
+
+  // User not in cache. Two possibilities:
+  // A) Cache miss — user exists in Firestore but listeners haven't populated cache yet.
+  //    Using createUserField would replace the ENTIRE data.${uid} object, wiping
+  //    fields like isAdmin, firstName, lastName.
+  // B) Genuinely new user — not in Firestore either.
+  //
+  // If other users exist in cache, there are active listeners and this is likely
+  // case (A). Use updateUserField (per-field dot-notation) to preserve existing data.
+  // If cache is completely empty, this may be case (B) — use createUserField which
+  // handles the not-found fallback for the very first user document.
   const now = new Date().toISOString();
-  createUserField(uid, {
-    id: uid,
-    displayName: displayName || "משתמש",
-    isAdmin: false,
-    email: email || null,
-    profileCompleted: false,
-    createdAt: now,
-    lastLoginAt: now,
-  });
+  const hasOtherUsers = Object.keys(cache.users).length > 0;
+  if (hasOtherUsers) {
+    // Case A: other users loaded → listeners are working → this user likely exists
+    // in Firestore. Use per-field update to avoid overwriting existing data.
+    const fields = { id: uid, lastLoginAt: now };
+    if (displayName) fields.displayName = displayName;
+    if (email) fields.email = email;
+    cache.users = {
+      ...cache.users,
+      [uid]: { isAdmin: false, profileCompleted: false, createdAt: now, ...fields },
+    };
+    notifyAndEmit("users");
+    updateUserField(uid, fields);
+  } else {
+    // Case B: no other users in cache → likely genuinely new user or first-ever.
+    // createUserField handles the not-found fallback for first document creation.
+    createUserField(uid, {
+      id: uid,
+      displayName: displayName || "משתמש",
+      isAdmin: false,
+      email: email || null,
+      profileCompleted: false,
+      createdAt: now,
+      lastLoginAt: now,
+    });
+  }
   return uid;
 }
 
@@ -533,7 +730,39 @@ export function demoteAdmin(userId) {
   updateUserField(userId, { isAdmin: false });
 }
 
+/**
+ * Set admin custom claim via server-side Netlify function.
+ * This sets Firebase Custom Claims (tamper-proof) and updates Firestore.
+ * Returns { success, error } object.
+ */
+export async function setAdminClaim(targetUid, action) {
+  if (!requireAdmin()) return { error: "Not admin" };
+  try {
+    const { auth: firebaseAuth } = await import("./firebase.js");
+    const idToken = await firebaseAuth.currentUser?.getIdToken();
+    if (!idToken) return { error: "Not authenticated" };
+
+    const res = await fetch("/.netlify/functions/set-admin-claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ targetUid, action }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { error: data?.error || `Error ${res.status}` };
+    }
+    return { success: true };
+  } catch (err) {
+    console.error("setAdminClaim error:", err);
+    return { error: err.message };
+  }
+}
+
 export async function deleteUser(userId) {
+  if (!requireAdmin()) return;
   const userCountBefore = Object.keys(getUsers()).length;
 
   // Find user's forms to delete
@@ -582,6 +811,16 @@ export function getCurrentUser() {
   }
 }
 
+// Defense-in-depth: client-side admin guard (Firestore rules are the real security layer)
+function requireAdmin() {
+  const u = getCurrentUser();
+  if (!u?.isAdmin) {
+    console.warn("Admin operation blocked: user is not admin");
+    return false;
+  }
+  return true;
+}
+
 export function setCurrentUser(userId) {
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userId));
   notifyAndEmit("currentUser");
@@ -592,6 +831,10 @@ export function logoutUser() {
   lastEnsuredUid = null;
   listenersInitialized = false;
   listenersHadError = false;
+  for (const key of Object.keys(retryState)) delete retryState[key];
+  clearTimeout(upgradeTimer);
+  upgradeTimer = null;
+  closeBroadcastChannel();
   if (predictionsUnsub) {
     predictionsUnsub();
     predictionsUnsub = null;
@@ -607,6 +850,7 @@ export function logoutUser() {
   cache.actualBonuses = { champion: null, topScorers: [] };
   cache.settings = { predictionsLocked: false };
   cache._ready = {};
+  rebuildUserFormIndex();
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");
@@ -625,9 +869,36 @@ export function getActiveFormId() {
 export function setActiveFormId(formId) {
   localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
   notifyAndEmit("activeForm");
+  try { broadcastChannel?.postMessage({ type: "activeForm-changed" }); } catch {}
 }
 
 // ============ PREDICTIONS (PER-FORM DOCUMENTS) ============
+
+// userId -> Set<formId> index for O(1) user form lookup
+const userFormIndex = {};
+
+function rebuildUserFormIndex() {
+  for (const key of Object.keys(userFormIndex)) delete userFormIndex[key];
+  for (const [formId, data] of Object.entries(cache.predictions || {})) {
+    const uid = data.userId;
+    if (uid) {
+      if (!userFormIndex[uid]) userFormIndex[uid] = new Set();
+      userFormIndex[uid].add(formId);
+    }
+  }
+}
+
+function indexAddForm(formId, userId) {
+  if (!userId) return;
+  if (!userFormIndex[userId]) userFormIndex[userId] = new Set();
+  userFormIndex[userId].add(formId);
+}
+
+function indexRemoveForm(formId, userId) {
+  if (!userId || !userFormIndex[userId]) return;
+  userFormIndex[userId].delete(formId);
+  if (userFormIndex[userId].size === 0) delete userFormIndex[userId];
+}
 
 export function getAllPredictions() {
   return cache.predictions || EMPTY_OBJ;
@@ -643,11 +914,12 @@ const DEFAULT_FORM = {
 
 export function getFormsForUser(userId) {
   const all = getAllPredictions();
+  const formIds = userFormIndex[userId];
+  if (!formIds || formIds.size === 0) return [];
   const forms = [];
-  for (const [formId, data] of Object.entries(all)) {
-    if (data.userId === userId) {
-      forms.push({ formId, ...data });
-    }
+  for (const formId of formIds) {
+    const data = all[formId];
+    if (data) forms.push({ formId, ...data });
   }
   forms.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   return forms;
@@ -665,16 +937,17 @@ export function createForm(userId, formName) {
   if (userForms.length >= MAX_FORMS_PER_USER) {
     throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
   }
-  const nextIndex = userForms.length + 1;
-  const formId = `${userId}__${nextIndex}`;
+  const formId = `${userId}__${Date.now()}`;
+  const displayIndex = userForms.length + 1;
 
   const formData = {
     userId,
-    formName: formName || `טופס ${nextIndex}`,
+    formName: formName || `טופס ${displayIndex}`,
     budgetNumber: "",
     ...DEFAULT_FORM,
     createdAt: new Date().toISOString(),
   };
+  indexAddForm(formId, userId);
   writeFormDoc(formId, formData);
   setActiveFormId(formId);
   return formId;
@@ -682,8 +955,10 @@ export function createForm(userId, formName) {
 
 export async function deleteForm(formId) {
   const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
+  if (!form || (form.status !== "draft" && form.status !== "pending")) return;
 
+  clearPendingWritesForForm(formId);
+  indexRemoveForm(formId, form.userId);
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
   cache.predictions = newPreds;
@@ -755,6 +1030,7 @@ export function submitPredictions(formId) {
 }
 
 export function adminApprovePrediction(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("approve-form", { formId });
   const form = getForm(formId);
   if (!form || form.status !== "pending") return;
@@ -778,6 +1054,7 @@ export function reopenForm(formId) {
 }
 
 export function adminForceSubmitForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("force-submit", { formId });
   flushPendingWrites();
   const form = getForm(formId);
@@ -792,6 +1069,7 @@ export function adminForceSubmitForm(formId) {
 }
 
 export function adminReopenForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("reopen-form", { formId });
   flushPendingWrites();
   const form = getForm(formId);
@@ -806,6 +1084,7 @@ export function adminReopenForm(formId) {
 }
 
 export async function adminDeleteForm(formId) {
+  if (!requireAdmin()) return;
   writeAuditLog("delete-form", { formId });
   flushPendingWrites();
   await deleteDoc(formDocRef(formId));
@@ -821,12 +1100,15 @@ export async function adminDeleteForm(formId) {
 }
 
 export function adminUpdateForm(formId, fields) {
+  if (!requireAdmin()) return;
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
+  // userId is immutable — never allow reassignment even by admin
+  const { userId: _drop, ...safeFields } = fields;
   const updated = {
     ...form,
-    ...fields,
+    ...safeFields,
     updatedAt: new Date().toISOString(),
   };
   if (fields.adminNote != null) {
@@ -836,6 +1118,7 @@ export function adminUpdateForm(formId, fields) {
 }
 
 export function adminSaveMatchPrediction(formId, matchId, prediction) {
+  if (!requireAdmin()) return;
   flushPendingWrites();
   const form = getForm(formId);
   if (!form) return;
@@ -849,6 +1132,7 @@ export function adminSaveMatchPrediction(formId, matchId, prediction) {
 // ============ MATCH RESULTS (admin) ============
 
 export function clearMatchResults() {
+  if (!requireAdmin()) return;
   writeAuditLog("clear-match-results");
   writeGameDoc("matchResults", {});
 }
@@ -858,12 +1142,14 @@ export function getMatchResults() {
 }
 
 export function saveMatchResult(matchId, result) {
+  if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
   results[matchId] = { ...result, updatedAt: new Date().toISOString() };
   writeGameDoc("matchResults", results);
 }
 
 export function deleteMatchResult(matchId) {
+  if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
   delete results[matchId];
   writeGameDoc("matchResults", results);
@@ -876,6 +1162,7 @@ export function getActualBonuses() {
 }
 
 export function saveActualBonuses(bonuses) {
+  if (!requireAdmin()) return;
   writeGameDoc("actualBonuses", bonuses);
 }
 
@@ -886,6 +1173,7 @@ export function getSettings() {
 }
 
 export function updateSettings(newSettings) {
+  if (!requireAdmin()) return;
   const settings = { ...getSettings(), ...newSettings };
   writeGameDoc("settings", settings);
 }
@@ -905,20 +1193,19 @@ export function exportAllData() {
 }
 
 export async function clearAllData() {
+  if (!requireAdmin()) return;
   writeAuditLog("clear-all-data");
 
-  // Delete all form documents
+  // Delete all form documents using batched operations
   const snapshot = await getDocs(predictionsCollectionRef);
-  const batch = writeBatch(db);
-  snapshot.forEach((docSnap) => batch.delete(docSnap.ref));
-  batch.set(gameDocRef("users"), { data: {} });
-  batch.set(gameDocRef("matchResults"), { data: {} });
-  batch.set(gameDocRef("actualAdvancing"), { data: {} });
-  batch.set(gameDocRef("actualBonuses"), {
-    data: { champion: null, topScorers: [] },
-  });
-  batch.set(gameDocRef("settings"), { data: { predictionsLocked: false } });
-  await batch.commit();
+  const ops = [];
+  snapshot.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  ops.push({ type: "set", ref: gameDocRef("users"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("matchResults"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("actualAdvancing"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("actualBonuses"), data: { data: { champion: null, topScorers: [] } } });
+  ops.push({ type: "set", ref: gameDocRef("settings"), data: { data: { predictionsLocked: false } } });
+  await commitInBatches(ops);
 
   cache.users = {};
   cache.predictions = {};
@@ -932,6 +1219,7 @@ export async function clearAllData() {
 }
 
 export async function importAllData(data) {
+  if (!requireAdmin()) return;
   writeAuditLog("import-data", { keys: Object.keys(data) });
 
   // Validate imported data structure
@@ -943,7 +1231,7 @@ export async function importAllData(data) {
   if (data.matchResults && typeof data.matchResults !== "object")
     throw new Error("מבנה תוצאות לא תקין");
 
-  const batch = writeBatch(db);
+  const ops = [];
 
   // Write gameData docs
   const gameKeys = [
@@ -956,7 +1244,7 @@ export async function importAllData(data) {
   for (const key of gameKeys) {
     if (data[key]) {
       cache[key] = data[key];
-      batch.set(gameDocRef(key), { data: structuredClone(data[key]) });
+      ops.push({ type: "set", ref: gameDocRef(key), data: { data: structuredClone(data[key]) } });
     }
   }
 
@@ -964,15 +1252,15 @@ export async function importAllData(data) {
   if (data.predictions) {
     // First delete existing forms
     const existing = await getDocs(predictionsCollectionRef);
-    existing.forEach((docSnap) => batch.delete(docSnap.ref));
+    existing.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
 
     // Then create new ones
     for (const [formId, formData] of Object.entries(data.predictions)) {
-      batch.set(formDocRef(formId), structuredClone(formData));
+      ops.push({ type: "set", ref: formDocRef(formId), data: structuredClone(formData) });
     }
     cache.predictions = data.predictions;
   }
 
   notifyListeners();
-  await batch.commit();
+  await commitInBatches(ops);
 }

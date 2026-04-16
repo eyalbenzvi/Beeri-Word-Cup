@@ -12,8 +12,7 @@ import {
   STAGES,
 } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { calcBracketTeams } from "../utils/bracket";
-import { getCachedChampion } from "../utils/bracketCache";
+import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -39,7 +38,7 @@ function MatchRow({ match, prediction }) {
       <div className="flex items-center justify-between">
         <span className="flex-1 text-right truncate">{homeName}</span>
         <span className="w-16 text-center font-bold text-gray-700">
-          {hasScore ? <span dir="ltr">{prediction.homeScore} – {prediction.awayScore}</span> : "–"}
+          {hasScore ? <span dir="ltr">{prediction.awayScore} – {prediction.homeScore}</span> : "–"}
         </span>
         <span className="flex-1 text-left truncate">{awayName}</span>
       </div>
@@ -52,13 +51,14 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, championDisplay, locked, isOwnForm }) {
+function FormCard({ form, championDisplay, locked, isOwnForm, userName }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
+  // Lazy: only compute bracket when the card is expanded (not for all 250 forms on load)
   const bracketTeams = useMemo(
-    () => calcBracketTeams(predictions),
-    [predictions],
+    () => expanded ? getCachedBracket(predictions) : null,
+    [predictions, expanded],
   );
 
   return (
@@ -74,6 +74,9 @@ function FormCard({ form, championDisplay, locked, isOwnForm }) {
           <div className="font-semibold text-sm truncate">
             {form.formName || "טופס ללא שם"}
           </div>
+          {userName && (
+            <div className="text-xs text-gray-400 truncate">{userName}</div>
+          )}
           {canExpand ? (
             <>
               {championDisplay && (
@@ -263,24 +266,31 @@ export default function AllFormsView({ onBack }) {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-center">
               <div className="text-2xl mb-1">🔒</div>
               <div className="text-sm font-semibold text-amber-700">
-                הטורניר עדיין לא נעול
+                הניחושים עדיין לא גלויים
               </div>
               <div className="text-xs text-amber-600 mt-1">
-                ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר נעילת
-                הטורניר
+                ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר תחילת
+                המשחקים
               </div>
             </div>
           )}
           <div className="space-y-2">
-            {filteredForms.map((form) => (
-              <FormCard
-                key={form.formId}
-                form={form}
-                championDisplay={form.championName}
-                locked={locked}
-                isOwnForm={form.userId === user?.id}
-              />
-            ))}
+            {filteredForms.map((form) => {
+              const u = users[form.userId];
+              const userName = u?.firstName
+                ? (u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName)
+                : u?.displayName || null;
+              return (
+                <FormCard
+                  key={form.formId}
+                  form={form}
+                  championDisplay={form.championName}
+                  locked={locked}
+                  isOwnForm={form.userId === user?.id}
+                  userName={userName}
+                />
+              );
+            })}
             {filteredForms.length === 0 && (
               <div className="text-center py-6 text-gray-400 text-sm">
                 לא נמצאו טפסים תואמים

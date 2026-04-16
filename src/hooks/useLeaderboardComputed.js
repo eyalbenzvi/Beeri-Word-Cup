@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { calculateFullScore, compareTiebreaker } from "../utils/scoring";
 import {
-  calcBracketTeams,
   deriveAdvancingTeams,
   deriveActualAdvancing,
   deriveChampion,
 } from "../utils/bracket";
+import { getCachedBracket } from "../utils/bracketCache";
 
 export function useLeaderboardComputed(
   results,
@@ -13,7 +13,7 @@ export function useLeaderboardComputed(
   users,
   actualBonuses,
 ) {
-  const actualBracket = useMemo(() => calcBracketTeams(results), [results]);
+  const actualBracket = useMemo(() => getCachedBracket(results), [results]);
 
   const actualDerivedAdvancing = useMemo(
     () => deriveActualAdvancing(actualBracket, results),
@@ -30,7 +30,7 @@ export function useLeaderboardComputed(
       const s = predData.status;
       if (s !== "submitted" && s !== "approved") continue;
       const matchPreds = predData.matches || {};
-      const predBracket = calcBracketTeams(matchPreds);
+      const predBracket = getCachedBracket(matchPreds);
       map[formId] = {
         predBracket,
         advancing: deriveAdvancingTeams(predBracket),

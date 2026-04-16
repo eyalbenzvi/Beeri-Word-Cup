@@ -54,12 +54,7 @@ export function calculateMatchPoints(
   predTeams,
   actualTeams,
 ) {
-  if (
-    !prediction ||
-    !actual ||
-    actual.homeScore === null ||
-    actual.awayScore === null
-  ) {
+  if (!prediction || !actual || actual.homeScore == null || actual.awayScore == null) {
     return {
       points: 0,
       outcomePoints: 0,
@@ -68,12 +63,7 @@ export function calculateMatchPoints(
       wrongMatchup: false,
     };
   }
-  if (
-    prediction.homeScore === null ||
-    prediction.homeScore === undefined ||
-    prediction.awayScore === null ||
-    prediction.awayScore === undefined
-  ) {
+  if (prediction.homeScore == null || prediction.awayScore == null) {
     return {
       points: 0,
       outcomePoints: 0,

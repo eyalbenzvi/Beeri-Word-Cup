@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { normalizeStatus } from "../utils/helpers";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
+import { getCachedChampion } from "../utils/bracketCache";
+import { getTeamByCode } from "../data/teams";
 import { useToast } from "./Toast";
 
 const totalMatches = groupMatches.length + knockoutMatches.length;
@@ -47,13 +49,15 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         <div className="text-center py-12">
           <div className="text-5xl mb-3">📋</div>
           <p className="font-bold text-gray-700 text-base mb-1">ברוך הבא! צור טופס ניחושים ראשון</p>
-          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למטה כדי להתחיל לנחש תוצאות משחקים</p>
+          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למעלה כדי להתחיל לנחש תוצאות משחקים</p>
         </div>
       )}
 
       <div className="space-y-2.5 mb-4">
         {forms.map((form) => {
           const formStatus = normalizeStatus(form.status);
+          const championCode = getCachedChampion(form.matches || {});
+          const championName = championCode ? getTeamByCode(championCode)?.name : null;
           return (
             <div
               key={form.formId}
@@ -81,7 +85,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     {Object.keys(form.matches || {}).length}/{totalMatches}{" "}
                     משחקים
                     {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ""}
-                    {form.champion ? ` • 🏆 ${form.champion}` : ""}
+                    {championName ? ` • 🏆 ${championName}` : ""}
                   </div>
                 </div>
                 <span
@@ -112,7 +116,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     פתח לעריכה
                   </button>
                 )}
-                {formStatus === "draft" && (
+                {(formStatus === "draft" || form.status === "pending") && (
                   <button
                     onClick={() => {
                       if (window.confirm(`למחוק את "${form.formName}"?`))

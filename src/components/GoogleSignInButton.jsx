@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useToast } from "./Toast";
 import { signInWithGoogle } from "../firebase";
-import { ensureUserInStore } from "../store";
 import { captureClientError } from "../sentry";
 
 export default function GoogleSignInButton({ onSuccess }) {
@@ -14,9 +13,9 @@ export default function GoogleSignInButton({ onSuccess }) {
     setError("");
     try {
       const user = await signInWithGoogle();
+      if (!user) return; // redirect flow — auth completes on page reload
       const displayName =
         user.displayName || user.email?.split("@")[0] || "משתמש";
-      ensureUserInStore(user.uid, displayName);
       showToast(`ברוך הבא, ${displayName}!`);
       onSuccess?.();
     } catch (err) {
@@ -29,6 +28,8 @@ export default function GoogleSignInButton({ onSuccess }) {
         setError("הדפדפן חסם את חלון ההתחברות. אפשר חלונות קופצים ונסה שוב");
       } else if (err.code === "auth/network-request-failed") {
         setError("שגיאת רשת. בדוק את החיבור לאינטרנט");
+      } else if (err.code === "auth/missing-initial-state") {
+        setError("פתח את האתר בדפדפן (Safari/Chrome) ולא מתוך אפליקציה");
       } else {
         setError("שגיאה בהתחברות. נסה שוב");
         console.error("Auth error:", err.code, err.message);

@@ -3,12 +3,14 @@ import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
+import { useToast } from "../components/Toast";
 
 export default function Home() {
   const settings = useSettings();
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
+  const showToast = useToast();
 
   return (
     <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
@@ -23,7 +25,7 @@ export default function Home() {
         <button
           onClick={() => {
             if (user) {
-              try { createForm(user.id); } catch {}
+              try { createForm(user.id); } catch (err) { showToast(err.message, "error"); }
             }
             navigate("predict");
           }}
@@ -44,17 +46,17 @@ export default function Home() {
               שריקת הפתיחה בעוד
             </p>
             <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
-              <CountdownUnit value={countdown.seconds} label="שניות" />
-              <CountdownUnit value={countdown.minutes} label="דקות" />
-              <CountdownUnit value={countdown.hours} label="שעות" />
               <CountdownUnit
                 value={countdown.days}
                 label="ימים"
                 accent="bg-primary-light"
               />
+              <CountdownUnit value={countdown.hours} label="שעות" />
+              <CountdownUnit value={countdown.minutes} label="דקות" />
+              <CountdownUnit value={countdown.seconds} label="שניות" />
             </div>
             <p className="text-[10px] text-ink-muted/50 mt-2">
-              11 ביוני 2026 · 19:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+              11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
             </p>
           </>
         )}
@@ -75,7 +77,7 @@ export default function Home() {
             aria-hidden="true"
           />
           <span className="sr-only">
-            {settings.predictionsLocked ? "סטטוס: הגשת טפסים נעולה" : "סטטוס: הגשת טפסים פתוחה"}
+            {settings.predictionsLocked ? "סטטוס: המשחקים התחילו — ההגשה נסגרה" : "סטטוס: ניתן להגיש ולערוך טפסים"}
           </span>
           <span
             className={`text-sm font-bold ${
@@ -83,8 +85,8 @@ export default function Home() {
             }`}
           >
             {settings.predictionsLocked
-              ? "הגשת טפסים נעולה"
-              : "הגשת טפסים פתוחה"}
+              ? "המשחקים התחילו — ההגשה נסגרה"
+              : "ניתן להגיש ולערוך טפסים"}
           </span>
         </div>
       </div>

@@ -20,6 +20,7 @@ export function useStoreReady() {
 
 export function useCurrentUser() {
   useStoreValue(store.isStoreReady);
+  useStoreValue(store.getUsers); // subscribe to user changes so we re-render when a new user is created
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
   const storeReady = store.isStoreReady();
@@ -47,9 +48,11 @@ export function useCurrentUser() {
   // Single consolidated write when both auth and store are ready
   useEffect(() => {
     if (!storeReady || !firebaseUser) return;
+    const isPhoneUser = firebaseUser.uid.startsWith("phone_");
+    const phoneName = isPhoneUser ? firebaseUser.uid.replace("phone_", "") : null;
     store.ensureUserInStore(
       firebaseUser.uid,
-      firebaseUser.displayName || firebaseUser.phoneNumber || "משתמש",
+      firebaseUser.displayName || firebaseUser.phoneNumber || phoneName || "משתמש",
       firebaseUser.email || null,
     );
   }, [storeReady, firebaseUser]);

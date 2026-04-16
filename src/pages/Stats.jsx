@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useAllPredictions, useMatchResults, useSettings } from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 
@@ -46,10 +47,7 @@ function MatchPredictions({ forms }) {
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [selectedMatch, setSelectedMatch] = useState(null);
 
-  const filteredMatches =
-    selectedStage === "group"
-      ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
+  const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
 
   const matchStats = useMemo(() => {
     if (!selectedMatch) return null;
@@ -298,28 +296,18 @@ function TopScorerStats({ forms }) {
 // ============ GENERAL STATS ============
 function GeneralStats({ forms, results }) {
   const stats = useMemo(() => {
-    let totalGoals = 0,
-      totalMatches = 0;
-    forms.forEach((f) => {
-      Object.values(f.matches || {}).forEach((p) => {
+    let totalGoals = 0, totalMatches = 0, draws = 0;
+    for (const f of forms) {
+      for (const p of Object.values(f.matches || {})) {
         if (p?.homeScore != null) {
           totalGoals += (p.homeScore || 0) + (p.awayScore || 0);
           totalMatches++;
+          if (p.homeScore === p.awayScore) draws++;
         }
-      });
-    });
-    const avgGoals =
-      totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0";
-
-    // Most predicted draw
-    let draws = 0;
-    forms.forEach((f) => {
-      Object.values(f.matches || {}).forEach((p) => {
-        if (p?.homeScore != null && p.homeScore === p.awayScore) draws++;
-      });
-    });
-    const drawPct =
-      totalMatches > 0 ? ((draws / totalMatches) * 100).toFixed(1) : "0";
+      }
+    }
+    const avgGoals = totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0";
+    const drawPct = totalMatches > 0 ? ((draws / totalMatches) * 100).toFixed(1) : "0";
 
     return {
       totalForms: forms.length,
@@ -373,9 +361,17 @@ function GeneralStats({ forms, results }) {
 // ============ SEARCH ============
 function SearchStats({ forms }) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
 
   const searchResults = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     if (!q || q.length < 2) return null;
 
     const results = [];
@@ -443,7 +439,7 @@ function SearchStats({ forms }) {
     return results.length > 0
       ? results
       : [{ title: "לא נמצאו תוצאות", items: [] }];
-  }, [query, forms]);
+  }, [debouncedQuery, forms]);
 
   return (
     <StatCard title="חיפוש חופשי" icon="💬">
@@ -496,7 +492,7 @@ export default function Stats() {
       <div className="text-center py-16">
         <div className="text-5xl mb-4">🔒</div>
         <h2 className="text-lg font-bold text-primary mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר נעילת הניחושים</p>
+        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר תחילת המשחקים</p>
       </div>
     );
   }

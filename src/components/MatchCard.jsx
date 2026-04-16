@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import MatchAnalysis from "./MatchAnalysis";
 
@@ -14,21 +14,26 @@ function focusNextInput(currentInput) {
     return;
   }
 
-  const allCards = document.querySelectorAll("[data-match-card]");
-  const cardIdx = Array.from(allCards).indexOf(card);
-  for (let i = cardIdx + 1; i < allCards.length; i++) {
-    const nextInput = allCards[i].querySelector('input[type="number"]');
-    if (nextInput) {
-      nextInput.focus();
-      nextInput.select();
-      nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+  // Use nextElementSibling traversal instead of querying all cards in DOM
+  let nextCard = card.parentElement?.nextElementSibling;
+  while (nextCard) {
+    const cardEl = nextCard.querySelector("[data-match-card]") || (nextCard.hasAttribute("data-match-card") ? nextCard : null);
+    if (cardEl) {
+      const nextInput = cardEl.querySelector('input[type="number"]');
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+        nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
+    nextCard = nextCard.nextElementSibling;
   }
 }
 
-export default function MatchCard({
+function MatchCard({
   match,
+  bracketEntry,
   prediction,
   actualResult,
   onPredictionChange,
@@ -62,15 +67,18 @@ export default function MatchCard({
     return () => clearTimeout(saveTimerRef.current);
   }, [prediction, editable]);
 
-  const homeTeam = getTeamByCode(match.homeTeam);
-  const awayTeam = getTeamByCode(match.awayTeam);
+  // Use bracket-derived teams for knockout matches, falling back to match data
+  const homeCode = (bracketEntry?.home) || match.homeTeam;
+  const awayCode = (bracketEntry?.away) || match.awayTeam;
+  const homeTeam = getTeamByCode(homeCode);
+  const awayTeam = getTeamByCode(awayCode);
   const homeName = homeTeam?.name || "טרם נקבע";
   const awayName = awayTeam?.name || "טרם נקבע";
   const predHome = prediction?.homeScore ?? "";
   const predAway = prediction?.awayScore ?? "";
   const hasResult = actualResult && actualResult.homeScore !== null;
   const hasPrediction = predHome !== "" && predAway !== "";
-  const showLabel = match.label && match.stage !== "group";
+  const showLabel = match.label && match.stage !== "group" && !/^W\d+\s+vs\s+W\d+$/.test(match.label);
 
   const importanceStyles = {
     group: "p-4",
@@ -141,16 +149,18 @@ export default function MatchCard({
         <div className="h-1 w-full rounded-full bg-gradient-to-l from-secondary via-accent to-primary mb-3 -mt-1" />
       )}
 
-      {showLabel && (
+      {(showLabel || match.date) && (
         <div className="flex justify-between items-center mb-2">
-          <span
-            className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
-          >
-            {match.label}
+          {showLabel ? (
+            <span
+              className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
+            >
+              {match.label}
+            </span>
+          ) : <span />}
+          <span className="text-[11px] text-ink-muted/60">
+            {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
           </span>
-          {match.date && (
-            <span className="text-[11px] text-ink-muted/60">{match.date}</span>
-          )}
         </div>
       )}
 
@@ -181,7 +191,7 @@ export default function MatchCard({
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
             <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              <span dir="ltr">{actualResult.homeScore} – {actualResult.awayScore}</span>
+              <span dir="ltr">{actualResult.awayScore} – {actualResult.homeScore}</span>
             </div>
           )}
 
@@ -189,7 +199,7 @@ export default function MatchCard({
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
@@ -205,7 +215,7 @@ export default function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.({...prediction, homeScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
                 <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
@@ -216,7 +226,7 @@ export default function MatchCard({
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
@@ -233,7 +243,7 @@ export default function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.({...prediction, awayScore: v}); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
               </div>
@@ -256,14 +266,14 @@ export default function MatchCard({
               <div
                 className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/60"}`}
               >
-                {hasPrediction ? <span dir="ltr">{predHome} – {predAway}</span> : "– : –"}
+                {hasPrediction ? <span dir="ltr">{predAway} – {predHome}</span> : "– : –"}
               </div>
             )
           )}
 
           {hasResult && !editable && predHome !== "" && (
             <div className="text-[11px] text-ink-muted font-medium tabular-nums">
-              ניחוש: <span dir="ltr">{predHome} – {predAway}</span>
+              ניחוש: <span dir="ltr">{predAway} – {predHome}</span>
             </div>
           )}
         </div>
@@ -288,8 +298,8 @@ export default function MatchCard({
             </div>
             <div className="flex gap-2 justify-center">
               {[
-                { team: match.homeTeam, name: homeName },
-                { team: match.awayTeam, name: awayName },
+                { team: homeCode, name: homeName },
+                { team: awayCode, name: awayName },
               ].map(({ team, name }) => (
                 <button
                   key={team}
@@ -310,14 +320,15 @@ export default function MatchCard({
         ) : prediction?.advancingTeam ? (
           <div className="mt-1.5 text-[11px] text-ink-muted text-center font-medium">
             {match.stage === "F" ? "אלופה:" : "עולה:"}{" "}
-            {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
+            {prediction.advancingTeam === homeCode ? homeName : awayName}
           </div>
         ) : null)}
 
       {showAnalysis && editable && homeTeam && awayTeam && (
         <MatchAnalysis
-          homeTeam={match.homeTeam}
-          awayTeam={match.awayTeam}
+          key={`${homeCode}-${awayCode}`}
+          homeTeam={homeCode}
+          awayTeam={awayCode}
           homeTeamName={homeName}
           awayTeamName={awayName}
           stage={match.stage}
@@ -333,3 +344,33 @@ export default function MatchCard({
     </div>
   );
 }
+
+// Custom memo comparator — update when adding new props that affect rendering
+export default React.memo(MatchCard, (prev, next) => {
+  // Match identity & bracket-derived teams
+  if (prev.match?.id !== next.match?.id) return false;
+  if (prev.bracketEntry?.home !== next.bracketEntry?.home ||
+      prev.bracketEntry?.away !== next.bracketEntry?.away) return false;
+
+  // Prediction state
+  if (prev.prediction?.homeScore !== next.prediction?.homeScore ||
+      prev.prediction?.awayScore !== next.prediction?.awayScore ||
+      prev.prediction?.advancingTeam !== next.prediction?.advancingTeam) return false;
+
+  // Actual result
+  if (prev.actualResult?.homeScore !== next.actualResult?.homeScore ||
+      prev.actualResult?.awayScore !== next.actualResult?.awayScore) return false;
+
+  // Scalar props
+  if (prev.editable !== next.editable ||
+      prev.isKnockout !== next.isKnockout ||
+      prev.importance !== next.importance ||
+      prev.showPoints !== next.showPoints) return false;
+
+  // Points & callback
+  if (prev.points?.points !== next.points?.points ||
+      prev.points?.breakdown !== next.points?.breakdown) return false;
+  if (prev.onPredictionChange !== next.onPredictionChange) return false;
+
+  return true;
+});

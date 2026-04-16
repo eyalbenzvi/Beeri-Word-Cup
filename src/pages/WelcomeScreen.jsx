@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import CountdownUnit from "../components/CountdownUnit";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
 import { Menu } from "lucide-react";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
 
   return (
     <div className="h-dvh bg-bg flex flex-col overflow-hidden">
@@ -52,24 +54,44 @@ export default function WelcomeScreen() {
                 שריקת הפתיחה בעוד
               </p>
               <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
-                <CountdownUnit value={countdown.seconds} label="שניות" />
-                <CountdownUnit value={countdown.minutes} label="דקות" />
-                <CountdownUnit value={countdown.hours} label="שעות" />
                 <CountdownUnit
                   value={countdown.days}
                   label="ימים"
                   accent="bg-primary-light"
                 />
+                <CountdownUnit value={countdown.hours} label="שעות" />
+                <CountdownUnit value={countdown.minutes} label="דקות" />
+                <CountdownUnit value={countdown.seconds} label="שניות" />
               </div>
               <p className="text-[10px] text-ink-muted/50 mt-2">
-                11 ביוני 2026 · 19:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+                12 ביוני 2026 · 00:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
               </p>
             </>
           )}
         </div>
 
-        <div className="pt-1">
-          <GoogleSignInButton />
+        <div className="pt-1 space-y-3">
+          {authMethod === "google" ? (
+            <>
+              <GoogleSignInButton />
+              <button
+                onClick={() => setAuthMethod("phone")}
+                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+              >
+                📱 התחבר עם מספר טלפון
+              </button>
+            </>
+          ) : (
+            <>
+              <PhoneSignIn />
+              <button
+                onClick={() => setAuthMethod("google")}
+                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+              >
+                ← חזור להתחברות עם Google
+              </button>
+            </>
+          )}
         </div>
       </div>
       </div>

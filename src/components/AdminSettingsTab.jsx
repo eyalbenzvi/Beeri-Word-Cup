@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useNavigation } from "../hooks/useNavigation";
 import {
   updateSettings,
@@ -7,6 +7,9 @@ import {
   clearAllData,
   clearMatchResults,
 } from "../store";
+import { TOP_SCORER_PLAYERS } from "../data/players";
+import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmModal";
 
 export default function AdminSettingsTab({
   settings,
@@ -16,6 +19,10 @@ export default function AdminSettingsTab({
 }) {
   const { navigate } = useNavigation();
   const fileInputRef = useRef(null);
+  const playerFileRef = useRef(null);
+  const [playerCount, setPlayerCount] = useState(settings.topScorerPlayers?.length || 0);
+  const showToast = useToast();
+  const confirm = useConfirm();
 
   const downloadBackup = (label = "backup") => {
     const data = exportAllData();
@@ -52,12 +59,12 @@ export default function AdminSettingsTab({
         const validKeys = ["users", "predictions", "matchResults", "settings", "actualBonuses", "actualAdvancing"];
         const dataKeys = Object.keys(data);
         if (dataKeys.length === 0 || !dataKeys.some(k => validKeys.includes(k))) {
-          alert("קובץ לא תקין — חסרים שדות נדרשים (users, predictions, וכו')");
+          showToast("קובץ לא תקין — חסרים שדות נדרשים", "error");
           return;
         }
         const invalidKeys = dataKeys.filter(k => !validKeys.includes(k));
         if (invalidKeys.length > 0) {
-          alert(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`);
+          showToast(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`, "error");
           return;
         }
         // Confirm with preview
@@ -67,9 +74,9 @@ export default function AdminSettingsTab({
         }).join("\n");
         if (!window.confirm(`ייבוא ידרוס את הנתונים הקיימים.\n\nתוכן הקובץ:\n${preview}\n\nלהמשיך?`)) return;
         importAllData(data);
-        alert("כל הנתונים הקיימים הוחלפו בנתונים שיובאו בהצלחה");
+        showToast("כל הנתונים הוחלפו בהצלחה");
       } catch {
-        alert("קובץ לא תקין — שגיאה בפרסור JSON");
+        showToast("קובץ לא תקין — שגיאה בפרסור JSON", "error");
       }
     };
     reader.readAsText(file);
@@ -120,6 +127,60 @@ export default function AdminSettingsTab({
             </div>
             <div className="text-xs text-gray-500">תוצאות</div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <h3 className="font-semibold text-sm mb-3">רשימת מלך שערים</h3>
+        <div className="text-xs text-gray-400 mb-3">
+          {settings.topScorerPlayers?.length > 0
+            ? `רשימה מותאמת: ${settings.topScorerPlayers.length} שחקנים`
+            : `רשימה ברירת מחדל: ${TOP_SCORER_PLAYERS.length} שחקנים`}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              updateSettings({ topScorerPlayers: TOP_SCORER_PLAYERS });
+              setPlayerCount(TOP_SCORER_PLAYERS.length);
+              showToast("רשימת השחקנים אופסה לברירת המחדל");
+            }}
+            className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
+          >
+            אפס לברירת מחדל
+          </button>
+          <button
+            onClick={() => playerFileRef.current?.click()}
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition"
+          >
+            טען רשימה מקובץ
+          </button>
+          <input
+            ref={playerFileRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                try {
+                  const data = JSON.parse(ev.target.result);
+                  if (!Array.isArray(data) || !data[0]?.team || !data[0]?.name) {
+                    showToast("פורמט לא תקין — נדרש מערך של { team, name }", "error");
+                    return;
+                  }
+                  updateSettings({ topScorerPlayers: data });
+                  setPlayerCount(data.length);
+                  showToast(`נטענו ${data.length} שחקנים`);
+                } catch {
+                  showToast("שגיאה בקריאת הקובץ", "error");
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = "";
+            }}
+          />
         </div>
       </div>
 

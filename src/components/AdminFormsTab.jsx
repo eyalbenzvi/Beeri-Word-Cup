@@ -7,6 +7,8 @@ import {
   adminSaveMatchPrediction,
   adminApprovePrediction,
 } from "../store";
+import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmModal";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
@@ -40,7 +42,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
       topScorer: topScorer.trim(),
       adminNote: adminNote.trim(),
     });
-    alert("נשמר");
+    onClose();
   };
 
   const saveMatchPred = (match, homeScore, awayScore, advancingTeam) => {
@@ -287,6 +289,8 @@ export default function AdminFormsTab({ users, allPredictions }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingId, setEditingId] = useState(null);
+  const showToast = useToast();
+  const confirm = useConfirm();
 
   const rows = useMemo(() => {
     return Object.entries(allPredictions)
@@ -390,9 +394,10 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {r.status === "draft" && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("להגיש את הטופס בשם המשתמש?")) {
+                  onClick={async () => {
+                    if (await confirm("להגיש את הטופס בשם המשתמש?")) {
                       adminForceSubmitForm(r.formId);
+                      showToast("הטופס הוגש");
                     }
                   }}
                   className="text-[11px] bg-green-100 text-green-800 px-2 py-1 rounded-lg"
@@ -403,9 +408,10 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {(r.status === "submitted" || r.status === "approved") && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("לפתוח מחדש כטיוטה?")) {
+                  onClick={async () => {
+                    if (await confirm("לפתוח מחדש כטיוטה?")) {
                       adminReopenForm(r.formId);
+                      showToast("הטופס נפתח מחדש");
                     }
                   }}
                   className="text-[11px] bg-amber-100 text-amber-900 px-2 py-1 rounded-lg"
@@ -415,9 +421,10 @@ export default function AdminFormsTab({ users, allPredictions }) {
               )}
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm("למחוק טופס זה לצמיתות?")) {
+                onClick={async () => {
+                  if (await confirm("למחוק טופס זה לצמיתות?")) {
                     adminDeleteForm(r.formId);
+                    showToast("הטופס נמחק");
                   }
                 }}
                 className="text-[11px] bg-red-50 text-red-600 px-2 py-1 rounded-lg"

@@ -1,14 +1,29 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { calcGroupStandings } from "../utils/bracket";
 
 export default function GroupTable({ matchData, group }) {
   const standings = useMemo(() => calcGroupStandings(matchData), [matchData]);
   const groupStandings = standings[group];
-  if (!groupStandings) return null;
 
-  const hasData = groupStandings.some((t) => t.played > 0);
-  if (!hasData) return null;
+  const hasData = groupStandings?.some((t) => t.played > 0) ?? false;
+  const prevHasData = useRef(false);
+
+  useEffect(() => {
+    if (hasData && !prevHasData.current) {
+      // Table just appeared for the first time — scroll the focused match back into view
+      requestAnimationFrame(() => {
+        const activeEl = document.activeElement;
+        const card = activeEl?.closest?.("[data-match-card]");
+        if (card) {
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+    prevHasData.current = hasData;
+  }, [hasData]);
+
+  if (!groupStandings || !hasData) return null;
 
   return (
     <div className="bg-white rounded-2xl border border-border p-4 mb-3">

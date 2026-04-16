@@ -8,6 +8,7 @@ import {
   FINAL_MATCHES,
 } from "../data/matches";
 import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
+import { isScoreValid } from "./helpers";
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -15,6 +16,17 @@ for (const [groupName, teams] of Object.entries(GROUPS)) {
     ALL_TEAMS_MAP[team.code] = groupName;
   }
 }
+
+// FIFA/Coca-Cola World Ranking (used as last-resort tiebreaker per 2026 regulations)
+const FIFA_RANKING = {
+  FRA: 1, ESP: 2, ARG: 3, ENG: 4, POR: 5, BRA: 6, NED: 7, MAR: 8,
+  BEL: 9, GER: 10, CRO: 11, COL: 13, SEN: 14, MEX: 15, USA: 16,
+  URU: 17, JPN: 18, SUI: 19, IRN: 21, TUR: 22, ECU: 23, AUT: 24,
+  KOR: 25, AUS: 27, ALG: 28, EGY: 29, CAN: 30, NOR: 31, PAN: 33,
+  CIV: 34, SWE: 38, PAR: 40, CZE: 41, SCO: 43, TUN: 44, COD: 46,
+  UZB: 50, QAT: 55, IRQ: 57, RSA: 60, KSA: 61, JOR: 63, BIH: 65,
+  CPV: 69, GHA: 74, CUR: 82, HAI: 83, NZL: 85,
+};
 
 export function calcGroupStandings(matchPredictions) {
   const standings = {};
@@ -40,14 +52,7 @@ export function calcGroupStandings(matchPredictions) {
     const gMatches = groupMatches.filter((m) => m.group === groupName);
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
-      if (
-        !pred ||
-        pred.homeScore === null ||
-        pred.homeScore === undefined ||
-        pred.awayScore === null ||
-        pred.awayScore === undefined
-      )
-        continue;
+      if (!isScoreValid(pred)) continue;
 
       const h = Number(pred.homeScore);
       const a = Number(pred.awayScore);
@@ -82,14 +87,7 @@ export function calcGroupStandings(matchPredictions) {
     const groupMatchResults = [];
     for (const match of gMatches) {
       const pred = matchPredictions[match.id];
-      if (
-        !pred ||
-        pred.homeScore === null ||
-        pred.homeScore === undefined ||
-        pred.awayScore === null ||
-        pred.awayScore === undefined
-      )
-        continue;
+      if (!isScoreValid(pred)) continue;
       groupMatchResults.push({
         team1Code: match.homeTeam,
         team2Code: match.awayTeam,
@@ -132,45 +130,44 @@ export function calcGroupStandings(matchPredictions) {
       const tiedCodes = tiedTeams.map((t) => t.code);
       const h2h = computeH2HStats(tiedCodes);
 
+      // Step 1: Sort by H2H criteria only (FIFA rules a-c)
       tiedTeams.sort((a, b) => {
         const ha = h2h[a.code],
           hb = h2h[b.code];
         if (hb.pts !== ha.pts) return hb.pts - ha.pts;
         if (hb.gd !== ha.gd) return hb.gd - ha.gd;
         if (hb.gf !== ha.gf) return hb.gf - ha.gf;
-        const gdA = a.gf - a.ga,
-          gdB = b.gf - b.ga;
-        if (gdB !== gdA) return gdB - gdA;
-        if (b.gf !== a.gf) return b.gf - a.gf;
-        return a.code.localeCompare(b.code);
+        return 0;
       });
 
+      // Step 2: Group consecutive teams still tied on H2H
       const result = [];
       let i = 0;
       while (i < tiedTeams.length) {
         let j = i + 1;
-
         while (j < tiedTeams.length) {
-          const a = tiedTeams[i],
-            b = tiedTeams[j];
-          const ha = h2h[a.code],
-            hb = h2h[b.code];
-          const gdA = a.gf - a.ga,
-            gdB = b.gf - b.ga;
-          if (
-            ha.pts !== hb.pts ||
-            ha.gd !== hb.gd ||
-            ha.gf !== hb.gf ||
-            gdA !== gdB ||
-            a.gf !== b.gf ||
-            a.code !== b.code
-          )
-            break;
+          const ha = h2h[tiedTeams[i].code],
+            hb = h2h[tiedTeams[j].code];
+          if (ha.pts !== hb.pts || ha.gd !== hb.gd || ha.gf !== hb.gf) break;
           j++;
         }
         const subGroup = tiedTeams.slice(i, j);
         if (subGroup.length > 1 && subGroup.length < tiedTeams.length) {
+          // Step 3 (FIFA rule d): Re-apply H2H among just these teams
           result.push(...sortTiedGroup(subGroup));
+        } else if (subGroup.length > 1) {
+          // H2H exhausted (same group size) — fall to overall stats (FIFA rules e-h)
+          subGroup.sort((a, b) => {
+            const gdA = a.gf - a.ga,
+              gdB = b.gf - b.ga;
+            if (gdB !== gdA) return gdB - gdA;
+            if (b.gf !== a.gf) return b.gf - a.gf;
+            // FIFA ranking as last resort (2026 regulations, replaces drawing of lots)
+            const rankA = FIFA_RANKING[a.code] || 999;
+            const rankB = FIFA_RANKING[b.code] || 999;
+            return rankA - rankB;
+          });
+          result.push(...subGroup);
         } else {
           result.push(...subGroup);
         }
@@ -225,7 +222,9 @@ function getBestThirdPlaceTeams(standings) {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.gd !== a.gd) return b.gd - a.gd;
     if (b.gf !== a.gf) return b.gf - a.gf;
-    return a.code.localeCompare(b.code);
+    const rankA = FIFA_RANKING[a.code] || 999;
+    const rankB = FIFA_RANKING[b.code] || 999;
+    return rankA - rankB;
   });
   return thirdPlace.slice(0, 8);
 }
@@ -263,21 +262,18 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   if (!teams || !teams.home || !teams.away) return null;
 
   const pred = matchPredictions[matchId];
-  if (
-    !pred ||
-    pred.homeScore === null ||
-    pred.homeScore === undefined ||
-    pred.awayScore === null ||
-    pred.awayScore === undefined
-  )
-    return null;
+  if (!isScoreValid(pred)) return null;
 
   const hs = Number(pred.homeScore);
   const as = Number(pred.awayScore);
   if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
 
   if (hs === as) {
-    return pred.advancingTeam || teams.home;
+    // Validate advancingTeam is one of the actual match teams
+    if (pred.advancingTeam === teams.home || pred.advancingTeam === teams.away) {
+      return pred.advancingTeam;
+    }
+    return teams.home; // default fallback
   }
   return hs > as ? teams.home : teams.away;
 }

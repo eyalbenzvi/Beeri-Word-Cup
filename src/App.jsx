@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
+import { ConfirmProvider } from "./components/ConfirmModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import WelcomeScreen from "./pages/WelcomeScreen";
-import Predict from "./pages/Predict";
-import Leaderboard from "./pages/Leaderboard";
-import Results from "./pages/Results";
-import Stats from "./pages/Stats";
-import Admin from "./pages/Admin";
-import Profile from "./pages/Profile";
 import ProfileSetup from "./components/ProfileSetup";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
+
+// Lazy-load pages that aren't needed on initial render
+const Predict = lazy(() => import("./pages/Predict"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Results = lazy(() => import("./pages/Results"));
+const Stats = lazy(() => import("./pages/Stats"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 const PAGES = {
   home: Home,
@@ -48,6 +51,7 @@ function AppContent() {
   if (!isLoggedIn) return <WelcomeScreen />;
 
   // Logged in but Firestore data or user record still loading
+  // (store.js retries indefinitely with backoff + online/visibility listeners)
   if (!ready || !user) return <Loading />;
 
   // Show profile setup for truly new users (profileCompleted === false, not undefined)
@@ -59,9 +63,11 @@ function AppContent() {
 
   return (
     <Layout>
-      <div key={page} className="animate-fade-in">
-        <Page />
-      </div>
+      <Suspense fallback={<div className="text-center py-8 text-gray-400">טוען...</div>}>
+        <div key={page} className="animate-fade-in">
+          <Page />
+        </div>
+      </Suspense>
     </Layout>
   );
 }
@@ -71,7 +77,9 @@ function App() {
     <ErrorBoundary>
       <NavigationProvider>
         <ToastProvider>
-          <AppContent />
+          <ConfirmProvider>
+            <AppContent />
+          </ConfirmProvider>
         </ToastProvider>
       </NavigationProvider>
     </ErrorBoundary>

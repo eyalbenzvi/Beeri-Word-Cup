@@ -19,9 +19,10 @@ import {
 } from "../store";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { getCachedBracket } from "../utils/bracketCache";
+import { getFilteredMatches } from "../utils/matchFiltering";
+import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
-import { predictAllMatches, predictTopScorer } from "../utils/fifaPredictor";
+import { predictAllMatches } from "../utils/fifaPredictor";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
@@ -34,43 +35,14 @@ import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
+import PlayerAutocomplete from "../components/PlayerAutocomplete";
+import AIFillOverlay from "../components/AIFillOverlay";
+import { TOP_SCORER_PLAYERS } from "../data/players";
+import { validateForm } from "../utils/formValidation";
 
-const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
+import { KNOCKOUT_STAGE_ORDER as knockoutStageOrder, getStageLabel, STAGE_LABELS } from "../utils/constants";
 const EMPTY_MATCHES = {};
-
-const STAGE_LABELS = { R32: "שלב ה-32", R16: "שמינית גמר", QF: "רבע גמר", SF: "חצי גמר", "3RD": "מקום שלישי", F: "גמר" };
-function getStageLabel(stage) { return STAGE_LABELS[stage] || stage; }
-
-const AI_MESSAGES = [
-  "⚽ סורק דירוגי FIFA...",
-  "📊 מנתח סטטיסטיקות של נבחרות...",
-  "🔍 בודק עימותים היסטוריים...",
-  "🧠 מחשב הסתברויות...",
-  "🌍 מעריך יתרון בית...",
-  "💪 בודק פורם אחרון...",
-  "🎯 מחפש הפתעות אפשריות...",
-  "🏟️ מדמה תרחישי משחק...",
-  "⭐ מזהה dark horses...",
-  "🤔 מתלבט על תיקו פוטנציאלי...",
-  "🔮 מנבא תוצאות...",
-  "📝 מסכם ניתוח...",
-];
-
-function AiProgressMessage({ step }) {
-  const [msgIdx, setMsgIdx] = useState(0);
-  useEffect(() => {
-    setMsgIdx(Math.floor(Math.random() * AI_MESSAGES.length));
-    const interval = setInterval(() => {
-      setMsgIdx((prev) => (prev + 1) % AI_MESSAGES.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [step]);
-  return (
-    <div className="text-xs text-ink-muted/70 animate-pulse h-5">
-      {AI_MESSAGES[msgIdx]}
-    </div>
-  );
-}
+const SCROLL_DELAY = 100; // ms to wait for DOM before scrollIntoView
 
 export default function Predict() {
   const { user } = useCurrentUser();
@@ -134,6 +106,26 @@ export default function Predict() {
     () => getCachedBracket(matchPredictions),
     [matchPredictions],
   );
+  const championCode = useMemo(
+    () => getCachedChampion(matchPredictions),
+    [matchPredictions],
+  );
+  const championName = championCode ? getTeamByCode(championCode)?.name : null;
+
+  // All useMemo hooks must be above early returns to preserve hook call order
+  const predictedGroupMatches = useMemo(() => groupMatches.filter(
+    (m) =>
+      matchPredictions[m.id]?.homeScore != null &&
+      matchPredictions[m.id]?.awayScore != null,
+  ).length, [matchPredictions]);
+  const predictedKnockout = useMemo(() => knockoutMatches.filter(
+    (m) =>
+      matchPredictions[m.id]?.homeScore != null &&
+      matchPredictions[m.id]?.awayScore != null,
+  ).length, [matchPredictions]);
+  const filteredMatches = useMemo(
+    () => getFilteredMatches(selectedStage, selectedGroup),
+    [selectedStage, selectedGroup]);
 
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
@@ -142,6 +134,19 @@ export default function Predict() {
     },
     [activeFormId, canEdit],
   );
+
+  // Stable per-match callback refs to avoid inline arrow functions in map
+  const matchCallbacksRef = useRef({});
+  const getMatchCallback = useCallback((matchId) => {
+    if (!matchCallbacksRef.current[matchId]) {
+      matchCallbacksRef.current[matchId] = (pred) => handlePredictionChange(matchId, pred);
+    }
+    return matchCallbacksRef.current[matchId];
+  }, [handlePredictionChange]);
+  // Reset callbacks when handler changes
+  useEffect(() => {
+    matchCallbacksRef.current = {};
+  }, [handlePredictionChange]);
 
   const handleSubmit = useCallback(() => {
     if (!activeFormId || submitting) return;
@@ -154,135 +159,32 @@ export default function Predict() {
     setActiveFormId(null); // return to form list
   }, [activeFormId, submitting, showToast]);
 
+  // Map validation error targets to scroll/navigate actions
+  const scrollToTarget = useCallback((target) => {
+    if (!target) return undefined;
+    return () => {
+      if (target.field) {
+        setTimeout(() => document.getElementById(`field-${target.field}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), SCROLL_DELAY);
+      } else if (target.matchId) {
+        if (target.stage === "group" && target.group) {
+          setSelectedStage("group");
+          setSelectedGroup(target.group);
+        } else if (target.stage) {
+          setSelectedStage(target.stage);
+        }
+        setActiveTab("matches");
+        setTimeout(() => document.getElementById(`match-${target.matchId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), SCROLL_DELAY);
+      }
+    };
+  }, []);
+
   const handleTrySubmit = useCallback(() => {
     if (!activeFormId || !activeForm) return;
-    const preds = activeForm.matches || {};
-    const errors = [];
-
-    const missingGroupMatches = groupMatches.filter(
-      (m) =>
-        preds[m.id]?.homeScore === undefined ||
-        preds[m.id]?.homeScore === null ||
-        preds[m.id]?.awayScore === undefined ||
-        preds[m.id]?.awayScore === null,
-    );
-    if (missingGroupMatches.length > 0) {
-      const firstMissing = missingGroupMatches[0];
-      errors.push({
-        label: `${missingGroupMatches.length} משחקי בתים חסרים`,
-        action: () => {
-          setSelectedStage("group");
-          setSelectedGroup(firstMissing.group);
-          setActiveTab("matches");
-          setTimeout(() => {
-            document
-              .getElementById(`match-${firstMissing.id}`)
-              ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
-        },
-      });
-    }
-
-    const missingKnockoutMatches = knockoutMatches.filter(
-      (m) =>
-        preds[m.id]?.homeScore === undefined ||
-        preds[m.id]?.homeScore === null ||
-        preds[m.id]?.awayScore === undefined ||
-        preds[m.id]?.awayScore === null,
-    );
-    if (missingKnockoutMatches.length > 0) {
-      const firstMissing = missingKnockoutMatches[0];
-      errors.push({
-        label: `${missingKnockoutMatches.length} משחקי נוקאאוט חסרים`,
-        action: () => {
-          setSelectedStage(firstMissing.stage);
-          setActiveTab("matches");
-          setTimeout(() => {
-            document
-              .getElementById(`match-${firstMissing.id}`)
-              ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
-        },
-      });
-    }
-
-    const bracket = getCachedBracket(preds);
-    const unresolvedTieMatches = knockoutMatches.filter((m) => {
-      const pred = preds[m.id];
-      if (!pred || pred.homeScore === null || pred.awayScore === null)
-        return false;
-      if (pred.homeScore !== pred.awayScore) return false;
-      const teams = bracket[m.id];
-      return (
-        !pred.advancingTeam ||
-        (teams &&
-          pred.advancingTeam !== teams.home &&
-          pred.advancingTeam !== teams.away)
-      );
-    });
-    if (unresolvedTieMatches.length > 0) {
-      const firstTie = unresolvedTieMatches[0];
-      errors.push({
-        label: `${unresolvedTieMatches.length} תיקו בנוקאאוט בלי בחירת מי עולה`,
-        action: () => {
-          setSelectedStage(firstTie.stage);
-          setActiveTab("matches");
-          setTimeout(() => {
-            document
-              .getElementById(`match-${firstTie.id}`)
-              ?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 100);
-        },
-      });
-    }
-
-    if (!activeForm.topScorer?.trim()) {
-      errors.push({
-        label: "לא הוכנס מלך שערים",
-        action: () => {
-          setTimeout(() => document.getElementById('field-topScorer')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        },
-      });
-    }
-
-    if (!activeForm.formName?.trim()) {
-      errors.push({
-        label: "לא הוכנס שם טופס",
-        action: () => {
-          setTimeout(() => document.getElementById('field-formName')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        },
-      });
-    } else {
-      const trimmedName = activeForm.formName.trim().toLowerCase();
-      const duplicateName = Object.entries(allPredictions).some(
-        ([fid, f]) =>
-          fid !== activeFormId &&
-          f.formName?.trim().toLowerCase() === trimmedName &&
-          (f.status === "submitted" ||
-            f.status === "approved" ||
-            f.status === "pending"),
-      );
-      if (duplicateName) {
-        errors.push({
-          label: "כבר קיים טופס שהוגש עם שם זהה. בחר שם אחר",
-          action: () => {
-            setTimeout(() => document.getElementById('field-formName')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-          },
-        });
-      }
-    }
-    if (!activeForm.budgetNumber || !/^\d+$/.test(activeForm.budgetNumber) || parseInt(activeForm.budgetNumber) < 100 || parseInt(activeForm.budgetNumber) > 9999) {
-      errors.push({
-        label: "מספר תקציב חייב להיות מספר שלם בין 100 ל-9999",
-        action: () => {
-          setTimeout(() => document.getElementById('field-budget')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        },
-      });
-    }
-
+    const rawErrors = validateForm(activeForm, activeFormId, allPredictions, settings);
+    const errors = rawErrors.map((e) => ({ label: e.label, action: scrollToTarget(e.target) }));
     setValidationErrors(errors);
     setShowConfirm(true);
-  }, [activeFormId, activeForm, allPredictions]);
+  }, [activeFormId, activeForm, allPredictions, settings, scrollToTarget]);
 
   const [aiProgress, setAiProgress] = useState(null);
 
@@ -311,7 +213,9 @@ export default function Predict() {
       setAiProgress({ current: 3, total: totalSteps });
       await new Promise((r) => setTimeout(r, 800));
 
-      saveBonusPrediction(activeFormId, "topScorer", predictTopScorer());
+      const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
+      const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
+      saveBonusPrediction(activeFormId, "topScorer", randomPlayer.name);
 
       showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
@@ -333,7 +237,7 @@ export default function Predict() {
       document
         .getElementById(`match-${match.id}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
+    }, SCROLL_DELAY);
   }, []);
 
   if (!user) {
@@ -376,22 +280,6 @@ export default function Predict() {
   }
 
   // === FORM EDITING VIEW ===
-  const predictedGroupMatches = groupMatches.filter(
-    (m) =>
-      matchPredictions[m.id]?.homeScore != null &&
-      matchPredictions[m.id]?.awayScore != null,
-  ).length;
-  const predictedKnockout = knockoutMatches.filter(
-    (m) =>
-      matchPredictions[m.id]?.homeScore != null &&
-      matchPredictions[m.id]?.awayScore != null,
-  ).length;
-
-  const filteredMatches =
-    selectedStage === "group"
-      ? groupMatches.filter((m) => m.group === selectedGroup)
-      : knockoutMatches.filter((m) => m.stage === selectedStage);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -416,7 +304,7 @@ export default function Predict() {
           )}
           {settings.predictionsLocked && (
             <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">
-              🔒 נעול
+              🔒 ההגשה נסגרה
             </span>
           )}
         </div>
@@ -477,15 +365,18 @@ export default function Predict() {
           </div>
           <div id="field-topScorer">
             <label className="text-[11px] font-semibold text-ink-muted">מלך שערים</label>
-            <input
+            <PlayerAutocomplete
               value={activeForm.topScorer || ""}
-              onChange={(e) => saveBonusPrediction(activeFormId, "topScorer", e.target.value)}
-              placeholder="שם שחקן"
-              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+              onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
               disabled={!canEdit}
             />
           </div>
         </div>
+        {championName && (
+          <div className="mt-2 pt-2 border-t border-gray-100 text-center text-xs text-yellow-700 font-semibold">
+            🏆 אלופה: {championName}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-3">
@@ -493,17 +384,7 @@ export default function Predict() {
           {activeForm.formName} ›{" "}
           {selectedStage === "group"
             ? `שלב בתים › בית ${selectedGroup}`
-            : (() => {
-                const stageNames = {
-                  R32: "שלב ה-32",
-                  R16: "שמינית גמר",
-                  QF: "רבע גמר",
-                  SF: "חצי גמר",
-                  "3RD": "מקום שלישי",
-                  F: "גמר",
-                };
-                return stageNames[selectedStage] || selectedStage;
-              })()}
+            : getStageLabel(selectedStage)}
         </div>
         <button
           onClick={() => setShowSearch(true)}
@@ -553,23 +434,15 @@ export default function Predict() {
           )}
 
           <div className="space-y-2">
-            {filteredMatches.map((match, idx) => {
-              const derivedMatch =
-                match.stage !== "group" && bracketTeams[match.id]
-                  ? {
-                      ...match,
-                      homeTeam: bracketTeams[match.id].home,
-                      awayTeam: bracketTeams[match.id].away,
-                    }
-                  : match;
-              return (
+            {filteredMatches.map((match, idx) => (
                 <div
                   key={match.id}
                   id={`match-${match.id}`}
                   className={`scroll-mt-[220px] rounded-2xl ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
                 >
                   <MatchCard
-                    match={derivedMatch}
+                    match={match}
+                    bracketEntry={bracketTeams[match.id]}
                     prediction={matchPredictions[match.id]}
                     editable={canEdit}
                     isKnockout={match.stage !== "group"}
@@ -580,13 +453,10 @@ export default function Predict() {
                           ? "knockout"
                           : "group"
                     }
-                    onPredictionChange={(pred) =>
-                      handlePredictionChange(match.id, pred)
-                    }
+                    onPredictionChange={getMatchCallback(match.id)}
                   />
                 </div>
-              );
-            })}
+              ))}
             {filteredMatches.length === 0 && (
               <div className="text-center py-8 text-gray-400">
                 <p>אין משחקים בשלב הזה</p>
@@ -601,6 +471,7 @@ export default function Predict() {
           activeForm={activeForm}
           activeFormId={activeFormId}
           canEdit={canEdit}
+          championName={championName}
         />
       )}
 
@@ -615,27 +486,7 @@ export default function Predict() {
         />
       )}
 
-      {aiProgress && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
-            <div className="text-5xl mb-4 animate-bounce">🤖</div>
-            <div className="text-lg font-extrabold text-primary mb-4">
-              הבינה המלאכותית מנתחת
-            </div>
-
-            {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700"
-                style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
-              />
-            </div>
-
-            {/* Rotating fun messages */}
-            <AiProgressMessage step={aiProgress.current} />
-          </div>
-        </div>
-      )}
+      <AIFillOverlay aiProgress={aiProgress} />
 
 
       {showConfirm && (
@@ -646,6 +497,7 @@ export default function Predict() {
           knockoutMatchesCount={knockoutMatches.length}
           predictedGroupCount={predictedGroupMatches}
           predictedKnockoutCount={predictedKnockout}
+          championName={championName}
           onClose={() => {
             setShowConfirm(false);
             setValidationErrors([]);
