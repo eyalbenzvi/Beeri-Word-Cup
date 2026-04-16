@@ -20,7 +20,7 @@ import {
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
-import { getCachedBracket } from "../utils/bracketCache";
+import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
 import { predictAllMatches } from "../utils/fifaPredictor";
 import { normalizeStatus } from "../utils/helpers";
@@ -106,6 +106,11 @@ export default function Predict() {
     () => getCachedBracket(matchPredictions),
     [matchPredictions],
   );
+  const championCode = useMemo(
+    () => getCachedChampion(matchPredictions),
+    [matchPredictions],
+  );
+  const championName = championCode ? getTeamByCode(championCode)?.name : null;
 
   // All useMemo hooks must be above early returns to preserve hook call order
   const predictedGroupMatches = useMemo(() => groupMatches.filter(
@@ -367,6 +372,11 @@ export default function Predict() {
             />
           </div>
         </div>
+        {championName && (
+          <div className="mt-2 pt-2 border-t border-gray-100 text-center text-xs text-yellow-700 font-semibold">
+            🏆 אלופה: {championName}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-3">
@@ -461,6 +471,7 @@ export default function Predict() {
           activeForm={activeForm}
           activeFormId={activeFormId}
           canEdit={canEdit}
+          championName={championName}
         />
       )}
 
@@ -486,6 +497,7 @@ export default function Predict() {
           knockoutMatchesCount={knockoutMatches.length}
           predictedGroupCount={predictedGroupMatches}
           predictedKnockoutCount={predictedKnockout}
+          championName={championName}
           onClose={() => {
             setShowConfirm(false);
             setValidationErrors([]);

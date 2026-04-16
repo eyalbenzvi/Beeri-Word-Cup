@@ -1,6 +1,6 @@
 import { saveBonusPrediction, updateFormDetails } from "../store";
 
-export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
+export default function FormDetailsTab({ activeForm, activeFormId, canEdit, championName }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
@@ -60,6 +60,18 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit }) {
           title="ניחוש מלך השערים — 8 נקודות בונוס"
           className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
         />
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+        <h3 className="font-bold text-sm text-primary mb-1">
+          🏆 אלופה (10 נק׳)
+        </h3>
+        <p className="text-xs text-gray-400 mb-3">
+          נגזר מתוצאות הגמר שמילאת בטופס.
+        </p>
+        <div className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base bg-gray-50 ${championName ? "text-yellow-700 font-bold" : "text-gray-400"}`}>
+          {championName ? `🏆 ${championName}` : "טרם נקבע"}
+        </div>
       </div>
     </div>
   );

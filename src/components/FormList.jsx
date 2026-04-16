@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { normalizeStatus } from "../utils/helpers";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
+import { getCachedChampion } from "../utils/bracketCache";
+import { getTeamByCode } from "../data/teams";
 import { useToast } from "./Toast";
 
 const totalMatches = groupMatches.length + knockoutMatches.length;
@@ -54,6 +56,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       <div className="space-y-2.5 mb-4">
         {forms.map((form) => {
           const formStatus = normalizeStatus(form.status);
+          const championCode = getCachedChampion(form.matches || {});
+          const championName = championCode ? getTeamByCode(championCode)?.name : null;
           return (
             <div
               key={form.formId}
@@ -81,7 +85,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     {Object.keys(form.matches || {}).length}/{totalMatches}{" "}
                     משחקים
                     {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ""}
-                    {form.champion ? ` • 🏆 ${form.champion}` : ""}
+                    {championName ? ` • 🏆 ${championName}` : ""}
                   </div>
                 </div>
                 <span
