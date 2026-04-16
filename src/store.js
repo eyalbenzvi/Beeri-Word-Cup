@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import {
   doc,
   getDoc,
@@ -13,6 +13,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import { captureClientError, captureClientMessage } from "./sentry";
 
 // ============ AUDIT LOG ============
 const AUDIT_LOG_KEY = "wc2026_audit_log";
@@ -50,9 +51,33 @@ function writeAuditLog(action, details = {}) {
     "auditLog",
     `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
   );
-  setDoc(auditRef, entry).catch((err) =>
-    console.error("Audit log write failed:", err),
-  );
+  setDoc(auditRef, entry).catch((err) => {
+    console.error("Audit log write failed:", err);
+    captureClientError(err, { source: "auditLog.setDoc", action });
+  });
+}
+
+// ============ TOKEN REFRESH HELPER (A2) ============
+// Force a single ID-token refresh per uid per session when Firestore returns
+// permission-denied. Safeguards against rate-limit abuse if the denial is
+// genuinely a rule violation (in which case the refresh won't help anyway).
+const tokenRefreshedFor = new Set();
+async function maybeRefreshToken(err) {
+  if (err?.code !== "permission-denied") return false;
+  const u = auth.currentUser;
+  if (!u || tokenRefreshedFor.has(u.uid)) return false;
+  tokenRefreshedFor.add(u.uid);
+  try {
+    await u.getIdToken(true);
+    captureClientMessage("token-refreshed-after-denied", { uid: u.uid });
+    return true;
+  } catch (refreshErr) {
+    captureClientError(refreshErr, {
+      source: "maybeRefreshToken",
+      originalCode: err?.code,
+    });
+    return false;
+  }
 }
 
 export function getAuditLog() {
@@ -165,6 +190,8 @@ async function writeGameDoc(docName, data) {
   } catch (err) {
     console.error(`Failed to write ${docName}:`, err);
     emitWriteError(docName, err);
+    captureClientError(err, { source: "writeGameDoc", docName, code: err?.code });
+    await maybeRefreshToken(err);
     return false;
   }
 }
@@ -188,6 +215,13 @@ async function updateUserField(uid, fields) {
   } catch (err) {
     console.error(`Failed to update user ${uid}:`, err);
     emitWriteError("users", err);
+    captureClientError(err, {
+      source: "updateUserField",
+      uid,
+      fieldKeys: Object.keys(fields || {}),
+      code: err?.code,
+    });
+    await maybeRefreshToken(err);
     return false;
   }
 }
@@ -231,6 +265,12 @@ async function createUserField(uid, userData) {
     }
     console.error(`Failed to create user ${uid}:`, err);
     emitWriteError("users", err);
+    captureClientError(err, {
+      source: "createUserField",
+      uid,
+      code: err?.code,
+    });
+    await maybeRefreshToken(err);
     return false;
   }
 }
@@ -250,6 +290,7 @@ async function removeUserField(uid) {
   } catch (err) {
     console.error(`Failed to remove user ${uid}:`, err);
     emitWriteError("users", err);
+    captureClientError(err, { source: "removeUserField", uid, code: err?.code });
     return false;
   }
 }
@@ -268,6 +309,8 @@ async function writeFormDoc(formId, formData) {
   } catch (err) {
     console.error(`Failed to write form ${formId}:`, err);
     emitWriteError("predictions", err);
+    captureClientError(err, { source: "writeFormDoc", formId, code: err?.code });
+    await maybeRefreshToken(err);
     return false;
   }
 }
@@ -290,6 +333,12 @@ function debouncedWriteForm(formId, formData, delay = 500) {
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
         emitWriteError("predictions", err);
+        captureClientError(err, {
+          source: "debouncedWriteForm",
+          formId,
+          code: err?.code,
+        });
+        maybeRefreshToken(err);
       });
   }, delay);
 }
@@ -378,6 +427,14 @@ async function fallbackLoadGameDoc(key, docName) {
     }
   } catch (err) {
     console.error(`Fallback load failed for ${docName}:`, err);
+    captureClientError(err, {
+      source: "fallbackLoadGameDoc",
+      key,
+      docName,
+      code: err?.code,
+      retryCount: getRetryState(key).count,
+    });
+    await maybeRefreshToken(err);
     // Schedule another retry with increasing backoff — never give up
     scheduleRetry(key, () => fallbackLoadGameDoc(key, docName));
   }
@@ -399,6 +456,13 @@ async function fallbackLoadPredictions(userId) {
     notifyAndEmit("predictions");
   } catch (err) {
     console.error("Fallback load failed for predictions:", err);
+    captureClientError(err, {
+      source: "fallbackLoadPredictions",
+      userId,
+      code: err?.code,
+      retryCount: getRetryState("predictions").count,
+    });
+    await maybeRefreshToken(err);
     scheduleRetry("predictions", () => fallbackLoadPredictions(userId));
   }
 }
@@ -455,6 +519,13 @@ function setupPredictionsListener(userId, showAll) {
     },
     (err) => {
       console.error("Listener error for predictions:", err);
+      captureClientError(err, {
+        source: "predictionsListener",
+        code: err?.code,
+        retryCount: getRetryState("predictions").count,
+        showAll: predictionsShowAll,
+      });
+      maybeRefreshToken(err);
       listenersHadError = true;
       notifyAndEmit("predictions");
       const rs = getRetryState("predictions");
@@ -530,8 +601,24 @@ export function initRealtimeListeners(userId) {
         gameDocRef(docName),
         (snap) => {
           getRetryState(key).count = 0;
+          const prevUsers = key === "users" ? cache.users || {} : null;
           if (snap.exists()) cache[key] = snap.data().data;
           cache._ready[key] = true;
+          // A7: if we just wrote our own user and the server snapshot has no
+          // record of them, the write was rejected and the SDK reverted the
+          // optimistic cache. Clear lastEnsuredUid so ensureUserInStore can
+          // try again, and report to Sentry with context.
+          if (key === "users" && lastEnsuredUid) {
+            const stillThere = (cache.users || {})[lastEnsuredUid];
+            const wasThere = prevUsers && prevUsers[lastEnsuredUid];
+            if (wasThere && !stillThere) {
+              captureClientMessage("user-cache-reverted", {
+                uid: lastEnsuredUid,
+                userCount: Object.keys(cache.users || {}).length,
+              });
+              lastEnsuredUid = null;
+            }
+          }
           notifyAndEmit(key);
           // When settings or users load, check if we should upgrade to all predictions
           if (key === "settings" || key === "users") {
@@ -540,6 +627,14 @@ export function initRealtimeListeners(userId) {
         },
         (err) => {
           console.error(`Listener error for ${docName}:`, err);
+          captureClientError(err, {
+            source: "gameDocListener",
+            docName,
+            key,
+            code: err?.code,
+            retryCount: getRetryState(key).count,
+          });
+          maybeRefreshToken(err);
           listenersHadError = true;
           notifyAndEmit(key);
           const rs = getRetryState(key);
@@ -567,6 +662,13 @@ export function isStoreReady() {
   return (
     Object.keys(DOCS).every((k) => cache._ready[k]) && cache._ready.predictions
   );
+}
+
+export function getMissingReadyKeys() {
+  const missing = [];
+  for (const k of Object.keys(DOCS)) if (!cache._ready[k]) missing.push(k);
+  if (!cache._ready.predictions) missing.push("predictions");
+  return missing;
 }
 
 // ============ SUBSCRIPTIONS ============
@@ -637,26 +739,54 @@ export function getUsers() {
 }
 
 let lastEnsuredUid = null;
+// A1: bounded retry counter per uid. Prevents infinite loop when the write
+// keeps failing for a permanent reason (rule violation we can't fix client-side).
+const ensureRetryCount = new Map();
+const MAX_ENSURE_RETRIES = 3;
+let ensureInFlight = null; // single-flight guard across parallel renders
 
 export async function ensureUserInStore(uid, displayName, email) {
   if (!cache._ready.users) return uid;
-  // Prevent repeated writes for the same user in the same session
+  // Skip if we already succeeded for this uid (cache has the user).
   if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
-  lastEnsuredUid = uid;
+  // Single-flight guard — parallel render cycles must not double-write.
+  if (ensureInFlight) return ensureInFlight;
+  ensureInFlight = doEnsureUserInStore(uid, displayName, email).finally(() => {
+    ensureInFlight = null;
+  });
+  return ensureInFlight;
+}
 
+async function doEnsureUserInStore(uid, displayName, email) {
   const existing = getUsers()[uid];
   if (existing) {
     const needsUpdate =
       (displayName && existing.displayName !== displayName) ||
       (email && !existing.email);
-    if (!needsUpdate) return uid;
+    if (!needsUpdate) {
+      lastEnsuredUid = uid;
+      return uid;
+    }
     const fields = {};
     if (displayName && existing.displayName !== displayName)
       fields.displayName = displayName;
     if (email && !existing.email) fields.email = email;
-    updateUserField(uid, fields);
+    const ok = await updateUserField(uid, fields);
+    if (ok) lastEnsuredUid = uid;
     return uid;
   }
+
+  // Bounded retry — avoid infinite loop on a permanent rule violation.
+  const attempts = ensureRetryCount.get(uid) || 0;
+  if (attempts >= MAX_ENSURE_RETRIES) {
+    captureClientMessage("ensure-user-retry-exhausted", {
+      uid,
+      attempts,
+      userCount: Object.keys(cache.users || {}).length,
+    });
+    return uid;
+  }
+  ensureRetryCount.set(uid, attempts + 1);
 
   // User not in cache. Two possibilities:
   //   A) Cache desync — user exists in Firestore. Per-field update preserves
@@ -673,11 +803,17 @@ export async function ensureUserInStore(uid, displayName, email) {
     if (snap.exists()) firestoreUser = snap.data().data?.[uid] || null;
   } catch (err) {
     console.error("Failed to verify user in Firestore:", err);
-    lastEnsuredUid = null; // allow retry on next call
+    captureClientError(err, {
+      source: "ensureUserInStore.getDoc",
+      uid,
+      code: err?.code,
+    });
+    await maybeRefreshToken(err);
     return uid;
   }
 
   const now = new Date().toISOString();
+  let ok;
   if (firestoreUser) {
     // Case A: per-field update preserves existing fields (isAdmin, names, etc.).
     const fields = { id: uid, lastLoginAt: now };
@@ -686,10 +822,10 @@ export async function ensureUserInStore(uid, displayName, email) {
     if (email && !firestoreUser.email) fields.email = email;
     cache.users = { ...cache.users, [uid]: { ...firestoreUser, ...fields } };
     notifyAndEmit("users");
-    updateUserField(uid, fields);
+    ok = await updateUserField(uid, fields);
   } else {
     // Case B: write full record so isAdmin: false satisfies the create-rule.
-    createUserField(uid, {
+    ok = await createUserField(uid, {
       id: uid,
       displayName: displayName || "משתמש",
       isAdmin: false,
@@ -699,6 +835,10 @@ export async function ensureUserInStore(uid, displayName, email) {
       lastLoginAt: now,
     });
   }
+  if (ok) {
+    lastEnsuredUid = uid;
+    ensureRetryCount.delete(uid);
+  }
   return uid;
 }
 
@@ -707,8 +847,8 @@ export function updateUser(userId, fields) {
   updateUserField(userId, fields);
 }
 
-export function updateUserProfile(uid, profileFields) {
-  if (!getUsers()[uid]) return;
+export async function updateUserProfile(uid, profileFields) {
+  if (!getUsers()[uid]) return false;
   const { firstName, lastName, displayName, profileCompleted } = profileFields;
   const fields = {};
   if (firstName !== undefined) fields.firstName = firstName;
@@ -716,9 +856,8 @@ export function updateUserProfile(uid, profileFields) {
   if (displayName !== undefined) fields.displayName = displayName;
   if (profileCompleted !== undefined)
     fields.profileCompleted = profileCompleted;
-  if (Object.keys(fields).length > 0) {
-    updateUserField(uid, fields);
-  }
+  if (Object.keys(fields).length === 0) return true;
+  return await updateUserField(uid, fields);
 }
 
 export function touchUserLogin(uid) {
@@ -833,6 +972,8 @@ export function setCurrentUser(userId) {
 export function logoutUser() {
   flushPendingWrites();
   lastEnsuredUid = null;
+  ensureRetryCount.clear();
+  tokenRefreshedFor.clear();
   listenersInitialized = false;
   listenersHadError = false;
   for (const key of Object.keys(retryState)) delete retryState[key];

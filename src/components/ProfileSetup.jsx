@@ -7,25 +7,37 @@ export default function ProfileSetup({ user, onComplete }) {
   const [firstName, setFirstName] = useState(parts[0] || "");
   const [lastName, setLastName] = useState(parts.slice(1).join(" ") || "");
   const [nickname, setNickname] = useState(parts[0] || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const initials = (firstName || googleName || "?").charAt(0).toUpperCase();
 
-  const handleSave = () => {
-    updateUserProfile(user.id, {
-      firstName,
-      lastName,
-      displayName: nickname || firstName || googleName,
-      profileCompleted: true,
-    });
-    onComplete();
+  const attempt = async (fields) => {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const ok = await updateUserProfile(user.id, fields);
+      if (!ok) {
+        setError("שמירה נכשלה. נסה שוב.");
+        return;
+      }
+      onComplete();
+    } catch (err) {
+      setError(err?.message || "שמירה נכשלה. נסה שוב.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSkip = () => {
-    updateUserProfile(user.id, {
-      profileCompleted: true,
-    });
-    onComplete();
-  };
+  const handleSave = () => attempt({
+    firstName,
+    lastName,
+    displayName: nickname || firstName || googleName,
+    profileCompleted: true,
+  });
+
+  const handleSkip = () => attempt({ profileCompleted: true });
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg px-4">
@@ -75,17 +87,23 @@ export default function ProfileSetup({ user, onComplete }) {
 
         <button
           onClick={handleSave}
-          className="w-full bg-primary text-white font-extrabold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mt-6"
+          disabled={saving}
+          className="w-full bg-primary text-white font-extrabold py-3.5 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mt-6 disabled:opacity-60"
         >
-          !בואו נתחיל
+          {saving ? "שומר..." : "!בואו נתחיל"}
         </button>
 
         <button
           onClick={handleSkip}
-          className="mt-3 text-sm text-ink-muted hover:text-primary transition bg-transparent border-none cursor-pointer underline"
+          disabled={saving}
+          className="mt-3 text-sm text-ink-muted hover:text-primary transition bg-transparent border-none cursor-pointer underline disabled:opacity-60"
         >
           דלג
         </button>
+
+        {error && (
+          <p className="text-sm text-red-500 mt-3" role="alert">{error}</p>
+        )}
       </div>
     </div>
   );

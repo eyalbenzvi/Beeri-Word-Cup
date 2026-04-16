@@ -145,41 +145,52 @@ console.log("--- 4. ensureUserInStore guard prevents double writes ---");
   assert(writeCount === 1, "Guard reset + different name = 1 write");
 }
 
-// ============ 5. ensureUserInStore: cache miss with storeReady=true ============
-console.log("--- 5. Cache miss scenario: user exists in Firestore but not in cache ---");
+// ============ 5. ensureUserInStore: getDoc-based disambiguation ============
+console.log("--- 5. Cache miss: getDoc decides between create (new) and update (desync) ---");
 
 {
-  // This is the exact race condition scenario
-  const cacheReady = true;
-  const cacheUsers = {}; // empty cache (listeners haven't populated yet)
-  let lastEnsuredUid = null;
-  const firestoreHasUser = true; // user EXISTS in Firestore
+  // New behavior: when user not in cache, ensureUserInStore reads
+  // gameData/users directly. If the user exists there, per-field update.
+  // If not, full createUserField — which is what Firestore rules demand
+  // for new entries (isAdmin: false must be present in the payload).
 
-  // Simulate the fixed behavior: when user not in cache, use updateUserField
-  // instead of createUserField to avoid overwriting
-  let usedUpdateField = false;
-  let usedCreateField = false;
-
-  function fixedEnsure(uid, displayName, email) {
-    if (!cacheReady) return;
-    if (lastEnsuredUid === uid && cacheUsers[uid]) return;
-    lastEnsuredUid = uid;
-
-    const existing = cacheUsers[uid];
-    if (existing) {
-      // Normal path: user in cache, update specific fields
-      usedUpdateField = true;
-      return;
+  function simulateEnsure({ firestoreUsers, uid, displayName, email }) {
+    // Mirrors the real disambiguation in src/store.js ensureUserInStore.
+    const existingInFirestore = firestoreUsers[uid] || null;
+    if (existingInFirestore) {
+      const fields = { id: uid, lastLoginAt: "now" };
+      if (displayName && existingInFirestore.displayName !== displayName)
+        fields.displayName = displayName;
+      if (email && !existingInFirestore.email) fields.email = email;
+      return { type: "update", fields };
     }
-    // Fixed path: user not in cache — use per-field update, not full replace
-    // This writes only displayName, email, lastLoginAt — preserves isAdmin, names
-    usedUpdateField = true;
-    usedCreateField = false;
+    return {
+      type: "create",
+      userData: {
+        id: uid, displayName: displayName || "משתמש", isAdmin: false,
+        email: email || null, profileCompleted: false,
+        createdAt: "now", lastLoginAt: "now",
+      },
+    };
   }
 
-  fixedEnsure("admin1", "Admin", "admin@test.com");
-  assert(usedUpdateField === true, "Cache miss: uses updateUserField (safe)");
-  assert(usedCreateField === false, "Cache miss: does NOT use createUserField (unsafe)");
+  // Scenario A: cache desync — admin exists in Firestore
+  const adminDoc = { id: "admin1", displayName: "Admin", isAdmin: true, firstName: "אייל" };
+  const desyncResult = simulateEnsure({
+    firestoreUsers: { admin1: adminDoc },
+    uid: "admin1", displayName: "Admin", email: null,
+  });
+  assert(desyncResult.type === "update", "Desync: uses per-field update (preserves isAdmin)");
+  assert(!("isAdmin" in desyncResult.fields), "Desync: update payload does NOT touch isAdmin");
+
+  // Scenario B: genuinely new user (dad recreated after deletion)
+  const newResult = simulateEnsure({
+    firestoreUsers: { admin1: adminDoc },
+    uid: "newuser", displayName: "New", email: "n@b.com",
+  });
+  assert(newResult.type === "create", "New: uses full createUserField");
+  assert(newResult.userData.isAdmin === false, "New: payload includes isAdmin: false (rule requirement)");
+  assert(newResult.userData.profileCompleted === false, "New: payload includes profileCompleted");
 }
 
 // ============ 6. updateUserField dot-notation payload ============
@@ -232,69 +243,75 @@ console.log("--- 7. createUserField replaces entire user object ---");
   // This demonstrates why createUserField is WRONG for existing users
 }
 
-// ============ 8. Simulate full race condition: login with other users in cache ============
-console.log("--- 8. Full race condition simulation (hasOtherUsers heuristic) ---");
+// ============ 8. Firestore rule requirement: new users need isAdmin: false ============
+console.log("--- 8. Rule alignment: new-user write payload must satisfy create-rule ---");
 
 {
-  // State: Firestore has admin1 and user2
-  // State: cache has user2 loaded but NOT admin1 (partial cache load)
-  let cache = { user2: { id: "user2", displayName: "Bob" } };
-  const cacheReady = true;
+  // firestore.rules:29-31 says:
+  //   (!(uid in resource.data.data) &&
+  //    request.resource.data.data[uid].isAdmin == false)
+  // A partial update that omits isAdmin will be REJECTED and the SDK
+  // reverts the optimistic cache, which leaves user=null and App stuck.
 
-  // BUGGY ensureUserInStore: creates full user, overwrites Firestore
-  function buggyEnsure(uid, displayName, email) {
-    if (!cacheReady) return;
-    const existing = cache[uid];
-    if (existing) return;
-    const now = new Date().toISOString();
-    const newUser = {
-      id: uid, displayName: displayName || "משתמש", isAdmin: false,
-      email: email || null, profileCompleted: false, createdAt: now, lastLoginAt: now,
-    };
-    cache[uid] = newUser;
-    return { type: "create", payload: { [`data.${uid}`]: newUser } };
-  }
-
-  const bugResult = buggyEnsure("admin1", "אייל", "a@b.com");
-  assert(bugResult?.type === "create", "Bug: uses create (full replace)");
-  assert(cache.admin1.isAdmin === false, "Bug: isAdmin reset to false");
-  assert(!cache.admin1.firstName, "Bug: firstName gone");
-
-  // Reset cache to have other users (the realistic scenario)
-  cache = { user2: { id: "user2", displayName: "Bob" } };
-
-  // FIXED ensureUserInStore: uses per-field update when other users exist
-  function fixedEnsure(uid, displayName, email) {
-    if (!cacheReady) return;
-    const existing = cache[uid];
-    if (existing) return;
-    const hasOtherUsers = Object.keys(cache).length > 0;
-    const now = new Date().toISOString();
-    if (hasOtherUsers) {
-      const fields = { id: uid, lastLoginAt: now };
-      if (displayName) fields.displayName = displayName;
-      if (email) fields.email = email;
-      cache[uid] = { isAdmin: false, profileCompleted: false, createdAt: now, ...fields };
-      return { type: "update", fields };
+  function ruleAllowsCreate(existingUsers, updatePayloadForUid, uid) {
+    // Mimic the rule: for a new entry, isAdmin must be explicitly false.
+    const already = !!existingUsers[uid];
+    if (already) {
+      return updatePayloadForUid.isAdmin === existingUsers[uid].isAdmin;
     }
-    // Empty cache: genuinely new user
-    const newUser = {
-      id: uid, displayName: displayName || "משתמש", isAdmin: false,
-      email: email || null, profileCompleted: false, createdAt: now, lastLoginAt: now,
-    };
-    cache[uid] = newUser;
-    return { type: "create", payload: { [`data.${uid}`]: newUser } };
+    return updatePayloadForUid.isAdmin === false;
   }
 
-  const fixResult = fixedEnsure("admin1", "אייל", "a@b.com");
-  assert(fixResult?.type === "update", "Fix: uses update when other users in cache");
-  assert(!("isAdmin" in (fixResult?.fields || {})), "Fix: isAdmin not in update fields");
-  assert(!("firstName" in (fixResult?.fields || {})), "Fix: firstName not in update fields");
+  const firestore = { admin1: { id: "admin1", isAdmin: true, displayName: "Admin" } };
 
-  // Test case B: empty cache = genuinely new user
-  cache = {};
-  const newResult = fixedEnsure("firstUser", "First", null);
-  assert(newResult?.type === "create", "Empty cache: uses create (genuinely new user)");
+  // Partial payload (the buggy pre-fix path) — MUST be rejected
+  const partial = { id: "dad", lastLoginAt: "now", displayName: "Dad" };
+  assert(!ruleAllowsCreate(firestore, partial, "dad"),
+    "Rule: partial payload without isAdmin is REJECTED for new entry");
+
+  // Full payload (what createUserField sends) — MUST pass
+  const full = {
+    id: "dad", displayName: "Dad", isAdmin: false, email: null,
+    profileCompleted: false, createdAt: "now", lastLoginAt: "now",
+  };
+  assert(ruleAllowsCreate(firestore, full, "dad"),
+    "Rule: full payload with isAdmin:false passes for new entry");
+
+  // Existing user: partial update must preserve isAdmin
+  const existing = { admin1: { id: "admin1", isAdmin: true } };
+  const partialAdmin = { lastLoginAt: "now" }; // no isAdmin touched
+  // In Firestore, dot-notation preserves untouched fields — so resulting
+  // entry still has isAdmin: true.
+  const afterUpdate = { ...existing.admin1, ...partialAdmin };
+  assert(ruleAllowsCreate(existing, afterUpdate, "admin1"),
+    "Rule: per-field update preserves isAdmin for existing user");
+}
+
+// ============ 8b. Bounded ensureUserInStore retry ============
+console.log("--- 8b. A1: ensureUserInStore retry is bounded to MAX_ENSURE_RETRIES ---");
+
+{
+  const MAX_ENSURE_RETRIES = 3;
+  const retryCount = new Map();
+  let writeAttempts = 0;
+
+  function attempt(uid) {
+    const n = retryCount.get(uid) || 0;
+    if (n >= MAX_ENSURE_RETRIES) return { skipped: true, attempts: n };
+    retryCount.set(uid, n + 1);
+    writeAttempts++;
+    return { skipped: false, attempts: n + 1 };
+  }
+
+  // Simulate 5 calls for same uid (each write fails and we retry)
+  const results = [];
+  for (let i = 0; i < 5; i++) results.push(attempt("dad"));
+
+  assert(writeAttempts === 3, "Retry cap: write attempted exactly 3 times");
+  assert(results[0].attempts === 1, "First call: attempt 1");
+  assert(results[2].attempts === 3, "Third call: attempt 3");
+  assert(results[3].skipped === true, "Fourth call: skipped (cap reached)");
+  assert(results[4].skipped === true, "Fifth call: still skipped");
 }
 
 // ============ 9. First-ever user must still get isAdmin ============
