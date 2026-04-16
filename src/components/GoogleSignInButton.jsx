@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "./Toast";
 import { signInWithGoogle } from "../firebase";
 import { ensureUserInStore } from "../store";
+import { captureClientError } from "../sentry";
 
 export default function GoogleSignInButton({ onSuccess }) {
   const showToast = useToast();
@@ -31,6 +32,7 @@ export default function GoogleSignInButton({ onSuccess }) {
       } else {
         setError("שגיאה בהתחברות. נסה שוב");
         console.error("Auth error:", err.code, err.message);
+        captureClientError(err, { source: "GoogleSignInButton", code: err.code });
       }
     } finally {
       setLoading(false);

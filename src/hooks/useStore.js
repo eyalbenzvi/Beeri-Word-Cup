@@ -8,6 +8,7 @@ import {
 import * as store from "../store";
 import { initRealtimeListeners } from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
+import { setSentryUser } from "../sentry";
 
 function useStoreValue(getSnapshot) {
   return useSyncExternalStore(store.subscribe, getSnapshot);
@@ -31,8 +32,13 @@ export function useCurrentUser() {
         // (Re-)init Firestore listeners now that we have auth
         initRealtimeListeners(fbUser.uid);
         store.setCurrentUser(fbUser.uid);
+        setSentryUser({
+          id: fbUser.uid,
+          displayName: fbUser.displayName || fbUser.phoneNumber || null,
+        });
       } else {
         store.logoutUser();
+        setSentryUser(null);
       }
     });
     return unsubscribe;

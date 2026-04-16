@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { withSentry } from "./_sentry.js";
 
 // ---- Variety generators ----
 
@@ -60,7 +61,7 @@ async function callGroq(prompt, temperature = 1.0) {
 
 // ---- Handler ----
 
-export async function handler(event) {
+async function batchAnalysisHandler(event) {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -254,3 +255,5 @@ function getStageLabel(stage) {
   };
   return names[stage] || stage;
 }
+
+export const handler = withSentry(batchAnalysisHandler, "batch-analysis");

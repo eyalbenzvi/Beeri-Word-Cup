@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/node": "^10.49.0",
+    "@sentry/react": "^10.49.0",
     "@tailwindcss/vite": "^4.2.2",
     "firebase": "^12.11.0",
     "groq-sdk": "^1.1.2",
