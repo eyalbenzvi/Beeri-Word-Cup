@@ -657,16 +657,44 @@ export function ensureUserInStore(uid, displayName, email) {
     updateUserField(uid, fields);
     return uid;
   }
+
+  // User not in cache. Two possibilities:
+  // A) Cache miss — user exists in Firestore but listeners haven't populated cache yet.
+  //    Using createUserField would replace the ENTIRE data.${uid} object, wiping
+  //    fields like isAdmin, firstName, lastName.
+  // B) Genuinely new user — not in Firestore either.
+  //
+  // If other users exist in cache, there are active listeners and this is likely
+  // case (A). Use updateUserField (per-field dot-notation) to preserve existing data.
+  // If cache is completely empty, this may be case (B) — use createUserField which
+  // handles the not-found fallback for the very first user document.
   const now = new Date().toISOString();
-  createUserField(uid, {
-    id: uid,
-    displayName: displayName || "משתמש",
-    isAdmin: false,
-    email: email || null,
-    profileCompleted: false,
-    createdAt: now,
-    lastLoginAt: now,
-  });
+  const hasOtherUsers = Object.keys(cache.users).length > 0;
+  if (hasOtherUsers) {
+    // Case A: other users loaded → listeners are working → this user likely exists
+    // in Firestore. Use per-field update to avoid overwriting existing data.
+    const fields = { id: uid, lastLoginAt: now };
+    if (displayName) fields.displayName = displayName;
+    if (email) fields.email = email;
+    cache.users = {
+      ...cache.users,
+      [uid]: { isAdmin: false, profileCompleted: false, createdAt: now, ...fields },
+    };
+    notifyAndEmit("users");
+    updateUserField(uid, fields);
+  } else {
+    // Case B: no other users in cache → likely genuinely new user or first-ever.
+    // createUserField handles the not-found fallback for first document creation.
+    createUserField(uid, {
+      id: uid,
+      displayName: displayName || "משתמש",
+      isAdmin: false,
+      email: email || null,
+      profileCompleted: false,
+      createdAt: now,
+      lastLoginAt: now,
+    });
+  }
   return uid;
 }
 
