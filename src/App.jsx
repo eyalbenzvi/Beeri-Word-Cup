@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmModal";
@@ -8,6 +8,8 @@ import WelcomeScreen from "./pages/WelcomeScreen";
 import ProfileSetup from "./components/ProfileSetup";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
+import { firebaseSignOut } from "./firebase";
+import { captureClientMessage } from "./sentry";
 
 // Lazy-load pages that aren't needed on initial render
 const Predict = lazy(() => import("./pages/Predict"));
@@ -27,12 +29,73 @@ const PAGES = {
   profile: Profile,
 };
 
-function Loading() {
+// After STUCK_THRESHOLD_MS, the spinner surfaces recovery options. Without
+// this, rare auth/Firestore failures (Safari ITP, stale tokens, permission
+// denied after user deletion) would leave users watching a ball forever.
+const STUCK_THRESHOLD_MS = 12000;
+
+function Loading({ reason = "unknown", compact = false }) {
+  const [stuck, setStuck] = useState(false);
+  const mountedAt = useRef(Date.now());
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setStuck(true);
+      captureClientMessage("loading-stuck", {
+        reason,
+        durationMs: Date.now() - mountedAt.current,
+      });
+    }, STUCK_THRESHOLD_MS);
+    return () => clearTimeout(t);
+  }, [reason]);
+
+  const reload = () => {
+    captureClientMessage("recovery-reload-tapped", {
+      reason,
+      durationMs: Date.now() - mountedAt.current,
+    });
+    window.location.reload();
+  };
+
+  const signOutAndReload = async () => {
+    captureClientMessage("recovery-signout-tapped", {
+      reason,
+      durationMs: Date.now() - mountedAt.current,
+    });
+    try { await firebaseSignOut(); } catch { /* ignore */ }
+    try { localStorage.removeItem("wc2026_currentUser"); } catch { /* ignore */ }
+    try { localStorage.removeItem("wc2026_activeForm"); } catch { /* ignore */ }
+    window.location.reload();
+  };
+
+  if (compact && !stuck) {
+    return <div className="text-center py-8 text-gray-400">טוען...</div>;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center max-w-sm w-full">
         <div className="text-4xl animate-bounce">⚽</div>
         <div className="text-gray-500 text-sm mt-3">טוען...</div>
+        {stuck && (
+          <div className="mt-8 space-y-3">
+            <p className="text-sm text-gray-600">
+              נתקע? נסה את האפשרויות הבאות.
+            </p>
+            <button
+              onClick={reload}
+              className="w-full bg-primary text-white font-bold py-3 rounded-2xl border-none cursor-pointer text-sm"
+            >
+              רענן את הדף
+            </button>
+            <button
+              onClick={signOutAndReload}
+              className="w-full bg-white text-ink font-bold py-3 rounded-2xl border-2 border-border cursor-pointer text-sm"
+            >
+              התנתק והתחל מחדש
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -45,14 +108,15 @@ function AppContent() {
   const [profileDone, setProfileDone] = useState(false);
 
   // Wait for Firebase Auth to determine login state
-  if (!authReady) return <Loading />;
+  if (!authReady) return <Loading reason="auth-init" />;
 
   // Not logged in at all — show welcome/login screen
   if (!isLoggedIn) return <WelcomeScreen />;
 
   // Logged in but Firestore data or user record still loading
   // (store.js retries indefinitely with backoff + online/visibility listeners)
-  if (!ready || !user) return <Loading />;
+  if (!ready) return <Loading reason="store-not-ready" />;
+  if (!user) return <Loading reason="user-not-in-cache" />;
 
   // Show profile setup for truly new users (profileCompleted === false, not undefined)
   if (user.profileCompleted === false && !profileDone) {
@@ -63,7 +127,7 @@ function AppContent() {
 
   return (
     <Layout>
-      <Suspense fallback={<div className="text-center py-8 text-gray-400">טוען...</div>}>
+      <Suspense fallback={<Loading reason="lazy-page" compact />}>
         <div key={page} className="animate-fade-in">
           <Page />
         </div>

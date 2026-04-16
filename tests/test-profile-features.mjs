@@ -49,11 +49,11 @@ assert(iconPickerFile.includes('📋'), "FormIconPicker: has default 📋 option
 // ---- 4. Store: updateUserProfile function ----
 console.log("--- 4. Store profile functions ---");
 const storeFile = read(`${SRC}/store.js`);
-assert(storeFile.includes('export function updateUserProfile'), "Store: updateUserProfile exported");
+assert(/export async function updateUserProfile/.test(storeFile), "Store: updateUserProfile exported as async");
 assert(storeFile.includes('firstName') && storeFile.includes('lastName'), "Store: handles firstName/lastName");
 assert(storeFile.includes('profileCompleted'), "Store: handles profileCompleted");
 // Verify updateUserProfile only destructures safe fields (not isAdmin)
-const updateProfileFn = storeFile.match(/export function updateUserProfile[\s\S]*?\n\}/)?.[0] || '';
+const updateProfileFn = storeFile.match(/export async function updateUserProfile[\s\S]*?\n\}/)?.[0] || '';
 assert(!updateProfileFn.includes('isAdmin'), "Store: updateUserProfile doesn't touch isAdmin");
 
 // ---- 5. Backward compatibility — fallbacks ----

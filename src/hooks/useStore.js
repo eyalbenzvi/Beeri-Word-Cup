@@ -8,7 +8,22 @@ import {
 import * as store from "../store";
 import { initRealtimeListeners } from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
-import { setSentryUser } from "../sentry";
+import { setSentryUser, captureClientMessage } from "../sentry";
+
+// Watchdog thresholds — tuned so slow-3G users don't trip them prematurely.
+const AUTH_WATCHDOG_MS = 8000;
+const STORE_WATCHDOG_MS = 15000;
+const USER_WATCHDOG_MS = 15000;
+
+function connectionInfo() {
+  try {
+    const c = navigator.connection;
+    if (!c) return { effectiveType: null, saveData: null };
+    return { effectiveType: c.effectiveType || null, saveData: !!c.saveData };
+  } catch {
+    return { effectiveType: null, saveData: null };
+  }
+}
 
 function useStoreValue(getSnapshot) {
   return useSyncExternalStore(store.subscribe, getSnapshot);
@@ -26,7 +41,23 @@ export function useCurrentUser() {
   const storeReady = store.isStoreReady();
 
   useEffect(() => {
+    // A6: if Firebase Auth never fires onAuthStateChanged (Safari ITP blocking
+    // IndexedDB is the known culprit), we force-resolve authReady so the app
+    // shows WelcomeScreen instead of a spinner. We do NOT call signOut —
+    // Firebase Auth may recover later; we just stop blocking render.
+    const watchdog = setTimeout(() => {
+      setAuthReady((prev) => {
+        if (prev) return prev;
+        captureClientMessage("auth-watchdog-timeout", {
+          thresholdMs: AUTH_WATCHDOG_MS,
+          ...connectionInfo(),
+        });
+        return true;
+      });
+    }, AUTH_WATCHDOG_MS);
+
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      clearTimeout(watchdog);
       setFirebaseUser(fbUser);
       setAuthReady(true);
       if (fbUser) {
@@ -42,7 +73,10 @@ export function useCurrentUser() {
         setSentryUser(null);
       }
     });
-    return unsubscribe;
+    return () => {
+      clearTimeout(watchdog);
+      unsubscribe();
+    };
   }, []);
 
   // Single consolidated write when both auth and store are ready
@@ -56,6 +90,39 @@ export function useCurrentUser() {
       firebaseUser.email || null,
     );
   }, [storeReady, firebaseUser]);
+
+  // B3: watchdog — store never becomes ready after login. Tells us which
+  // listener is missing so we can see which permission/network failure.
+  useEffect(() => {
+    if (!firebaseUser || storeReady) return;
+    const t = setTimeout(() => {
+      if (store.isStoreReady()) return;
+      captureClientMessage("store-watchdog-timeout", {
+        thresholdMs: STORE_WATCHDOG_MS,
+        missingKeys: store.getMissingReadyKeys(),
+        ...connectionInfo(),
+      });
+    }, STORE_WATCHDOG_MS);
+    return () => clearTimeout(t);
+  }, [firebaseUser, storeReady]);
+
+  // B3: watchdog — user is logged in + store is ready, but user record never
+  // materialized in cache. This is the exact "bouncing ball" class of bug.
+  useEffect(() => {
+    if (!firebaseUser || !storeReady) return;
+    const uid = firebaseUser.uid;
+    if (store.getUsers()[uid]) return;
+    const t = setTimeout(() => {
+      if (store.getUsers()[uid]) return;
+      captureClientMessage("user-watchdog-timeout", {
+        thresholdMs: USER_WATCHDOG_MS,
+        uid,
+        userCount: Object.keys(store.getUsers()).length,
+        ...connectionInfo(),
+      });
+    }, USER_WATCHDOG_MS);
+    return () => clearTimeout(t);
+  }, [firebaseUser, storeReady]);
 
   const user = firebaseUser ? store.getUser(firebaseUser.uid) : null;
 

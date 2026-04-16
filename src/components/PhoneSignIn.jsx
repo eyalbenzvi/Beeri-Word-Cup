@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "./Toast";
 import { signInWithPhoneOtp } from "../firebase";
+import { captureClientError } from "../sentry";
 
 export default function PhoneSignIn() {
   const showToast = useToast();
@@ -41,6 +42,7 @@ export default function PhoneSignIn() {
       setTimeout(() => codeInputRef.current?.focus(), 100);
     } catch (err) {
       setError(err.message);
+      captureClientError(err, { source: "PhoneSignIn.sendOtp" });
     } finally {
       setLoading(false);
     }
@@ -71,6 +73,7 @@ export default function PhoneSignIn() {
       showToast("ברוך הבא! 📱");
     } catch (err) {
       setError(err.message);
+      captureClientError(err, { source: "PhoneSignIn.verifyCode" });
     } finally {
       setLoading(false);
     }
