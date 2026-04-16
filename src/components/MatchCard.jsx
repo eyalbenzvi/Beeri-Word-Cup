@@ -298,8 +298,8 @@ function MatchCard({
             </div>
             <div className="flex gap-2 justify-center">
               {[
-                { team: match.homeTeam, name: homeName },
-                { team: match.awayTeam, name: awayName },
+                { team: homeCode, name: homeName },
+                { team: awayCode, name: awayName },
               ].map(({ team, name }) => (
                 <button
                   key={team}
@@ -320,7 +320,7 @@ function MatchCard({
         ) : prediction?.advancingTeam ? (
           <div className="mt-1.5 text-[11px] text-ink-muted text-center font-medium">
             {match.stage === "F" ? "אלופה:" : "עולה:"}{" "}
-            {prediction.advancingTeam === match.homeTeam ? homeName : awayName}
+            {prediction.advancingTeam === homeCode ? homeName : awayName}
           </div>
         ) : null)}
 
