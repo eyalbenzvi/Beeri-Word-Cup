@@ -326,8 +326,8 @@ function MatchCard({
 
       {showAnalysis && editable && homeTeam && awayTeam && (
         <MatchAnalysis
-          homeTeam={match.homeTeam}
-          awayTeam={match.awayTeam}
+          homeTeam={homeCode}
+          awayTeam={awayCode}
           homeTeamName={homeName}
           awayTeamName={awayName}
           stage={match.stage}
