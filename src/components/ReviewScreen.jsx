@@ -5,6 +5,7 @@ export default function ReviewScreen({
   knockoutMatchesCount,
   predictedGroupCount,
   predictedKnockoutCount,
+  championName,
   onClose,
   onSubmit,
 }) {
@@ -55,6 +56,14 @@ export default function ReviewScreen({
                   className={`font-bold ${activeForm.budgetNumber?.trim() ? "text-gray-800" : "text-red-500"}`}
                 >
                   {activeForm.budgetNumber?.trim() || "חסר"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>אלופה:</span>
+                <span
+                  className={`font-bold ${championName ? "text-yellow-700" : "text-gray-400"}`}
+                >
+                  {championName ? `🏆 ${championName}` : "טרם נקבע"}
                 </span>
               </div>
             </div>
