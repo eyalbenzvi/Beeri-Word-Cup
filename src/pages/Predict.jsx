@@ -127,6 +127,51 @@ export default function Predict() {
     () => getFilteredMatches(selectedStage, selectedGroup),
     [selectedStage, selectedGroup]);
 
+  // Focus the first unfilled match when the user switches tabs (stage or group).
+  // If everything in the tab is filled: scroll to the group table for the group
+  // stage, or to the first match for knockout stages. Skip on initial mount so
+  // we don't open the mobile keyboard unprompted.
+  const predictionsRef = useRef(matchPredictions);
+  predictionsRef.current = matchPredictions;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const skipFocusOnMount = useRef(true);
+  useEffect(() => {
+    if (skipFocusOnMount.current) {
+      skipFocusOnMount.current = false;
+      return;
+    }
+    if (!canEditRef.current) return;
+    if (filteredMatches.length === 0) return;
+    const preds = predictionsRef.current;
+    const firstUnfilled = filteredMatches.find((m) => {
+      const p = preds[m.id];
+      return !p || p.homeScore == null || p.awayScore == null;
+    });
+    const timer = setTimeout(() => {
+      if (firstUnfilled) {
+        const container = document.getElementById(`match-${firstUnfilled.id}`);
+        if (!container) return;
+        const p = predictionsRef.current[firstUnfilled.id];
+        const inputs = container.querySelectorAll('input[type="number"]');
+        const target = p?.homeScore == null ? inputs[0] : inputs[1];
+        container.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (target) {
+          target.focus();
+          target.select?.();
+        }
+      } else if (selectedStage === "group") {
+        const table = document.querySelector("[data-group-table]");
+        table?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        const first = filteredMatches[0];
+        const container = document.getElementById(`match-${first.id}`);
+        container?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, SCROLL_DELAY);
+    return () => clearTimeout(timer);
+  }, [selectedStage, selectedGroup, filteredMatches]);
+
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
       if (!activeFormId || !canEdit) return;
