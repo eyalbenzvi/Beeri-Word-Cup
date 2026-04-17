@@ -305,7 +305,7 @@ function MatchCard({
         (editable ? (
           <div className="mt-3 pt-3 border-t border-border">
             <div className="text-[11px] text-ink-muted text-center mb-2 font-medium">
-              {match.stage === "F" ? "מי האלופה? (בעיטות הכרעה)" : "מי עולה? (בעיטות הכרעה)"}
+              {match.stage === "F" ? "מי האלופה?" : "מי עולה?"}
             </div>
             <div className="flex gap-2 justify-center">
               {[
