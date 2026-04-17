@@ -74,12 +74,14 @@ export default function WelcomeScreen() {
           {authMethod === "google" ? (
             <>
               <GoogleSignInButton />
-              <button
-                onClick={() => setAuthMethod("phone")}
-                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
-              >
-                📱 התחבר עם מספר טלפון
-              </button>
+              {false && (
+                <button
+                  onClick={() => setAuthMethod("phone")}
+                  className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+                >
+                  📱 התחבר עם מספר טלפון
+                </button>
+              )}
             </>
           ) : (
             <>
