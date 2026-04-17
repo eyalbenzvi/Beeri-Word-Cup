@@ -12,23 +12,20 @@ export default function ProgressHub({
   onSelectGroup,
   onSelectStage,
 }) {
+  const isFilled = (m) => {
+    const p = matchPredictions[m.id];
+    return p != null && p.homeScore != null && p.awayScore != null;
+  };
+
   const groupCompletion = groupKeys.map((g) => {
     const matches = groupMatches.filter((m) => m.group === g);
-    const filled = matches.filter(
-      (m) =>
-        matchPredictions[m.id]?.homeScore !== undefined &&
-        matchPredictions[m.id]?.homeScore !== null,
-    ).length;
+    const filled = matches.filter(isFilled).length;
     return { group: g, filled, total: matches.length };
   });
 
   const stageCompletion = knockoutStages.map(([key, label]) => {
     const matches = knockoutMatches.filter((m) => m.stage === key);
-    const filled = matches.filter(
-      (m) =>
-        matchPredictions[m.id]?.homeScore !== undefined &&
-        matchPredictions[m.id]?.homeScore !== null,
-    ).length;
+    const filled = matches.filter(isFilled).length;
     return { stage: key, label, filled, total: matches.length };
   });
 
