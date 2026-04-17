@@ -25,7 +25,7 @@ function MatchRow({ match, prediction }) {
   const homeName = home?.name || "טרם נקבע";
   const awayName = away?.name || "טרם נקבע";
   const hasScore =
-    prediction?.homeScore !== undefined && prediction?.homeScore !== null;
+    prediction?.homeScore != null && prediction?.awayScore != null;
 
   const isTie =
     match.stage !== "group" &&

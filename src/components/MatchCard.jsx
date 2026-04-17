@@ -99,13 +99,26 @@ function MatchCard({
     return Math.max(0, Math.min(20, n));
   };
 
+  const buildPredictionUpdate = useCallback(
+    (side, value) => {
+      const key = side === "home" ? "homeScore" : "awayScore";
+      const otherKey = side === "home" ? "awayScore" : "homeScore";
+      const p = { ...prediction, [key]: value };
+      // Auto-initialize the other side to 0 the first time the user sets a score
+      if (value !== null && value !== undefined && (prediction?.[otherKey] === null || prediction?.[otherKey] === undefined)) {
+        p[otherKey] = 0;
+      }
+      if (isKnockout) delete p.advancingTeam;
+      return p;
+    },
+    [prediction, isKnockout],
+  );
+
   const handleHomeChange = useCallback(
     (e) => {
       const raw = e.target.value;
       const v = clampScore(raw);
-      const p = { ...prediction, homeScore: v };
-      if (isKnockout) delete p.advancingTeam;
-      onPredictionChange?.(p);
+      onPredictionChange?.(buildPredictionUpdate("home", v));
       if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
         setTimeout(() => {
           awayInputRef.current?.focus();
@@ -113,23 +126,21 @@ function MatchCard({
         }, 0);
       }
     },
-    [prediction, isKnockout, onPredictionChange],
+    [buildPredictionUpdate, onPredictionChange],
   );
 
   const handleAwayChange = useCallback(
     (e) => {
       const raw = e.target.value;
       const v = clampScore(raw);
-      const p = { ...prediction, awayScore: v };
-      if (isKnockout) delete p.advancingTeam;
-      onPredictionChange?.(p);
+      onPredictionChange?.(buildPredictionUpdate("away", v));
       if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
         setTimeout(() => {
           if (awayInputRef.current) focusNextInput(awayInputRef.current);
         }, 0);
       }
     },
-    [prediction, isKnockout, onPredictionChange],
+    [buildPredictionUpdate, onPredictionChange],
   );
 
   return (
@@ -199,7 +210,7 @@ function MatchCard({
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
@@ -215,7 +226,7 @@ function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); const p = {...prediction, homeScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
                 <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
@@ -226,7 +237,7 @@ function MatchCard({
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
+                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
@@ -243,7 +254,7 @@ function MatchCard({
                     }`}
                     placeholder="–"
                   />
-                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); const p = {...prediction, awayScore: v}; if (isKnockout) delete p.advancingTeam; onPredictionChange?.(p); }}
+                  <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
                     className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
                 </div>
               </div>

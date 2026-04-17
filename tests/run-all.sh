@@ -58,6 +58,7 @@ run_test "23. User Data Protection (ensureUserInStore race)" "test-user-data-pro
 run_test "24. Selection Visualization & Champion Display" "test-selection-and-champion.mjs" "yes"
 run_test "25. Sentry Wrapper" "test-sentry-wrapper.mjs" "no"
 run_test "26. Stuck-Loading Protection (watchdogs, retry, escape hatch)" "test-stuck-loading-protection.mjs" "no"
+run_test "27. Score Auto-Init (MatchCard + filled-check regressions)" "test-score-auto-init.mjs" "no"
 
 echo ""
 echo "==========================================="
