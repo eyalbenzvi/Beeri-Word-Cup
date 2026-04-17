@@ -26,7 +26,7 @@ export default function GroupTable({ matchData, group }) {
   if (!groupStandings || !hasData) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-4 mb-3">
+    <div data-group-table className="bg-white rounded-2xl border border-border p-4 mb-3">
       <h4 className="text-xs font-bold text-primary mb-2">טבלת בית {group}</h4>
       <div className="overflow-x-auto scroll-smooth -mx-1">
       <table className="w-full text-xs min-w-[400px]">
