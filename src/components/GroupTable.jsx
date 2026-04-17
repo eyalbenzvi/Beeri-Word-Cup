@@ -35,13 +35,13 @@ export default function GroupTable({ matchData, group }) {
             <th scope="col" className="text-right py-1.5 pr-1 w-5 font-semibold">#</th>
             <th scope="col" className="text-right py-1.5 font-semibold">קבוצה</th>
             <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="משחקים">מש׳</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="נקודות">נק׳</th>
             <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="ניצחונות">נ</th>
             <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="תיקו">ת</th>
             <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="הפסדים">ה</th>
             <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים בעד">שע+</th>
             <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים נגד">שע-</th>
             <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="הפרש שערים">הפ</th>
-            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="נקודות">נק׳</th>
           </tr>
         </thead>
         <tbody>
@@ -71,6 +71,9 @@ export default function GroupTable({ matchData, group }) {
                 <td className="text-center py-1.5 text-gray-500">
                   {team.played}
                 </td>
+                <td className="text-center py-1.5 font-bold text-primary">
+                  {team.pts}
+                </td>
                 <td className="text-center py-1.5 text-gray-500">{team.won}</td>
                 <td className="text-center py-1.5 text-gray-500">
                   {team.drawn}
@@ -82,9 +85,6 @@ export default function GroupTable({ matchData, group }) {
                 <td className="text-center py-1.5 text-gray-500">{team.ga}</td>
                 <td className="text-center py-1.5 font-semibold text-gray-600">
                   {team.gd > 0 ? `+${team.gd}` : team.gd}
-                </td>
-                <td className="text-center py-1.5 font-bold text-primary">
-                  {team.pts}
                 </td>
               </tr>
             );
