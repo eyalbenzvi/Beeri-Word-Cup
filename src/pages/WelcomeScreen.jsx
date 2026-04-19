@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
-import { useSettings } from "../hooks/useStore";
+import { usePublicSettings } from "../hooks/usePublicSettings";
 import CountdownUnit from "../components/CountdownUnit";
 import UpcomingMatches from "../components/UpcomingMatches";
 import GoogleSignInButton from "../components/GoogleSignInButton";
@@ -10,11 +10,11 @@ import { Menu } from "lucide-react";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
-  const settings = useSettings();
+  const publicSettings = usePublicSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
   // Show upcoming matches when predictions are admin-locked OR kickoff has passed.
-  const tournamentStarted = !!settings?.predictionsLocked || countdown.started;
+  const tournamentStarted = !!publicSettings?.predictionsLocked || countdown.started;
 
   return (
     <div className={`min-h-dvh bg-bg flex flex-col ${tournamentStarted ? "" : "h-dvh overflow-hidden"}`}>
