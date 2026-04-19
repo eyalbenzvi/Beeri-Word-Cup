@@ -17,7 +17,9 @@ service cloud.firestore {
 
     // gameData collection — single documents
     match /gameData/{docId} {
-      allow read: if isAuth();
+      // Most docs require auth; the `settings` doc is public so the
+      // welcome screen can show lock state before the user logs in.
+      allow read: if isAuth() || docId == 'settings';
 
       // Users document: first creation allowed; updates restricted
       allow create: if isAuth() && docId == 'users';

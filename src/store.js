@@ -559,7 +559,37 @@ function maybeUpgradePredictionsListener() {
   }, 100);
 }
 
+// Public settings listener — can run before auth so the WelcomeScreen
+// knows if `predictionsLocked` is true. Firestore rules permit
+// unauthenticated reads of `gameData/settings` only.
+let publicSettingsUnsub = null;
+
+export function initPublicSettingsListener() {
+  if (publicSettingsUnsub) return;
+  publicSettingsUnsub = onSnapshot(
+    gameDocRef("settings"),
+    (snap) => {
+      if (snap.exists()) cache.settings = snap.data().data;
+      cache._ready.settings = true;
+      notifyAndEmit("settings");
+    },
+    (err) => {
+      console.error("Public settings listener error:", err);
+      captureClientError(err, { source: "publicSettingsListener", code: err?.code });
+      notifyAndEmit("settings");
+    },
+  );
+}
+
+export function stopPublicSettingsListener() {
+  if (!publicSettingsUnsub) return;
+  try { publicSettingsUnsub(); } catch { /* ignore */ }
+  publicSettingsUnsub = null;
+}
+
 export function initRealtimeListeners(userId) {
+  // The authenticated listener below takes over the `settings` subscription.
+  stopPublicSettingsListener();
   // Only restart if first time or if previous attempt had errors
   if (listenersInitialized && !listenersHadError) return;
   listenersInitialized = true;
@@ -999,6 +1029,9 @@ export function logoutUser() {
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("currentUser");
+  // Restart the public settings listener so the welcome screen stays live
+  // for whoever sees it next (e.g. the just-logged-out user).
+  initPublicSettingsListener();
 }
 
 // ============ ACTIVE FORM (local per-browser) ============

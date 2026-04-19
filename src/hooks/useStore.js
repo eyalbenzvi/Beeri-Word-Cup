@@ -6,8 +6,12 @@ import {
   useSyncExternalStore,
 } from "react";
 import * as store from "../store";
-import { initRealtimeListeners } from "../store";
+import { initRealtimeListeners, initPublicSettingsListener } from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
+
+// Start the public settings listener at module load so the WelcomeScreen
+// can show lock state before the user logs in.
+initPublicSettingsListener();
 import { setSentryUser, captureClientMessage } from "../sentry";
 
 // Watchdog thresholds — tuned so slow-3G users don't trip them prematurely.
