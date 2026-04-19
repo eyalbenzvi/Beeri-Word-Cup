@@ -1078,6 +1078,9 @@ export function getForm(formId) {
 const MAX_FORMS_PER_USER = 10;
 
 export function createForm(userId, formName) {
+  if (getSettings().predictionsLocked) {
+    throw new Error("ההגשה נסגרה — לא ניתן ליצור טפסים חדשים");
+  }
   const userForms = getFormsForUser(userId);
   if (userForms.length >= MAX_FORMS_PER_USER) {
     throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);

@@ -63,6 +63,7 @@ run_test "28. Match Time Parsing (Israel -> UTC)" "test-match-time.mjs" "yes"
 run_test "29. Upcoming Matches Selector" "test-upcoming-matches.mjs" "yes"
 run_test "30. Prediction Alignment (home/away swap)" "test-prediction-align.mjs" "no"
 run_test "31. Upcoming Matches Integration" "test-upcoming-integration.mjs" "yes"
+run_test "32. Form Lock UI (hide new-form when locked)" "test-form-lock-ui.mjs" "no"
 
 echo ""
 echo "==========================================="
