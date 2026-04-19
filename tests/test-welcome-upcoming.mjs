@@ -15,10 +15,45 @@ console.log("=== WELCOME-SCREEN: UPCOMING MATCHES FOR UNAUTH USERS ===\n");
 const KICKOFF = new Date("2026-06-11T19:00:00Z").getTime();
 
 // ============================================================
-// 1. tournamentStarted derivation mirrors countdown.started
+// 1. tournamentStarted derivation mirrors countdown.started + predictionsLocked
 // ============================================================
 console.log("--- 1. tournamentStarted derivation ---");
 {
+  // Mirrors WelcomeScreen: show upcoming matches when admin-locked OR kickoff passed.
+  function derivedStarted({ settings, now }) {
+    const started = Math.max(0, KICKOFF - now) === 0;
+    return !!settings?.predictionsLocked || started;
+  }
+
+  // Admin locked before kickoff — should show upcoming matches (the real bug)
+  assert(derivedStarted({ settings: { predictionsLocked: true }, now: Date.UTC(2026, 3, 19, 12, 0) }) === true,
+    "Locked + pre-kickoff (Apr 19) -> show upcoming matches");
+
+  // Not locked, pre-kickoff -> countdown
+  assert(derivedStarted({ settings: { predictionsLocked: false }, now: Date.UTC(2026, 3, 19, 12, 0) }) === false,
+    "Unlocked + pre-kickoff -> countdown");
+
+  // Not locked, post-kickoff -> upcoming matches (kickoff-based trigger)
+  assert(derivedStarted({ settings: { predictionsLocked: false }, now: KICKOFF + 60_000 }) === true,
+    "Unlocked + post-kickoff -> upcoming matches");
+
+  // Locked + post-kickoff -> upcoming matches
+  assert(derivedStarted({ settings: { predictionsLocked: true }, now: KICKOFF + 60_000 }) === true,
+    "Locked + post-kickoff -> upcoming matches");
+
+  // Missing settings (pre-auth cache, snapshot not yet received) -> treat as unlocked,
+  // fall back to kickoff trigger.
+  assert(derivedStarted({ settings: undefined, now: KICKOFF - 1000 }) === false,
+    "Settings undefined pre-kickoff -> countdown (fallback safe)");
+  assert(derivedStarted({ settings: null, now: KICKOFF + 1 }) === true,
+    "Settings null post-kickoff -> upcoming (fallback safe)");
+
+  // Defensive against truthy coercions
+  assert(derivedStarted({ settings: { predictionsLocked: "yes" }, now: 0 }) === true,
+    "Truthy string lock value -> upcoming matches");
+  assert(derivedStarted({ settings: { predictionsLocked: 0 }, now: 0 }) === false,
+    "Falsy number lock value + pre-kickoff -> countdown");
+
   function countdownFromNow(now) {
     const diff = Math.max(0, KICKOFF - now);
     return { diff, started: diff === 0 };
@@ -192,6 +227,75 @@ console.log("--- 8. Started flag is monotonic at the boundary ---");
   for (let i = 0; i < samples.length; i++) {
     assert(started(samples[i]) === expected[i], `t=${samples[i] - KICKOFF}ms -> started=${expected[i]}`);
   }
+}
+
+// ============================================================
+// 9. Public settings listener lifecycle
+// Regression: ensure idempotent init, proper handoff to auth listener,
+// and re-init on logout.
+// ============================================================
+console.log("--- 9. Public settings listener lifecycle ---");
+{
+  // Simulate the publicSettingsUnsub state machine
+  let unsub = null;
+  let firestoreListenerCount = 0;
+
+  function mockOnSnapshot() {
+    firestoreListenerCount++;
+    return () => { firestoreListenerCount--; };
+  }
+
+  function initPublicSettingsListener() {
+    if (unsub) return false; // no-op if already running
+    unsub = mockOnSnapshot();
+    return true;
+  }
+
+  function stopPublicSettingsListener() {
+    if (!unsub) return false;
+    unsub();
+    unsub = null;
+    return true;
+  }
+
+  // Fresh: init sets up one listener
+  assert(initPublicSettingsListener() === true, "First init sets up listener");
+  assert(firestoreListenerCount === 1, "One active listener");
+
+  // Idempotent: second init is a no-op
+  assert(initPublicSettingsListener() === false, "Re-init is no-op");
+  assert(firestoreListenerCount === 1, "Still one active listener");
+
+  // Auth listener takes over: stop public listener
+  assert(stopPublicSettingsListener() === true, "Stop succeeds");
+  assert(firestoreListenerCount === 0, "No active listener after stop");
+
+  // Stop again is safe no-op
+  assert(stopPublicSettingsListener() === false, "Double-stop is safe");
+  assert(firestoreListenerCount === 0, "Still no active listener");
+
+  // Re-init after logout works
+  assert(initPublicSettingsListener() === true, "Re-init after logout");
+  assert(firestoreListenerCount === 1, "Listener restarted after logout");
+}
+
+// ============================================================
+// 10. Firestore rule fragment: settings doc readable without auth
+// ============================================================
+console.log("--- 10. Firestore rule: public settings read ---");
+{
+  // Mirrors: allow read: if isAuth() || docId == 'settings';
+  function canRead(docId, isAuth) {
+    return isAuth || docId === "settings";
+  }
+
+  assert(canRead("settings", false) === true, "Unauth can read settings");
+  assert(canRead("settings", true) === true, "Auth can read settings");
+  assert(canRead("users", false) === false, "Unauth CANNOT read users");
+  assert(canRead("matchResults", false) === false, "Unauth CANNOT read matchResults");
+  assert(canRead("actualBonuses", false) === false, "Unauth CANNOT read actualBonuses");
+  assert(canRead("users", true) === true, "Auth can read users (unchanged)");
+  assert(canRead("matchResults", true) === true, "Auth can read matchResults (unchanged)");
 }
 
 // ============================================================
