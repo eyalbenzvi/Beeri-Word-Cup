@@ -10,11 +10,12 @@ const totalMatches = groupMatches.length + knockoutMatches.length;
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
+  const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
 
   const handleCreateForm = useCallback(() => {
-    if (!user) return;
+    if (!user || locked) return;
     const name = newFormName.trim() || `טופס ${forms.length + 1}`;
     try {
       createForm(user.id, name);
@@ -24,7 +25,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     } catch (err) {
       showToast(err.message, "error");
     }
-  }, [user, newFormName, forms.length, showToast]);
+  }, [user, locked, newFormName, forms.length, showToast]);
 
   const handleDeleteForm = useCallback(
     (formId) => {
@@ -39,17 +40,27 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       <div className="sticky top-[56px] z-10 bg-bg pb-2">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-extrabold text-primary tracking-tight">הטפסים שלך</h1>
-          <button onClick={() => setShowNewForm(true)} className="bg-primary text-white font-bold px-4 py-2 rounded-xl text-sm border-none cursor-pointer shadow-sm">
-            + טופס חדש
-          </button>
+          {!locked && (
+            <button onClick={() => setShowNewForm(true)} className="bg-primary text-white font-bold px-4 py-2 rounded-xl text-sm border-none cursor-pointer shadow-sm">
+              + טופס חדש
+            </button>
+          )}
         </div>
       </div>
 
-      {forms.length === 0 && !showNewForm && (
+      {forms.length === 0 && !showNewForm && !locked && (
         <div className="text-center py-12">
           <div className="text-5xl mb-3">📋</div>
           <p className="font-bold text-gray-700 text-base mb-1">ברוך הבא! צור טופס ניחושים ראשון</p>
           <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למעלה כדי להתחיל לנחש תוצאות משחקים</p>
+        </div>
+      )}
+
+      {forms.length === 0 && locked && (
+        <div className="text-center py-12">
+          <div className="text-5xl mb-3">🔒</div>
+          <p className="font-bold text-gray-700 text-base mb-1">ההגשה נסגרה</p>
+          <p className="text-gray-400 text-sm">לא ניתן ליצור טפסים חדשים לאחר תחילת המשחקים</p>
         </div>
       )}
 
@@ -140,7 +151,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         👀 צפייה בטפסים של כולם
       </button>
 
-      {showNewForm && (
+      {showNewForm && !locked && (
         <div className="bg-white rounded-2xl p-5 border-2 border-primary/30 shadow-sm">
           <h3 className="font-bold text-sm text-primary mb-3">טופס חדש</h3>
           <input
