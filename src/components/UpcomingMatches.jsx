@@ -1,0 +1,216 @@
+import { useMemo } from "react";
+import { useCurrentUser, useUserForms, useMatchResults } from "../hooks/useStore";
+import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
+import { getTeamByCode } from "../data/teams";
+import { STAGES } from "../data/matches";
+import { getCachedBracket } from "../utils/bracketCache";
+import { formatIsraelDateLabel } from "../utils/matchTime";
+import { isScoreValid } from "../utils/helpers";
+import {
+  alignPredictionToActual,
+  resolveMatchTeams,
+  teamsMatch,
+} from "../utils/predictionAlign";
+
+const STAGE_LABELS = STAGES;
+
+function teamName(code) {
+  if (!code) return "טרם נקבע";
+  return getTeamByCode(code)?.name || code;
+}
+
+function FormPredictionRow({ form, match, actualTeams, formBracket }) {
+  const pred = form.matches?.[match.id];
+  const valid = isScoreValid(pred);
+
+  const isKnockout = match.stage !== "group";
+  const formEntry = isKnockout ? formBracket?.[match.id] : null;
+  let bracketMismatch = false;
+  if (isKnockout) {
+    // Can only compare when both sides have resolved teams.
+    if (!actualTeams.home || !actualTeams.away) {
+      // Actual teams not yet determined — can't verify alignment; hide to
+      // avoid mis-displaying a prediction against an unknown matchup.
+      bracketMismatch = true;
+    } else if (!teamsMatch(formEntry, actualTeams)) {
+      bracketMismatch = true;
+    }
+  }
+
+  const formLabel = form.formName || "טופס";
+  const showPrediction = valid && !bracketMismatch;
+  const aligned = showPrediction && isKnockout
+    ? alignPredictionToActual(pred, formEntry, actualTeams)
+    : { homeScore: pred?.homeScore, awayScore: pred?.awayScore, advancingTeam: pred?.advancingTeam };
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 py-1 text-[12px] ${
+        bracketMismatch ? "text-ink-muted/50" : "text-ink"
+      }`}
+    >
+      <span className="flex-1 min-w-0 truncate font-medium">{formLabel}</span>
+      {showPrediction ? (
+        <span className="tabular-nums font-bold" dir="ltr">
+          {aligned.awayScore} – {aligned.homeScore}
+        </span>
+      ) : bracketMismatch ? (
+        <span className="text-[11px]">קבוצות שונות בטופס</span>
+      ) : (
+        <span className="text-ink-muted/60">—</span>
+      )}
+      {showPrediction &&
+        isKnockout &&
+        aligned.homeScore === aligned.awayScore &&
+        aligned.advancingTeam && (
+          <span className="text-[10px] text-ink-muted whitespace-nowrap">
+            מעפילה: {teamName(aligned.advancingTeam)}
+          </span>
+        )}
+    </div>
+  );
+}
+
+function PredictionsList({ forms, match, actualTeams, formBrackets }) {
+  if (forms.length === 0) return null;
+
+  const rows = forms.map((form) => (
+    <FormPredictionRow
+      key={form.formId}
+      form={form}
+      match={match}
+      actualTeams={actualTeams}
+      formBracket={formBrackets[form.formId]}
+    />
+  ));
+
+  // 1 form: inline, no heading. 2-4: expanded list. 5+: collapsible <details>.
+  if (forms.length === 1) {
+    return (
+      <div className="mt-2 pt-2 border-t border-border">
+        <div className="text-[11px] text-ink-muted mb-0.5">הניחוש שלך</div>
+        {rows}
+      </div>
+    );
+  }
+
+  if (forms.length <= 4) {
+    return (
+      <div className="mt-2 pt-2 border-t border-border">
+        <div className="text-[11px] text-ink-muted mb-0.5">
+          הניחושים שלך ({forms.length})
+        </div>
+        <div className="md:grid md:grid-cols-2 md:gap-x-4">{rows}</div>
+      </div>
+    );
+  }
+
+  return (
+    <details className="mt-2 pt-2 border-t border-border">
+      <summary className="text-[11px] text-ink-muted cursor-pointer select-none">
+        הניחושים שלך ({forms.length})
+      </summary>
+      <div className="md:grid md:grid-cols-2 md:gap-x-4 mt-1">{rows}</div>
+    </details>
+  );
+}
+
+function MatchRow({ match, actualTeams }) {
+  const home = actualTeams.home ? getTeamByCode(actualTeams.home) : null;
+  const away = actualTeams.away ? getTeamByCode(actualTeams.away) : null;
+  const stageLabel = STAGE_LABELS[match.stage] || "";
+  const meta = [match.date, match.time, match.venue].filter(Boolean).join(" · ");
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-medium text-secondary/90">
+          {stageLabel}
+          {match.group ? ` · ${match.group}` : ""}
+        </span>
+        <span className="text-[11px] text-ink-muted/60">{meta}</span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 text-center">
+          <div
+            className={`text-sm font-medium ${
+              home ? "text-ink" : "text-ink-muted/60 italic"
+            }`}
+          >
+            <bdi>{home?.name || "טרם נקבע"}</bdi>
+          </div>
+        </div>
+        <div className="text-sm text-ink-muted/60 font-black">–</div>
+        <div className="flex-1 text-center">
+          <div
+            className={`text-sm font-medium ${
+              away ? "text-ink" : "text-ink-muted/60 italic"
+            }`}
+          >
+            <bdi>{away?.name || "טרם נקבע"}</bdi>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function UpcomingMatches() {
+  const { user } = useCurrentUser();
+  const userForms = useUserForms(user?.id || null);
+  const matches = useUpcomingMatches();
+  const matchResults = useMatchResults();
+
+  const actualBracket = useMemo(
+    () => getCachedBracket(matchResults || {}),
+    [matchResults],
+  );
+
+  const formBrackets = useMemo(() => {
+    const map = {};
+    for (const form of userForms) {
+      map[form.formId] = getCachedBracket(form.matches || {});
+    }
+    return map;
+  }, [userForms]);
+
+  if (matches.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-border p-5 md:p-7 text-center text-sm text-ink-muted">
+        אין משחקים קרובים להצגה כרגע
+      </div>
+    );
+  }
+
+  const headingDate = formatIsraelDateLabel(matches[0]);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-6 text-right">
+      <div className="text-[11px] md:text-xs font-bold text-ink-muted mb-3 text-center">
+        המשחקים הבאים
+        {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
+      </div>
+      <div className="space-y-3">
+        {matches.map((match) => {
+          const actualTeams = resolveMatchTeams(match, actualBracket);
+          return (
+            <div
+              key={match.id}
+              className="rounded-xl border border-border p-3 bg-white"
+            >
+              <MatchRow match={match} actualTeams={actualTeams} />
+              {user && (
+                <PredictionsList
+                  forms={userForms}
+                  match={match}
+                  actualTeams={actualTeams}
+                  formBrackets={formBrackets}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

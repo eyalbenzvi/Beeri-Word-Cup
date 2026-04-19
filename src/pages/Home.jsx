@@ -3,6 +3,7 @@ import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
+import UpcomingMatches from "../components/UpcomingMatches";
 import { useToast } from "../components/Toast";
 
 export default function Home() {
@@ -35,32 +36,38 @@ export default function Home() {
         </button>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-7 mb-3">
-        {countdown.started ? (
-          <div className="text-lg md:text-2xl font-extrabold text-green-600">
-            🎉 המונדיאל התחיל!
-          </div>
-        ) : (
-          <>
-            <p className="text-[11px] md:text-sm font-bold text-ink-muted mb-2 md:mb-4">
-              שריקת הפתיחה בעוד
-            </p>
-            <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
-              <CountdownUnit
-                value={countdown.days}
-                label="ימים"
-                accent="bg-primary-light"
-              />
-              <CountdownUnit value={countdown.hours} label="שעות" />
-              <CountdownUnit value={countdown.minutes} label="דקות" />
-              <CountdownUnit value={countdown.seconds} label="שניות" />
+      {settings.predictionsLocked ? (
+        <div className="mb-3">
+          <UpcomingMatches />
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-7 mb-3">
+          {countdown.started ? (
+            <div className="text-lg md:text-2xl font-extrabold text-green-600">
+              🎉 המונדיאל התחיל!
             </div>
-            <p className="text-[10px] text-ink-muted/50 mt-2">
-              11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
-            </p>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <p className="text-[11px] md:text-sm font-bold text-ink-muted mb-2 md:mb-4">
+                שריקת הפתיחה בעוד
+              </p>
+              <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
+                <CountdownUnit
+                  value={countdown.days}
+                  label="ימים"
+                  accent="bg-primary-light"
+                />
+                <CountdownUnit value={countdown.hours} label="שעות" />
+                <CountdownUnit value={countdown.minutes} label="דקות" />
+                <CountdownUnit value={countdown.seconds} label="שניות" />
+              </div>
+              <p className="text-[10px] text-ink-muted/50 mt-2">
+                11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       <div
         className={`rounded-2xl shadow-sm border p-3 ${

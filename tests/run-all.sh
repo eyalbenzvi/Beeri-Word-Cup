@@ -59,6 +59,10 @@ run_test "24. Selection Visualization & Champion Display" "test-selection-and-ch
 run_test "25. Sentry Wrapper" "test-sentry-wrapper.mjs" "no"
 run_test "26. Stuck-Loading Protection (watchdogs, retry, escape hatch)" "test-stuck-loading-protection.mjs" "no"
 run_test "27. Score Auto-Init (MatchCard + filled-check regressions)" "test-score-auto-init.mjs" "no"
+run_test "28. Match Time Parsing (Israel -> UTC)" "test-match-time.mjs" "yes"
+run_test "29. Upcoming Matches Selector" "test-upcoming-matches.mjs" "yes"
+run_test "30. Prediction Alignment (home/away swap)" "test-prediction-align.mjs" "no"
+run_test "31. Upcoming Matches Integration" "test-upcoming-integration.mjs" "yes"
 
 echo ""
 echo "==========================================="
