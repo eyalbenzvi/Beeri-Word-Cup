@@ -230,72 +230,132 @@ console.log("--- 8. Started flag is monotonic at the boundary ---");
 }
 
 // ============================================================
-// 9. Public settings listener lifecycle
-// Regression: ensure idempotent init, proper handoff to auth listener,
-// and re-init on logout.
+// 9. get-public-settings Netlify function: response shape
 // ============================================================
-console.log("--- 9. Public settings listener lifecycle ---");
+console.log("--- 9. Netlify function response shape ---");
 {
-  // Simulate the publicSettingsUnsub state machine
-  let unsub = null;
-  let firestoreListenerCount = 0;
-
-  function mockOnSnapshot() {
-    firestoreListenerCount++;
-    return () => { firestoreListenerCount--; };
+  // Mirrors netlify/functions/get-public-settings.js handler logic.
+  function handle({ httpMethod, snapExists, snapData }) {
+    if (httpMethod === "OPTIONS") return { statusCode: 204, body: "" };
+    if (httpMethod !== "GET") return { statusCode: 405, body: { error: "Method Not Allowed" } };
+    const data = snapExists ? snapData?.data : null;
+    return {
+      statusCode: 200,
+      body: { predictionsLocked: !!(data && data.predictionsLocked) },
+    };
   }
 
-  function initPublicSettingsListener() {
-    if (unsub) return false; // no-op if already running
-    unsub = mockOnSnapshot();
-    return true;
+  // Locked
+  {
+    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: true } } });
+    assert(r.statusCode === 200, "Locked: 200");
+    assert(r.body.predictionsLocked === true, "Locked: returns true");
   }
 
-  function stopPublicSettingsListener() {
-    if (!unsub) return false;
-    unsub();
-    unsub = null;
-    return true;
+  // Unlocked
+  {
+    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: false } } });
+    assert(r.body.predictionsLocked === false, "Unlocked: returns false");
   }
 
-  // Fresh: init sets up one listener
-  assert(initPublicSettingsListener() === true, "First init sets up listener");
-  assert(firestoreListenerCount === 1, "One active listener");
+  // Missing field → false
+  {
+    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: {} } });
+    assert(r.body.predictionsLocked === false, "Missing field: false");
+  }
 
-  // Idempotent: second init is a no-op
-  assert(initPublicSettingsListener() === false, "Re-init is no-op");
-  assert(firestoreListenerCount === 1, "Still one active listener");
+  // Document doesn't exist → false (safe default)
+  {
+    const r = handle({ httpMethod: "GET", snapExists: false, snapData: null });
+    assert(r.body.predictionsLocked === false, "No doc: false");
+  }
 
-  // Auth listener takes over: stop public listener
-  assert(stopPublicSettingsListener() === true, "Stop succeeds");
-  assert(firestoreListenerCount === 0, "No active listener after stop");
+  // Truthy/falsy coercion
+  {
+    const truthy = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: "yes" } } });
+    assert(truthy.body.predictionsLocked === true, "Truthy string -> true");
+    const falsy = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: 0 } } });
+    assert(falsy.body.predictionsLocked === false, "Falsy 0 -> false");
+  }
 
-  // Stop again is safe no-op
-  assert(stopPublicSettingsListener() === false, "Double-stop is safe");
-  assert(firestoreListenerCount === 0, "Still no active listener");
-
-  // Re-init after logout works
-  assert(initPublicSettingsListener() === true, "Re-init after logout");
-  assert(firestoreListenerCount === 1, "Listener restarted after logout");
+  // Method guard
+  {
+    const opts = handle({ httpMethod: "OPTIONS" });
+    assert(opts.statusCode === 204, "OPTIONS: preflight 204");
+    const post = handle({ httpMethod: "POST" });
+    assert(post.statusCode === 405, "POST: 405 Method Not Allowed");
+  }
 }
 
 // ============================================================
-// 10. Firestore rule fragment: settings doc readable without auth
+// 10. usePublicSettings polling behaviour
 // ============================================================
-console.log("--- 10. Firestore rule: public settings read ---");
+console.log("--- 10. usePublicSettings polling logic ---");
 {
-  // Mirrors: allow read: if isAuth() || docId == 'settings';
-  function canRead(docId, isAuth) {
-    return isAuth || docId === "settings";
+  // Simulates the effect body in src/hooks/usePublicSettings.js
+  async function driveHook(responses) {
+    let settings = { predictionsLocked: false };
+    let fetchCount = 0;
+    let cancelled = false;
+
+    async function fetchOnce() {
+      if (cancelled) return;
+      const res = responses[fetchCount++];
+      try {
+        if (!res.ok) return;
+        settings = { predictionsLocked: !!res.body?.predictionsLocked };
+      } catch {
+        // swallow
+      }
+    }
+
+    await fetchOnce();
+    // Simulate 3 more poll ticks
+    for (let i = 0; i < 3 && fetchCount < responses.length; i++) {
+      await fetchOnce();
+    }
+
+    return { settings, fetchCount };
   }
 
-  assert(canRead("settings", false) === true, "Unauth can read settings");
-  assert(canRead("settings", true) === true, "Auth can read settings");
-  assert(canRead("users", false) === false, "Unauth CANNOT read users");
-  assert(canRead("matchResults", false) === false, "Unauth CANNOT read matchResults");
-  assert(canRead("actualBonuses", false) === false, "Unauth CANNOT read actualBonuses");
-  assert(canRead("users", true) === true, "Auth can read users (unchanged)");
-  assert(canRead("matchResults", true) === true, "Auth can read matchResults (unchanged)");
+  // First poll locks, stays locked
+  {
+    const p = driveHook([
+      { ok: true, body: { predictionsLocked: true } },
+      { ok: true, body: { predictionsLocked: true } },
+    ]);
+    const { settings, fetchCount } = await p;
+    assert(settings.predictionsLocked === true, "First poll locks the UI");
+    assert(fetchCount === 2, "Polls repeatedly");
+  }
+
+  // Unlock → lock transition propagates
+  {
+    const { settings } = await driveHook([
+      { ok: true, body: { predictionsLocked: false } },
+      { ok: true, body: { predictionsLocked: true } },
+    ]);
+    assert(settings.predictionsLocked === true, "Transition unlocked→locked surfaces");
+  }
+
+  // Fetch error keeps last-known value
+  {
+    const { settings } = await driveHook([
+      { ok: true, body: { predictionsLocked: true } },
+      { ok: false },
+      { ok: false },
+    ]);
+    assert(settings.predictionsLocked === true, "Network failure keeps last-known locked state");
+  }
+
+  // Initial default before any response
+  {
+    const { settings } = await driveHook([
+      { ok: false },
+      { ok: false },
+    ]);
+    assert(settings.predictionsLocked === false, "All failures: safe default (unlocked)");
+  }
 }
 
 // ============================================================
