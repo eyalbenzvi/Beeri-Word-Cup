@@ -1,10 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useAllPredictions, useMatchResults, useSettings } from "../hooks/useStore";
+import {
+  useAllPredictions,
+  useMatchResults,
+  useSettings,
+  useCurrentUser,
+} from "../hooks/useStore";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
+import SimulatorPanel from "../components/SimulatorPanel";
 
 const allMatches = [...groupMatches, ...knockoutMatches];
 
@@ -485,6 +491,7 @@ export default function Stats() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
   const settings = useSettings();
+  const { user: currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState("matches");
 
   if (!settings.predictionsLocked) {
@@ -524,6 +531,7 @@ export default function Stats() {
               { id: "teams", label: "🏆 קבוצות" },
               { id: "forms", label: "📋 טפסים" },
               { id: "search", label: "🔍 חיפוש" },
+              { id: "simulate", label: "🎮 סימולציה" },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border-none cursor-pointer ${activeTab === tab.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
@@ -550,6 +558,13 @@ export default function Stats() {
             )}
             {activeTab === "search" && (
               <SearchStats forms={submittedForms} />
+            )}
+            {activeTab === "simulate" && (
+              <SimulatorPanel
+                userMode
+                highlightUserId={currentUser?.id || null}
+                leaderboardLimit={0}
+              />
             )}
           </div>
         </>
