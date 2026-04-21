@@ -273,6 +273,16 @@ export default function Leaderboard({
             {rankedLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
               const isTop3 = currentRank <= 3;
+              const canView =
+                forceUnlockView || locked || entry.userId === user?.id;
+              const championCode = formBracketMap[entry.formId]?.champion;
+              const championName = championCode
+                ? getTeamByCode(championCode)?.name
+                : null;
+              const topScorerRaw = allPredictions[entry.formId]?.topScorer;
+              const topScorerDisplay = topScorerRaw
+                ? getPlayerDisplayName(topScorerRaw, playerList)
+                : null;
               const borderColor =
                 currentRank === 1
                   ? "border-yellow-300"
@@ -285,14 +295,12 @@ export default function Leaderboard({
                 <button
                   key={entry.formId}
                   onClick={() => {
-                    const canView =
-                      forceUnlockView || locked || entry.userId === user?.id;
                     if (canView) setSelectedForm(entry.formId);
                   }}
                   className={`w-full bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3 text-right ${borderColor} ${
                     entry.userId === user?.id ? "ring-2 ring-primary/10" : ""
                   } ${
-                    forceUnlockView || locked || entry.userId === user?.id
+                    canView
                       ? "cursor-pointer card-hover"
                       : "cursor-default opacity-50"
                   }`}
@@ -342,6 +350,16 @@ export default function Leaderboard({
                         <div className="text-[11px] text-ink-muted/70 truncate">{name}</div>
                       ) : null;
                     })()}
+                    {canView && championName && (
+                      <div className="text-[11px] text-yellow-600 truncate">
+                        🏆 {championName}
+                      </div>
+                    )}
+                    {canView && topScorerDisplay && (
+                      <div className="text-[11px] text-ink-muted/70 truncate">
+                        ⚽ {topScorerDisplay}
+                      </div>
+                    )}
                     <div className="text-[11px] text-ink-muted/70 tabular-nums">
                       <span dir="ltr">{entry.exactScoreCount}</span> מדויקים • <span dir="ltr">{entry.outcomeCount}</span>{" "}
                       הכרעות

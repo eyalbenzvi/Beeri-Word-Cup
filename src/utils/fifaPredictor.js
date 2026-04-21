@@ -72,13 +72,37 @@ export function predictMatch(homeTeam, awayTeam) {
   return { homeScore, awayScore };
 }
 
-// Predict all group matches + knockout using bracket cascade
-export function predictAllMatches(groupMatches, knockoutMatches, calcBracketTeams) {
+// Treat a prediction as "already filled" only when BOTH scores are numbers.
+// Prevents partial/corrupt entries from blocking a sensible AI fill.
+function isFilled(pred) {
+  return (
+    pred != null &&
+    typeof pred.homeScore === "number" &&
+    typeof pred.awayScore === "number"
+  );
+}
+
+// Predict all group matches + knockout using bracket cascade.
+// `existingPreds` (optional): a matches map from the user's form. Any match
+// that is already filled is preserved verbatim (including `advancingTeam`),
+// and the knockout cascade uses those user predictions so downstream rounds
+// line up with what the user actually chose.
+export function predictAllMatches(
+  groupMatches,
+  knockoutMatches,
+  calcBracketTeams,
+  existingPreds = {},
+) {
   const allPreds = {};
 
   // Group stage
   for (const m of groupMatches) {
-    allPreds[m.id] = predictMatch(m.homeTeam, m.awayTeam);
+    const existing = existingPreds[m.id];
+    if (isFilled(existing)) {
+      allPreds[m.id] = { ...existing };
+    } else {
+      allPreds[m.id] = predictMatch(m.homeTeam, m.awayTeam);
+    }
   }
 
   // Knockout: round by round
@@ -87,6 +111,11 @@ export function predictAllMatches(groupMatches, knockoutMatches, calcBracketTeam
     const bracket = calcBracketTeams(allPreds);
     const stageMatches = knockoutMatches.filter((m) => m.stage === stage);
     for (const m of stageMatches) {
+      const existing = existingPreds[m.id];
+      if (isFilled(existing)) {
+        allPreds[m.id] = { ...existing };
+        continue;
+      }
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
       const pred = predictMatch(teams.home, teams.away);
