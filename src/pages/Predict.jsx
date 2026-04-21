@@ -23,6 +23,7 @@ import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
 import { predictAllMatches } from "../utils/fifaPredictor";
+import { predictScenario, pickTopScorerForTeam } from "../utils/scenarioPredictor";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
@@ -37,6 +38,7 @@ import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import AIFillOverlay from "../components/AIFillOverlay";
+import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
 
@@ -232,6 +234,7 @@ export default function Predict() {
   }, [activeFormId, activeForm, allPredictions, settings, scrollToTarget]);
 
   const [aiProgress, setAiProgress] = useState(null);
+  const [showScenarioModal, setShowScenarioModal] = useState(false);
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
@@ -272,6 +275,52 @@ export default function Predict() {
       }
 
       showToast("הניחושים החסרים מולאו בעזרת AI! 🤖✨");
+    } catch (err) {
+      showToast(`שגיאה: ${err.message}`);
+    } finally {
+      setAiProgress(null);
+    }
+  }, [activeFormId, canEdit, activeForm, settings, showToast]);
+
+  const handleScenarioFill = useCallback(async (champion, runnerUp) => {
+    if (!activeFormId || !canEdit) return;
+    setShowScenarioModal(false);
+
+    const totalSteps = 3;
+    try {
+      setAiProgress({ current: 1, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 1000));
+
+      const existingMatches = activeForm?.matches || {};
+      const allPreds = predictScenario(
+        champion,
+        runnerUp,
+        groupMatches,
+        knockoutMatches,
+        calcBracketTeams,
+        existingMatches,
+      );
+
+      setAiProgress({ current: 2, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 900));
+
+      savePredictionsBatch(activeFormId, allPreds);
+      saveBonusPrediction(activeFormId, "chosenChampion", champion);
+      saveBonusPrediction(activeFormId, "chosenRunnerUp", runnerUp);
+
+      setAiProgress({ current: 3, total: totalSteps });
+      await new Promise((r) => setTimeout(r, 700));
+
+      // Top scorer from the champion squad (don't override user's existing pick)
+      if (!activeForm?.topScorer) {
+        const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
+        const player = pickTopScorerForTeam(champion, playerList);
+        if (player) {
+          saveBonusPrediction(activeFormId, "topScorer", player.nameHe || player.name);
+        }
+      }
+
+      showToast("התרחיש נוצר! הטופס מלא לפי האלופה שבחרת 🏆✨");
     } catch (err) {
       showToast(`שגיאה: ${err.message}`);
     } finally {
@@ -467,6 +516,14 @@ export default function Predict() {
           {status === "draft" && !settings.predictionsLocked && (
             <div className="mb-4 space-y-2 md:max-w-md md:mx-auto">
               <button
+                onClick={() => setShowScenarioModal(true)}
+                disabled={!!aiProgress}
+                title="בחר אלופה וסגנית — הטופס ימולא כך שהן ייפגשו בגמר"
+                className="w-full bg-gradient-to-r from-amber-400 to-pink-500 text-white font-bold py-3 rounded-2xl shadow-sm hover:from-amber-500 hover:to-pink-600 transition text-sm border-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                ✨ יצירת תרחיש עם AI
+              </button>
+              <button
                 onClick={handleAIFill}
                 disabled={!!aiProgress}
                 title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
@@ -542,6 +599,14 @@ export default function Predict() {
 
       <AIFillOverlay aiProgress={aiProgress} />
 
+      {showScenarioModal && (
+        <FinalistsPickerModal
+          initialChampion={activeForm?.chosenChampion}
+          initialRunnerUp={activeForm?.chosenRunnerUp}
+          onCancel={() => setShowScenarioModal(false)}
+          onConfirm={handleScenarioFill}
+        />
+      )}
 
       {showConfirm && (
         <ReviewScreen

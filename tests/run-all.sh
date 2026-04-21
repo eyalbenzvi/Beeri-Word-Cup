@@ -70,6 +70,7 @@ run_test "35. Player Search (Hebrew)" "test-player-search-he.mjs" "yes"
 run_test "36. Player Display (Hebrew canonical)" "test-player-display.mjs" "yes"
 run_test "37. Scoring (Hebrew topScorer)" "test-scoring-he.mjs" "yes"
 run_test "38. AI Fill + Leaderboard Display + Simulator Layout" "test-ai-fill-and-display.mjs" "yes"
+run_test "39. Scenario Predictor (champion + runner-up auto-fill)" "test-scenario-predictor.mjs" "yes"
 
 echo ""
 echo "==========================================="
