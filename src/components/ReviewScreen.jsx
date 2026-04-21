@@ -1,3 +1,7 @@
+import { getPlayerDisplayName } from "../utils/playerSearch";
+import { useSettings } from "../hooks/useStore";
+import { resolvePlayerList } from "../utils/playerSearch";
+
 export default function ReviewScreen({
   errors,
   activeForm,
@@ -9,6 +13,11 @@ export default function ReviewScreen({
   onClose,
   onSubmit,
 }) {
+  const settings = useSettings();
+  const playerList = resolvePlayerList(settings.topScorerPlayers);
+  const topScorerDisplay = activeForm.topScorer?.trim()
+    ? getPlayerDisplayName(activeForm.topScorer.trim(), playerList)
+    : "";
   const hasErrors = errors.length > 0;
   const totalMatches = groupMatchesCount + knockoutMatchesCount;
   const totalFilled = predictedGroupCount + predictedKnockoutCount;
@@ -45,9 +54,9 @@ export default function ReviewScreen({
               <div className="flex justify-between">
                 <span>מלך שערים:</span>
                 <span
-                  className={`font-bold ${activeForm.topScorer?.trim() ? "text-gray-800" : "text-red-500"}`}
+                  className={`font-bold ${topScorerDisplay ? "text-gray-800" : "text-red-500"}`}
                 >
-                  {activeForm.topScorer?.trim() || "חסר"}
+                  {topScorerDisplay || "חסר"}
                 </span>
               </div>
               <div className="flex justify-between">

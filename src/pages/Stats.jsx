@@ -11,6 +11,7 @@ import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
+import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 
 const allMatches = [...groupMatches, ...knockoutMatches];
 
@@ -268,17 +269,20 @@ function ChampionStats({ forms }) {
 }
 
 // ============ TOP SCORER DISTRIBUTION ============
-function TopScorerStats({ forms }) {
+function TopScorerStats({ forms, playerList }) {
   const distribution = useMemo(() => {
+    // Group by canonical Hebrew label so legacy English values merge with new Hebrew ones.
     const counts = {};
     forms.forEach((f) => {
       const ts = f.topScorer?.trim();
-      if (ts) counts[ts] = (counts[ts] || 0) + 1;
+      if (!ts) return;
+      const display = getPlayerDisplayName(ts, playerList) || ts;
+      counts[display] = (counts[display] || 0) + 1;
     });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-  }, [forms]);
+  }, [forms, playerList]);
 
   if (distribution.length === 0) return null;
 
@@ -365,7 +369,7 @@ function GeneralStats({ forms, results }) {
 }
 
 // ============ SEARCH ============
-function SearchStats({ forms }) {
+function SearchStats({ forms, playerList }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const debounceRef = useRef(null);
@@ -395,12 +399,24 @@ function SearchStats({ forms }) {
           value: champName,
         });
       }
-      if (f.topScorer?.toLowerCase().includes(q)) {
-        teamMatches.push({
-          formName: f.formName,
-          type: "מלך שערים",
-          value: f.topScorer,
-        });
+      if (f.topScorer) {
+        const raw = String(f.topScorer);
+        const display = getPlayerDisplayName(raw, playerList) || raw;
+        const hit =
+          raw.toLowerCase().includes(q) ||
+          display.toLowerCase().includes(q) ||
+          // Also allow finding by the other language: if stored Hebrew, search English name too.
+          (() => {
+            const p = getPlayerByEitherName(raw, playerList);
+            return p ? `${p.name} ${p.nameHe || ""}`.toLowerCase().includes(q) : false;
+          })();
+        if (hit) {
+          teamMatches.push({
+            formName: f.formName,
+            type: "מלך שערים",
+            value: display,
+          });
+        }
       }
     });
     if (teamMatches.length > 0) {
@@ -510,6 +526,11 @@ export default function Stats() {
       .map(([formId, f]) => ({ formId, ...f }));
   }, [allPredictions]);
 
+  const playerList = useMemo(
+    () => resolvePlayerList(settings.topScorerPlayers),
+    [settings.topScorerPlayers],
+  );
+
   return (
     <div>
       <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
@@ -550,14 +571,14 @@ export default function Stats() {
             {activeTab === "teams" && (
               <>
                 <ChampionStats forms={submittedForms} />
-                <TopScorerStats forms={submittedForms} />
+                <TopScorerStats forms={submittedForms} playerList={playerList} />
               </>
             )}
             {activeTab === "forms" && (
               <GeneralStats forms={submittedForms} results={results} />
             )}
             {activeTab === "search" && (
-              <SearchStats forms={submittedForms} />
+              <SearchStats forms={submittedForms} playerList={playerList} />
             )}
             {activeTab === "simulate" && (
               <SimulatorPanel

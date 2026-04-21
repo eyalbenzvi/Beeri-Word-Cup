@@ -13,6 +13,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import GroupSelector from "./GroupSelector";
+import PlayerAutocomplete from "./PlayerAutocomplete";
 
 function AdminFormEditModal({ formId, form, onClose }) {
   const [tab, setTab] = useState("details");
@@ -104,14 +105,13 @@ function AdminFormEditModal({ formId, form, onClose }) {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">
-                  מלך שערים (טקסט)
-                </label>
-                <input
-                  value={topScorer}
-                  onChange={(e) => setTopScorer(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-0.5"
-                />
+                <label className="text-xs text-gray-500">מלך שערים</label>
+                <div className="mt-0.5">
+                  <PlayerAutocomplete
+                    value={topScorer}
+                    onChange={(val) => setTopScorer(val)}
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-xs text-gray-500">

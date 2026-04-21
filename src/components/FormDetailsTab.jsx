@@ -1,4 +1,5 @@
 import { saveBonusPrediction, updateFormDetails } from "../store";
+import PlayerAutocomplete from "./PlayerAutocomplete";
 
 export default function FormDetailsTab({ activeForm, activeFormId, canEdit, championName }) {
   return (
@@ -49,16 +50,12 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
         <p className="text-xs text-gray-400 mb-3">
           מי יהיה מלך השערים? שערים מבעיטות הכרעה לא נספרים.
         </p>
-        <input
-          type="text"
+        <PlayerAutocomplete
           value={activeForm.topScorer || ""}
           disabled={!canEdit}
-          onChange={(e) =>
-            saveBonusPrediction(activeFormId, "topScorer", e.target.value)
+          onChange={(val) =>
+            saveBonusPrediction(activeFormId, "topScorer", val)
           }
-          placeholder="הכנס שם שחקן..."
-          title="ניחוש מלך השערים — 8 נקודות בונוס"
-          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
         />
       </div>
 

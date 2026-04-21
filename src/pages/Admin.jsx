@@ -15,6 +15,8 @@ import AdminUsersTab from "../components/AdminUsersTab";
 import AdminDashboardTab from "../components/AdminDashboardTab";
 import AdminFormsTab from "../components/AdminFormsTab";
 import AdminToolsTab from "../components/AdminToolsTab";
+import PlayerAutocomplete from "../components/PlayerAutocomplete";
+import { isSamePlayer, getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 export default function Admin() {
   const { user } = useCurrentUser();
@@ -123,20 +125,23 @@ export default function Admin() {
               הוסף את כל השחקנים שנמצאים בראש טבלת הכובשים (במקרה של שוויון).
             </p>
             <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={topScorerInput}
-                onChange={(e) => setTopScorerInput(e.target.value)}
-                placeholder="שם שחקן..."
-                className="flex-1 px-3 py-2 border rounded-lg text-sm"
-              />
+              <div className="flex-1">
+                <PlayerAutocomplete
+                  value={topScorerInput}
+                  onChange={(val) => setTopScorerInput(val)}
+                />
+              </div>
               <button
                 onClick={() => {
-                  if (!topScorerInput.trim()) return;
-                  const current = actualBonuses.topScorers || [];
                   const name = topScorerInput.trim();
-                  if (current.some(n => n.toLowerCase() === name.toLowerCase())) {
-                    showToast(`"${name}" כבר ברשימה`, "error");
+                  if (!name) return;
+                  const playerList = resolvePlayerList(settings.topScorerPlayers);
+                  const current = actualBonuses.topScorers || [];
+                  if (current.some((n) => isSamePlayer(n, name, playerList))) {
+                    showToast(
+                      `"${getPlayerDisplayName(name, playerList)}" כבר ברשימה`,
+                      "error",
+                    );
                     return;
                   }
                   saveActualBonuses({
@@ -156,7 +161,7 @@ export default function Admin() {
                   key={i}
                   className="bg-green-100 text-green-700 px-2 py-1 rounded-lg text-xs flex items-center gap-1"
                 >
-                  {name}
+                  {getPlayerDisplayName(name, resolvePlayerList(settings.topScorerPlayers))}
                   <button
                     onClick={() => {
                       const updated = [...(actualBonuses.topScorers || [])];

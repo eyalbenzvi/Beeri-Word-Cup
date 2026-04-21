@@ -1,3 +1,5 @@
+import { isSamePlayer } from "./playerSearch.js";
+
 export const POINTS = {
   group: {
     outcome: 1,
@@ -226,13 +228,13 @@ export function calculateFullScore(
   }
 
   // 4. Top scorer bonus (מלך השערים)
-  // If multiple top scorers, any correct guess gets points
+  // If multiple top scorers, any correct guess gets points.
+  // Uses isSamePlayer so stored values in either language (legacy English
+  // vs. new Hebrew) still match against actual top scorers regardless of
+  // which language the admin entered them in.
   if (Array.isArray(actualBonuses?.topScorers) && userPredictions.topScorer) {
-    const userGuess = String(userPredictions.topScorer).toLowerCase().trim();
-    const topScorers = actualBonuses.topScorers.map((s) =>
-      String(s).toLowerCase().trim(),
-    );
-    if (userGuess && topScorers.includes(userGuess)) {
+    const userGuess = userPredictions.topScorer;
+    if (actualBonuses.topScorers.some((s) => isSamePlayer(userGuess, s))) {
       totalPoints += BONUSES.topScorer;
       correctTopScorer = true;
     }
