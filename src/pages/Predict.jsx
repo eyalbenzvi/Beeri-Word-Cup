@@ -235,7 +235,7 @@ export default function Predict() {
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
-    if (!window.confirm("כל הניחושים הקיימים יימחקו ויוחלפו בניחושי AI. להמשיך?")) return;
+    if (!window.confirm("הניחושים החסרים ימולאו בעזרת AI. ניחושים קיימים ומלך שערים שנבחר יישמרו. להמשיך?")) return;
 
     const totalSteps = 3;
 
@@ -244,31 +244,40 @@ export default function Predict() {
       setAiProgress({ current: 1, total: totalSteps });
       await new Promise((r) => setTimeout(r, 1200));
 
-      // Generate all predictions locally using FIFA rankings
-      const allPreds = predictAllMatches(groupMatches, knockoutMatches, calcBracketTeams);
+      // Fill only missing predictions; user's filled matches are preserved
+      // verbatim, and the knockout cascade uses them for continuity.
+      const existingMatches = activeForm?.matches || {};
+      const allPreds = predictAllMatches(
+        groupMatches,
+        knockoutMatches,
+        calcBracketTeams,
+        existingMatches,
+      );
 
       // Step 2: "Computing bracket"
       setAiProgress({ current: 2, total: totalSteps });
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Save all predictions in one batch
+      // Save all predictions in one batch (preserved ones are unchanged)
       savePredictionsBatch(activeFormId, allPreds);
 
-      // Step 3: Top scorer
+      // Step 3: Top scorer — keep user's choice if already set
       setAiProgress({ current: 3, total: totalSteps });
       await new Promise((r) => setTimeout(r, 800));
 
-      const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
-      const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
-      saveBonusPrediction(activeFormId, "topScorer", randomPlayer.nameHe || randomPlayer.name);
+      if (!activeForm?.topScorer) {
+        const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
+        const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
+        saveBonusPrediction(activeFormId, "topScorer", randomPlayer.nameHe || randomPlayer.name);
+      }
 
-      showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
+      showToast("הניחושים החסרים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
       showToast(`שגיאה: ${err.message}`);
     } finally {
       setAiProgress(null);
     }
-  }, [activeFormId, canEdit, showToast]);
+  }, [activeFormId, canEdit, activeForm, settings, showToast]);
 
   const handleMatchJump = useCallback((match) => {
     if (match.stage === "group") {
