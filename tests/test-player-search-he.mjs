@@ -14,7 +14,7 @@ console.log("=== PLAYER SEARCH (HEBREW) TESTS ===\n");
 
 // ---- 1. Data integrity ----
 console.log("--- 1. Data integrity ---");
-assert(TOP_SCORER_PLAYERS.length === 170, `Expected 170 players, got ${TOP_SCORER_PLAYERS.length}`);
+assert(TOP_SCORER_PLAYERS.length >= 1000, `Expected full squads (>=1000 players), got ${TOP_SCORER_PLAYERS.length}`);
 
 const missingHe = TOP_SCORER_PLAYERS.filter(p => !p.nameHe || !p.nameHe.trim());
 assert(missingHe.length === 0, `All players must have nameHe; missing: ${missingHe.map(p => p.name).join(', ')}`);
