@@ -65,7 +65,10 @@ export function validateForm(activeForm, activeFormId, allPredictions, settings)
     });
   } else {
     const playerList = settings?.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
-    const isValid = playerList.some((p) => p.name === activeForm.topScorer.trim());
+    const trimmed = activeForm.topScorer.trim();
+    const isValid = playerList.some(
+      (p) => p.nameHe === trimmed || p.name === trimmed,
+    );
     if (!isValid) {
       errors.push({
         key: "invalidTopScorer",

@@ -13,6 +13,7 @@ import {
 } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
+import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -51,7 +52,7 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, championDisplay, locked, isOwnForm, userName }) {
+function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerList }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
@@ -86,7 +87,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName }) {
               )}
               {form.topScorer && (
                 <div className="text-xs text-gray-400 mt-0.5">
-                  ⚽ {form.topScorer}
+                  ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
                 </div>
               )}
             </>
@@ -153,7 +154,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName }) {
             <div className="flex justify-between text-xs">
               <span className="text-gray-500">⚽ מלך שערים</span>
               <span className="font-semibold">
-                {form.topScorer || "לא הוכנס"}
+                {form.topScorer ? getPlayerDisplayName(form.topScorer, playerList) : "לא הוכנס"}
               </span>
             </div>
           </div>
@@ -169,6 +170,10 @@ export default function AllFormsView({ onBack }) {
   const settings = useSettings();
   const { user } = useCurrentUser();
   const locked = settings.predictionsLocked;
+  const playerList = useMemo(
+    () => resolvePlayerList(settings.topScorerPlayers),
+    [settings.topScorerPlayers],
+  );
   const [filterText, setFilterText] = useState("");
   const [filterBy, setFilterBy] = useState("form");
 
@@ -288,6 +293,7 @@ export default function AllFormsView({ onBack }) {
                   locked={locked}
                   isOwnForm={form.userId === user?.id}
                   userName={userName}
+                  playerList={playerList}
                 />
               );
             })}

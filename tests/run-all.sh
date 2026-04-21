@@ -67,6 +67,8 @@ run_test "32. Form Lock UI (hide new-form when locked)" "test-form-lock-ui.mjs" 
 run_test "33. Welcome Screen Upcoming (unauth post-kickoff)" "test-welcome-upcoming.mjs" "yes"
 run_test "34. Simulator Parity (user sim == real calc)" "test-simulator-parity.mjs" "yes"
 run_test "35. Player Search (Hebrew)" "test-player-search-he.mjs" "yes"
+run_test "36. Player Display (Hebrew canonical)" "test-player-display.mjs" "yes"
+run_test "37. Scoring (Hebrew topScorer)" "test-scoring-he.mjs" "yes"
 
 echo ""
 echo "==========================================="

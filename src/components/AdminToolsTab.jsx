@@ -4,23 +4,28 @@ import {
   useAllPredictions,
   useUsers,
   useActualBonuses,
+  useSettings,
 } from "../hooks/useStore";
+import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import Leaderboard from "../pages/Leaderboard";
 import SimulatorPanel from "./SimulatorPanel";
 
-function AdminExportReports({ leaderboard, users, allPredictions }) {
+function AdminExportReports({ leaderboard, users, allPredictions, playerList }) {
   const downloadCsv = () => {
     const header = "מקום,שם טופס,משתמש,תקציב,אלופה,מלך שערים,נקודות,מדויקים,הכרעות\n";
     const lines = leaderboard.map((e, i) => {
       const pred = allPredictions[e.formId] || {};
+      const topScorerDisplay = pred.topScorer
+        ? getPlayerDisplayName(pred.topScorer, playerList)
+        : "";
       return [
         i + 1,
         `"${(e.formName || "").replace(/"/g, '""')}"`,
         `"${(e.userName || "").replace(/"/g, '""')}"`,
         `"${pred.budgetNumber || ""}"`,
         `"${pred.champion || ""}"`,
-        `"${pred.topScorer || ""}"`,
+        `"${topScorerDisplay.replace(/"/g, '""')}"`,
         e.totalPoints,
         e.exactScoreCount,
         e.outcomeCount,
@@ -114,6 +119,8 @@ export default function AdminToolsTab() {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const actualBonuses = useActualBonuses();
+  const settings = useSettings();
+  const playerList = resolvePlayerList(settings.topScorerPlayers);
   const { leaderboard } = useLeaderboardComputed(
     results,
     allPredictions,
@@ -154,6 +161,7 @@ export default function AdminToolsTab() {
           leaderboard={leaderboard}
           users={users}
           allPredictions={allPredictions}
+          playerList={playerList}
         />
       )}
     </div>

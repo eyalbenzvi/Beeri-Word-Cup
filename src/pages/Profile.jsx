@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers } from "../hooks/useStore";
+import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers, useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { updateUserProfile } from "../store";
 import { getTeamByCode } from "../data/teams";
+import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 export default function Profile() {
   const { user, logout } = useCurrentUser();
@@ -13,6 +14,8 @@ export default function Profile() {
   const allPredictions = useAllPredictions();
   const users = useUsers();
   const actualBonuses = useActualBonuses();
+  const settings = useSettings();
+  const playerList = resolvePlayerList(settings.topScorerPlayers);
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
@@ -195,7 +198,7 @@ export default function Profile() {
                     <div className="font-medium text-sm truncate">{form.formName || "טופס ללא שם"}</div>
                     <div className="text-[11px] text-ink-muted/70">
                       {champion && <span>🏆 אלופה: {champion} </span>}
-                      {form.topScorer && <span>⚽ מלך: {form.topScorer}</span>}
+                      {form.topScorer && <span>⚽ מלך: {getPlayerDisplayName(form.topScorer, playerList)}</span>}
                     </div>
                   </div>
                   {position && (

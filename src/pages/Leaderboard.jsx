@@ -12,6 +12,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
 import { compareTiebreaker } from "../utils/scoring";
+import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -28,6 +29,10 @@ export default function Leaderboard({
   const actualBonuses = useActualBonuses();
   const settings = useSettings();
   const locked = settings.predictionsLocked;
+  const playerList = useMemo(
+    () => resolvePlayerList(settings.topScorerPlayers),
+    [settings.topScorerPlayers],
+  );
   const [selectedForm, setSelectedForm] = useState(null);
   const [showCount, setShowCount] = useState(20);
 
@@ -161,7 +166,7 @@ export default function Leaderboard({
           <div className="flex justify-between py-1">
             <span className="text-ink-muted">ניחוש מלך שערים:</span>
             <span className="font-medium">
-              {predData.topScorer || "אין"}
+              {predData.topScorer ? getPlayerDisplayName(predData.topScorer, playerList) : "אין"}
               {score.correctTopScorer ? " ✅" : ""}
             </span>
           </div>

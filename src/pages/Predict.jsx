@@ -260,7 +260,7 @@ export default function Predict() {
 
       const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
       const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
-      saveBonusPrediction(activeFormId, "topScorer", randomPlayer.name);
+      saveBonusPrediction(activeFormId, "topScorer", randomPlayer.nameHe || randomPlayer.name);
 
       showToast("כל הניחושים מולאו בעזרת AI! 🤖✨");
     } catch (err) {
