@@ -275,61 +275,79 @@ export default function SimulatorPanel({
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="truncate">{homeTeam?.name || "—"}</div>
-                  <div className="truncate">{awayTeam?.name || "—"}</div>
-                </div>
-                {isEditing ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      value={editScores.homeScore}
-                      onChange={(e) =>
-                        setEditScores((s) => ({
-                          ...s,
-                          homeScore: e.target.value,
-                        }))
-                      }
-                      className="w-9 h-7 text-center border rounded text-xs"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      value={editScores.awayScore}
-                      onChange={(e) =>
-                        setEditScores((s) => ({
-                          ...s,
-                          awayScore: e.target.value,
-                        }))
-                      }
-                      className="w-9 h-7 text-center border rounded text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSaveResult(match)}
-                      className="bg-green-500 text-white px-2 py-1 rounded text-[10px]"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingMatch(null)}
-                      className="bg-gray-200 px-2 py-1 rounded text-[10px]"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold text-primary">
-                      {result ? `${result.homeScore}-${result.awayScore}` : "—"}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate flex-1">
+                      {homeTeam?.name || "—"}
                     </span>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={editScores.homeScore}
+                        onChange={(e) =>
+                          setEditScores((s) => ({
+                            ...s,
+                            homeScore: e.target.value,
+                          }))
+                        }
+                        aria-label={`שערים ל${homeTeam?.name || "ביתית"}`}
+                        className="w-10 h-7 text-center border rounded text-xs shrink-0"
+                      />
+                    ) : (
+                      <span className="font-bold text-primary w-6 text-center shrink-0">
+                        {result ? result.homeScore : "—"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate flex-1">
+                      {awayTeam?.name || "—"}
+                    </span>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={editScores.awayScore}
+                        onChange={(e) =>
+                          setEditScores((s) => ({
+                            ...s,
+                            awayScore: e.target.value,
+                          }))
+                        }
+                        aria-label={`שערים ל${awayTeam?.name || "אורחת"}`}
+                        className="w-10 h-7 text-center border rounded text-xs shrink-0"
+                      />
+                    ) : (
+                      <span className="font-bold text-primary w-6 text-center shrink-0">
+                        {result ? result.awayScore : "—"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveResult(match)}
+                        className="bg-green-500 text-white px-2 py-1 rounded text-[10px]"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingMatch(null)}
+                        className="bg-gray-200 px-2 py-1 rounded text-[10px]"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  ) : (
                     <button
                       type="button"
                       onClick={() => {
-                        // Only allow editing when teams are resolvable.
                         if (!derived.home || !derived.away) return;
                         setEditingMatch(match.id);
                         setEditScores({
@@ -346,8 +364,8 @@ export default function SimulatorPanel({
                     >
                       ערוך
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               {isKnockout &&
                 isTie &&
