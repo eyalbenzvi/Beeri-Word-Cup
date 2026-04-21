@@ -167,12 +167,17 @@ export default function AdminSettingsTab({
                 try {
                   const data = JSON.parse(ev.target.result);
                   if (!Array.isArray(data) || !data[0]?.team || !data[0]?.name) {
-                    showToast("פורמט לא תקין — נדרש מערך של { team, name }", "error");
+                    showToast("פורמט לא תקין — נדרש מערך של { team, name, nameHe? }", "error");
                     return;
                   }
+                  const missingHe = data.filter((p) => !p.nameHe).length;
                   updateSettings({ topScorerPlayers: data });
                   setPlayerCount(data.length);
-                  showToast(`נטענו ${data.length} שחקנים`);
+                  if (missingHe > 0) {
+                    showToast(`נטענו ${data.length} שחקנים (${missingHe} ללא nameHe — חיפוש בעברית לא יעבוד עבורם)`);
+                  } else {
+                    showToast(`נטענו ${data.length} שחקנים`);
+                  }
                 } catch {
                   showToast("שגיאה בקריאת הקובץ", "error");
                 }
