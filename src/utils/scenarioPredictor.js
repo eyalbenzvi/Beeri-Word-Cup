@@ -17,6 +17,7 @@ import {
   SF_MATCHES,
 } from "../data/matches";
 import { predictMatch } from "./fifaPredictor";
+import { calcGroupStandings } from "./bracket";
 
 const TEAM_TO_GROUP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -102,8 +103,19 @@ export function pickGroupPositions(championGroup, runnerUpGroup) {
 // - targetPos 1: target wins all 3 matches.
 // - targetPos 2: target loses to ONE other team (who then finishes 1st), wins the other 2.
 //   If `opponentFirst` is set and in the same group, they're the designated 1st-place team.
-// Preserves any user-filled matches verbatim; only writes to unfilled matches.
-function forceGroupResult(groupName, target, targetPos, opponentFirst, groupMatchesArr, allPreds, existingPreds) {
+// When `respectExisting` is true (default): user-filled matches are preserved verbatim.
+// When false: every match in the group involving the target (and, for pos 2, firstPlace)
+//   is overwritten, regardless of what the user had there.
+function forceGroupResult(
+  groupName,
+  target,
+  targetPos,
+  opponentFirst,
+  groupMatchesArr,
+  allPreds,
+  existingPreds,
+  respectExisting = true,
+) {
   const groupTeams = GROUPS[groupName].map((t) => t.code);
   const gms = groupMatchesArr.filter((m) => m.group === groupName);
 
@@ -118,9 +130,15 @@ function forceGroupResult(groupName, target, targetPos, opponentFirst, groupMatc
   }
 
   for (const m of gms) {
-    if (isFilled(existingPreds[m.id])) continue; // preserve user-filled
     const home = m.homeTeam;
     const away = m.awayTeam;
+    const touchesTarget = home === target || away === target;
+    const touchesFirst = firstPlace && (home === firstPlace || away === firstPlace);
+
+    // In hard mode, always overwrite matches involving target or firstPlace.
+    // For matches that don't involve them, still respect user-filled data.
+    const mustOverwrite = !respectExisting && (touchesTarget || touchesFirst);
+    if (!mustOverwrite && isFilled(existingPreds[m.id])) continue;
 
     let pred;
     if (targetPos === 1) {
@@ -202,8 +220,41 @@ export function pickTopScorerForTeam(teamCode, playerList) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function findTeamPosition(sortedTeams, code) {
+  if (!Array.isArray(sortedTeams)) return null;
+  const idx = sortedTeams.findIndex((t) => t.code === code);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+// Given a filled knockout prediction, return the team that advances per the prediction.
+// null if scores are missing; for a draw, returns advancingTeam (may be undefined).
+function predictedWinner(pred, teams) {
+  if (!pred || !teams) return null;
+  const h = pred.homeScore;
+  const a = pred.awayScore;
+  if (typeof h !== "number" || typeof a !== "number") return null;
+  if (h === a) return pred.advancingTeam || null;
+  return h > a ? teams.home : teams.away;
+}
+
+// Apply the scenario-shaped group fill. Both calls use the user's `existingPreds` (not a
+// running virtual state), so the second call can still write runner-up results into
+// matches that Call 1 wrote as random predictions — while still skipping user-filled matches.
+// In the same-group case the two calls agree on champ-vs-runner-up (champion wins).
+function fillGroupStage(champion, runnerUp, champGroup, runnerGroup, positions, groupMatchesArr, allPreds, existingPreds, respectExisting) {
+  if (champGroup === runnerGroup) {
+    forceGroupResult(champGroup, champion, 1, null, groupMatchesArr, allPreds, existingPreds, respectExisting);
+    forceGroupResult(runnerGroup, runnerUp, 2, champion, groupMatchesArr, allPreds, existingPreds, respectExisting);
+  } else {
+    forceGroupResult(champGroup, champion, positions.champion, null, groupMatchesArr, allPreds, existingPreds, respectExisting);
+    forceGroupResult(runnerGroup, runnerUp, positions.runnerUp, null, groupMatchesArr, allPreds, existingPreds, respectExisting);
+  }
+}
+
 // Generate a full form of predictions where `champion` beats `runnerUp` in the final.
-// Contract mirrors predictAllMatches — preserves existing filled predictions verbatim.
+// Preserves user-filled predictions when they're consistent with the scenario. If they
+// would prevent the scenario (e.g. champion losing in groups, wrong bracket side, or
+// losing a knockout match), predictions for the two finalists are silently overwritten.
 export function predictScenario(
   champion,
   runnerUp,
@@ -222,30 +273,17 @@ export function predictScenario(
   }
 
   const allPreds = {};
-
-  // Start by copying existing predictions (preserve verbatim)
+  // Start by copying existing predictions (preserve verbatim — may be overwritten below)
   for (const [mid, p] of Object.entries(existingPreds)) {
     if (isFilled(p)) allPreds[mid] = { ...p };
   }
 
   const positions = pickGroupPositions(champGroup, runnerGroup);
+  const expectedChampPos = champGroup === runnerGroup ? 1 : positions.champion;
+  const expectedRunnerPos = champGroup === runnerGroup ? 2 : positions.runnerUp;
 
-  // --- Group stage ---
-  if (champGroup === runnerGroup) {
-    // Champion 1st, runner-up 2nd, in the same group
-    forceGroupResult(champGroup, champion, 1, null, groupMatchesArr, allPreds, existingPreds);
-    // The 2nd-place logic needs to know that champion is the one who beats runner-up —
-    // but forceGroupResult(champion, 1) already wrote "champion beats runner-up".
-    // Now we need runner-up to win their other 2 matches so they finish 2nd.
-    // forceGroupResult with target=runnerUp, targetPos=2, opponentFirst=champion handles it,
-    // but we must NOT overwrite the champion's matches we just wrote. Use existingPreds+allPreds.
-    const virtualExisting = { ...existingPreds, ...allPreds };
-    forceGroupResult(runnerGroup, runnerUp, 2, champion, groupMatchesArr, allPreds, virtualExisting);
-  } else {
-    forceGroupResult(champGroup, champion, positions.champion, null, groupMatchesArr, allPreds, existingPreds);
-    const virtualExisting = { ...existingPreds, ...allPreds };
-    forceGroupResult(runnerGroup, runnerUp, positions.runnerUp, null, groupMatchesArr, allPreds, virtualExisting);
-  }
+  // --- Group stage (soft — preserve user-filled matches verbatim) ---
+  fillGroupStage(champion, runnerUp, champGroup, runnerGroup, positions, groupMatchesArr, allPreds, existingPreds, true);
 
   // Fill remaining group matches (groups other than champion/runner-up) with normal predictions
   for (const m of groupMatchesArr) {
@@ -257,23 +295,53 @@ export function predictScenario(
     }
   }
 
+  // --- Detect group-stage conflict and hard-override if needed ---
+  const standings = calcGroupStandings(allPreds);
+  const actualChampPos = findTeamPosition(standings[champGroup], champion);
+  const actualRunnerPos = findTeamPosition(standings[runnerGroup], runnerUp);
+  const champSide = BRACKET_SIDE_MAP[`${expectedChampPos}${champGroup}`];
+  const runnerSide = BRACKET_SIDE_MAP[`${expectedRunnerPos}${runnerGroup}`];
+
+  const groupConflict =
+    actualChampPos !== expectedChampPos ||
+    actualRunnerPos !== expectedRunnerPos ||
+    champSide === runnerSide; // defensive — pickGroupPositions guarantees otherwise
+
+  if (groupConflict) {
+    fillGroupStage(champion, runnerUp, champGroup, runnerGroup, positions, groupMatchesArr, allPreds, existingPreds, false);
+  }
+
   // --- Knockout cascade ---
+  // For each match involving champion/runner-up, keep user's pick only if it agrees
+  // with the scenario (correct team advances). Otherwise silently override.
   const knockoutStages = ["R32", "R16", "QF", "SF", "3RD", "F"];
   for (const stage of knockoutStages) {
     const bracket = calcBracketTeams(allPreds);
     const stageMatches = knockoutMatchesArr.filter((m) => m.stage === stage);
     for (const m of stageMatches) {
-      if (isFilled(existingPreds[m.id])) {
-        allPreds[m.id] = { ...existingPreds[m.id] };
-        continue;
-      }
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
 
       const hasChamp = teams.home === champion || teams.away === champion;
       const hasRunner = teams.home === runnerUp || teams.away === runnerUp;
+      const isFinalMatch = m.stage === "F" && hasChamp && hasRunner;
 
-      if (m.stage === "F" && hasChamp && hasRunner) {
+      const existing = existingPreds[m.id];
+      if (isFilled(existing)) {
+        let compatible = true;
+        if (isFinalMatch || hasChamp) {
+          compatible = predictedWinner(existing, teams) === champion;
+        } else if (hasRunner) {
+          compatible = predictedWinner(existing, teams) === runnerUp;
+        }
+        if (compatible) {
+          allPreds[m.id] = { ...existing };
+          continue;
+        }
+        // incompatible — fall through to biased generator (silent override)
+      }
+
+      if (isFinalMatch) {
         allPreds[m.id] = predictFinal(teams.home, teams.away, champion);
       } else if (hasChamp) {
         allPreds[m.id] = predictKnockoutBiased(teams.home, teams.away, champion);

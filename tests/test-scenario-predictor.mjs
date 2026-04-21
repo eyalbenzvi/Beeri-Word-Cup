@@ -270,6 +270,233 @@ section("8. Top scorer selected from champion's squad");
 }
 
 // ============================================================
+// 9a. CONFLICT: user filled all champion's group matches as losses
+//     — scenario must silently override them and still win.
+// ============================================================
+section("9a. Conflict: champion has 3 group-stage losses in existingPreds");
+{
+  // Germany is in Group E. Force losses in all three GER group matches.
+  const champion = "GER";
+  const runnerUp = "ARG";
+  const gerMatches = groupMatches.filter((m) => m.group === "E" && (m.homeTeam === champion || m.awayTeam === champion));
+  assert(gerMatches.length === 3, `GER should have 3 group matches, got ${gerMatches.length}`);
+  const existing = {};
+  for (const m of gerMatches) {
+    // GER loses 0-3 regardless of home/away
+    if (m.homeTeam === champion) existing[m.id] = { homeScore: 0, awayScore: 3 };
+    else existing[m.id] = { homeScore: 3, awayScore: 0 };
+  }
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  const standings = calcGroupStandings(preds);
+  const gerPos = standings["E"].findIndex((t) => t.code === champion) + 1;
+  assert(gerPos === 1, `GER should finish 1st in E after override, got position ${gerPos}`);
+
+  const bracket = calcBracketTeams(preds);
+  const champ = deriveChampion(preds, bracket);
+  assert(champ === champion, `Expected champion=${champion}, got ${champ}`);
+
+  // Verify the GER matches were overwritten (should be GER wins now)
+  for (const m of gerMatches) {
+    const p = preds[m.id];
+    const gerWon =
+      (m.homeTeam === champion && p.homeScore > p.awayScore) ||
+      (m.awayTeam === champion && p.awayScore > p.homeScore);
+    assert(gerWon, `GER match ${m.id} should be a GER win, got ${p.homeScore}-${p.awayScore}`);
+  }
+}
+
+// ============================================================
+// 9b. CONFLICT: user filled runner-up losses in group — still works
+// ============================================================
+section("9b. Conflict: runner-up has losses in group");
+{
+  const champion = "ARG";
+  const runnerUp = "FRA";
+  const fraMatches = groupMatches.filter((m) => m.group === "I" && (m.homeTeam === runnerUp || m.awayTeam === runnerUp));
+  const existing = {};
+  for (const m of fraMatches) {
+    if (m.homeTeam === runnerUp) existing[m.id] = { homeScore: 0, awayScore: 2 };
+    else existing[m.id] = { homeScore: 2, awayScore: 0 };
+  }
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  const bracket = calcBracketTeams(preds);
+  const finalTeams = bracket["F-1"];
+  const champ = deriveChampion(preds, bracket);
+  assert(champ === champion, `Expected champion=${champion}, got ${champ}`);
+  assert(
+    finalTeams?.home === runnerUp || finalTeams?.away === runnerUp,
+    `${runnerUp} should be in the final, got ${finalTeams?.home} vs ${finalTeams?.away}`,
+  );
+}
+
+// ============================================================
+// 9c. CONFLICT: both champion AND runner-up have losses in existing
+// ============================================================
+section("9c. Conflict: both teams have group-stage losses");
+{
+  const champion = "BRA";
+  const runnerUp = "ENG";
+  const matches = groupMatches.filter(
+    (m) =>
+      (m.group === "C" && (m.homeTeam === champion || m.awayTeam === champion)) ||
+      (m.group === "L" && (m.homeTeam === runnerUp || m.awayTeam === runnerUp)),
+  );
+  const existing = {};
+  for (const m of matches) {
+    const target = m.group === "C" ? champion : runnerUp;
+    if (m.homeTeam === target) existing[m.id] = { homeScore: 0, awayScore: 4 };
+    else existing[m.id] = { homeScore: 4, awayScore: 0 };
+  }
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  const bracket = calcBracketTeams(preds);
+  const champ = deriveChampion(preds, bracket);
+  assert(champ === champion, `Expected champion=${champion}, got ${champ}`);
+}
+
+// ============================================================
+// 9d. CONFLICT: user filled a knockout match where champion loses.
+//     Override silently.
+// ============================================================
+section("9d. Conflict: champion filled to lose a knockout match");
+{
+  const champion = "ESP";
+  const runnerUp = "ARG";
+  // First, run predictScenario without existing preds to find out which R32 match
+  // the champion will be in:
+  const seedPreds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams);
+  const seedBracket = calcBracketTeams(seedPreds);
+  let champR32MatchId = null;
+  for (const [mid, t] of Object.entries(seedBracket)) {
+    if (!mid.startsWith("R32-")) continue;
+    if (t.home === champion || t.away === champion) {
+      champR32MatchId = mid;
+      break;
+    }
+  }
+  assert(champR32MatchId !== null, "Could not find champion's R32 match");
+
+  // Now craft existingPreds that copy the seed group stage but force a loss in R32
+  const existing = {};
+  for (const m of groupMatches) {
+    existing[m.id] = seedPreds[m.id];
+  }
+  const r32Teams = seedBracket[champR32MatchId];
+  // Make the non-champion team win 4-0
+  if (r32Teams.home === champion) {
+    existing[champR32MatchId] = { homeScore: 0, awayScore: 4 };
+  } else {
+    existing[champR32MatchId] = { homeScore: 4, awayScore: 0 };
+  }
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  const bracket = calcBracketTeams(preds);
+  const champ = deriveChampion(preds, bracket);
+  assert(champ === champion, `Expected champion=${champion} after knockout override, got ${champ}`);
+
+  // Verify the R32 match was overwritten
+  const r32Pred = preds[champR32MatchId];
+  const r32TeamsNew = bracket[champR32MatchId];
+  const champWonR32 =
+    (r32TeamsNew.home === champion && r32Pred.homeScore > r32Pred.awayScore) ||
+    (r32TeamsNew.away === champion && r32Pred.awayScore > r32Pred.homeScore) ||
+    (r32Pred.homeScore === r32Pred.awayScore && r32Pred.advancingTeam === champion);
+  assert(champWonR32, `Champion's R32 match should have been rewritten for champion to advance: ${JSON.stringify(r32Pred)}`);
+}
+
+// ============================================================
+// 9e. CONFLICT: user filled the FINAL with runner-up winning
+// ============================================================
+section("9e. Conflict: final filled with runner-up winning");
+{
+  const champion = "ARG";
+  const runnerUp = "FRA";
+  // Force a final where runner-up "wins" 3-1
+  const existing = {
+    "F-1": { homeScore: 1, awayScore: 3, advancingTeam: runnerUp },
+  };
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  const bracket = calcBracketTeams(preds);
+  const champ = deriveChampion(preds, bracket);
+  assert(champ === champion, `Expected champion=${champion}, got ${champ} (final: ${JSON.stringify(preds["F-1"])})`);
+}
+
+// ============================================================
+// 9f. CONSISTENT existingPreds preserved (no override when not needed)
+// ============================================================
+section("9f. Consistent group predictions preserved verbatim");
+{
+  const champion = "ARG";
+  const runnerUp = "FRA";
+  // Pre-fill ARG winning one match 5-0 — consistent with scenario
+  const argMatch = groupMatches.find((m) => m.group === "J" && (m.homeTeam === champion || m.awayTeam === champion));
+  const winScore = argMatch.homeTeam === champion ? { homeScore: 5, awayScore: 0 } : { homeScore: 0, awayScore: 5 };
+  const existing = { [argMatch.id]: winScore };
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  assert(
+    preds[argMatch.id].homeScore === winScore.homeScore && preds[argMatch.id].awayScore === winScore.awayScore,
+    `Consistent prediction was not preserved: expected ${JSON.stringify(winScore)}, got ${JSON.stringify(preds[argMatch.id])}`,
+  );
+}
+
+// ============================================================
+// 9g. Stress test: random existing conflicts for champion,
+//     ensure champion still wins 50/50 times.
+// ============================================================
+section("9g. Stress: 50 random champion-loss scenarios, champion still wins");
+{
+  const allCodes = Object.values(GROUPS).flat().map((t) => t.code);
+  let ok = 0;
+  const fails = [];
+  for (let i = 0; i < 50; i++) {
+    const champ = allCodes[Math.floor(Math.random() * allCodes.length)];
+    let runner = allCodes[Math.floor(Math.random() * allCodes.length)];
+    while (runner === champ) runner = allCodes[Math.floor(Math.random() * allCodes.length)];
+
+    // Sabotage: fill every group match the champion plays as a loss
+    const champMatches = groupMatches.filter((m) => m.homeTeam === champ || m.awayTeam === champ);
+    const existing = {};
+    for (const m of champMatches) {
+      existing[m.id] =
+        m.homeTeam === champ
+          ? { homeScore: 0, awayScore: 2 }
+          : { homeScore: 2, awayScore: 0 };
+    }
+    const preds = predictScenario(champ, runner, groupMatches, knockoutMatches, calcBracketTeams, existing);
+    const bracket = calcBracketTeams(preds);
+    const out = deriveChampion(preds, bracket);
+    if (out === champ) ok++;
+    else fails.push(`${champ}/${runner} -> ${out}`);
+  }
+  assert(ok === 50, `Stress: ${ok}/50 — failures: ${fails.slice(0, 5).join("; ")}`);
+}
+
+// ============================================================
+// 9h. Non-finalist matches preserved even when conflicts happen
+// ============================================================
+section("9h. Matches not involving either finalist are preserved");
+{
+  const champion = "ARG";
+  const runnerUp = "ENG";
+  // Pre-fill a match between two teams that are NOT champion/runner-up
+  const neutralMatch = groupMatches.find(
+    (m) =>
+      m.group === "A" && m.homeTeam !== champion && m.awayTeam !== champion && m.homeTeam !== runnerUp && m.awayTeam !== runnerUp,
+  );
+  const neutralScore = { homeScore: 7, awayScore: 2 };
+  const existing = { [neutralMatch.id]: neutralScore };
+
+  const preds = predictScenario(champion, runnerUp, groupMatches, knockoutMatches, calcBracketTeams, existing);
+  assert(
+    preds[neutralMatch.id].homeScore === 7 && preds[neutralMatch.id].awayScore === 2,
+    `Neutral match should be preserved: got ${JSON.stringify(preds[neutralMatch.id])}`,
+  );
+}
+
+// ============================================================
 // 9. Stress test — 50 random scenarios, champion always wins
 // ============================================================
 section("9. Stress test: 50 random (champion, runnerUp) pairs — champion always wins");
