@@ -491,6 +491,7 @@ export default function Predict() {
               value={activeForm.topScorer || ""}
               onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
               disabled={!canEdit}
+              compact
             />
           </div>
         </div>

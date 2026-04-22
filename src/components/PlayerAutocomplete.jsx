@@ -12,7 +12,7 @@ import {
 // Stored value is the Hebrew name (`nameHe`) of the chosen player.
 // Free-typed text that doesn't resolve to a list item is rejected on blur
 // (the input reverts to the last-stored value).
-export default function PlayerAutocomplete({ value, onChange, disabled }) {
+export default function PlayerAutocomplete({ value, onChange, disabled, compact = false }) {
   const settings = useSettings();
   const players = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),
@@ -98,8 +98,9 @@ export default function PlayerAutocomplete({ value, onChange, disabled }) {
           setHint("");
         }}
         onFocus={() => setOpen(true)}
-        placeholder="הקלד שם שחקן (עברית/אנגלית)"
+        placeholder={compact ? "שם שחקן..." : "הקלד שם שחקן (עברית/אנגלית)"}
         className="input-duo"
+        style={compact ? { padding: "0.5rem 0.75rem", fontSize: "0.85rem" } : undefined}
         disabled={disabled}
       />
       {hint && (
