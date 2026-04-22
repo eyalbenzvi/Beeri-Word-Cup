@@ -1119,8 +1119,9 @@ export async function deleteForm(formId) {
 }
 
 export function updateFormDetails(formId, fields) {
+  if (getSettings().predictionsLocked) return;
   const form = getForm(formId);
-  if (!form) return;
+  if (!form || form.status !== "draft") return;
   const updated = { ...form, ...fields };
   debouncedWriteForm(formId, updated);
 }
@@ -1191,6 +1192,9 @@ export function reopenForm(formId) {
   if (getSettings().predictionsLocked) return;
   const form = getForm(formId);
   if (!form) return;
+  // Firestore rules only allow the owner to transition pending -> draft.
+  // A 'submitted' form can only be reopened by an admin (adminReopenForm).
+  if (form.status !== "pending") return;
   const updated = {
     ...form,
     status: "draft",

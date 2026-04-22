@@ -31,9 +31,17 @@ export default function MatchAnalysis({
     setLoading(true);
     setError(null);
     try {
+      const { auth: firebaseAuth } = await import("../firebase.js");
+      const idToken = await firebaseAuth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("נדרשת התחברות לניתוח AI");
+      }
       const res = await fetch("/.netlify/functions/match-analysis", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           homeTeam: homeTeamName,
           awayTeam: awayTeamName,

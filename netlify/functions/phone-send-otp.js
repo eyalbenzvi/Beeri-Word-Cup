@@ -1,5 +1,14 @@
 import crypto from "crypto";
+import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+
+let adminInitialized = false;
+function initAdmin() {
+  if (adminInitialized) return;
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  adminInitialized = true;
+}
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173").split(",");
 
@@ -14,19 +23,46 @@ function getCorsHeaders(event) {
   };
 }
 
-// In-memory rate limiting (resets on cold start — sufficient for serverless)
-const rateLimits = {};
+// Persistent sliding-window rate limiting backed by Firestore.
+// Survives Netlify cold starts — in-memory counters were trivially bypassed.
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_SENDS_PER_PHONE = 3;
 const MAX_SENDS_PER_IP = 10;
 
-function checkRateLimit(key, max) {
+// Escape XML special chars for safe interpolation into Inforu XML payload.
+const XML_ESCAPES = { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" };
+function escapeXml(s) {
+  return String(s ?? "").replace(/[<>&'"]/g, (c) => XML_ESCAPES[c]);
+}
+
+// Validate hostname against RFC-1123 label pattern before using in SMS body.
+function sanitizeHostname(h) {
+  return /^[a-z0-9.-]{1,253}$/i.test(h) ? h : "";
+}
+
+// Firestore doc ID-safe key (alnum, underscore, colon, dot allowed).
+function rateLimitDocId(kind, raw) {
+  return `${kind}_${String(raw).replace(/[^A-Za-z0-9_.:-]/g, "_")}`;
+}
+
+// Atomic sliding-window check via Firestore transaction. Fail-closed on error.
+async function checkPersistentRateLimit(kind, raw, max) {
+  const docId = rateLimitDocId(kind, raw);
+  const ref = admin.firestore().collection("rateLimit").doc(docId);
   const now = Date.now();
-  if (!rateLimits[key]) rateLimits[key] = [];
-  rateLimits[key] = rateLimits[key].filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
-  if (rateLimits[key].length >= max) return false;
-  rateLimits[key].push(now);
-  return true;
+  return admin.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = (snap.exists && Array.isArray(snap.data()?.attempts)) ? snap.data().attempts : [];
+    const fresh = prev.filter((ts) => typeof ts === "number" && now - ts < RATE_LIMIT_WINDOW_MS);
+    if (fresh.length >= max) return false;
+    fresh.push(now);
+    tx.set(ref, {
+      attempts: fresh,
+      // expiresAt lets a Firestore TTL policy garbage-collect old docs.
+      expiresAt: admin.firestore.Timestamp.fromMillis(now + RATE_LIMIT_WINDOW_MS),
+    });
+    return true;
+  });
 }
 
 async function phoneSendOtpHandler(event) {
@@ -37,8 +73,8 @@ async function phoneSendOtpHandler(event) {
     return { statusCode: 405, headers: getCorsHeaders(event), body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const { INFORU_API_TOKEN, INFORU_USERNAME, INFORU_SENDER, OTP_SECRET } = process.env;
-  if (!INFORU_API_TOKEN || !INFORU_USERNAME || !OTP_SECRET) {
+  const { INFORU_API_TOKEN, INFORU_USERNAME, INFORU_SENDER, OTP_SECRET, FIREBASE_SERVICE_ACCOUNT } = process.env;
+  if (!INFORU_API_TOKEN || !INFORU_USERNAME || !OTP_SECRET || !FIREBASE_SERVICE_ACCOUNT) {
     return { statusCode: 500, headers: getCorsHeaders(event), body: JSON.stringify({ error: "Missing server configuration" }) };
   }
 
@@ -56,13 +92,21 @@ async function phoneSendOtpHandler(event) {
 
   const cleanPhone = phone.replace(/[-\s]/g, "");
 
-  // Rate limiting per phone and per IP
+  // Persistent rate limiting per phone and per IP (fail-closed on Firestore errors).
   const clientIp = event.headers["x-forwarded-for"]?.split(",")[0]?.trim() || event.headers["client-ip"] || "unknown";
-  if (!checkRateLimit(`phone:${cleanPhone}`, MAX_SENDS_PER_PHONE)) {
-    return { statusCode: 429, headers: getCorsHeaders(event), body: JSON.stringify({ error: "יותר מדי בקשות. נסה שוב בעוד מספר דקות" }) };
-  }
-  if (!checkRateLimit(`ip:${clientIp}`, MAX_SENDS_PER_IP)) {
-    return { statusCode: 429, headers: getCorsHeaders(event), body: JSON.stringify({ error: "יותר מדי בקשות מכתובת זו. נסה שוב מאוחר יותר" }) };
+  try {
+    initAdmin();
+    const phoneOk = await checkPersistentRateLimit("phone", cleanPhone, MAX_SENDS_PER_PHONE);
+    if (!phoneOk) {
+      return { statusCode: 429, headers: getCorsHeaders(event), body: JSON.stringify({ error: "יותר מדי בקשות. נסה שוב בעוד מספר דקות" }) };
+    }
+    const ipOk = await checkPersistentRateLimit("ip", clientIp, MAX_SENDS_PER_IP);
+    if (!ipOk) {
+      return { statusCode: 429, headers: getCorsHeaders(event), body: JSON.stringify({ error: "יותר מדי בקשות מכתובת זו. נסה שוב מאוחר יותר" }) };
+    }
+  } catch (err) {
+    console.error("Rate-limit check failed:", err?.message || err);
+    return { statusCode: 503, headers: getCorsHeaders(event), body: JSON.stringify({ error: "שירות זמני לא זמין. נסה שוב" }) };
   }
 
   // Generate 6-digit OTP (cryptographically secure)
@@ -79,7 +123,7 @@ async function phoneSendOtpHandler(event) {
   const origin = event?.headers?.origin || event?.headers?.Origin || "";
   let otpHost = "";
   try {
-    if (origin) otpHost = new URL(origin).hostname;
+    if (origin) otpHost = sanitizeHostname(new URL(origin).hostname);
   } catch {
     otpHost = "";
   }
@@ -89,17 +133,17 @@ async function phoneSendOtpHandler(event) {
 
   const xml = `<Inforu>
 <User>
-<Username>${INFORU_USERNAME}</Username>
-<ApiToken>${INFORU_API_TOKEN}</ApiToken>
+<Username>${escapeXml(INFORU_USERNAME)}</Username>
+<ApiToken>${escapeXml(INFORU_API_TOKEN)}</ApiToken>
 </User>
 <Content Type="sms">
-<Message>${smsMessage}</Message>
+<Message>${escapeXml(smsMessage)}</Message>
 </Content>
 <Recipients>
-<PhoneNumber>${cleanPhone}</PhoneNumber>
+<PhoneNumber>${escapeXml(cleanPhone)}</PhoneNumber>
 </Recipients>
 <Settings>
-<Sender>${sender}</Sender>
+<Sender>${escapeXml(sender)}</Sender>
 </Settings>
 </Inforu>`;
 
@@ -117,7 +161,7 @@ async function phoneSendOtpHandler(event) {
       return {
         statusCode: 502,
         headers: getCorsHeaders(event),
-        body: JSON.stringify({ error: `שליחת SMS נכשלה: ${smsBody.slice(0, 200)}` }),
+        body: JSON.stringify({ error: "שליחת SMS נכשלה. נסה שוב בעוד מספר רגעים" }),
       };
     }
   } catch (err) {
