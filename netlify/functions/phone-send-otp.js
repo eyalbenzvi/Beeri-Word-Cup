@@ -73,8 +73,18 @@ async function phoneSendOtpHandler(event) {
   const hmacData = `${cleanPhone}:${code}:${expiresAt}`;
   const verificationToken = crypto.createHmac("sha256", OTP_SECRET).update(hmacData).digest("hex");
 
-  // Send SMS via Inforu (XML API — primary documented endpoint)
-  const smsMessage = `קוד האימות שלך לטורניר בארי: ${code}`;
+  // Send SMS via Inforu (XML API — primary documented endpoint).
+  // The trailing `@host #code` line lets Chrome for Android auto-fill via the
+  // Web OTP API (navigator.credentials.get({ otp })). Ignored by other clients.
+  const origin = event?.headers?.origin || event?.headers?.Origin || "";
+  let otpHost = "";
+  try {
+    if (origin) otpHost = new URL(origin).hostname;
+  } catch {
+    otpHost = "";
+  }
+  const otpSuffix = otpHost ? `\n\n@${otpHost} #${code}` : "";
+  const smsMessage = `קוד האימות שלך לטורניר בארי: ${code}${otpSuffix}`;
   const sender = INFORU_SENDER || "Beeri";
 
   const xml = `<Inforu>

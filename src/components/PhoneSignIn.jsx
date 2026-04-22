@@ -20,6 +20,24 @@ export default function PhoneSignIn() {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
+  // Web OTP API (Chrome on Android): auto-fill the SMS code when it arrives.
+  // iOS Safari handles auto-fill via autocomplete="one-time-code" on the input.
+  useEffect(() => {
+    if (step !== "code") return;
+    if (typeof window === "undefined" || !("OTPCredential" in window)) return;
+    const ac = new AbortController();
+    navigator.credentials
+      .get({ otp: { transport: ["sms"] }, signal: ac.signal })
+      .then((cred) => {
+        const otp = cred?.code?.replace(/\D/g, "").slice(0, 6);
+        if (otp && otp.length === 6) setCode(otp);
+      })
+      .catch(() => {
+        // User dismissed the prompt or no SMS arrived — silent.
+      });
+    return () => ac.abort();
+  }, [step]);
+
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/[-\s]/g, "");
     if (!/^05\d{8}$/.test(cleanPhone)) {
@@ -117,6 +135,8 @@ export default function PhoneSignIn() {
           ref={codeInputRef}
           type="text"
           inputMode="numeric"
+          autoComplete="one-time-code"
+          name="otp"
           dir="ltr"
           maxLength={6}
           value={code}
