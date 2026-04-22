@@ -15,6 +15,31 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/gameData/settings).data.data.predictionsLocked == true;
     }
 
+    // --- predictions schema allow-lists (H14/H1/H18) ---
+    // Fields a non-admin user is allowed to set when creating a form.
+    function userCreateFields() {
+      return [
+        'userId', 'formName', 'budgetNumber',
+        'matches', 'advancing', 'champion', 'topScorer',
+        'status', 'createdAt'
+      ];
+    }
+    // Fields a non-admin user is allowed to mutate when updating a form.
+    // Admin-only fields (approvedAt, adminSubmittedAt, adminReopenedAt,
+    // adminEditedAt, adminNote) are intentionally excluded.
+    function userUpdateFields() {
+      return [
+        'formName', 'budgetNumber',
+        'matches', 'advancing', 'champion', 'topScorer',
+        'status', 'updatedAt', 'submittedAt', 'reopenedAt'
+      ];
+    }
+    // Allowed FSM transitions of `status` for a non-admin user.
+    function validUserStatusTransition(oldStatus, newStatus) {
+      return (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'pending')) ||
+             (oldStatus == 'pending' && newStatus == 'draft');
+    }
+
     // gameData collection — single documents
     match /gameData/{docId} {
       // Most docs require auth; the `settings` doc is public so the
@@ -52,17 +77,25 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isLocked() || isAdmin()
       );
 
-      // Users can create their own forms only when predictions not locked
-      // H29: new forms must have correct userId and start as draft
+      // Users can create their own forms only when predictions not locked.
+      // H29: new forms must have correct userId and start as draft.
+      // H14: only the whitelisted fields may be present on create.
       allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'draft';
+        && request.resource.data.status == 'draft'
+        && request.resource.data.keys().hasOnly(userCreateFields());
 
-      // Users can update their own forms only when not locked; admins always
-      // userId is immutable — no one (including admins) can reassign form ownership
-      allow update: if isAuth() && (
-        (resource.data.userId == request.auth.uid && !isLocked()) || isAdmin()
-      ) && request.resource.data.userId == resource.data.userId;
+      // Updates:
+      //   - Admin: may change anything except userId (immutable).
+      //   - Owner (not locked): status must follow the allowed FSM, and the
+      //     set of changed keys must be a subset of userUpdateFields.
+      allow update: if isAuth() && request.resource.data.userId == resource.data.userId && (
+        isAdmin() || (
+          resource.data.userId == request.auth.uid && !isLocked()
+          && validUserStatusTransition(resource.data.status, request.resource.data.status)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(userUpdateFields())
+        )
+      );
 
       // Users can delete their own forms only when not locked; admins can delete any
       allow delete: if isAuth() && (
@@ -78,6 +111,16 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.action is string
         && request.resource.data.timestamp is string;
+    }
+
+    // Server-side counters written by Netlify Functions via Admin SDK.
+    // Admin SDK bypasses security rules; listing explicit denies here
+    // documents that clients must never read or write these collections.
+    match /rateLimit/{id} {
+      allow read, write: if false;
+    }
+    match /otpVerifyAttempts/{id} {
+      allow read, write: if false;
     }
   }
 }

@@ -58,7 +58,6 @@ const allSrcFiles = [
   "src/components/AdminToolsTab.jsx",
   "src/App.jsx",
   "src/main.jsx",
-  "netlify/functions/batch-analysis.js",
   "netlify/functions/match-analysis.js",
 ];
 

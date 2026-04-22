@@ -21,87 +21,68 @@ const GROQ_UNSUPPORTED_PARAMS = ['timeout', 'api_key', 'apiKey', 'headers', 'bas
 // Read the function files and check for unsupported params
 import { readFileSync } from 'fs';
 
-const batchFile = readFileSync('/home/user/Beeri-World-Cup/netlify/functions/batch-analysis.js', 'utf8');
 const matchFile = readFileSync('/home/user/Beeri-World-Cup/netlify/functions/match-analysis.js', 'utf8');
 
 for (const param of GROQ_UNSUPPORTED_PARAMS) {
-  // Check if param appears inside a create() call (not in comments or strings)
-  const batchHas = batchFile.includes(`${param}:`) || batchFile.includes(`${param} :`);
-  const matchHas = matchFile.includes(`${param}:`) || matchFile.includes(`${param} :`);
-
   // Filter: only flag if it's inside a .create({ ... }) block
   if (param === 'timeout') {
-    const batchCreate = batchFile.match(/\.create\(\{[\s\S]*?\}\)/g) || [];
     const matchCreate = matchFile.match(/\.create\(\{[\s\S]*?\}\)/g) || [];
-    const batchInCreate = batchCreate.some(block => block.includes('timeout'));
     const matchInCreate = matchCreate.some(block => block.includes('timeout'));
-    assert(!batchInCreate, `batch-analysis: 'timeout' NOT in .create() call`);
     assert(!matchInCreate, `match-analysis: 'timeout' NOT in .create() call`);
   }
 }
 
 // ---- 2. Function: handles missing API key ----
 console.log("--- 2. Missing API key handling ---");
-assert(batchFile.includes('GROQ_API_KEY'), "batch-analysis checks for GROQ_API_KEY");
 assert(matchFile.includes('GROQ_API_KEY'), "match-analysis checks for GROQ_API_KEY");
 
 // Check that missing key returns error, not crashes
-assert(batchFile.includes('"Missing GROQ_API_KEY"') || batchFile.includes("Missing GROQ_API_KEY"), "batch-analysis returns error for missing key");
-assert(matchFile.includes('"Missing GROQ_API_KEY"') || matchFile.includes("Missing GROQ_API_KEY"), "match-analysis returns error for missing key");
+assert(
+  matchFile.includes('"Missing GROQ_API_KEY"') ||
+  matchFile.includes("Missing GROQ_API_KEY") ||
+  matchFile.includes("Missing server configuration"),
+  "match-analysis returns error for missing key"
+);
 
 // ---- 3. Function: handles invalid JSON body ----
 console.log("--- 3. Invalid JSON handling ---");
-assert(batchFile.includes('JSON.parse') && batchFile.includes('catch'), "batch-analysis catches JSON parse errors");
 assert(matchFile.includes('JSON.parse') && matchFile.includes('catch'), "match-analysis catches JSON parse errors");
 
 // ---- 4. Function: handles missing required fields ----
 console.log("--- 4. Missing fields handling ---");
-assert(batchFile.includes('Missing') || batchFile.includes('missing'), "batch-analysis validates required fields");
 assert(matchFile.includes('Missing') || matchFile.includes('missing'), "match-analysis validates required fields");
 
 // ---- 5. Function: returns proper HTTP status codes ----
 console.log("--- 5. HTTP status codes ---");
-assert(batchFile.includes('statusCode: 400'), "batch-analysis returns 400 for bad request");
-assert(batchFile.includes('statusCode: 500'), "batch-analysis returns 500 for server error");
-assert(batchFile.includes('statusCode: 502'), "batch-analysis returns 502 for API error");
-assert(batchFile.includes('statusCode: 200'), "batch-analysis returns 200 for success");
-assert(batchFile.includes('statusCode: 405'), "batch-analysis returns 405 for wrong method");
-
 assert(matchFile.includes('statusCode: 400'), "match-analysis returns 400 for bad request");
 assert(matchFile.includes('statusCode: 500'), "match-analysis returns 500 for server error");
 assert(matchFile.includes('statusCode: 502'), "match-analysis returns 502 for API error");
 assert(matchFile.includes('statusCode: 200'), "match-analysis returns 200 for success");
 assert(matchFile.includes('statusCode: 405'), "match-analysis returns 405 for wrong method");
+assert(matchFile.includes('statusCode: 401'), "match-analysis returns 401 for unauthenticated");
 
 // ---- 6. Function: returns JSON content type ----
 console.log("--- 6. JSON content type ---");
-assert(batchFile.includes('"Content-Type": "application/json"'), "batch-analysis sets JSON content type");
 assert(matchFile.includes('"Content-Type": "application/json"'), "match-analysis sets JSON content type");
 
 // ---- 7. Function: error responses include error field ----
 console.log("--- 7. Error response structure ---");
 // All error responses should have { error: "..." }
-const batchErrorReturns = (batchFile.match(/body: JSON\.stringify\(\{[^}]*error/g) || []).length;
-assert(batchErrorReturns >= 3, `batch-analysis has ${batchErrorReturns} error responses with 'error' field (expected >=3)`);
 const matchErrorReturns = (matchFile.match(/body: JSON\.stringify\(\{[^}]*error/g) || []).length;
 assert(matchErrorReturns >= 3, `match-analysis has ${matchErrorReturns} error responses with 'error' field (expected >=3)`);
 
 // ---- 8. Function: POST only ----
 console.log("--- 8. POST method enforcement ---");
-assert(batchFile.includes('httpMethod') && batchFile.includes('"POST"'), "batch-analysis enforces POST");
 assert(matchFile.includes('httpMethod') && matchFile.includes('"POST"'), "match-analysis enforces POST");
 
 // ---- 9. Response format: JSON mode enabled ----
 console.log("--- 9. JSON response format ---");
-assert(batchFile.includes('response_format') && batchFile.includes('json_object'), "batch-analysis uses JSON response format");
 assert(matchFile.includes('response_format') && matchFile.includes('json_object'), "match-analysis uses JSON response format");
 
 // ---- 10. Model name is valid ----
 console.log("--- 10. Model name ---");
 const validModels = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
-const batchModel = batchFile.match(/model:\s*"([^"]+)"/);
 const matchModel = matchFile.match(/model:\s*"([^"]+)"/);
-assert(batchModel && validModels.includes(batchModel[1]), `batch-analysis model "${batchModel?.[1]}" is valid`);
 assert(matchModel && validModels.includes(matchModel[1]), `match-analysis model "${matchModel?.[1]}" is valid`);
 
 // ---- 11. No setState during render (React anti-pattern check) ----
@@ -143,18 +124,18 @@ assert(!storeFile.includes('merge: true'), "store.js: no merge:true in setDoc (u
 
 // ---- 13. Security: no hardcoded API keys in source ----
 console.log("--- 13. No hardcoded API keys ---");
-const srcFiles = [batchFile, matchFile, storeFile];
+const srcFiles = [matchFile, storeFile];
 for (const content of srcFiles) {
   assert(!content.includes('AIzaSy'), "No hardcoded Firebase API key in source");
   assert(!content.includes('gsk_'), "No hardcoded Groq API key in source");
   assert(!content.includes('sk-'), "No hardcoded OpenAI-style key in source");
 }
 
-// ---- 14. enforceVariety: output validation ----
-console.log("--- 14. enforceVariety function ---");
-assert(batchFile.includes('enforceVariety'), "batch-analysis has enforceVariety post-processing");
-// Check it handles edge cases
-assert(batchFile.includes('results.length <= 2') || batchFile.includes('results.length < 2'), "enforceVariety handles small arrays");
+// ---- 14. match-analysis: requires Firebase ID token ----
+console.log("--- 14. match-analysis requires authorization ---");
+assert(matchFile.includes('verifyIdToken'), "match-analysis verifies Firebase ID token");
+assert(matchFile.includes('Bearer'), "match-analysis expects Bearer token");
+assert(matchFile.includes('FIREBASE_SERVICE_ACCOUNT'), "match-analysis uses Firebase Admin SDK");
 
 console.log(`\n=== FUNCTIONS & CONTRACT RESULTS: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach(f => console.log("  - " + f)); }
