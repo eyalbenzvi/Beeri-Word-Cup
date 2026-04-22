@@ -210,7 +210,7 @@ export default function AdminResultsTab() {
         <button
           type="button"
           onClick={handleRandomizeResults}
-          className="flex-1 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-gray-50 active:bg-gray-100 transition text-sm"
+          className="flex-1 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-bg-soft active:bg-bg-soft transition text-sm"
         >
           🎲 הגרלת כל התוצאות
         </button>
@@ -218,7 +218,7 @@ export default function AdminResultsTab() {
           type="button"
           onClick={undoLast}
           disabled={undoStack.length === 0}
-          className={`px-4 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 ${undoStack.length === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
+          className={`px-4 py-2.5 rounded-xl border-2 border-border text-sm font-semibold text-ink hover:bg-bg-soft ${undoStack.length === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
           title="בטל את השינוי האחרון בתוצאה בודדת"
         >
           ↩︎ ביטול
@@ -275,7 +275,7 @@ export default function AdminResultsTab() {
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-xl p-3 border ${result ? "border-green-200 bg-green-50/30" : "border-gray-100"}`}
+              className={`bg-white rounded-xl p-3 border ${result ? "border-green-200 bg-green-50/30" : "border-border"}`}
             >
               <div className="flex justify-end mb-1">
                 {result ? (
@@ -291,11 +291,11 @@ export default function AdminResultsTab() {
               {match.date && (
                 <div className="flex justify-between items-center mb-1.5">
                   {isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label) ? (
-                    <span className="text-xs text-gray-400 font-medium">
+                    <span className="text-xs text-ink-muted font-medium">
                       {match.label}
                     </span>
                   ) : <span />}
-                  <span className="text-xs text-gray-300">
+                  <span className="text-xs text-ink-light">
                     {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
                   </span>
                 </div>
@@ -346,13 +346,13 @@ export default function AdminResultsTab() {
                     <div className="flex flex-col gap-1">
                       <button
                         onClick={() => handleSaveResult(match)}
-                        className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                        className="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-green-600"
                       >
                         ✓
                       </button>
                       <button
                         onClick={() => setEditingMatch(null)}
-                        className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded hover:bg-gray-300"
+                        className="text-xs bg-gray-200 text-ink-muted px-2 py-1 rounded hover:bg-gray-300"
                       >
                         ✕
                       </button>
@@ -365,7 +365,7 @@ export default function AdminResultsTab() {
                         {result.homeScore} - {result.awayScore}
                       </span>
                     ) : (
-                      <span className="text-gray-400 text-sm">לא שוחק</span>
+                      <span className="text-ink-muted text-sm">לא שוחק</span>
                     )}
                     <button
                       onClick={() => {
@@ -395,8 +395,8 @@ export default function AdminResultsTab() {
                 )}
               </div>
               {isKnockout && isTie && derived.home && derived.away && (
-                <div className="mt-2 pt-2 border-t border-gray-100">
-                  <div className="text-xs text-gray-500 text-center mb-1.5">
+                <div className="mt-2 pt-2 border-t border-border">
+                  <div className="text-xs text-ink-muted text-center mb-1.5">
                     מי עולה? (בעיטות הכרעה)
                   </div>
                   {!result?.advancingTeam && (
@@ -416,7 +416,7 @@ export default function AdminResultsTab() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                         result?.advancingTeam === derived.home
                           ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-bg-soft text-ink-muted hover:bg-gray-200"
                       }`}
                     >
                       {homeTeam?.name || "טרם נקבע"}
@@ -431,7 +431,7 @@ export default function AdminResultsTab() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                         result?.advancingTeam === derived.away
                           ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-bg-soft text-ink-muted hover:bg-gray-200"
                       }`}
                     >
                       {awayTeam?.name || "טרם נקבע"}

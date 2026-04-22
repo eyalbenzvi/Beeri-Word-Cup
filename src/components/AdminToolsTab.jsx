@@ -67,11 +67,11 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-2">
           ייצוא טבלת דירוג (CSV)
         </h3>
-        <p className="text-xs text-gray-500 mb-2">
+        <p className="text-xs text-ink-muted mb-2">
           קובץ עם דירוג, שמות טפסים ונקודות — לפתיחה באקסל / גוגל שיטס
         </p>
         <button
@@ -82,8 +82,8 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
           הורד CSV
         </button>
       </div>
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-2">
           סיכום ניחושים לפי משתמש (JSON)
         </h3>
         <button
@@ -94,17 +94,17 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
           הורד JSON
         </button>
       </div>
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
-        <h3 className="font-bold text-sm text-primary mb-2">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-2">
           הדפסה / שמירה כ-PDF
         </h3>
-        <p className="text-xs text-gray-500 mb-2">
+        <p className="text-xs text-ink-muted mb-2">
           יפתח חלון הדפסה — אפשר &quot;שמור כ-PDF&quot; בדפדפן
         </p>
         <button
           type="button"
           onClick={() => window.print()}
-          className="w-full bg-gray-100 text-gray-800 py-2 rounded-xl text-sm font-semibold"
+          className="w-full bg-bg-soft text-ink py-2 rounded-xl text-sm font-semibold"
         >
           הדפס / PDF
         </button>
@@ -143,7 +143,7 @@ export default function AdminToolsTab() {
             className={`px-3 py-2 rounded-lg text-xs font-semibold ${
               sub === t.id
                 ? "bg-primary text-white"
-                : "bg-gray-100 text-gray-600"
+                : "bg-bg-soft text-ink-muted"
             }`}
           >
             {t.label}

@@ -84,12 +84,12 @@ export default function AdminSettingsTab({
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
+      <div className="card-duo">
         <h3 className="font-semibold text-sm mb-3">בקרת טורניר</h3>
         <div className="flex items-center justify-between py-3 border-b border-gray-50">
           <div>
             <div className="text-sm font-medium">הקפאת טפסים</div>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-ink-muted">
               מונע הגשה, עריכה ופתיחה מחדש
             </div>
           </div>
@@ -106,33 +106,33 @@ export default function AdminSettingsTab({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
+      <div className="card-duo">
         <h3 className="font-semibold text-sm mb-2">סטטיסטיקות</h3>
         <div className="grid grid-cols-3 gap-3 text-center">
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-bg-soft rounded-xl border-2 border-border p-3">
             <div className="text-2xl font-bold text-primary">
               {Object.keys(users).length}
             </div>
-            <div className="text-xs text-gray-500">שחקנים</div>
+            <div className="text-xs text-ink-muted">שחקנים</div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-bg-soft rounded-xl border-2 border-border p-3">
             <div className="text-2xl font-bold text-primary">
               {Object.keys(allPredictions).length}
             </div>
-            <div className="text-xs text-gray-500">טפסים</div>
+            <div className="text-xs text-ink-muted">טפסים</div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-bg-soft rounded-xl border-2 border-border p-3">
             <div className="text-2xl font-bold text-primary">
               {Object.keys(results).length}
             </div>
-            <div className="text-xs text-gray-500">תוצאות</div>
+            <div className="text-xs text-ink-muted">תוצאות</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
+      <div className="card-duo">
         <h3 className="font-semibold text-sm mb-3">רשימת מלך שערים</h3>
-        <div className="text-xs text-gray-400 mb-3">
+        <div className="text-xs text-ink-muted mb-3">
           {settings.topScorerPlayers?.length > 0
             ? `רשימה מותאמת: ${settings.topScorerPlayers.length} שחקנים`
             : `רשימה ברירת מחדל: ${TOP_SCORER_PLAYERS.length} שחקנים`}
@@ -150,7 +150,7 @@ export default function AdminSettingsTab({
           </button>
           <button
             onClick={() => playerFileRef.current?.click()}
-            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition"
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-bg-soft transition"
           >
             טען רשימה מקובץ
           </button>
@@ -189,7 +189,7 @@ export default function AdminSettingsTab({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 border border-gray-100">
+      <div className="card-duo">
         <h3 className="font-semibold text-sm mb-3">גיבוי נתונים</h3>
         <div className="flex gap-2">
           <button
@@ -200,7 +200,7 @@ export default function AdminSettingsTab({
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-gray-50 transition"
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-bg-soft transition"
           >
             ייבוא
           </button>
@@ -227,7 +227,7 @@ export default function AdminSettingsTab({
         >
           מחק את כל תוצאות האמת
         </button>
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-ink-muted mb-3">
           מחיקת כל הנתונים: משתמשים, ניחושים, תוצאות. לא ניתן לבטל.
         </p>
         <button

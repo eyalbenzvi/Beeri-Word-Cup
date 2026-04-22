@@ -35,16 +35,16 @@ function MatchRow({ match, prediction }) {
     prediction.advancingTeam;
 
   return (
-    <div className="py-1.5 border-b border-gray-50 last:border-0 text-xs">
+    <div className="py-1.5 border-b border-border last:border-0 text-xs">
       <div className="flex items-center justify-between">
-        <span className="flex-1 text-right truncate">{homeName}</span>
-        <span className="w-16 text-center font-bold text-gray-700">
+        <span className="flex-1 text-right truncate text-ink font-medium">{homeName}</span>
+        <span className="w-16 text-center font-extrabold text-ink tabular-nums">
           {hasScore ? <span dir="ltr">{prediction.awayScore} – {prediction.homeScore}</span> : "–"}
         </span>
-        <span className="flex-1 text-left truncate">{awayName}</span>
+        <span className="flex-1 text-left truncate text-ink font-medium">{awayName}</span>
       </div>
       {isTie && (
-        <div className="text-[10px] text-gray-400 text-center mt-0.5">
+        <div className="text-[10px] text-ink-muted font-bold text-center mt-0.5">
           בעיטות הכרעה: {getTeamByCode(prediction.advancingTeam)?.name}
         </div>
       )}
@@ -63,42 +63,42 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border-2 border-border overflow-hidden">
       <button
         onClick={() => canExpand && setExpanded(!expanded)}
-        className={`w-full flex items-center gap-3 p-4 text-right bg-transparent border-none ${canExpand ? "cursor-pointer" : "cursor-default"}`}
+        className={`w-full flex items-center gap-3 p-4 text-right bg-transparent border-none ${canExpand ? "cursor-pointer hover:bg-bg-soft" : "cursor-default"}`}
       >
-        <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-extrabold text-sm flex-shrink-0 border-2 border-primary-dark">
           {(form.formName || "?")[0]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm truncate">
+          <div className="font-extrabold text-sm truncate text-ink">
             {form.formName || "טופס ללא שם"}
           </div>
           {userName && (
-            <div className="text-xs text-gray-400 truncate">{userName}</div>
+            <div className="text-xs text-ink-muted font-medium truncate">{userName}</div>
           )}
           {canExpand ? (
             <>
               {championDisplay && (
-                <div className="text-xs text-yellow-600 mt-0.5">
+                <div className="text-xs text-accent-text font-bold mt-0.5">
                   🏆 {championDisplay}
                 </div>
               )}
               {form.topScorer && (
-                <div className="text-xs text-gray-400 mt-0.5">
+                <div className="text-xs text-ink-muted font-medium mt-0.5">
                   ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
                 </div>
               )}
             </>
           ) : (
-            <div className="text-xs text-gray-400 mt-0.5">
+            <div className="text-xs text-ink-muted font-medium mt-0.5">
               🔒 הניחושים יוצגו לאחר נעילת הטורניר
             </div>
           )}
         </div>
         {canExpand && (
-          <span className="text-gray-400 text-sm">{expanded ? "▾" : "▸"}</span>
+          <span className="text-ink-muted text-sm font-bold">{expanded ? "▾" : "▸"}</span>
         )}
       </button>
 
@@ -108,7 +108,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
             const matches = groupMatches.filter((m) => m.group === group);
             return (
               <div key={group}>
-                <div className="text-xs font-bold text-gray-500 mb-1">
+                <div className="text-xs font-extrabold text-ink-muted mb-1">
                   בית {group}
                 </div>
                 {matches.map((m) => (
@@ -127,7 +127,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
             if (matches.length === 0) return null;
             return (
               <div key={stage}>
-                <div className="text-xs font-bold text-gray-500 mb-1">
+                <div className="text-xs font-extrabold text-ink-muted mb-1">
                   {STAGES[stage]}
                 </div>
                 {matches.map((m) => {
@@ -150,10 +150,10 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
             );
           })}
 
-          <div className="pt-2 border-t border-gray-100">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-500">⚽ מלך שערים</span>
-              <span className="font-semibold">
+          <div className="pt-2 border-t-2 border-border">
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-muted font-bold">⚽ מלך שערים</span>
+              <span className="font-extrabold text-ink">
                 {form.topScorer ? getPlayerDisplayName(form.topScorer, playerList) : "לא הוכנס"}
               </span>
             </div>
@@ -210,28 +210,29 @@ export default function AllFormsView({ onBack }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-extrabold text-primary tracking-tight">
+        <h1 className="text-2xl font-extrabold text-ink tracking-tight">
           כל הטפסים
         </h1>
         <button
           onClick={onBack}
-          className="text-xs text-primary font-bold bg-primary/10 px-3 py-1.5 rounded-xl border-none cursor-pointer"
+          className="btn-duo-flat"
+          style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
         >
           חזרה →
         </button>
       </div>
 
       {submittedForms.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="text-5xl mb-3">📋</div>
-          <p className="text-gray-500">אין טפסים שהוגשו עדיין</p>
+        <div className="text-center py-12 card-duo-lg">
+          <div className="text-6xl mb-3">📋</div>
+          <p className="text-ink-muted font-medium">אין טפסים שהוגשו עדיין</p>
         </div>
       ) : (
         <>
           {/* Filter controls */}
-          <div className="bg-white rounded-2xl border border-border p-4 mb-3 shadow-sm">
+          <div className="card-duo mb-3">
             {locked && (
-              <div className="flex gap-1 mb-2.5 bg-gray-100 rounded-xl p-1">
+              <div className="flex gap-1 mb-2.5 bg-bg-soft rounded-xl p-1 border-2 border-border">
                 {[
                   { id: "form", label: "לפי טופס" },
                   { id: "champion", label: "לפי אלופה" },
@@ -242,10 +243,10 @@ export default function AllFormsView({ onBack }) {
                       setFilterBy(tab.id);
                       setFilterText("");
                     }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition border-none cursor-pointer ${
+                    className={`flex-1 py-2 text-xs font-extrabold rounded-lg transition border-none cursor-pointer ${
                       filterBy === tab.id
-                        ? "bg-white text-primary shadow-sm"
-                        : "text-gray-400"
+                        ? "bg-white text-ink"
+                        : "bg-transparent text-ink-muted"
                     }`}
                   >
                     {tab.label}
@@ -258,22 +259,22 @@ export default function AllFormsView({ onBack }) {
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
               placeholder="חפש לפי שם טופס..."
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+              className="input-duo"
             />
           </div>
 
-          <p className="text-xs text-gray-400 mb-3">
+          <p className="text-sm text-ink-muted mb-3 font-bold">
             {filteredForms.length === submittedForms.length
               ? `${submittedForms.length} טפסים הוגשו • לחץ על טופס לצפייה`
               : `מציג ${filteredForms.length} מתוך ${submittedForms.length} טפסים`}
           </p>
           {!locked && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-center">
-              <div className="text-2xl mb-1">🔒</div>
-              <div className="text-sm font-semibold text-amber-700">
+            <div className="border-2 border-accent rounded-2xl p-4 mb-3 text-center" style={{ background: "#FFF8E1" }}>
+              <div className="text-3xl mb-1">🔒</div>
+              <div className="text-base font-extrabold text-accent-text">
                 הניחושים עדיין לא גלויים
               </div>
-              <div className="text-xs text-amber-600 mt-1">
+              <div className="text-xs text-accent-text mt-1 font-medium">
                 ניתן לראות את שמות הטפסים, אך הניחושים יוצגו רק לאחר תחילת
                 המשחקים
               </div>
@@ -298,7 +299,7 @@ export default function AllFormsView({ onBack }) {
               );
             })}
             {filteredForms.length === 0 && (
-              <div className="text-center py-6 text-gray-400 text-sm">
+              <div className="text-center py-6 text-ink-muted text-sm font-medium">
                 לא נמצאו טפסים תואמים
               </div>
             )}

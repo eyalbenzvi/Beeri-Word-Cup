@@ -24,53 +24,53 @@ export default function ReviewScreen({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-      <div role="dialog" aria-modal="true" aria-label="סקירת טופס" className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[85vh] flex flex-col">
-        <div className="p-5 pb-3 border-b border-gray-100">
-          <div className="text-3xl text-center mb-2">
+      <div role="dialog" aria-modal="true" aria-label="סקירת טופס" className="bg-white rounded-3xl max-w-md w-full border-2 border-border max-h-[85vh] flex flex-col animate-pop-in">
+        <div className="p-5 pb-3 border-b-2 border-border">
+          <div className="text-4xl text-center mb-2">
             {hasErrors ? "⚠️" : "📋"}
           </div>
-          <h3 className="text-lg font-bold text-center text-primary">
+          <h3 className="text-xl font-extrabold text-center text-ink">
             {hasErrors ? "סקירת הטופס" : "הטופס מוכן להגשה!"}
           </h3>
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 pt-3">
-          <div className="bg-gray-50 rounded-xl p-3.5 mb-4">
-            <div className="text-xs text-gray-600 space-y-1.5">
+          <div className="rounded-2xl p-4 mb-4 border-2 border-border" style={{ background: "var(--color-bg-soft)" }}>
+            <div className="text-sm text-ink space-y-2">
               <div className="flex justify-between">
-                <span>טופס:</span>
-                <span className="font-bold text-gray-800">
+                <span className="text-ink-muted font-medium">טופס:</span>
+                <span className="font-extrabold">
                   {activeForm.formName || "—"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>משחקים:</span>
+                <span className="text-ink-muted font-medium">משחקים:</span>
                 <span
-                  className={`font-bold ${totalFilled === totalMatches ? "text-green-600" : "text-amber-600"}`}
+                  className={`font-extrabold ${totalFilled === totalMatches ? "text-primary" : "text-accent-text"}`}
                 >
                   {totalFilled} / {totalMatches}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>מלך שערים:</span>
+                <span className="text-ink-muted font-medium">מלך שערים:</span>
                 <span
-                  className={`font-bold ${topScorerDisplay ? "text-gray-800" : "text-red-500"}`}
+                  className={`font-extrabold ${topScorerDisplay ? "text-ink" : "text-danger"}`}
                 >
                   {topScorerDisplay || "חסר"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>מספר תקציב:</span>
+                <span className="text-ink-muted font-medium">מספר תקציב:</span>
                 <span
-                  className={`font-bold ${activeForm.budgetNumber?.trim() ? "text-gray-800" : "text-red-500"}`}
+                  className={`font-extrabold ${activeForm.budgetNumber?.trim() ? "text-ink" : "text-danger"}`}
                 >
                   {activeForm.budgetNumber?.trim() || "חסר"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>אלופה:</span>
+                <span className="text-ink-muted font-medium">אלופה:</span>
                 <span
-                  className={`font-bold ${championName ? "text-yellow-700" : "text-gray-400"}`}
+                  className={`font-extrabold ${championName ? "text-accent-text" : "text-ink-muted"}`}
                 >
                   {championName ? `🏆 ${championName}` : "טרם נקבע"}
                 </span>
@@ -81,7 +81,7 @@ export default function ReviewScreen({
           {/* Errors */}
           {hasErrors && (
             <div className="space-y-2 mb-4">
-              <div className="text-sm font-bold text-red-700">
+              <div className="text-sm font-extrabold text-danger">
                 יש להשלים ({errors.length}):
               </div>
               {errors.map((err, i) => (
@@ -91,12 +91,13 @@ export default function ReviewScreen({
                     if (err.action) err.action();
                     onClose();
                   }}
-                  className="w-full text-right bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-red-100 transition border-none"
+                  className="w-full text-right border-2 border-danger/40 rounded-2xl px-4 py-3 flex items-center justify-between gap-2 cursor-pointer hover:border-danger transition"
+                  style={{ background: "#FFF1F1" }}
                 >
-                  <span className="text-xs text-red-600 font-medium">
+                  <span className="text-sm text-danger font-bold">
                     {err.label}
                   </span>
-                  <span className="text-red-400 text-xs">← תקן</span>
+                  <span className="text-danger text-xs font-extrabold">← תקן</span>
                 </button>
               ))}
             </div>
@@ -104,8 +105,8 @@ export default function ReviewScreen({
 
           {!hasErrors && (
             <div className="text-center py-4">
-              <div className="text-3xl mb-2">🎉</div>
-              <p className="text-sm text-gray-600">
+              <div className="text-4xl mb-2 animate-pop-in">🎉</div>
+              <p className="text-sm text-ink-muted font-medium">
                 לאחר ההגשה הטופס יינעל. תוכל לפתוח אותו לעריכה בכל עת.
               </p>
             </div>
@@ -113,18 +114,12 @@ export default function ReviewScreen({
         </div>
 
         {/* Actions */}
-        <div className="p-5 pt-3 border-t border-gray-100 flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition cursor-pointer"
-          >
+        <div className="p-5 pt-3 border-t-2 border-border flex gap-2">
+          <button onClick={onClose} className="btn-duo btn-duo-ghost flex-1">
             {hasErrors ? "חזרה" : "ביטול"}
           </button>
           {!hasErrors && (
-            <button
-              onClick={onSubmit}
-              className="flex-1 py-3 rounded-xl bg-green-500 text-white font-bold text-sm hover:bg-green-600 transition cursor-pointer border-none shadow-md"
-            >
+            <button onClick={onSubmit} className="btn-duo btn-duo-primary flex-1">
               הגש טופס
             </button>
           )}

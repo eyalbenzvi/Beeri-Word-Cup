@@ -83,7 +83,7 @@ export default function PhoneSignIn() {
     return (
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-semibold text-ink-muted block mb-1">מספר טלפון</label>
+          <label className="text-xs font-extrabold text-ink block mb-1">מספר טלפון</label>
           <input
             type="tel"
             inputMode="numeric"
@@ -91,26 +91,26 @@ export default function PhoneSignIn() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="050-1234567"
-            className="w-full px-4 py-3.5 border-2 border-border rounded-2xl text-base text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+            className="input-duo text-center"
             disabled={loading}
           />
         </div>
         <button
           onClick={handleSendOtp}
           disabled={loading || !phone.trim()}
-          className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-sm border-none cursor-pointer shadow-sm disabled:opacity-50"
+          className="btn-duo btn-duo-primary w-full"
         >
           {loading ? "שולח קוד..." : "שלח קוד אימות ב-SMS"}
         </button>
-        {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+        {error && <p className="text-sm text-danger font-bold text-center">{error}</p>}
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-ink-muted text-center">
-        קוד אימות נשלח ל-<span dir="ltr" className="font-semibold">{phone}</span>
+      <p className="text-sm text-ink-muted text-center font-medium">
+        קוד אימות נשלח ל-<span dir="ltr" className="font-extrabold text-ink">{phone}</span>
       </p>
       <div>
         <input
@@ -122,33 +122,33 @@ export default function PhoneSignIn() {
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
           placeholder="______"
-          className="w-full px-4 py-3.5 border-2 border-border rounded-2xl text-2xl text-center font-mono tracking-[0.5em] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+          className="input-duo text-2xl text-center font-mono tracking-[0.5em]"
           disabled={loading}
         />
       </div>
       <button
         onClick={handleVerifyCode}
         disabled={loading || code.length !== 6}
-        className="w-full bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-light transition text-sm border-none cursor-pointer shadow-sm disabled:opacity-50"
+        className="btn-duo btn-duo-primary w-full"
       >
         {loading ? "מאמת..." : "אמת קוד"}
       </button>
       <div className="flex items-center justify-between">
         <button
           onClick={() => { setStep("phone"); setCode(""); setError(""); }}
-          className="text-xs text-primary bg-transparent border-none cursor-pointer p-0"
+          className="text-sm text-secondary bg-transparent border-none cursor-pointer p-0 font-extrabold"
         >
           שינוי מספר
         </button>
         <button
           onClick={handleSendOtp}
           disabled={cooldown > 0 || loading}
-          className="text-xs text-primary bg-transparent border-none cursor-pointer p-0 disabled:text-gray-300"
+          className="text-sm text-secondary bg-transparent border-none cursor-pointer p-0 disabled:text-ink-light font-extrabold"
         >
           {cooldown > 0 ? `שלח שוב (${cooldown}s)` : "שלח קוד חדש"}
         </button>
       </div>
-      {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+      {error && <p className="text-sm text-danger font-bold text-center">{error}</p>}
     </div>
   );
 }

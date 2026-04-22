@@ -162,11 +162,10 @@ export default function SimulatorPanel({
     <div className="space-y-3">
       {showWarningBanner && (
         <div
-          className={`${
-            userMode
-              ? "bg-indigo-50 border-indigo-200 text-indigo-900"
-              : "bg-amber-50 border-amber-200 text-amber-900"
-          } border rounded-xl p-3 text-xs`}
+          className="border-2 rounded-2xl p-3 text-sm font-medium"
+          style={userMode
+            ? { background: "#F0F4FF", borderColor: "var(--color-secondary)", color: "#1E3A8A" }
+            : { background: "#FFF8E1", borderColor: "var(--color-accent)", color: "var(--color-accent-text)" }}
         >
           {userMode ? (
             <>
@@ -186,26 +185,18 @@ export default function SimulatorPanel({
           type="button"
           onClick={clearSim}
           disabled={overrideCount === 0}
-          className={`flex-1 py-2 rounded-xl text-sm font-medium ${
-            overrideCount === 0
-              ? "bg-gray-50 text-gray-300 cursor-not-allowed"
-              : "bg-gray-100 text-gray-700"
-          }`}
+          className="btn-duo-flat flex-1"
         >
           איפוס סימולציה{overrideCount > 0 ? ` (${overrideCount})` : ""}
         </button>
       </div>
-      <div className="flex overflow-x-auto gap-1 pb-1 -mx-1 px-1">
+      <div className="flex overflow-x-auto gap-2 pb-1 -mx-1 px-1">
         {Object.entries(STAGES_LIST).map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => setSelectedStage(key)}
-            className={`px-2.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${
-              selectedStage === key
-                ? "bg-primary text-white"
-                : "bg-white text-gray-600 shadow-sm"
-            }`}
+            className={`chip-duo flex-shrink-0 ${selectedStage === key ? "active" : ""}`}
           >
             {label}
           </button>
@@ -247,19 +238,18 @@ export default function SimulatorPanel({
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-xl p-2 border text-xs ${
-                needsTeam
-                  ? "border-amber-300 bg-amber-50/60"
-                  : result
-                    ? "border-green-200 bg-green-50/30"
-                    : "border-gray-100"
-              }`}
+              className="bg-white rounded-xl p-2 border-2 text-xs"
+              style={needsTeam
+                ? { borderColor: "var(--color-accent)", background: "#FFF8E1" }
+                : result
+                  ? { borderColor: "var(--color-primary)", background: "#F0FFE4" }
+                  : { borderColor: "var(--color-border)" }}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-gray-400">{match.id}</span>
+                <span className="text-[10px] text-ink-muted font-medium">{match.id}</span>
                 <div className="flex items-center gap-1">
                   {isSimmed && (
-                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded">
+                    <span className="text-[10px] bg-accent text-white font-extrabold px-1.5 py-0.5 rounded-full">
                       סימול
                     </span>
                   )}
@@ -267,7 +257,7 @@ export default function SimulatorPanel({
                     <button
                       type="button"
                       onClick={() => clearOne(match.id)}
-                      className="text-[10px] bg-gray-100 text-gray-600 px-1 rounded"
+                      className="text-[10px] bg-bg-soft text-ink-muted px-1.5 py-0.5 rounded-full font-bold border-none cursor-pointer"
                       aria-label="בטל סימולציה למשחק זה"
                     >
                       ↺
@@ -297,7 +287,7 @@ export default function SimulatorPanel({
                           }))
                         }
                         aria-label={`גולים ${homeTeam?.name || "ביתית"}`}
-                        className="w-10 h-7 text-center border rounded text-xs tabular-nums flex-shrink-0"
+                        className="w-10 h-7 text-center border-2 border-border rounded-lg text-xs tabular-nums flex-shrink-0 focus:border-primary focus:outline-none"
                       />
                     ) : (
                       <span className="w-10 text-center font-bold text-primary tabular-nums flex-shrink-0">
@@ -324,7 +314,7 @@ export default function SimulatorPanel({
                           }))
                         }
                         aria-label={`גולים ${awayTeam?.name || "חוץ"}`}
-                        className="w-10 h-7 text-center border rounded text-xs tabular-nums flex-shrink-0"
+                        className="w-10 h-7 text-center border-2 border-border rounded-lg text-xs tabular-nums flex-shrink-0 focus:border-primary focus:outline-none"
                       />
                     ) : (
                       <span className="w-10 text-center font-bold text-primary tabular-nums flex-shrink-0">
@@ -339,14 +329,14 @@ export default function SimulatorPanel({
                       <button
                         type="button"
                         onClick={() => handleSaveResult(match)}
-                        className="bg-green-500 text-white px-2 py-1 rounded text-[10px]"
+                        className="bg-primary text-white px-2 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer"
                       >
                         ✓
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingMatch(null)}
-                        className="bg-gray-200 px-2 py-1 rounded text-[10px]"
+                        className="bg-bg-soft text-ink-muted px-2 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer"
                       >
                         ✕
                       </button>
@@ -355,7 +345,6 @@ export default function SimulatorPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        // Only allow editing when teams are resolvable.
                         if (!derived.home || !derived.away) return;
                         setEditingMatch(match.id);
                         setEditScores({
@@ -364,10 +353,10 @@ export default function SimulatorPanel({
                         });
                       }}
                       disabled={!derived.home || !derived.away}
-                      className={`px-2 py-0.5 rounded text-[10px] ${
+                      className={`px-3 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer ${
                         !derived.home || !derived.away
-                          ? "bg-gray-200 text-gray-400"
-                          : "bg-primary text-white"
+                          ? "bg-bg-soft text-ink-light"
+                          : "bg-secondary text-white"
                       }`}
                     >
                       ערוך
@@ -396,10 +385,10 @@ export default function SimulatorPanel({
                             needsAdvancingTeam: false,
                           })
                         }
-                        className={`text-[10px] px-2 py-0.5 rounded ${
+                        className={`text-[11px] px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
                           result.advancingTeam === derived.home
                             ? "bg-primary text-white"
-                            : "bg-gray-100"
+                            : "bg-bg-soft text-ink"
                         }`}
                       >
                         {homeTeam?.name}
@@ -413,10 +402,10 @@ export default function SimulatorPanel({
                             needsAdvancingTeam: false,
                           })
                         }
-                        className={`text-[10px] px-2 py-0.5 rounded ${
+                        className={`text-[11px] px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
                           result.advancingTeam === derived.away
                             ? "bg-primary text-white"
-                            : "bg-gray-100"
+                            : "bg-bg-soft text-ink"
                         }`}
                       >
                         {awayTeam?.name}
@@ -428,14 +417,14 @@ export default function SimulatorPanel({
           );
         })}
       </div>
-      <div className="bg-white rounded-xl p-3 border border-gray-100">
-        <h4 className="text-xs font-bold text-primary mb-2">
+      <div className="bg-white rounded-2xl p-3 border-2 border-border">
+        <h4 className="text-sm font-extrabold text-ink mb-2">
           {leaderboardLimit > 0 && leaderboardLimit < simLeaderboard.length
             ? `דירוג על פי סימולציה (${leaderboardLimit} ראשונים)`
             : "דירוג על פי סימולציה"}
         </h4>
         {highlightUserId && userRank && userRank.rank > leaderboardLimit && (
-          <div className="mb-2 text-[11px] bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1">
+          <div className="mb-2 text-xs border-2 border-secondary/40 rounded-xl px-2 py-1 font-bold" style={{ background: "#F0F9FF", color: "var(--color-secondary-dark)" }}>
             המקום שלך: <strong>{userRank.rank}</strong> —{" "}
             {userRank.entry.formName} ({userRank.entry.totalPoints} נק׳)
           </div>
@@ -446,20 +435,20 @@ export default function SimulatorPanel({
             return (
               <li
                 key={e.formId}
-                className={`flex justify-between px-1 py-0.5 rounded ${
-                  isMine ? "bg-indigo-100 font-semibold" : ""
+                className={`flex justify-between px-2 py-1 rounded-lg ${
+                  isMine ? "bg-primary/10 font-extrabold text-primary-dark" : "text-ink"
                 }`}
               >
                 <span className="truncate">
                   {i + 1}. {e.formName}
                 </span>
-                <span className="font-mono">{e.totalPoints}</span>
+                <span className="font-mono font-extrabold">{e.totalPoints}</span>
               </li>
             );
           })}
         </ol>
         {simLeaderboard.length === 0 && (
-          <div className="text-[11px] text-gray-400 text-center py-2">
+          <div className="text-xs text-ink-muted font-medium text-center py-2">
             אין טפסים מאושרים לדירוג
           </div>
         )}

@@ -25,10 +25,10 @@ export default function UnfilledQueue({
 
   if (allMissing.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-4xl mb-3">🎉</div>
-        <p className="text-sm font-bold text-green-600">כל המשחקים הושלמו!</p>
-        <p className="text-xs text-gray-400 mt-1">
+      <div className="text-center py-12 card-duo-lg">
+        <div className="text-6xl mb-3 animate-pop-in">🎉</div>
+        <p className="text-lg font-extrabold text-primary">כל המשחקים הושלמו!</p>
+        <p className="text-sm text-ink-muted mt-1 font-medium">
           אל תשכח לבדוק את הפרטים ולהגיש
         </p>
       </div>
@@ -37,10 +37,10 @@ export default function UnfilledQueue({
 
   return (
     <div>
-      <div className="text-xs text-gray-500 mb-3 font-medium">
+      <div className="text-sm text-ink-muted mb-3 font-bold">
         {allMissing.length} משחקים חסרים — בתים ראשון, אח"כ נוקאאוט
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         {allMissing.map((match) => {
           const isKO = match.stage !== "group";
           const teams =
@@ -54,23 +54,21 @@ export default function UnfilledQueue({
             <button
               key={match.id}
               onClick={() => onJump(match)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 transition cursor-pointer active:scale-[0.98] text-right"
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border-2 border-border hover:border-border-strong transition cursor-pointer text-right"
             >
               <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                  isKO
-                    ? "bg-purple-50 text-purple-600"
-                    : "bg-blue-50 text-blue-600"
+                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
+                  isKO ? "bg-purple" : "bg-secondary"
                 }`}
               >
                 {match.stage === "group"
                   ? `בית ${match.group}`
                   : STAGES[match.stage]}
               </span>
-              <span className="text-xs text-gray-700 font-medium flex-1 truncate">
+              <span className="text-sm text-ink font-bold flex-1 truncate">
                 {homeInfo?.name || "טרם נקבע"} — {awayInfo?.name || "טרם נקבע"}
               </span>
-              <span className="text-gray-300 text-xs">←</span>
+              <span className="text-ink-light text-xs">←</span>
             </button>
           );
         })}

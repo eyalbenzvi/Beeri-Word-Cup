@@ -25,7 +25,7 @@ function AiProgressMessage({ step }) {
     return () => clearInterval(interval);
   }, [step]);
   return (
-    <div className="text-xs text-ink-muted/70 animate-pulse h-5">
+    <div className="text-sm text-ink-muted font-bold animate-pulse h-5">
       {AI_MESSAGES[msgIdx]}
     </div>
   );
@@ -35,15 +35,15 @@ export default function AIFillOverlay({ aiProgress }) {
   if (!aiProgress) return null;
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
-        <div className="text-5xl mb-4 animate-bounce">🤖</div>
-        <div className="text-lg font-extrabold text-primary mb-4">
+      <div className="bg-white rounded-3xl p-8 mx-4 max-w-sm w-full text-center border-2 border-border animate-pop-in">
+        <div className="text-6xl mb-4 animate-bounce">🤖</div>
+        <div className="text-xl font-extrabold text-ink mb-4">
           הבינה המלאכותית מנתחת
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
+        <div className="w-full rounded-full h-4 mb-4 overflow-hidden border-2 border-border" style={{ background: "var(--color-bg-soft)" }}>
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700"
-            style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%` }}
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${(aiProgress.current / aiProgress.total) * 100}%`, background: "linear-gradient(90deg, var(--color-secondary), var(--color-purple))" }}
           />
         </div>
         <AiProgressMessage step={aiProgress.current} />

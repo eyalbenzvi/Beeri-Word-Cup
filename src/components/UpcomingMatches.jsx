@@ -176,7 +176,7 @@ export default function UpcomingMatches() {
 
   if (matches.length === 0) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-border p-5 md:p-7 text-center text-sm text-ink-muted">
+      <div className="card-duo-lg text-center text-sm text-ink-muted font-medium">
         אין משחקים קרובים להצגה כרגע
       </div>
     );
@@ -185,8 +185,8 @@ export default function UpcomingMatches() {
   const headingDate = formatIsraelDateLabel(matches[0]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-6 text-right">
-      <div className="text-[11px] md:text-xs font-bold text-ink-muted mb-3 text-center">
+    <div className="card-duo text-right">
+      <div className="text-xs font-extrabold text-ink-muted mb-3 text-center">
         המשחקים הבאים
         {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
       </div>
@@ -196,7 +196,7 @@ export default function UpcomingMatches() {
           return (
             <div
               key={match.id}
-              className="rounded-xl border border-border p-3 bg-white"
+              className="rounded-xl border-2 border-border p-3 bg-white"
             >
               <MatchRow match={match} actualTeams={actualTeams} />
               {user && (

@@ -69,29 +69,23 @@ function Loading({ reason = "unknown", compact = false }) {
   };
 
   if (compact && !stuck) {
-    return <div className="text-center py-8 text-gray-400">טוען...</div>;
+    return <div className="text-center py-8 text-ink-muted font-bold">טוען...</div>;
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center max-w-sm w-full">
-        <div className="text-4xl animate-bounce">⚽</div>
-        <div className="text-gray-500 text-sm mt-3">טוען...</div>
+        <div className="text-5xl animate-bounce">⚽</div>
+        <div className="text-ink-muted text-sm mt-3 font-bold">טוען...</div>
         {stuck && (
           <div className="mt-8 space-y-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink font-medium">
               נתקע? נסה את האפשרויות הבאות.
             </p>
-            <button
-              onClick={reload}
-              className="w-full bg-primary text-white font-bold py-3 rounded-2xl border-none cursor-pointer text-sm"
-            >
+            <button onClick={reload} className="btn-duo btn-duo-primary w-full">
               רענן את הדף
             </button>
-            <button
-              onClick={signOutAndReload}
-              className="w-full bg-white text-ink font-bold py-3 rounded-2xl border-2 border-border cursor-pointer text-sm"
-            >
+            <button onClick={signOutAndReload} className="btn-duo btn-duo-ghost w-full">
               התנתק והתחל מחדש
             </button>
           </div>

@@ -26,18 +26,15 @@ export default class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-bg p-4">
-          <div className="text-center max-w-sm">
-            <div className="text-5xl mb-4">😵</div>
-            <h1 className="text-xl font-extrabold text-primary mb-2">
+          <div className="text-center max-w-sm card-duo-lg">
+            <div className="text-6xl mb-4">😵</div>
+            <h1 className="text-2xl font-extrabold text-ink mb-2">
               משהו השתבש
             </h1>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-ink-muted mb-6 leading-relaxed">
               קרתה שגיאה לא צפויה. נסה לרענן את הדף.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-primary text-white font-bold px-6 py-3 rounded-2xl hover:bg-primary-light transition border-none cursor-pointer shadow-sm"
-            >
+            <button onClick={() => window.location.reload()} className="btn-duo btn-duo-primary w-full">
               רענן דף
             </button>
           </div>

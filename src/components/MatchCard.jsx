@@ -83,7 +83,7 @@ function MatchCard({
   const importanceStyles = {
     group: "p-4",
     knockout: "p-4",
-    showcase: "p-4 ring-2 ring-accent/50 shadow-md",
+    showcase: "p-4 ring-2 ring-accent/60",
   };
 
   const nameStyles = {
@@ -146,13 +146,13 @@ function MatchCard({
   return (
     <div
       data-match-card
-      className={`bg-white rounded-2xl border mb-0.5 transition-all card-hover ${importanceStyles[importance]} ${
+      className={`bg-white rounded-2xl border-2 mb-2 transition-all card-duo-hover ${importanceStyles[importance]} ${
         justSaved
-          ? "animate-save-flash border-accent"
+          ? "animate-save-flash border-primary"
           : hasResult
-            ? "border-primary/25"
+            ? "border-primary/60"
             : hasPrediction && !editable
-              ? "border-green-200/80"
+              ? "border-primary/40"
               : "border-border"
       }`}
     >
@@ -178,10 +178,10 @@ function MatchCard({
       {showPoints && points !== null && (
         <div className="flex justify-end mb-1.5">
           <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+            className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full ${
               points.points > 0
-                ? "bg-green-50 text-green-700"
-                : "bg-gray-50 text-ink-muted"
+                ? "text-white bg-primary"
+                : "bg-bg-soft text-ink-muted"
             }`}
           >
             {points.points > 0 ? `+${points.points}` : "0"} נק׳
@@ -211,7 +211,7 @@ function MatchCard({
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
+                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
                     type="number"
@@ -221,24 +221,24 @@ function MatchCard({
                     aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-20)`}
                     value={predHome}
                     onChange={handleHomeChange}
-                    className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                      hasPrediction ? "border-primary/30" : "border-border"
+                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-[#F0FFE4] ${
+                      hasPrediction ? "border-primary/50" : "border-border"
                     }`}
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
+                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>−</button>
                 </div>
-                <span className="relative text-ink-muted/60 font-black text-xs bg-gray-100/80 px-1.5 py-0.5 rounded-md">
+                <span className="relative text-ink-muted font-black text-xs bg-bg-soft px-1.5 py-0.5 rounded-md">
                   {justSaved ? (
-                    <span className="text-green-500 text-[10px]">✓</span>
+                    <span className="text-primary text-[11px] animate-pop-in">✓</span>
                   ) : (
                     ":"
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>+</button>
+                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
                     type="number"
@@ -249,22 +249,22 @@ function MatchCard({
                     aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-20)`}
                     value={predAway}
                     onChange={handleAwayChange}
-                    className={`min-w-[44px] min-h-[44px] md:min-w-[52px] md:min-h-[52px] text-center border-2 rounded-2xl text-xl font-bold tabular-nums transition-colors bg-gradient-to-b from-white to-gray-50 shadow-inner focus:ring-2 focus:ring-accent/40 focus:border-accent ${
-                      hasPrediction ? "border-primary/30" : "border-border"
+                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-[#F0FFE4] ${
+                      hasPrediction ? "border-primary/50" : "border-border"
                     }`}
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-6 h-6 text-xs bg-gray-100 rounded-full border-none cursor-pointer text-gray-500 hover:bg-gray-200" disabled={!editable}>−</button>
+                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>−</button>
                 </div>
               </div>
               {homeTeam && awayTeam && (
                 <button
                   onClick={() => setShowAnalysis(!showAnalysis)}
-                  className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border-none cursor-pointer transition-all ${
+                  className={`text-[11px] font-extrabold px-3 py-1 rounded-full border-none cursor-pointer transition-all ${
                     showAnalysis
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-50 text-ink-muted hover:bg-blue-50 hover:text-blue-600"
+                      ? "bg-secondary text-white"
+                      : "bg-bg-soft text-ink-muted hover:bg-secondary/10 hover:text-secondary"
                   }`}
                   title="עזרת מומחה לניחוש"
                 >
@@ -317,11 +317,7 @@ function MatchCard({
                   onClick={() =>
                     onPredictionChange?.({ ...prediction, advancingTeam: team })
                   }
-                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
-                    prediction?.advancingTeam === team
-                      ? "bg-primary text-white shadow-md"
-                      : "bg-gray-100 text-ink-muted hover:bg-gray-200"
-                  }`}
+                  className={`chip-duo ${prediction?.advancingTeam === team ? "active" : ""}`}
                 >
                   {name}
                 </button>

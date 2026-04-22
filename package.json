@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/rubik": "^5.2.8",
     "@sentry/node": "^10.49.0",
     "@sentry/react": "^10.49.0",
     "@tailwindcss/vite": "^4.2.2",
+    "canvas-confetti": "^1.9.4",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.8.0",
     "groq-sdk": "^1.1.2",

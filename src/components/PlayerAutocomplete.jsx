@@ -99,16 +99,16 @@ export default function PlayerAutocomplete({ value, onChange, disabled }) {
         }}
         onFocus={() => setOpen(true)}
         placeholder="הקלד שם שחקן (עברית/אנגלית)"
-        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+        className="input-duo"
         disabled={disabled}
       />
       {hint && (
-        <div className="absolute top-full left-0 right-0 mt-0.5 text-[10px] text-red-500 pointer-events-none">
+        <div className="absolute top-full left-0 right-0 mt-0.5 text-[11px] text-danger font-bold pointer-events-none">
           {hint}
         </div>
       )}
       {open && !disabled && filtered.length > 0 && (
-        <div className="absolute z-30 top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto w-max min-w-full max-w-[calc(100vw-24px)]">
+        <div className="absolute z-30 top-full right-0 mt-1 bg-white border-2 border-border rounded-2xl max-h-72 overflow-y-auto w-max min-w-full max-w-[calc(100vw-24px)]" style={{ boxShadow: "0 6px 16px rgba(0,0,0,0.08)" }}>
           {filtered.map((p, i) => {
             const team = getTeamByCode(p.team);
             const selected = value && (value === p.nameHe || value === p.name);
@@ -116,8 +116,8 @@ export default function PlayerAutocomplete({ value, onChange, disabled }) {
               <button
                 key={`${p.team}-${p.name}-${i}`}
                 type="button"
-                className={`w-full text-right px-2.5 py-2 text-sm hover:bg-primary/10 transition border-none bg-transparent cursor-pointer flex items-center justify-between gap-3 whitespace-nowrap ${
-                  selected ? "bg-primary/5 font-semibold" : ""
+                className={`w-full text-right px-3 py-2.5 text-sm hover:bg-bg-soft transition border-none bg-transparent cursor-pointer flex items-center justify-between gap-3 whitespace-nowrap ${
+                  selected ? "bg-primary/5 font-extrabold text-ink" : "text-ink"
                 }`}
                 onMouseDown={(e) => {
                   // prevent input blur before click fires
@@ -126,7 +126,7 @@ export default function PlayerAutocomplete({ value, onChange, disabled }) {
                 onClick={() => selectPlayer(p)}
               >
                 <span className="text-sm">{p.nameHe || p.name}</span>
-                <span className="text-[10px] text-ink-muted/60 flex-shrink-0">
+                <span className="text-[11px] text-ink-muted font-bold flex-shrink-0">
                   {team?.flag} {team?.name}
                 </span>
               </button>

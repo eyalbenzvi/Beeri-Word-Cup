@@ -26,22 +26,22 @@ export default function GroupTable({ matchData, group }) {
   if (!groupStandings || !hasData) return null;
 
   return (
-    <div data-group-table className="bg-white rounded-2xl border border-border p-4 mb-3">
-      <h4 className="text-xs font-bold text-primary mb-2">טבלת בית {group}</h4>
+    <div data-group-table className="bg-white rounded-2xl border-2 border-border p-4 mb-3">
+      <h4 className="text-xs font-extrabold text-ink mb-2">טבלת בית {group}</h4>
       <div className="overflow-x-auto scroll-smooth -mx-1">
       <table className="w-full text-xs min-w-[400px]">
         <thead>
-          <tr className="text-gray-400 border-b-2 border-gray-100">
-            <th scope="col" className="text-right py-1.5 pr-1 w-5 font-semibold">#</th>
-            <th scope="col" className="text-right py-1.5 font-semibold">קבוצה</th>
-            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="משחקים">מש׳</th>
-            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="נקודות">נק׳</th>
-            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="ניצחונות">נ</th>
-            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="תיקו">ת</th>
-            <th scope="col" className="text-center py-1.5 w-6 font-semibold" title="הפסדים">ה</th>
-            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים בעד">שע+</th>
-            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="שערים נגד">שע-</th>
-            <th scope="col" className="text-center py-1.5 w-8 font-semibold" title="הפרש שערים">הפ</th>
+          <tr className="text-ink-muted border-b-2 border-border">
+            <th scope="col" className="text-right py-1.5 pr-1 w-5 font-bold">#</th>
+            <th scope="col" className="text-right py-1.5 font-bold">קבוצה</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-bold" title="משחקים">מש׳</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-extrabold" title="נקודות">נק׳</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-bold" title="ניצחונות">נ</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-bold" title="תיקו">ת</th>
+            <th scope="col" className="text-center py-1.5 w-6 font-bold" title="הפסדים">ה</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="שערים בעד">שע+</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="שערים נגד">שע-</th>
+            <th scope="col" className="text-center py-1.5 w-8 font-bold" title="הפרש שערים">הפ</th>
           </tr>
         </thead>
         <tbody>
@@ -52,38 +52,37 @@ export default function GroupTable({ matchData, group }) {
             return (
               <tr
                 key={team.code}
-                className={`border-b border-gray-50 ${
-                  qualifies
-                    ? "bg-green-50/60"
-                    : thirdPlace
-                      ? "bg-amber-50/60"
-                      : ""
-                }`}
+                className="border-b border-border"
+                style={qualifies
+                  ? { background: "#F0FFE4" }
+                  : thirdPlace
+                    ? { background: "#FFF3D6" }
+                    : undefined}
               >
-                <td className="py-1.5 pr-1 text-gray-400 font-bold text-[11px]">
+                <td className="py-1.5 pr-1 text-ink-light font-extrabold text-[11px]">
                   {i + 1}
                 </td>
                 <td className="py-1.5">
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-bold text-ink">
                     {info?.name || "טרם נקבע"}
                   </span>
                 </td>
-                <td className="text-center py-1.5 text-gray-500">
+                <td className="text-center py-1.5 text-ink-muted">
                   {team.played}
                 </td>
-                <td className="text-center py-1.5 font-bold text-primary">
+                <td className="text-center py-1.5 font-extrabold text-primary">
                   {team.pts}
                 </td>
-                <td className="text-center py-1.5 text-gray-500">{team.won}</td>
-                <td className="text-center py-1.5 text-gray-500">
+                <td className="text-center py-1.5 text-ink-muted">{team.won}</td>
+                <td className="text-center py-1.5 text-ink-muted">
                   {team.drawn}
                 </td>
-                <td className="text-center py-1.5 text-gray-500">
+                <td className="text-center py-1.5 text-ink-muted">
                   {team.lost}
                 </td>
-                <td className="text-center py-1.5 text-gray-500">{team.gf}</td>
-                <td className="text-center py-1.5 text-gray-500">{team.ga}</td>
-                <td className="text-center py-1.5 font-semibold text-gray-600">
+                <td className="text-center py-1.5 text-ink-muted">{team.gf}</td>
+                <td className="text-center py-1.5 text-ink-muted">{team.ga}</td>
+                <td className="text-center py-1.5 font-bold text-ink">
                   {team.gd > 0 ? `+${team.gd}` : team.gd}
                 </td>
               </tr>
@@ -92,12 +91,12 @@ export default function GroupTable({ matchData, group }) {
         </tbody>
       </table>
       </div>
-      <div className="flex gap-4 mt-2 text-[10px] text-gray-400">
+      <div className="flex gap-4 mt-2 text-[10px] text-ink-muted font-bold">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-green-100" /> עולה
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#F0FFE4", border: "1px solid var(--color-primary)" }} /> עולה
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-amber-100" /> מקום 3
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#FFF3D6", border: "1px solid var(--color-accent)" }} /> מקום 3
           (אפשרי)
         </span>
       </div>

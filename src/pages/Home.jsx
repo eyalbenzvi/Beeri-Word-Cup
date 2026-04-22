@@ -14,12 +14,15 @@ export default function Home() {
   const showToast = useToast();
 
   return (
-    <div className="text-center max-w-xl mx-auto -mb-20 md:mb-0">
+    <div className="text-center max-w-xl mx-auto">
       <div className="pt-2 pb-3 md:pt-8 md:pb-5">
-        <div className="text-4xl md:text-6xl mb-2">⚽🏆</div>
-        <h1 className="text-xl md:text-3xl font-extrabold text-primary mb-0.5 tracking-tight">
-          טורניר הניחושים של בארי — מונדיאל 2026
+        <div className="text-5xl md:text-7xl mb-3 animate-pop-in">⚽🏆</div>
+        <h1 className="text-2xl md:text-4xl font-extrabold text-ink mb-1 tracking-tight">
+          טורניר הניחושים של בארי
         </h1>
+        <p className="text-sm md:text-base font-bold text-ink-muted">
+          מונדיאל 2026
+        </p>
       </div>
 
       {!settings.predictionsLocked && (
@@ -30,7 +33,8 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="w-full bg-primary text-white font-extrabold py-4 rounded-2xl hover:bg-primary-light transition text-base border-none cursor-pointer shadow-md mb-3"
+          className="btn-duo btn-duo-primary w-full mb-4"
+          style={{ padding: "1rem 1.5rem", fontSize: "1rem" }}
         >
           צור את הטופס המנצח שלך
         </button>
@@ -41,27 +45,27 @@ export default function Home() {
           <UpcomingMatches />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-7 mb-3">
+        <div className="card-duo-lg mb-4">
           {countdown.started ? (
-            <div className="text-lg md:text-2xl font-extrabold text-green-600">
+            <div className="text-xl md:text-2xl font-extrabold text-primary">
               🎉 המונדיאל התחיל!
             </div>
           ) : (
             <>
-              <p className="text-[11px] md:text-sm font-bold text-ink-muted mb-2 md:mb-4">
+              <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
                 שריקת הפתיחה בעוד
               </p>
               <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
                 <CountdownUnit
                   value={countdown.days}
                   label="ימים"
-                  accent="bg-primary-light"
+                  accent="bg-secondary"
                 />
                 <CountdownUnit value={countdown.hours} label="שעות" />
-                <CountdownUnit value={countdown.minutes} label="דקות" />
+                <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
                 <CountdownUnit value={countdown.seconds} label="שניות" />
               </div>
-              <p className="text-[10px] text-ink-muted/50 mt-2">
+              <p className="text-xs text-ink-muted mt-3 font-medium">
                 11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
               </p>
             </>
@@ -70,26 +74,23 @@ export default function Home() {
       )}
 
       <div
-        className={`rounded-2xl shadow-sm border p-3 ${
-          settings.predictionsLocked
-            ? "bg-amber-50 border-amber-200"
-            : "bg-green-50 border-green-200"
-        }`}
+        className="rounded-2xl border-2 p-3"
+        style={settings.predictionsLocked
+          ? { background: "#FFF3D6", borderColor: "var(--color-accent)" }
+          : { background: "#F0FFE4", borderColor: "var(--color-primary)" }}
       >
         <div className="flex items-center justify-center gap-2">
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              settings.predictionsLocked ? "bg-amber-400" : "bg-green-400"
-            } animate-pulse`}
+            className="w-3 h-3 rounded-full animate-pulse"
+            style={{ background: settings.predictionsLocked ? "var(--color-accent)" : "var(--color-primary)" }}
             aria-hidden="true"
           />
           <span className="sr-only">
             {settings.predictionsLocked ? "סטטוס: המשחקים התחילו — ההגשה נסגרה" : "סטטוס: ניתן להגיש ולערוך טפסים"}
           </span>
           <span
-            className={`text-sm font-bold ${
-              settings.predictionsLocked ? "text-amber-700" : "text-green-700"
-            }`}
+            className="text-sm font-extrabold"
+            style={{ color: settings.predictionsLocked ? "var(--color-accent-text)" : "var(--color-primary-dark)" }}
           >
             {settings.predictionsLocked
               ? "המשחקים התחילו — ההגשה נסגרה"

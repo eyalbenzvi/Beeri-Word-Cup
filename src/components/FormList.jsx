@@ -37,11 +37,11 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
 
   return (
     <div>
-      <div className="sticky top-[56px] z-10 bg-bg pb-2">
+      <div className="sticky top-16 z-10 bg-bg pb-3 pt-1">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-extrabold text-primary tracking-tight">הטפסים שלך</h1>
+          <h1 className="text-2xl font-extrabold text-ink tracking-tight">הטפסים שלך</h1>
           {!locked && (
-            <button onClick={() => setShowNewForm(true)} className="bg-primary text-white font-bold px-4 py-2 rounded-xl text-sm border-none cursor-pointer shadow-sm">
+            <button onClick={() => setShowNewForm(true)} className="btn-duo btn-duo-primary" style={{ padding: "0.6rem 1rem", fontSize: "0.85rem" }}>
               + טופס חדש
             </button>
           )}
@@ -49,22 +49,22 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       </div>
 
       {forms.length === 0 && !showNewForm && !locked && (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-3">📋</div>
-          <p className="font-bold text-gray-700 text-base mb-1">ברוך הבא! צור טופס ניחושים ראשון</p>
-          <p className="text-gray-400 text-sm">לחץ על &quot;+ טופס חדש&quot; למעלה כדי להתחיל לנחש תוצאות משחקים</p>
+        <div className="text-center py-12 card-duo-lg">
+          <div className="text-6xl mb-3">📋</div>
+          <p className="font-extrabold text-ink text-lg mb-1">ברוך הבא!</p>
+          <p className="text-ink-muted text-sm">צור טופס ניחושים ראשון כדי להתחיל לנחש תוצאות משחקים</p>
         </div>
       )}
 
       {forms.length === 0 && locked && (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-3">🔒</div>
-          <p className="font-bold text-gray-700 text-base mb-1">ההגשה נסגרה</p>
-          <p className="text-gray-400 text-sm">לא ניתן ליצור טפסים חדשים לאחר תחילת המשחקים</p>
+        <div className="text-center py-12 card-duo-lg">
+          <div className="text-6xl mb-3">🔒</div>
+          <p className="font-extrabold text-ink text-lg mb-1">ההגשה נסגרה</p>
+          <p className="text-ink-muted text-sm">לא ניתן ליצור טפסים חדשים לאחר תחילת המשחקים</p>
         </div>
       )}
 
-      <div className="space-y-2.5 mb-4">
+      <div className="space-y-3 mb-4">
         {forms.map((form) => {
           const formStatus = normalizeStatus(form.status);
           const championCode = getCachedChampion(form.matches || {});
@@ -72,27 +72,27 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
           return (
             <div
               key={form.formId}
-              className={`bg-white rounded-2xl p-4 border shadow-sm card-hover ${
+              className={`bg-white rounded-2xl p-4 border-2 card-duo-hover ${
                 formStatus === "submitted"
-                  ? "border-green-200"
-                  : "border-gray-100"
+                  ? "border-primary/50"
+                  : "border-border"
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${
+                  className={`w-11 h-11 rounded-full flex items-center justify-center font-extrabold text-xl flex-shrink-0 ${
                     formStatus === "submitted"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-primary/10 text-primary"
+                      ? "bg-primary text-white"
+                      : "bg-bg-soft text-ink-muted"
                   }`}
                 >
                   {formStatus === "submitted" ? "✓" : "📋"}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate text-gray-800">
+                  <div className="font-extrabold text-base truncate text-ink">
                     {form.formName || "טופס ללא שם"}
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
+                  <div className="text-xs text-ink-muted mt-0.5 font-medium">
                     {Object.keys(form.matches || {}).length}/{totalMatches}{" "}
                     משחקים
                     {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ""}
@@ -100,30 +100,24 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   </div>
                 </div>
                 <span
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-extrabold ${
                     formStatus === "submitted"
-                      ? "bg-green-50 text-green-600"
+                      ? "bg-primary text-white"
                       : form.status === "pending"
-                        ? "bg-amber-50 text-amber-600"
-                        : "bg-gray-50 text-gray-400"
+                        ? "bg-accent text-white"
+                        : "bg-bg-soft text-ink-muted"
                   }`}
                   title={formStatus === "submitted" ? "הטופס הוגש ולא ניתן לעריכה" : form.status === "pending" ? "הטופס ממתין לאישור מנהל" : "הטופס עדיין בעריכה ולא הוגש"}
                 >
-                  {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין לאישור" : "טיוטה"}
+                  {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין" : "טיוטה"}
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => setActiveFormId(form.formId)}
-                  className="flex-1 bg-primary text-white text-sm font-bold py-2.5 rounded-xl hover:bg-primary-light transition border-none cursor-pointer"
-                >
+                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
                 {formStatus === "submitted" && !settings.predictionsLocked && (
-                  <button
-                    onClick={() => reopenForm(form.formId)}
-                    className="px-3 py-2.5 bg-amber-50 text-amber-700 text-sm font-semibold rounded-xl hover:bg-amber-100 transition border-none cursor-pointer"
-                  >
+                  <button onClick={() => reopenForm(form.formId)} className="btn-duo btn-duo-orange" style={{ padding: "0.65rem 1rem", fontSize: "0.8rem" }}>
                     פתח לעריכה
                   </button>
                 )}
@@ -133,7 +127,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                       if (window.confirm(`למחוק את "${form.formName}"?`))
                         handleDeleteForm(form.formId);
                     }}
-                    className="px-3 py-2.5 bg-red-50 text-red-400 text-sm font-semibold rounded-xl hover:bg-red-100 transition border-none cursor-pointer"
+                    className="btn-duo-flat"
+                    style={{ background: "#FFF1F1", color: "var(--color-danger)" }}
                   >
                     מחק
                   </button>
@@ -144,29 +139,23 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         })}
       </div>
 
-      <button
-        onClick={onShowAllForms}
-        className="w-full bg-white text-primary font-bold py-3.5 rounded-2xl border-2 border-primary/20 hover:border-primary/40 hover:bg-gray-50 transition text-sm mb-3 cursor-pointer shadow-sm"
-      >
+      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost w-full">
         👀 צפייה בטפסים של כולם
       </button>
 
       {showNewForm && !locked && (
-        <div className="bg-white rounded-2xl p-5 border-2 border-primary/30 shadow-sm">
-          <h3 className="font-bold text-sm text-primary mb-3">טופס חדש</h3>
+        <div className="card-duo-lg mt-3" style={{ borderColor: "var(--color-primary)" }}>
+          <h3 className="font-extrabold text-base text-ink mb-3">טופס חדש</h3>
           <input
             type="text"
             value={newFormName}
             onChange={(e) => setNewFormName(e.target.value)}
             placeholder={`טופס ${forms.length + 1}`}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 mb-3"
+            className="input-duo mb-3"
             autoFocus
           />
           <div className="flex gap-2">
-            <button
-              onClick={handleCreateForm}
-              className="flex-1 bg-primary text-white font-bold py-3 rounded-2xl hover:bg-primary-light transition text-sm border-none cursor-pointer shadow-sm"
-            >
+            <button onClick={handleCreateForm} className="btn-duo btn-duo-primary flex-1">
               צור טופס
             </button>
             <button
@@ -174,7 +163,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 setShowNewForm(false);
                 setNewFormName("");
               }}
-              className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-500 font-semibold text-sm hover:bg-gray-50 transition cursor-pointer"
+              className="btn-duo btn-duo-ghost flex-1"
             >
               ביטול
             </button>

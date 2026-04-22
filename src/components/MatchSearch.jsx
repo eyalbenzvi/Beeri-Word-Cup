@@ -67,31 +67,31 @@ export default function MatchSearch({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center pt-16 px-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[70vh] flex flex-col">
-        <div className="p-4 pb-2 flex items-center gap-3 border-b border-gray-100">
+      <div className="bg-white rounded-3xl max-w-md w-full border-2 border-border max-h-[70vh] flex flex-col">
+        <div className="p-4 pb-2 flex items-center gap-3 border-b-2 border-border">
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="חפש קבוצה או שלב..."
-            className="flex-1 px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none"
+            className="input-duo flex-1"
           />
           <button
             onClick={onClose}
-            className="text-gray-400 text-lg bg-transparent border-none cursor-pointer p-1 hover:text-gray-600"
+            className="text-ink-muted text-xl bg-transparent border-none cursor-pointer p-1 hover:text-ink font-bold"
           >
             ✕
           </button>
         </div>
         <div className="overflow-y-auto flex-1 p-3">
           {query.trim() && results.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm">
+            <div className="text-center py-8 text-ink-muted text-sm font-medium">
               לא נמצאו תוצאות
             </div>
           )}
           {!query.trim() && (
-            <div className="text-center py-8 text-gray-400 text-sm">
+            <div className="text-center py-8 text-ink-muted text-sm font-medium">
               הקלד שם קבוצה כדי לחפש
             </div>
           )}
@@ -113,29 +113,26 @@ export default function MatchSearch({
                     onJump(match);
                     onClose();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition cursor-pointer active:scale-[0.98] text-right bg-transparent border-none"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-bg-soft transition cursor-pointer text-right bg-transparent border-none"
                 >
                   <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      missing ? "bg-red-400" : "bg-green-400"
-                    }`}
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ background: missing ? "var(--color-danger)" : "var(--color-primary)" }}
                   />
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                      isKO
-                        ? "bg-purple-50 text-purple-600"
-                        : "bg-blue-50 text-blue-600"
+                    className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
+                      isKO ? "bg-purple" : "bg-secondary"
                     }`}
                   >
                     {match.stage === "group"
                       ? `בית ${match.group}`
                       : STAGES[match.stage]}
                   </span>
-                  <span className="text-xs text-gray-700 font-medium flex-1 truncate">
+                  <span className="text-sm text-ink font-bold flex-1 truncate">
                     {homeInfo?.name || "טרם נקבע"} —{" "}
                     {awayInfo?.name || "טרם נקבע"}
                   </span>
-                  <span className="text-gray-300 text-xs">←</span>
+                  <span className="text-ink-light text-xs">←</span>
                 </button>
               );
             })}
