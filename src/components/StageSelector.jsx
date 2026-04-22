@@ -9,11 +9,8 @@ export default function StageSelector({ selectedStage, onSelect }) {
         <button
           key={key}
           onClick={() => onSelect(key)}
-          className={`px-3.5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-150 flex-shrink-0 border-none cursor-pointer min-h-[40px] active:scale-95 ${
-            selectedStage === key
-              ? "bg-primary text-white shadow-md"
-              : "bg-white text-ink-muted shadow-sm hover:text-primary"
-          }`}
+          className={`chip-duo flex-shrink-0 ${selectedStage === key ? "active" : ""}`}
+          style={{ minHeight: 40 }}
         >
           {label}
         </button>

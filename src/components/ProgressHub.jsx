@@ -41,23 +41,23 @@ export default function ProgressHub({
   const [expanded, setExpanded] = useState(completionRatio < 0.5);
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm mb-4 overflow-hidden">
+    <div className="bg-white rounded-2xl border-2 border-border mb-4 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right"
+        className="w-full flex items-center justify-between p-4 bg-transparent border-none cursor-pointer text-right hover:bg-bg-soft transition-colors"
         aria-expanded={expanded}
       >
-        <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
+        <span className="text-ink-muted text-xs">{expanded ? "▲" : "▼"}</span>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-primary">מפת השלמה</span>
-          <div className="flex gap-1.5 text-[11px] font-bold">
+          <span className="text-sm font-extrabold text-ink">מפת השלמה</span>
+          <div className="flex gap-1.5 text-[11px] font-extrabold">
             <span
-              className={`px-2 py-0.5 rounded-full ${filledGroups === totalGroups ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
+              className={`px-2 py-0.5 rounded-full text-white ${filledGroups === totalGroups ? "bg-primary" : "bg-accent"}`}
             >
               בתים {filledGroups}/{totalGroups}
             </span>
             <span
-              className={`px-2 py-0.5 rounded-full ${filledKO === totalKO ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
+              className={`px-2 py-0.5 rounded-full text-white ${filledKO === totalKO ? "bg-primary" : "bg-accent"}`}
             >
               נוקאאוט {filledKO}/{totalKO}
             </span>
@@ -69,7 +69,7 @@ export default function ProgressHub({
         <div className="px-3.5 pb-3.5 space-y-3">
           {/* Groups grid */}
           <div>
-            <div className="text-[11px] font-bold text-gray-400 mb-2">
+            <div className="text-[11px] font-extrabold text-ink-muted mb-2">
               שלב הבתים
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
@@ -81,22 +81,21 @@ export default function ProgressHub({
                   <button
                     key={group}
                     onClick={() => onSelectGroup(group)}
-                    className={`relative flex flex-col items-center py-2.5 px-1.5 min-h-[44px] rounded-xl border-none cursor-pointer transition active:scale-95 ${
-                      isDone
-                        ? "bg-green-50 text-green-700"
-                        : isEmpty
-                          ? "bg-gray-50 text-gray-400"
-                          : "bg-amber-50 text-amber-700"
-                    }`}
+                    className="relative flex flex-col items-center py-2.5 px-1.5 min-h-[44px] rounded-xl border-2 cursor-pointer transition"
+                    style={{
+                      background: isDone ? "#F0FFE4" : isEmpty ? "var(--color-bg-soft)" : "#FFF3D6",
+                      borderColor: isDone ? "var(--color-primary)" : isEmpty ? "var(--color-border)" : "var(--color-accent)",
+                      color: isDone ? "var(--color-primary-dark)" : isEmpty ? "var(--color-ink-muted)" : "var(--color-accent-text)",
+                    }}
                   >
-                    <span className="text-sm font-bold">{group}</span>
-                    <span className="text-[11px] font-medium mt-0.5">
+                    <span className="text-sm font-extrabold">{group}</span>
+                    <span className="text-[11px] font-bold mt-0.5">
                       {filled}/{total}
                     </span>
-                    <div className="w-full h-1 bg-gray-200/60 rounded-full mt-1">
+                    <div className="w-full h-1 bg-white/70 rounded-full mt-1">
                       <div
-                        className={`h-1 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-amber-400"}`}
-                        style={{ width: `${pct * 100}%` }}
+                        className="h-1 rounded-full transition-all"
+                        style={{ width: `${pct * 100}%`, background: isDone ? "var(--color-primary)" : "var(--color-accent)" }}
                       />
                     </div>
                   </button>
@@ -107,7 +106,7 @@ export default function ProgressHub({
 
           {/* Knockout stages */}
           <div>
-            <div className="text-[11px] font-bold text-gray-400 mb-2">
+            <div className="text-[11px] font-extrabold text-ink-muted mb-2">
               שלב הנוקאאוט
             </div>
             <div className="space-y-1">
@@ -118,20 +117,20 @@ export default function ProgressHub({
                   <button
                     key={stage}
                     onClick={() => onSelectStage(stage)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-transparent border-none cursor-pointer hover:bg-gray-50 transition active:scale-[0.98] text-right"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-transparent border-none cursor-pointer hover:bg-bg-soft transition text-right"
                   >
-                    <span className="text-xs font-bold text-gray-700 flex-1">
+                    <span className="text-sm font-bold text-ink flex-1">
                       {label}
                     </span>
                     <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                      className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${isDone ? "bg-primary text-white" : "bg-bg-soft text-ink-muted"}`}
                     >
                       {filled}/{total}
                     </span>
-                    <div className="w-16 h-1.5 bg-gray-100 rounded-full">
+                    <div className="w-16 h-2 bg-bg-soft rounded-full overflow-hidden">
                       <div
-                        className={`h-1.5 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-primary"}`}
-                        style={{ width: `${pct * 100}%` }}
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct * 100}%`, background: isDone ? "var(--color-primary)" : "var(--color-secondary)" }}
                       />
                     </div>
                   </button>

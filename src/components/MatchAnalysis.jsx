@@ -60,11 +60,11 @@ export default function MatchAnalysis({
   }
 
   return (
-    <div className="bg-gradient-to-b from-blue-50 to-white border border-blue-200 rounded-xl p-4 mt-2 animate-fade-in">
+    <div className="border-2 border-secondary/30 rounded-2xl p-4 mt-2 animate-fade-in" style={{ background: "#F0F9FF" }}>
       {loading && (
         <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-3">
-          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-blue-600 font-medium">
+          <div className="w-5 h-5 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-secondary font-extrabold">
             מנתח את המשחק...
           </span>
         </div>
@@ -72,18 +72,12 @@ export default function MatchAnalysis({
 
       {error && (
         <div className="text-center py-2">
-          <p className="text-sm text-red-500 mb-2">{error}</p>
+          <p className="text-sm text-danger font-bold mb-3">{error}</p>
           <div className="flex justify-center gap-2">
-            <button
-              onClick={fetchAnalysis}
-              className="text-sm bg-blue-100 text-blue-700 px-4 py-1.5 rounded-lg border-none cursor-pointer hover:bg-blue-200 transition"
-            >
+            <button onClick={fetchAnalysis} className="btn-duo-flat" style={{ background: "var(--color-secondary)", color: "white" }}>
               נסה שוב
             </button>
-            <button
-              onClick={onClose}
-              className="text-sm bg-gray-100 text-gray-600 px-4 py-1.5 rounded-lg border-none cursor-pointer hover:bg-gray-200 transition"
-            >
+            <button onClick={onClose} className="btn-duo-flat">
               סגור
             </button>
           </div>
@@ -93,34 +87,28 @@ export default function MatchAnalysis({
       {result && (
         <>
           <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-base">🤖</span>
-            <span className="text-sm font-bold text-blue-700">ניתוח AI</span>
+            <span className="text-lg">🤖</span>
+            <span className="text-sm font-extrabold text-secondary">ניתוח AI</span>
           </div>
 
-          <p className="text-sm text-ink-muted leading-relaxed mb-3 text-right">
+          <p className="text-sm text-ink leading-relaxed mb-3 text-right font-medium">
             {result.analysis}
           </p>
 
-          <div className="flex items-center justify-center gap-2 mb-3 bg-white rounded-lg py-2.5 border border-blue-100">
+          <div className="flex items-center justify-center gap-2 mb-3 bg-white rounded-xl py-2.5 border-2 border-secondary/20">
             <span className="text-sm font-bold text-ink-muted">
               תוצאה מומלצת:
             </span>
-            <span className="text-base font-extrabold text-blue-700" dir="ltr">
+            <span className="text-lg font-extrabold text-secondary" dir="ltr">
               {result.homeScore} - {result.awayScore}
             </span>
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={() => onAccept(result.homeScore, result.awayScore)}
-              className="flex-1 text-sm font-bold bg-blue-600 text-white py-2.5 rounded-lg border-none cursor-pointer hover:bg-blue-700 transition"
-            >
+            <button onClick={() => onAccept(result.homeScore, result.awayScore)} className="btn-duo btn-duo-blue flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
               ✅ קבל תוצאה
             </button>
-            <button
-              onClick={onClose}
-              className="flex-1 text-sm font-bold bg-gray-100 text-gray-600 py-2.5 rounded-lg border-none cursor-pointer hover:bg-gray-200 transition"
-            >
+            <button onClick={onClose} className="btn-duo btn-duo-ghost flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
               ❌ דחה
             </button>
           </div>

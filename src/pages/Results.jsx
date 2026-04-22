@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMatchResults } from "../hooks/useStore";
-import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
+import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import GroupTable from "../components/GroupTable";
@@ -19,17 +19,17 @@ export default function Results() {
 
   return (
     <div>
-      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
+      <h1 className="text-2xl font-extrabold text-ink mb-4 tracking-tight">
         ⚽ תוצאות אמת
       </h1>
 
-      <div className="bg-white rounded-2xl p-4 mb-4 border border-border shadow-sm">
-        <div className="text-xs text-gray-400 text-center font-medium">
+      <div className="card-duo mb-4">
+        <div className="text-sm text-ink-muted text-center font-bold">
           {playedCount} / {totalMatches} משחקים שוחקו
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-2 mt-1.5">
+        <div className="w-full bg-bg-soft rounded-full h-3 mt-2 overflow-hidden border-2 border-border">
           <div
-            className="bg-primary rounded-full h-2 transition-all"
+            className="bg-primary rounded-full h-full transition-all"
             style={{ width: `${(playedCount / totalMatches) * 100}%` }}
           />
         </div>
@@ -56,7 +56,6 @@ export default function Results() {
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== "group";
           const result = results[match.id];
-          // For knockout, only show team names if the match has a result
           const derived =
             isKnockout && result
               ? { home: result.homeTeam, away: result.awayTeam }
@@ -69,52 +68,44 @@ export default function Results() {
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-2xl p-4 border card-hover ${
-                result ? "border-primary/20 shadow-sm" : "border-border"
+              className={`bg-white rounded-2xl p-4 border-2 card-duo-hover ${
+                result ? "border-primary/50" : "border-border"
               }`}
             >
               {match.date && (
                 <div className="flex justify-between items-center mb-1.5">
                   {isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label) ? (
-                    <span className="text-xs text-gray-400 font-medium">
+                    <span className="text-xs text-secondary font-bold">
                       {match.label}
                     </span>
                   ) : <span />}
-                  <span className="text-xs text-gray-300">
+                  <span className="text-xs text-ink-muted">
                     {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
                   </span>
                 </div>
               )}
               {result ? (
                 <div>
-                  <div className="flex items-center justify-between py-1">
-                    <span
-                      className={`text-sm font-semibold ${homeTeam ? "text-gray-800" : "text-gray-300 italic"}`}
-                    >
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
                       {homeTeam?.name || "טרם נקבע"}
                     </span>
-                    <span
-                      className={`text-lg font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-gray-400"}`}
-                    >
+                    <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
                       {result.homeScore}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-1 border-t border-gray-50">
-                    <span
-                      className={`text-sm font-semibold ${awayTeam ? "text-gray-800" : "text-gray-300 italic"}`}
-                    >
+                  <div className="flex items-center justify-between py-1.5 border-t border-border">
+                    <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
                       {awayTeam?.name || "טרם נקבע"}
                     </span>
-                    <span
-                      className={`text-lg font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-gray-400"}`}
-                    >
+                    <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
                       {result.awayScore}
                     </span>
                   </div>
                   {isKnockout &&
                     result.homeScore === result.awayScore &&
                     result.advancingTeam && (
-                      <div className="text-[11px] text-gray-400 text-center mt-1 pt-1 border-t border-gray-50">
+                      <div className="text-xs text-ink-muted text-center mt-2 pt-2 border-t border-border font-bold">
                         בעיטות הכרעה:{" "}
                         {getTeamByCode(result.advancingTeam)?.name ||
                           result.advancingTeam}
@@ -123,21 +114,17 @@ export default function Results() {
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-center justify-between py-1">
-                    <span
-                      className={`text-sm font-semibold ${homeTeam ? "text-gray-800" : "text-gray-300 italic"}`}
-                    >
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
                       {homeTeam?.name || "טרם נקבע"}
                     </span>
-                    <span className="text-sm text-gray-300">–</span>
+                    <span className="text-sm text-ink-light">–</span>
                   </div>
-                  <div className="flex items-center justify-between py-1 border-t border-gray-50">
-                    <span
-                      className={`text-sm font-semibold ${awayTeam ? "text-gray-800" : "text-gray-300 italic"}`}
-                    >
+                  <div className="flex items-center justify-between py-1.5 border-t border-border">
+                    <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
                       {awayTeam?.name || "טרם נקבע"}
                     </span>
-                    <span className="text-sm text-gray-300">–</span>
+                    <span className="text-sm text-ink-light">–</span>
                   </div>
                 </div>
               )}
@@ -147,9 +134,9 @@ export default function Results() {
       </div>
 
       {playedCount === 0 && (
-        <div className="text-center py-8 text-gray-400 mt-4">
-          <div className="text-4xl mb-2">🏟️</div>
-          <p>עדיין לא הוזנו תוצאות</p>
+        <div className="text-center py-12 card-duo-lg mt-4">
+          <div className="text-6xl mb-3">🏟️</div>
+          <p className="text-lg font-extrabold text-ink">עדיין לא הוזנו תוצאות</p>
         </div>
       )}
     </div>

@@ -4,9 +4,9 @@ import PlayerAutocomplete from "./PlayerAutocomplete";
 export default function FormDetailsTab({ activeForm, activeFormId, canEdit, championName }) {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <h3 className="font-bold text-sm text-primary mb-1">📝 פרטי הטופס</h3>
-        <p className="text-xs text-gray-400 mb-3">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-1">📝 פרטי הטופס</h3>
+        <p className="text-xs text-ink-muted mb-3">
           שם הטופס הוא מה שיוצג בטבלת התוצאות
         </p>
         <input
@@ -17,7 +17,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
             updateFormDetails(activeFormId, { formName: e.target.value })
           }
           placeholder="שם הטופס..."
-          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none mb-3 ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
+          className={`input-duo mb-3 ${!canEdit ? "opacity-60" : ""}`}
         />
         {(() => {
           const budgetValue = activeForm.budgetNumber || "";
@@ -35,19 +35,19 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
                   updateFormDetails(activeFormId, { budgetNumber: e.target.value })
                 }
                 placeholder="מספר תקציב (100-9999)"
-                className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-primary focus:outline-none ${!canEdit ? "opacity-60 bg-gray-50" : ""}`}
+                className={`input-duo ${!canEdit ? "opacity-60" : ""}`}
               />
-              {budgetError && <p className="text-xs text-red-500 mt-1">מספר תקציב חייב להיות מספר שלם בין 100 ל-9999</p>}
+              {budgetError && <p className="text-xs text-danger font-bold mt-1">מספר תקציב חייב להיות מספר שלם בין 100 ל-9999</p>}
             </>
           );
         })()}
       </div>
 
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <h3 className="font-bold text-sm text-primary mb-1">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-1">
           ⚽ מלך השערים (8 נק׳)
         </h3>
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-ink-muted mb-3">
           מי יהיה מלך השערים? שערים מבעיטות הכרעה לא נספרים.
         </p>
         <PlayerAutocomplete
@@ -59,14 +59,14 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
         />
       </div>
 
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <h3 className="font-bold text-sm text-primary mb-1">
+      <div className="card-duo">
+        <h3 className="font-extrabold text-base text-ink mb-1">
           🏆 אלופה (10 נק׳)
         </h3>
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-ink-muted mb-3">
           נגזר מתוצאות הגמר שמילאת בטופס.
         </p>
-        <div className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base bg-gray-50 ${championName ? "text-yellow-700 font-bold" : "text-gray-400"}`}>
+        <div className={`w-full px-4 py-3 border-2 border-border rounded-2xl text-base ${championName ? "text-accent-text font-extrabold" : "text-ink-muted"}`} style={{ background: "var(--color-bg-soft)" }}>
           {championName ? `🏆 ${championName}` : "טרם נקבע"}
         </div>
       </div>

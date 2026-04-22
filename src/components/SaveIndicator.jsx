@@ -40,8 +40,8 @@ export default function SaveIndicator() {
 
   if (state === "error") {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 mb-3">
-        <span className="text-xs font-medium text-red-600">
+      <div className="border-2 border-danger rounded-2xl px-3 py-2 flex items-center justify-between gap-2 mb-3" style={{ background: "#FFF1F1" }}>
+        <span className="text-xs font-bold text-danger">
           {errorMsg}
         </span>
         <button
@@ -49,7 +49,8 @@ export default function SaveIndicator() {
             setState("idle");
             setErrorMsg("");
           }}
-          className="text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded-lg border-none cursor-pointer hover:bg-red-200 transition"
+          className="btn-duo-flat"
+          style={{ padding: "0.25rem 0.75rem", fontSize: "0.7rem" }}
         >
           סגור
         </button>
@@ -59,11 +60,12 @@ export default function SaveIndicator() {
 
   return (
     <div
-      className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-all ${
+      className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all ${
         state === "saving"
-          ? "text-amber-600 bg-amber-50"
-          : "text-green-600 bg-green-50"
+          ? "text-accent-text"
+          : "text-white bg-primary"
       }`}
+      style={state === "saving" ? { background: "#FFF3D6" } : undefined}
     >
       {state === "saving" ? "שומר..." : "נשמר ✓"}
     </div>

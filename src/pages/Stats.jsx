@@ -19,18 +19,18 @@ function Bar({ label, count, total, color = "bg-primary" }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-24 text-right text-gray-600 truncate font-medium">
+      <span className="w-24 text-right text-ink font-bold truncate">
         {label}
       </span>
-      <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+      <div className="flex-1 bg-bg-soft rounded-full h-6 overflow-hidden border border-border">
         <div
-          className={`${color} h-5 rounded-full transition-all duration-500 flex items-center justify-end px-2`}
+          className={`${color} h-full rounded-full transition-all duration-500 flex items-center justify-end px-2`}
           style={{ width: `${count > 0 ? Math.max(pct, 8) : 0}%` }}
         >
-          <span className="text-white text-[11px] font-bold">{count}</span>
+          <span className="text-white text-[11px] font-extrabold">{count}</span>
         </div>
       </div>
-      <span className="w-10 text-left text-gray-400 text-[11px]">
+      <span className="w-10 text-left text-ink-muted text-[11px] font-bold">
         {pct.toFixed(0)}%
       </span>
     </div>
@@ -39,8 +39,8 @@ function Bar({ label, count, total, color = "bg-primary" }) {
 
 function StatCard({ title, icon, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-      <h3 className="text-sm font-bold text-primary mb-3">
+    <div className="card-duo">
+      <h3 className="text-base font-extrabold text-ink mb-3">
         {icon} {title}
       </h3>
       {children}
@@ -105,7 +105,7 @@ function MatchPredictions({ forms }) {
   return (
     <StatCard title="ניחושים למשחק" icon="🔍">
       {/* Stage selector */}
-      <div className="flex overflow-x-auto gap-1.5 mb-3 pb-1 -mx-1 px-1">
+      <div className="flex overflow-x-auto gap-2 mb-3 pb-1 -mx-1 px-1">
         {Object.entries(STAGES).map(([key, label]) => (
           <button
             key={key}
@@ -113,11 +113,7 @@ function MatchPredictions({ forms }) {
               setSelectedStage(key);
               setSelectedMatch(null);
             }}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap border-none cursor-pointer transition-all flex-shrink-0 ${
-              selectedStage === key
-                ? "bg-primary text-white"
-                : "bg-gray-100 text-gray-500"
-            }`}
+            className={`chip-duo flex-shrink-0 ${selectedStage === key ? "active" : ""}`}
           >
             {label}
           </button>
@@ -134,10 +130,10 @@ function MatchPredictions({ forms }) {
                 setSelectedGroup(g);
                 setSelectedMatch(null);
               }}
-              className={`w-7 h-7 rounded-full text-[11px] font-bold border-none cursor-pointer ${
+              className={`w-8 h-8 rounded-full text-xs font-extrabold border-2 cursor-pointer ${
                 selectedGroup === g
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-500"
+                  ? "bg-primary text-white border-primary-dark"
+                  : "bg-white text-ink-muted border-border"
               }`}
             >
               {g}
@@ -147,7 +143,7 @@ function MatchPredictions({ forms }) {
       )}
 
       {/* Match list */}
-      <div className="space-y-1 mb-3">
+      <div className="space-y-1.5 mb-3">
         {filteredMatches.map((m) => {
           const h = getTeamByCode(m.homeTeam);
           const a = getTeamByCode(m.awayTeam);
@@ -155,10 +151,10 @@ function MatchPredictions({ forms }) {
             <button
               key={m.id}
               onClick={() => setSelectedMatch(m.id)}
-              className={`w-full text-xs py-2 px-3 rounded-xl border-none cursor-pointer text-right transition-all ${
+              className={`w-full text-sm py-2.5 px-3 rounded-xl border-2 cursor-pointer text-right font-bold transition-all ${
                 selectedMatch === m.id
-                  ? "bg-primary text-white"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  ? "bg-primary text-white border-primary-dark"
+                  : "bg-white text-ink border-border hover:border-border-strong"
               }`}
             >
               {h?.name || "טרם נקבע"} נגד {a?.name || "טרם נקבע"}
@@ -169,53 +165,53 @@ function MatchPredictions({ forms }) {
 
       {/* Stats */}
       {matchStats && (
-        <div className="border-t border-gray-100 pt-3 space-y-3">
-          <p className="text-xs text-gray-400 text-center">
+        <div className="border-t-2 border-border pt-3 space-y-3">
+          <p className="text-sm text-ink-muted text-center font-bold">
             {matchStats.preds} ניחושים
           </p>
 
           {/* 1/X/2 */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-blue-50 rounded-xl p-2">
-              <div className="text-lg font-extrabold text-blue-600">
+            <div className="rounded-xl p-3 border-2 border-secondary/30" style={{ background: "#F0F9FF" }}>
+              <div className="text-xl font-extrabold text-secondary">
                 {matchStats.homeWin}
               </div>
-              <div className="text-[11px] text-blue-400 font-medium">
+              <div className="text-xs text-secondary font-bold">
                 1 {home?.name || ""}
               </div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-2">
-              <div className="text-lg font-extrabold text-gray-500">
+            <div className="rounded-xl p-3 border-2 border-border" style={{ background: "var(--color-bg-soft)" }}>
+              <div className="text-xl font-extrabold text-ink-muted">
                 {matchStats.draw}
               </div>
-              <div className="text-[11px] text-gray-400 font-medium">
+              <div className="text-xs text-ink-muted font-bold">
                 X תיקו
               </div>
             </div>
-            <div className="bg-red-50 rounded-xl p-2">
-              <div className="text-lg font-extrabold text-red-500">
+            <div className="rounded-xl p-3 border-2 border-danger/30" style={{ background: "#FFF1F1" }}>
+              <div className="text-xl font-extrabold text-danger">
                 {matchStats.awayWin}
               </div>
-              <div className="text-[11px] text-red-400 font-medium">
+              <div className="text-xs text-danger font-bold">
                 2 {away?.name || ""}
               </div>
             </div>
           </div>
 
           {/* Average goals */}
-          <div className="text-center text-xs text-gray-500">
+          <div className="text-center text-sm text-ink-muted font-bold">
             ⚽ ממוצע שערים:{" "}
-            <span className="font-bold text-primary">
+            <span className="font-extrabold text-primary">
               {matchStats.avgGoals}
             </span>
           </div>
 
           {/* Top predictions */}
           <div>
-            <p className="text-[11px] font-bold text-gray-500 mb-1.5">
+            <p className="text-sm font-extrabold text-ink mb-2">
               תוצאות פופולריות:
             </p>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {matchStats.topScores.map(([score, count]) => (
                 <Bar
                   key={score}
@@ -259,7 +255,7 @@ function ChampionStats({ forms }) {
             count={count}
             total={forms.length}
             color={
-              i === 0 ? "bg-yellow-500" : i < 3 ? "bg-primary" : "bg-gray-400"
+              i === 0 ? "bg-accent" : i < 3 ? "bg-primary" : "bg-ink-muted"
             }
           />
         ))}
@@ -295,7 +291,7 @@ function TopScorerStats({ forms, playerList }) {
             label={name}
             count={count}
             total={forms.length}
-            color={i === 0 ? "bg-green-500" : "bg-primary"}
+            color={i === 0 ? "bg-accent" : "bg-primary"}
           />
         ))}
       </div>
@@ -331,35 +327,35 @@ function GeneralStats({ forms, results }) {
   return (
     <StatCard title="מספרים" icon="📊">
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-primary/5 rounded-xl p-3 text-center">
-          <div className="text-2xl font-extrabold text-primary">
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="text-3xl font-extrabold text-primary-dark">
             {stats.totalForms}
           </div>
-          <div className="text-[11px] text-gray-500 font-medium">
+          <div className="text-xs text-ink-muted font-bold">
             טפסים הוגשו
           </div>
         </div>
-        <div className="bg-primary/5 rounded-xl p-3 text-center">
-          <div className="text-2xl font-extrabold text-primary">
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="text-3xl font-extrabold text-primary-dark">
             {stats.playedResults}/{stats.totalPossible}
           </div>
-          <div className="text-[11px] text-gray-500 font-medium">
+          <div className="text-xs text-ink-muted font-bold">
             משחקים שוחקו
           </div>
         </div>
-        <div className="bg-primary/5 rounded-xl p-3 text-center">
-          <div className="text-2xl font-extrabold text-primary">
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="text-3xl font-extrabold text-primary-dark">
             {stats.avgGoals}
           </div>
-          <div className="text-[11px] text-gray-500 font-medium">
+          <div className="text-xs text-ink-muted font-bold">
             ממוצע שערים לניחוש
           </div>
         </div>
-        <div className="bg-primary/5 rounded-xl p-3 text-center">
-          <div className="text-2xl font-extrabold text-primary">
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="text-3xl font-extrabold text-primary-dark">
             {stats.drawPct}%
           </div>
-          <div className="text-[11px] text-gray-500 font-medium">
+          <div className="text-xs text-ink-muted font-bold">
             ניחושי תיקו
           </div>
         </div>
@@ -470,13 +466,13 @@ function SearchStats({ forms, playerList }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder='חפש קבוצה, שחקן, שם טופס או תוצאה (לדוגמה: "ברזיל", "מבאפה", "2-1")'
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 mb-3"
+        className="input-duo mb-3"
       />
       {searchResults && (
         <div className="space-y-3">
           {searchResults.map((group, i) => (
             <div key={group.title || i}>
-              <p className="text-xs font-bold text-gray-600 mb-1">
+              <p className="text-sm font-extrabold text-ink mb-2">
                 {group.title}
               </p>
               {group.items.length > 0 && (
@@ -484,10 +480,11 @@ function SearchStats({ forms, playerList }) {
                   {group.items.map((item, j) => (
                     <div
                       key={`${item.formName}-${item.type}-${item.value || j}`}
-                      className="flex justify-between text-[11px] bg-gray-50 rounded-lg px-3 py-1.5"
+                      className="flex justify-between text-xs rounded-xl px-3 py-2 border-2 border-border"
+                      style={{ background: "var(--color-bg-soft)" }}
                     >
-                      <span className="text-gray-500">{item.type}</span>
-                      <span className="font-medium text-gray-700">
+                      <span className="text-ink-muted font-bold">{item.type}</span>
+                      <span className="font-extrabold text-ink">
                         {item.formName} {item.value && `— ${item.value}`}
                       </span>
                     </div>
@@ -512,10 +509,10 @@ export default function Stats() {
 
   if (!settings.predictionsLocked) {
     return (
-      <div className="text-center py-16">
-        <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-lg font-bold text-primary mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted">הנתונים יהיו זמינים לאחר תחילת המשחקים</p>
+      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
+        <div className="text-6xl mb-4">🔒</div>
+        <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
+        <p className="text-sm text-ink-muted font-medium">הנתונים יהיו זמינים לאחר תחילת המשחקים</p>
       </div>
     );
   }
@@ -533,20 +530,20 @@ export default function Stats() {
 
   return (
     <div>
-      <h1 className="text-xl font-extrabold text-primary mb-4 tracking-tight">
+      <h1 className="text-2xl font-extrabold text-ink mb-4 tracking-tight">
         📈 סטטיסטיקות
       </h1>
 
       {submittedForms.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-3">📊</div>
-          <p className="text-gray-400 text-sm">
+        <div className="text-center py-12 card-duo-lg">
+          <div className="text-6xl mb-3">📊</div>
+          <p className="text-ink-muted text-sm font-medium">
             אין מספיק נתונים להצגת סטטיסטיקות
           </p>
         </div>
       ) : (
         <>
-          <div className="flex gap-1 mb-4 overflow-x-auto">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             {[
               { id: "matches", label: "📊 משחקים" },
               { id: "teams", label: "🏆 קבוצות" },
@@ -555,7 +552,7 @@ export default function Stats() {
               { id: "simulate", label: "🎮 סימולציה" },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border-none cursor-pointer ${activeTab === tab.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
+                className={`chip-duo flex-shrink-0 ${activeTab === tab.id ? "active" : ""}`}>
                 {tab.label}
               </button>
             ))}

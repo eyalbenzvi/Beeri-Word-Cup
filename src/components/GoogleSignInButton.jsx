@@ -45,7 +45,8 @@ export default function GoogleSignInButton({ onSuccess }) {
       <button
         onClick={handleSignIn}
         disabled={loading}
-        className="w-full bg-white text-ink font-bold min-h-[52px] py-4 rounded-2xl border-2 border-border hover:border-primary/30 hover:bg-gray-50 transition text-sm cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm"
+        className="w-full bg-white text-ink font-extrabold min-h-[56px] py-4 rounded-2xl border-2 border-border hover:border-border-strong transition text-base cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50"
+        style={{ boxShadow: "0 4px 0 0 var(--color-border)", marginBottom: 4 }}
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
           <path
@@ -69,11 +70,12 @@ export default function GoogleSignInButton({ onSuccess }) {
       </button>
 
       {error && (
-        <div className="text-sm text-red-500 flex items-center justify-between gap-2 mt-2">
+        <div className="text-sm text-danger font-bold flex items-center justify-between gap-2 mt-2">
           <span>{error}</span>
           <button
             onClick={handleSignIn}
-            className="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg border-none cursor-pointer hover:bg-red-100 transition flex-shrink-0"
+            className="btn-duo-flat flex-shrink-0"
+            style={{ background: "#FFF1F1", color: "var(--color-danger)" }}
           >
             נסה שוב
           </button>

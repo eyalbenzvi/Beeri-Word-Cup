@@ -40,13 +40,20 @@ export function ToastProvider({ children }) {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed bottom-20 md:bottom-8 left-1/2 z-[100] px-5 py-3 rounded-2xl text-white text-sm font-medium shadow-xl max-w-[90%] md:max-w-sm text-center backdrop-blur-sm ${
+          className={`fixed bottom-24 md:bottom-8 left-1/2 z-[100] px-5 py-3.5 rounded-2xl text-white text-sm font-extrabold max-w-[90%] md:max-w-sm text-center ${
             toast.type === "error"
-              ? "bg-red-600/95"
+              ? "bg-danger"
               : toast.type === "info"
-                ? "bg-primary/95"
-                : "bg-gray-800/95"
+                ? "bg-secondary"
+                : "bg-primary"
           } ${exiting ? "toast-exit" : "toast-enter"}`}
+          style={{
+            boxShadow: toast.type === "error"
+              ? "0 4px 0 0 var(--color-danger-dark)"
+              : toast.type === "info"
+                ? "0 4px 0 0 var(--color-secondary-dark)"
+                : "0 4px 0 0 var(--color-primary-dark)",
+          }}
         >
           {toast.message}
         </div>

@@ -19,19 +19,19 @@ export default function WelcomeScreen() {
   return (
     <div className={`min-h-dvh bg-bg flex flex-col ${tournamentStarted ? "" : "h-dvh overflow-hidden"}`}>
       {/* Header with hamburger */}
-      <header className="header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
+      <header className="header-duo sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="text-white/90 bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-white"
+              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-lg hover:bg-bg-soft"
               aria-label="תפריט"
             >
-              <Menu size={22} />
+              <Menu size={24} />
             </button>
-            <span className="text-lg font-bold flex items-center gap-2 tracking-tight">
+            <span className="text-lg font-extrabold text-ink flex items-center gap-2 tracking-tight">
               <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
-              בארי מונדיאל
+              <span className="hidden sm:inline">בארי מונדיאל</span>
             </span>
           </div>
         </div>
@@ -39,45 +39,45 @@ export default function WelcomeScreen() {
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       <div className={`flex-1 flex flex-col items-center px-4 py-4 min-h-0 ${tournamentStarted ? "justify-start" : "justify-center"}`}>
-      <div className="w-full max-w-md text-center space-y-3">
+      <div className="w-full max-w-md text-center space-y-4">
         <div>
-          <div className="text-4xl md:text-5xl mb-1">⚽🏆</div>
-          <h1 className="text-lg md:text-3xl font-extrabold text-primary tracking-tight mb-0.5">
+          <div className="text-5xl md:text-6xl mb-2 animate-pop-in">⚽🏆</div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1">
             טורניר הניחושים של בארי
           </h1>
-          <p className="text-ink-muted text-xs">מונדיאל 2026</p>
+          <p className="text-ink-muted text-sm font-bold">מונדיאל 2026</p>
         </div>
 
         {tournamentStarted ? (
           <UpcomingMatches />
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-6">
-            <p className="text-[11px] md:text-sm font-bold text-ink-muted mb-2 md:mb-4">
+          <div className="card-duo-lg">
+            <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
               שריקת הפתיחה בעוד
             </p>
             <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
               <CountdownUnit
                 value={countdown.days}
                 label="ימים"
-                accent="bg-primary-light"
+                accent="bg-secondary"
               />
               <CountdownUnit value={countdown.hours} label="שעות" />
-              <CountdownUnit value={countdown.minutes} label="דקות" />
+              <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
               <CountdownUnit value={countdown.seconds} label="שניות" />
             </div>
-            <p className="text-[10px] text-ink-muted/50 mt-2">
+            <p className="text-xs text-ink-muted mt-3 font-medium">
               12 ביוני 2026 · 00:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
             </p>
           </div>
         )}
 
-        <div className="pt-1 space-y-3">
+        <div className="pt-2 space-y-3">
           {authMethod === "google" ? (
             <>
               <GoogleSignInButton />
               <button
                 onClick={() => setAuthMethod("phone")}
-                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+                className="w-full text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer py-1 hover:text-secondary-dark"
               >
                 📱 התחבר עם מספר טלפון
               </button>
@@ -87,7 +87,7 @@ export default function WelcomeScreen() {
               <PhoneSignIn />
               <button
                 onClick={() => setAuthMethod("google")}
-                className="w-full text-sm text-primary bg-transparent border-none cursor-pointer py-1"
+                className="w-full text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer py-1 hover:text-secondary-dark"
               >
                 ← חזור להתחברות עם Google
               </button>

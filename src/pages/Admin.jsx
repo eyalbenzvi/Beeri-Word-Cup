@@ -50,10 +50,10 @@ export default function Admin() {
 
   if (!user?.isAdmin) {
     return (
-      <div className="text-center py-12">
-        <div className="text-5xl mb-4">🔐</div>
-        <h2 className="text-lg font-bold text-gray-700">נדרשת גישת מנהל</h2>
-        <p className="text-gray-500 text-sm mt-2">
+      <div className="text-center py-12 card-duo-lg max-w-md mx-auto">
+        <div className="text-6xl mb-4">🔐</div>
+        <h2 className="text-xl font-extrabold text-ink">נדרשת גישת מנהל</h2>
+        <p className="text-ink-muted text-sm mt-2 font-medium">
           השחקן הראשון שמצטרף הופך למנהל.
         </p>
       </div>
@@ -62,9 +62,9 @@ export default function Admin() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-primary mb-4">⚙️ לוח ניהול</h1>
+      <h1 className="text-2xl font-extrabold text-ink mb-4">⚙️ לוח ניהול</h1>
       <div
-        className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 overflow-x-auto scroll-smooth"
+        className="flex gap-1 mb-4 bg-bg-soft rounded-2xl p-1 overflow-x-auto scroll-smooth border-2 border-border"
         style={{
           maskImage: 'linear-gradient(to left, transparent, black 24px, black calc(100% - 24px), transparent)',
           WebkitMaskImage: 'linear-gradient(to left, transparent, black 24px, black calc(100% - 24px), transparent)',
@@ -82,15 +82,15 @@ export default function Admin() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-shrink-0 px-2 py-2 text-xs font-medium rounded-md transition ${
+            className={`flex-shrink-0 px-3 py-2 text-xs font-extrabold rounded-xl transition border-none cursor-pointer ${
               activeTab === tab.id
-                ? "bg-white text-primary shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-primary"
+                : "bg-transparent text-ink-muted hover:text-ink"
             }`}
           >
             {tab.label}
             {tabBadges[tab.id] != null && (
-              <span className="mr-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary/15 text-primary">
+              <span className="mr-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-extrabold rounded-full bg-primary text-white">
                 {tabBadges[tab.id]}
               </span>
             )}
@@ -117,14 +117,14 @@ export default function Admin() {
 
       {activeTab === "topscorer" && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-100">
-            <h3 className="font-bold text-sm text-primary mb-2">
+          <div className="card-duo">
+            <h3 className="font-extrabold text-base text-ink mb-2">
               ⚽ מלך השערים
             </h3>
-            <p className="text-xs text-gray-400 mb-2">
+            <p className="text-xs text-ink-muted mb-3 font-medium">
               הוסף את כל השחקנים שנמצאים בראש טבלת הכובשים (במקרה של שוויון).
             </p>
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-3">
               <div className="flex-1">
                 <PlayerAutocomplete
                   value={topScorerInput}
@@ -150,16 +150,17 @@ export default function Admin() {
                   });
                   setTopScorerInput("");
                 }}
-                className="bg-primary text-white px-3 py-2 rounded-lg text-sm"
+                className="btn-duo btn-duo-primary"
+                style={{ padding: "0.55rem 1rem", fontSize: "0.85rem" }}
               >
                 הוסף
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {(actualBonuses.topScorers || []).map((name, i) => (
                 <span
                   key={i}
-                  className="bg-green-100 text-green-700 px-2 py-1 rounded-lg text-xs flex items-center gap-1"
+                  className="bg-primary text-white px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-2"
                 >
                   {getPlayerDisplayName(name, resolvePlayerList(settings.topScorerPlayers))}
                   <button
@@ -171,7 +172,7 @@ export default function Admin() {
                         topScorers: updated,
                       });
                     }}
-                    className="text-green-500 hover:text-red-500"
+                    className="text-white/70 hover:text-white bg-transparent border-none cursor-pointer text-base leading-none"
                   >
                     ×
                   </button>

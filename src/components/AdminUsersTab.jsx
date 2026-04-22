@@ -47,7 +47,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
         return (
           <div
             key={uid}
-            className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3 flex-wrap"
+            className="card-duo-tight flex items-center gap-3 flex-wrap"
           >
             <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
               {(u.displayName || "?").charAt(0).toUpperCase()}
@@ -56,12 +56,12 @@ export default function AdminUsersTab({ users, allPredictions }) {
               <div className="text-sm font-medium truncate">
                 {u.displayName}
               </div>
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-ink-muted">
                 {userForms.length} טפסים
                 {submittedCount > 0 && ` • ${submittedCount} הוגשו`}
                 {draftCount > 0 && ` • ${draftCount} טיוטות`}
               </div>
-              <div className="text-[10px] text-gray-400 mt-0.5 space-x-2 space-x-reverse">
+              <div className="text-[10px] text-ink-muted mt-0.5 space-x-2 space-x-reverse">
                 {u.lastLoginAt && (
                   <span>
                     התחברות אחרונה:{" "}
@@ -80,7 +80,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
               <div className="text-sm font-bold text-primary">
                 {userForms.length}
               </div>
-              <div className="text-xs text-gray-400">טפסים</div>
+              <div className="text-xs text-ink-muted">טפסים</div>
             </div>
             {u.isAdmin ? (
               <div className="flex flex-col gap-1 items-end">
@@ -92,7 +92,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                     type="button"
                     disabled={pendingClaim === uid}
                     onClick={() => handleAdminToggle(uid, u.displayName, "demote")}
-                    className="text-[10px] text-gray-500 underline disabled:opacity-50"
+                    className="text-[10px] text-ink-muted underline disabled:opacity-50"
                   >
                     {pendingClaim === uid ? "..." : "הסר מנהל"}
                   </button>
@@ -103,7 +103,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                 type="button"
                 disabled={pendingClaim === uid}
                 onClick={() => handleAdminToggle(uid, u.displayName, "promote")}
-                className="text-[11px] bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer disabled:opacity-50"
+                className="text-[11px] bg-bg-soft text-ink-muted px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer disabled:opacity-50"
               >
                 {pendingClaim === uid ? "..." : "הפוך למנהל"}
               </button>
