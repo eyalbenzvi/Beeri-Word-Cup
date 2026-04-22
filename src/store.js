@@ -155,9 +155,10 @@ function formDocRef(formId) {
 
 const predictionsCollectionRef = collection(db, "predictions");
 
-async function writeGameDoc(docName, data) {
-  // Safety guard: block writes that would dramatically shrink shared data
-  if (docName === "users" || docName === "matchResults") {
+async function writeGameDoc(docName, data, { force = false } = {}) {
+  // Safety guard: block writes that would dramatically shrink shared data.
+  // Pass { force: true } for explicit admin-initiated clears.
+  if (!force && (docName === "users" || docName === "matchResults")) {
     const currentCount = Object.keys(cache[docName] || {}).length;
     const newCount = Object.keys(data || {}).length;
     if (currentCount > 2 && newCount < currentCount * 0.5) {
@@ -760,17 +761,15 @@ export async function ensureUserInStore(uid, displayName, email) {
 async function doEnsureUserInStore(uid, displayName, email) {
   const existing = getUsers()[uid];
   if (existing) {
-    const needsUpdate =
-      (displayName && existing.displayName !== displayName) ||
-      (email && !existing.email);
+    // Do NOT overwrite displayName on subsequent logins — the user's custom
+    // nickname (set via Profile / ProfileSetup) would be clobbered each time
+    // by the Google name or phone number coming from Firebase Auth.
+    const needsUpdate = email && !existing.email;
     if (!needsUpdate) {
       lastEnsuredUid = uid;
       return uid;
     }
-    const fields = {};
-    if (displayName && existing.displayName !== displayName)
-      fields.displayName = displayName;
-    if (email && !existing.email) fields.email = email;
+    const fields = { email };
     const ok = await updateUserField(uid, fields);
     if (ok) lastEnsuredUid = uid;
     return uid;
@@ -816,9 +815,8 @@ async function doEnsureUserInStore(uid, displayName, email) {
   let ok;
   if (firestoreUser) {
     // Case A: per-field update preserves existing fields (isAdmin, names, etc.).
+    // Don't overwrite displayName — preserve the user's custom nickname.
     const fields = { id: uid, lastLoginAt: now };
-    if (displayName && firestoreUser.displayName !== displayName)
-      fields.displayName = displayName;
     if (email && !firestoreUser.email) fields.email = email;
     cache.users = { ...cache.users, [uid]: { ...firestoreUser, ...fields } };
     notifyAndEmit("users");
@@ -1282,7 +1280,7 @@ export function adminSaveMatchPrediction(formId, matchId, prediction) {
 export function clearMatchResults() {
   if (!requireAdmin()) return;
   writeAuditLog("clear-match-results");
-  writeGameDoc("matchResults", {});
+  writeGameDoc("matchResults", {}, { force: true });
 }
 
 export function getMatchResults() {
