@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { normalizeIsraeliMobile } from "../../src/utils/phone.js";
 
 let adminInitialized = false;
 function initAdmin() {
@@ -86,11 +87,10 @@ async function phoneSendOtpHandler(event) {
   }
 
   const { phone } = body;
-  if (!phone || !/^05\d{8}$/.test(phone.replace(/[-\s]/g, ""))) {
-    return { statusCode: 400, headers: getCorsHeaders(event), body: JSON.stringify({ error: "מספר טלפון לא תקין (05XXXXXXXX)" }) };
+  const cleanPhone = normalizeIsraeliMobile(phone);
+  if (!cleanPhone) {
+    return { statusCode: 400, headers: getCorsHeaders(event), body: JSON.stringify({ error: "מספר נייד ישראלי לא תקין" }) };
   }
-
-  const cleanPhone = phone.replace(/[-\s]/g, "");
 
   // Persistent rate limiting per phone and per IP (fail-closed on Firestore errors).
   const clientIp = event.headers["x-forwarded-for"]?.split(",")[0]?.trim() || event.headers["client-ip"] || "unknown";

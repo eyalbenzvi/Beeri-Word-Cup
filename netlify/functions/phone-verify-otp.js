@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { normalizeIsraeliMobile } from "../../src/utils/phone.js";
 
 let adminInitialized = false;
 
@@ -83,6 +84,13 @@ async function phoneVerifyOtpHandler(event) {
     return { statusCode: 400, headers: getCorsHeaders(event), body: JSON.stringify({ error: "Missing fields" }) };
   }
 
+  // Canonicalize before anything phone-keyed (HMAC, UID) so that an attacker
+  // who reformats the number can't bypass the HMAC bound to send-time.
+  const cleanPhone = normalizeIsraeliMobile(phone);
+  if (!cleanPhone) {
+    return { statusCode: 400, headers: getCorsHeaders(event), body: JSON.stringify({ error: "מספר נייד ישראלי לא תקין" }) };
+  }
+
   // Firestore admin SDK is needed for both brute-force counter and custom token.
   try {
     initAdmin();
@@ -108,7 +116,6 @@ async function phoneVerifyOtpHandler(event) {
   }
 
   // Verify HMAC
-  const cleanPhone = phone.replace(/[-\s]/g, "");
   const hmacData = `${cleanPhone}:${code}:${expiresAt}`;
   const expectedToken = crypto.createHmac("sha256", OTP_SECRET).update(hmacData).digest("hex");
 
