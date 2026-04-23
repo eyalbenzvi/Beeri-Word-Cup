@@ -165,7 +165,7 @@ export default function SimulatorPanel({
           className="border-2 rounded-2xl p-3 text-sm font-medium"
           style={userMode
             ? { background: "#F0F4FF", borderColor: "var(--color-secondary)", color: "#1E3A8A" }
-            : { background: "#FFF8E1", borderColor: "var(--color-accent)", color: "var(--color-accent-text)" }}
+            : { background: "var(--color-accent-soft)", borderColor: "var(--color-accent)", color: "var(--color-accent-text)" }}
         >
           {userMode ? (
             <>
@@ -240,9 +240,9 @@ export default function SimulatorPanel({
               key={match.id}
               className="bg-white rounded-xl p-2 border-2 text-xs"
               style={needsTeam
-                ? { borderColor: "var(--color-accent)", background: "#FFF8E1" }
+                ? { borderColor: "var(--color-accent)", background: "var(--color-accent-soft)" }
                 : result
-                  ? { borderColor: "var(--color-primary)", background: "#F0FFE4" }
+                  ? { borderColor: "var(--color-primary)", background: "var(--color-primary-soft)" }
                   : { borderColor: "var(--color-border)" }}
             >
               <div className="flex justify-between items-center mb-1">
@@ -287,7 +287,7 @@ export default function SimulatorPanel({
                           }))
                         }
                         aria-label={`גולים ${homeTeam?.name || "ביתית"}`}
-                        className="w-10 h-7 text-center border-2 border-border rounded-lg text-xs tabular-nums flex-shrink-0 focus:border-primary focus:outline-none"
+                        className="w-10 h-7 text-center border-2 border-border rounded-xl text-xs tabular-nums flex-shrink-0 focus:border-primary"
                       />
                     ) : (
                       <span className="w-10 text-center font-bold text-primary tabular-nums flex-shrink-0">
@@ -314,7 +314,7 @@ export default function SimulatorPanel({
                           }))
                         }
                         aria-label={`גולים ${awayTeam?.name || "חוץ"}`}
-                        className="w-10 h-7 text-center border-2 border-border rounded-lg text-xs tabular-nums flex-shrink-0 focus:border-primary focus:outline-none"
+                        className="w-10 h-7 text-center border-2 border-border rounded-xl text-xs tabular-nums flex-shrink-0 focus:border-primary"
                       />
                     ) : (
                       <span className="w-10 text-center font-bold text-primary tabular-nums flex-shrink-0">
@@ -329,14 +329,14 @@ export default function SimulatorPanel({
                       <button
                         type="button"
                         onClick={() => handleSaveResult(match)}
-                        className="bg-primary text-white px-2 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer"
+                        className="bg-primary text-white px-2 py-1 rounded-xl text-xs font-extrabold border-none cursor-pointer"
                       >
                         ✓
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingMatch(null)}
-                        className="bg-bg-soft text-ink-muted px-2 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer"
+                        className="bg-bg-soft text-ink-muted px-2 py-1 rounded-xl text-xs font-extrabold border-none cursor-pointer"
                       >
                         ✕
                       </button>
@@ -353,7 +353,7 @@ export default function SimulatorPanel({
                         });
                       }}
                       disabled={!derived.home || !derived.away}
-                      className={`px-3 py-1 rounded-lg text-[11px] font-extrabold border-none cursor-pointer ${
+                      className={`px-3 py-1 rounded-xl text-xs font-extrabold border-none cursor-pointer ${
                         !derived.home || !derived.away
                           ? "bg-bg-soft text-ink-light"
                           : "bg-secondary text-white"
@@ -385,7 +385,7 @@ export default function SimulatorPanel({
                             needsAdvancingTeam: false,
                           })
                         }
-                        className={`text-[11px] px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
+                        className={`text-xs px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
                           result.advancingTeam === derived.home
                             ? "bg-primary text-white"
                             : "bg-bg-soft text-ink"
@@ -402,7 +402,7 @@ export default function SimulatorPanel({
                             needsAdvancingTeam: false,
                           })
                         }
-                        className={`text-[11px] px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
+                        className={`text-xs px-2.5 py-1 rounded-full font-bold border-none cursor-pointer ${
                           result.advancingTeam === derived.away
                             ? "bg-primary text-white"
                             : "bg-bg-soft text-ink"
@@ -435,7 +435,7 @@ export default function SimulatorPanel({
             return (
               <li
                 key={e.formId}
-                className={`flex justify-between px-2 py-1 rounded-lg ${
+                className={`flex justify-between px-2 py-1 rounded-xl ${
                   isMine ? "bg-primary/10 font-extrabold text-primary-dark" : "text-ink"
                 }`}
               >

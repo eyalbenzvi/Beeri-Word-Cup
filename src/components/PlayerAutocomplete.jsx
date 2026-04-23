@@ -104,7 +104,7 @@ export default function PlayerAutocomplete({ value, onChange, disabled, compact 
         disabled={disabled}
       />
       {hint && (
-        <div className="absolute top-full left-0 right-0 mt-0.5 text-[11px] text-danger font-bold pointer-events-none">
+        <div className="absolute top-full left-0 right-0 mt-0.5 text-xs text-danger font-bold pointer-events-none">
           {hint}
         </div>
       )}
@@ -127,7 +127,7 @@ export default function PlayerAutocomplete({ value, onChange, disabled, compact 
                 onClick={() => selectPlayer(p)}
               >
                 <span className="text-sm">{p.nameHe || p.name}</span>
-                <span className="text-[11px] text-ink-muted font-bold flex-shrink-0">
+                <span className="text-xs text-ink-muted font-bold flex-shrink-0">
                   {team?.flag} {team?.name}
                 </span>
               </button>

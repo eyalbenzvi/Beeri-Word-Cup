@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import EmptyState from "../components/EmptyState";
 import {
   useAllPredictions,
   useUsers,
@@ -223,10 +224,7 @@ export default function AllFormsView({ onBack }) {
       </div>
 
       {submittedForms.length === 0 ? (
-        <div className="text-center py-12 card-duo-lg">
-          <div className="text-6xl mb-3">📋</div>
-          <p className="text-ink-muted font-medium">אין טפסים שהוגשו עדיין</p>
-        </div>
+        <EmptyState icon="📋" title="אין טפסים שהוגשו עדיין" />
       ) : (
         <>
           {/* Filter controls */}
@@ -243,7 +241,7 @@ export default function AllFormsView({ onBack }) {
                       setFilterBy(tab.id);
                       setFilterText("");
                     }}
-                    className={`flex-1 py-2 text-xs font-extrabold rounded-lg transition border-none cursor-pointer ${
+                    className={`flex-1 py-2 text-xs font-extrabold rounded-xl transition border-none cursor-pointer ${
                       filterBy === tab.id
                         ? "bg-white text-ink"
                         : "bg-transparent text-ink-muted"
@@ -269,7 +267,7 @@ export default function AllFormsView({ onBack }) {
               : `מציג ${filteredForms.length} מתוך ${submittedForms.length} טפסים`}
           </p>
           {!locked && (
-            <div className="border-2 border-accent rounded-2xl p-4 mb-3 text-center" style={{ background: "#FFF8E1" }}>
+            <div className="border-2 border-accent rounded-2xl p-4 mb-3 text-center" style={{ background: "var(--color-accent-soft)" }}>
               <div className="text-3xl mb-1">🔒</div>
               <div className="text-base font-extrabold text-accent-text">
                 הניחושים עדיין לא גלויים
@@ -299,9 +297,7 @@ export default function AllFormsView({ onBack }) {
               );
             })}
             {filteredForms.length === 0 && (
-              <div className="text-center py-6 text-ink-muted text-sm font-medium">
-                לא נמצאו טפסים תואמים
-              </div>
+              <EmptyState icon="🔎" title="לא נמצאו טפסים תואמים" />
             )}
           </div>
         </>

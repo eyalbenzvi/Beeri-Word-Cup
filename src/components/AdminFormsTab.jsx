@@ -75,7 +75,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 text-sm font-semibold rounded-t-lg ${
+              className={`flex-1 py-2 text-sm font-bold rounded-t-2xl ${
                 tab === t.id
                   ? "bg-primary text-white"
                   : "bg-bg-soft text-ink-muted"
@@ -93,7 +93,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-0.5"
+                  className="input-duo mt-0.5"
                 />
               </div>
               <div>
@@ -101,7 +101,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                 <input
                   value={budgetNumber}
                   onChange={(e) => setBudgetNumber(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-0.5"
+                  className="input-duo mt-0.5"
                 />
               </div>
               <div>
@@ -121,14 +121,14 @@ function AdminFormEditModal({ formId, form, onClose }) {
                   value={adminNote}
                   onChange={(e) => setAdminNote(e.target.value)}
                   rows={3}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-0.5"
+                  className="input-duo mt-0.5"
                   placeholder="תיעוד תיקון..."
                 />
               </div>
               <button
                 type="button"
                 onClick={handleSaveDetails}
-                className="w-full bg-primary text-white py-2 rounded-xl text-sm font-semibold"
+                className="btn-duo btn-duo-primary w-full"
               >
                 שמור פרטים
               </button>
@@ -142,10 +142,10 @@ function AdminFormEditModal({ formId, form, onClose }) {
                     key={key}
                     type="button"
                     onClick={() => setEditStage(key)}
-                    className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                    className={`px-2 py-1 rounded-xl text-xs font-bold ${
                       editStage === key
                         ? "bg-primary text-white"
-                        : "bg-bg-soft"
+                        : "bg-bg-soft text-ink-muted"
                     }`}
                   >
                     {label}
@@ -175,7 +175,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                   return (
                     <div
                       key={rowKey}
-                      className="border border-border rounded-lg p-2 text-xs"
+                      className="border-2 border-border rounded-xl p-2 text-xs"
                     >
                       <div className="text-[10px] text-ink-muted mb-1">
                         {match.id}
@@ -190,7 +190,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                           min="0"
                           defaultValue={pred?.homeScore ?? ""}
                           id={`${match.id}-h`}
-                          className="w-10 border rounded text-center"
+                          className="w-10 border-2 border-border rounded-xl text-center"
                         />
                         <span>-</span>
                         <input
@@ -198,14 +198,15 @@ function AdminFormEditModal({ formId, form, onClose }) {
                           min="0"
                           defaultValue={pred?.awayScore ?? ""}
                           id={`${match.id}-a`}
-                          className="w-10 border rounded text-center"
+                          className="w-10 border-2 border-border rounded-xl text-center"
                         />
                         <span className="truncate max-w-[40%]">
                           {awayTeam?.name || "—"}
                         </span>
                         <button
                           type="button"
-                          className="bg-primary text-white px-2 py-1 rounded text-[11px]"
+                          className="btn-duo-flat"
+                          style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                           onClick={() => {
                             const hi = document.getElementById(`${match.id}-h`);
                             const ai = document.getElementById(`${match.id}-a`);
@@ -343,7 +344,7 @@ export default function AdminFormsTab({ users, allPredictions }) {
               key={f.id}
               type="button"
               onClick={() => setStatusFilter(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium ${
                 statusFilter === f.id
                   ? "bg-primary text-white"
                   : "bg-bg-soft text-ink-muted"
@@ -361,7 +362,7 @@ export default function AdminFormsTab({ users, allPredictions }) {
             key={r.formId}
             className="card-duo-tight text-sm"
           >
-            <div className="font-semibold text-primary truncate">
+            <div className="font-bold text-primary truncate">
               {r.formName || "ללא שם"}
             </div>
             <div className="text-xs text-ink-muted mt-0.5">
@@ -370,7 +371,10 @@ export default function AdminFormsTab({ users, allPredictions }) {
                 ` · ${new Date(r.submittedAt).toLocaleDateString("he-IL")}`}
             </div>
             {r.adminNote && (
-              <div className="text-[11px] text-amber-700 mt-1 bg-amber-50 rounded px-2 py-1">
+              <div
+                className="text-xs text-accent-text mt-1 rounded-xl px-2 py-1"
+                style={{ background: "var(--color-accent-soft)" }}
+              >
                 הערת מנהל: {r.adminNote}
               </div>
             )}
@@ -378,7 +382,7 @@ export default function AdminFormsTab({ users, allPredictions }) {
               <button
                 type="button"
                 onClick={() => setEditingId(r.formId)}
-                className="text-[11px] bg-bg-soft px-2 py-1 rounded-lg"
+                className="btn-duo-flat"
               >
                 עריכה
               </button>
@@ -386,7 +390,8 @@ export default function AdminFormsTab({ users, allPredictions }) {
                 <button
                   type="button"
                   onClick={() => adminApprovePrediction(r.formId)}
-                  className="bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer"
+                  className="btn-duo-flat"
+                  style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                 >
                   ✅ אשר
                 </button>
@@ -400,7 +405,8 @@ export default function AdminFormsTab({ users, allPredictions }) {
                       showToast("הטופס הוגש");
                     }
                   }}
-                  className="text-[11px] bg-green-100 text-green-800 px-2 py-1 rounded-lg"
+                  className="btn-duo-flat"
+                  style={{ background: "var(--color-primary-soft)", color: "var(--color-primary-dark)" }}
                 >
                   הגשה כפויה
                 </button>
@@ -409,12 +415,13 @@ export default function AdminFormsTab({ users, allPredictions }) {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (await confirm("לפתוח מחדש כטיוטה?")) {
+                    if (await confirm("לפתוח מחדש כטיוטה")) {
                       adminReopenForm(r.formId);
                       showToast("הטופס נפתח מחדש");
                     }
                   }}
-                  className="text-[11px] bg-amber-100 text-amber-900 px-2 py-1 rounded-lg"
+                  className="btn-duo-flat"
+                  style={{ background: "var(--color-accent-soft)", color: "var(--color-accent-text)" }}
                 >
                   פתח מחדש
                 </button>
@@ -422,12 +429,13 @@ export default function AdminFormsTab({ users, allPredictions }) {
               <button
                 type="button"
                 onClick={async () => {
-                  if (await confirm("למחוק טופס זה לצמיתות?")) {
+                  if (await confirm("למחוק טופס זה לצמיתות")) {
                     adminDeleteForm(r.formId);
                     showToast("הטופס נמחק");
                   }
                 }}
-                className="text-[11px] bg-danger/10 text-danger font-bold px-2 py-1 rounded-lg"
+                className="btn-duo-flat"
+                style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
               >
                 מחק
               </button>

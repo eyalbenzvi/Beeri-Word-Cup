@@ -150,8 +150,7 @@ export default function Admin() {
                   });
                   setTopScorerInput("");
                 }}
-                className="btn-duo btn-duo-primary"
-                style={{ padding: "0.55rem 1rem", fontSize: "0.85rem" }}
+                className="btn-duo btn-duo-primary btn-duo-sm"
               >
                 הוסף
               </button>

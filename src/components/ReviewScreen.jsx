@@ -92,7 +92,7 @@ export default function ReviewScreen({
                     onClose();
                   }}
                   className="w-full text-right border-2 border-danger/40 rounded-2xl px-4 py-3 flex items-center justify-between gap-2 cursor-pointer hover:border-danger transition"
-                  style={{ background: "#FFF1F1" }}
+                  style={{ background: "var(--color-danger-soft)" }}
                 >
                   <span className="text-sm text-danger font-bold">
                     {err.label}

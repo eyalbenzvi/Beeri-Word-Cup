@@ -66,7 +66,7 @@ export default function FinalistsPickerModal({
         </div>
 
         {championTeam && runnerUpTeam && (
-          <div className="border-2 border-accent rounded-2xl p-3 mb-4 text-center text-sm text-accent-text font-bold" style={{ background: "#FFF8E1" }}>
+          <div className="border-2 border-accent rounded-2xl p-3 mb-4 text-center text-sm text-accent-text font-bold" style={{ background: "var(--color-accent-soft)" }}>
             <div className="font-extrabold mb-1">הגמר יהיה:</div>
             <div>
               {championTeam.flag} {championTeam.name}

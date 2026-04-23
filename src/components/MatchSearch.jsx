@@ -66,7 +66,12 @@ export default function MatchSearch({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center pt-16 px-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center pt-16 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="חיפוש משחק"
+    >
       <div className="bg-white rounded-3xl max-w-md w-full border-2 border-border max-h-[70vh] flex flex-col">
         <div className="p-4 pb-2 flex items-center gap-3 border-b-2 border-border">
           <input
@@ -76,10 +81,12 @@ export default function MatchSearch({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="חפש קבוצה או שלב..."
             className="input-duo flex-1"
+            aria-label="חיפוש משחק"
           />
           <button
             onClick={onClose}
             className="text-ink-muted text-xl bg-transparent border-none cursor-pointer p-1 hover:text-ink font-bold"
+            aria-label="סגור"
           >
             ✕
           </button>

@@ -35,7 +35,7 @@ export default function Layout({ children }) {
             {/* Hamburger — always visible */}
             <button
               onClick={() => setMenuOpen(true)}
-              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-lg hover:bg-bg-soft"
+              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-xl hover:bg-bg-soft"
               aria-label="תפריט"
               aria-expanded={menuOpen}
               aria-controls="menu-overlay"
@@ -91,8 +91,7 @@ export default function Layout({ children }) {
           ) : (
             <button
               onClick={() => navigate("login")}
-              className="btn-duo btn-duo-primary"
-              style={{ padding: "0.5rem 1.25rem", fontSize: "0.85rem" }}
+              className="btn-duo btn-duo-primary btn-duo-sm"
             >
               התחבר
             </button>
@@ -102,7 +101,7 @@ export default function Layout({ children }) {
 
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <main className="max-w-3xl mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-24 md:pb-8">
+      <main className="max-w-4xl mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-24 md:pb-8">
         {children}
       </main>
 
@@ -113,8 +112,8 @@ export default function Layout({ children }) {
             <button
               key={item.id}
               onClick={() => navigate(item.id)}
-              className={`flex-1 flex flex-col items-center min-h-[60px] justify-center gap-0.5 text-[11px] bg-transparent border-none cursor-pointer transition-colors duration-150 pt-2 pb-1 ${
-                page === item.id ? "text-primary font-extrabold" : "text-ink-muted font-semibold"
+              className={`flex-1 flex flex-col items-center min-h-[60px] justify-center gap-0.5 text-xs bg-transparent border-none cursor-pointer transition-colors duration-150 pt-2 pb-1 ${
+                page === item.id ? "text-primary font-extrabold" : "text-ink-muted font-bold"
               }`}
               aria-current={page === item.id ? "page" : undefined}
             >

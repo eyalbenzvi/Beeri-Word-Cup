@@ -103,7 +103,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                 type="button"
                 disabled={pendingClaim === uid}
                 onClick={() => handleAdminToggle(uid, u.displayName, "promote")}
-                className="text-[11px] bg-bg-soft text-ink-muted px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer disabled:opacity-50"
+                className="text-xs bg-bg-soft text-ink-muted px-2.5 py-1 rounded-full hover:bg-primary/10 hover:text-primary transition border-none cursor-pointer disabled:opacity-50"
               >
                 {pendingClaim === uid ? "..." : "הפוך למנהל"}
               </button>
@@ -123,7 +123,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                   deleteUser(uid);
                 }
               }}
-              className="text-[11px] text-red-500 px-2 py-1"
+              className="text-xs text-danger px-2 py-1 font-bold"
             >
               מחק משתמש
             </button>

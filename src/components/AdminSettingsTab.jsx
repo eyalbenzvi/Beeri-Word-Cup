@@ -85,7 +85,7 @@ export default function AdminSettingsTab({
   return (
     <div className="space-y-4">
       <div className="card-duo">
-        <h3 className="font-semibold text-sm mb-3">בקרת טורניר</h3>
+        <h3 className="font-bold text-sm mb-3">בקרת טורניר</h3>
         <div className="flex items-center justify-between py-3 border-b border-gray-50">
           <div>
             <div className="text-sm font-medium">הקפאת טפסים</div>
@@ -97,7 +97,9 @@ export default function AdminSettingsTab({
             onClick={() =>
               updateSettings({ predictionsLocked: !settings.predictionsLocked })
             }
-            className={`relative w-12 h-6 rounded-full transition-colors ${settings.predictionsLocked ? "bg-red-400" : "bg-gray-300"}`}
+            className={`relative w-12 h-6 rounded-full transition-colors ${settings.predictionsLocked ? "bg-danger" : "bg-border-strong"}`}
+            aria-pressed={settings.predictionsLocked}
+            aria-label="נעל ניחושים"
           >
             <span
               className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.predictionsLocked ? "translate-x-6" : "translate-x-0.5"}`}
@@ -107,7 +109,7 @@ export default function AdminSettingsTab({
       </div>
 
       <div className="card-duo">
-        <h3 className="font-semibold text-sm mb-2">סטטיסטיקות</h3>
+        <h3 className="font-bold text-sm mb-2">סטטיסטיקות</h3>
         <div className="grid grid-cols-3 gap-3 text-center">
           <div className="bg-bg-soft rounded-xl border-2 border-border p-3">
             <div className="text-2xl font-bold text-primary">
@@ -131,7 +133,7 @@ export default function AdminSettingsTab({
       </div>
 
       <div className="card-duo">
-        <h3 className="font-semibold text-sm mb-3">רשימת מלך שערים</h3>
+        <h3 className="font-bold text-sm mb-3">רשימת מלך שערים</h3>
         <div className="text-xs text-ink-muted mb-3">
           {settings.topScorerPlayers?.length > 0
             ? `רשימה מותאמת: ${settings.topScorerPlayers.length} שחקנים`
@@ -144,13 +146,13 @@ export default function AdminSettingsTab({
               setPlayerCount(TOP_SCORER_PLAYERS.length);
               showToast("רשימת השחקנים אופסה לברירת המחדל");
             }}
-            className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
+            className="flex-1 bg-primary text-white text-sm py-2 rounded-xl hover:bg-primary-light transition"
           >
             אפס לברירת מחדל
           </button>
           <button
             onClick={() => playerFileRef.current?.click()}
-            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-bg-soft transition"
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-xl border-2 border-primary hover:bg-bg-soft transition"
           >
             טען רשימה מקובץ
           </button>
@@ -190,17 +192,17 @@ export default function AdminSettingsTab({
       </div>
 
       <div className="card-duo">
-        <h3 className="font-semibold text-sm mb-3">גיבוי נתונים</h3>
+        <h3 className="font-bold text-sm mb-3">גיבוי נתונים</h3>
         <div className="flex gap-2">
           <button
             onClick={handleExport}
-            className="flex-1 bg-primary text-white text-sm py-2 rounded-lg hover:bg-primary-light transition"
+            className="flex-1 bg-primary text-white text-sm py-2 rounded-xl hover:bg-primary-light transition"
           >
             ייצוא
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 bg-white text-primary text-sm py-2 rounded-lg border-2 border-primary hover:bg-bg-soft transition"
+            className="flex-1 bg-white text-primary text-sm py-2 rounded-xl border-2 border-primary hover:bg-bg-soft transition"
           >
             ייבוא
           </button>
@@ -214,8 +216,8 @@ export default function AdminSettingsTab({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 border border-red-200">
-        <h3 className="font-semibold text-sm text-red-600 mb-2">אזור מסוכן</h3>
+      <div className="bg-white rounded-xl p-4 border-2 border-danger/30">
+        <h3 className="font-bold text-sm text-danger mb-2">אזור מסוכן</h3>
         <button
           onClick={() => {
             if (window.confirm("בטוח? פעולה זו תמחק את כל תוצאות האמת.")) {
@@ -223,7 +225,7 @@ export default function AdminSettingsTab({
               clearMatchResults();
             }
           }}
-          className="w-full bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-orange-600 transition mb-3"
+          className="btn-duo btn-duo-orange w-full mb-3"
         >
           מחק את כל תוצאות האמת
         </button>
@@ -239,7 +241,7 @@ export default function AdminSettingsTab({
             clearAllData();
             navigate("home");
           }}
-          className="w-full bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"
+          className="btn-duo btn-duo-danger w-full"
         >
           מחק את כל הנתונים
         </button>

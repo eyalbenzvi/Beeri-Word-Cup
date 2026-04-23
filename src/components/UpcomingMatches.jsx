@@ -45,7 +45,7 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
 
   return (
     <div
-      className={`flex items-center justify-between gap-2 py-1 text-[12px] ${
+      className={`flex items-center justify-between gap-2 py-1 text-xs ${
         bracketMismatch ? "text-ink-muted/50" : "text-ink"
       }`}
     >
@@ -55,7 +55,7 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
           {aligned.awayScore} – {aligned.homeScore}
         </span>
       ) : bracketMismatch ? (
-        <span className="text-[11px]">קבוצות שונות בטופס</span>
+        <span className="text-xs">קבוצות שונות בטופס</span>
       ) : (
         <span className="text-ink-muted/60">—</span>
       )}
@@ -88,7 +88,7 @@ function PredictionsList({ forms, match, actualTeams, formBrackets }) {
   if (forms.length === 1) {
     return (
       <div className="mt-2 pt-2 border-t border-border">
-        <div className="text-[11px] text-ink-muted mb-0.5">הניחוש שלך</div>
+        <div className="text-xs text-ink-muted mb-0.5">הניחוש שלך</div>
         {rows}
       </div>
     );
@@ -97,7 +97,7 @@ function PredictionsList({ forms, match, actualTeams, formBrackets }) {
   if (forms.length <= 4) {
     return (
       <div className="mt-2 pt-2 border-t border-border">
-        <div className="text-[11px] text-ink-muted mb-0.5">
+        <div className="text-xs text-ink-muted mb-0.5">
           הניחושים שלך ({forms.length})
         </div>
         <div className="md:grid md:grid-cols-2 md:gap-x-4">{rows}</div>
@@ -107,7 +107,7 @@ function PredictionsList({ forms, match, actualTeams, formBrackets }) {
 
   return (
     <details className="mt-2 pt-2 border-t border-border">
-      <summary className="text-[11px] text-ink-muted cursor-pointer select-none">
+      <summary className="text-xs text-ink-muted cursor-pointer select-none">
         הניחושים שלך ({forms.length})
       </summary>
       <div className="md:grid md:grid-cols-2 md:gap-x-4 mt-1">{rows}</div>
@@ -124,11 +124,11 @@ function MatchRow({ match, actualTeams }) {
   return (
     <>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-medium text-secondary/90">
+        <span className="text-xs font-medium text-secondary/90">
           {stageLabel}
           {match.group ? ` · ${match.group}` : ""}
         </span>
-        <span className="text-[11px] text-ink-muted/60">{meta}</span>
+        <span className="text-xs text-ink-muted/60">{meta}</span>
       </div>
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-center">

@@ -32,6 +32,8 @@ import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
+import Badge from "../components/Badge";
+import Spinner from "../components/Spinner";
 const AllFormsView = React.lazy(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import SaveIndicator from "../components/SaveIndicator";
@@ -381,7 +383,7 @@ export default function Predict() {
 
   if (!activeForm && showAllForms) {
     return (
-      <Suspense fallback={<div className="text-center py-8 text-ink-muted font-bold">טוען...</div>}>
+      <Suspense fallback={<div className="text-center py-8 text-ink-muted font-bold"><Spinner label="טוען..." /></div>}>
         <AllFormsView onBack={() => setShowAllForms(false)} />
       </Suspense>
     );
@@ -416,21 +418,13 @@ export default function Predict() {
         </div>
         <div className="flex items-center gap-2">
           <SaveIndicator />
-          {status === "submitted" && (
-            <span className="text-[11px] bg-primary text-white px-2 py-1 rounded-full font-extrabold">
-              ✅ הוגש
-            </span>
-          )}
-          {settings.predictionsLocked && (
-            <span className="text-[11px] bg-danger text-white px-2 py-1 rounded-full font-extrabold">
-              🔒 נסגר
-            </span>
-          )}
+          {status === "submitted" && <Badge variant="primary" icon="✅">הוגש</Badge>}
+          {settings.predictionsLocked && <Badge variant="danger" icon="🔒">נסגר</Badge>}
         </div>
       </div>
 
       {activeForm?.status === "pending" && (
-        <div className="border-2 border-accent rounded-2xl p-4 mb-4 text-center" style={{ background: "#FFF8E1" }}>
+        <div className="border-2 border-accent rounded-2xl p-4 mb-4 text-center" style={{ background: "var(--color-accent-soft)" }}>
           <div className="text-3xl mb-1">⏳</div>
           <div className="text-base font-extrabold text-accent-text">
             הטופס ממתין לאישור
@@ -441,7 +435,7 @@ export default function Predict() {
         </div>
       )}
       {status === "submitted" && activeForm?.status !== "pending" && (
-        <div className="border-2 border-primary rounded-2xl p-4 mb-4 text-center" style={{ background: "#F0FFE4" }}>
+        <div className="border-2 border-primary rounded-2xl p-4 mb-4 text-center" style={{ background: "var(--color-primary-soft)" }}>
           <div className="text-3xl mb-1">✅</div>
           <div className="text-base font-extrabold text-primary-dark">הטופס הוגש</div>
           <div className="text-xs text-primary-dark mt-1 font-medium">
@@ -462,31 +456,30 @@ export default function Predict() {
       <div id="form-details-section" className="card-duo-tight mb-3">
         <div className="grid grid-cols-3 gap-2">
           <div id="field-formName">
-            <label className="text-[11px] font-extrabold text-ink-muted">שם הטופס</label>
+            <label className="text-xs font-extrabold text-ink-muted">שם הטופס</label>
             <input
               value={activeForm.formName || ""}
               onChange={(e) => updateFormDetails(activeFormId, { formName: e.target.value })}
               placeholder="שם הטופס"
               name="formName"
-              className="input-duo"
-              style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
+              maxLength={50}
+              className="input-duo input-duo-sm"
               disabled={!canEdit}
             />
           </div>
           <div id="field-budget">
-            <label className="text-[11px] font-extrabold text-ink-muted">תקציב (חובה)</label>
+            <label className="text-xs font-extrabold text-ink-muted">תקציב (חובה)</label>
             <input
               value={activeForm.budgetNumber || ""}
               onChange={(e) => updateFormDetails(activeFormId, { budgetNumber: e.target.value })}
               inputMode="numeric"
               placeholder="100-9999"
-              className="input-duo"
-              style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
+              className="input-duo input-duo-sm"
               disabled={!canEdit}
             />
           </div>
           <div id="field-topScorer">
-            <label className="text-[11px] font-extrabold text-ink-muted">מלך שערים</label>
+            <label className="text-xs font-extrabold text-ink-muted">מלך שערים</label>
             <PlayerAutocomplete
               value={activeForm.topScorer || ""}
               onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
@@ -535,7 +528,7 @@ export default function Predict() {
           </div>
 
           {status === "draft" && !settings.predictionsLocked && (
-            <div className="mb-4 space-y-2 md:max-w-md md:mx-auto">
+            <div className="mb-4 space-y-3 md:max-w-md md:mx-auto">
               <button
                 onClick={() => setShowScenarioModal(true)}
                 disabled={!!aiProgress}
@@ -552,7 +545,7 @@ export default function Predict() {
               >
                 🤖 מלא הכל עם AI
               </button>
-              <button onClick={handleTrySubmit} className="btn-duo btn-duo-primary w-full" style={{ padding: "1rem 1.5rem", fontSize: "1rem" }}>
+              <button onClick={handleTrySubmit} className="btn-duo btn-duo-primary w-full">
                 הגש טופס
               </button>
             </div>

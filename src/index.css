@@ -37,6 +37,25 @@
   --color-card-hover: #F7F7F7;
   --color-border: #E5E5E5;
   --color-border-strong: #D0D0D0;
+
+  /* Soft accent backgrounds (for alert boxes, info cards) */
+  --color-primary-soft: #F0FFE4;
+  --color-accent-soft: #FFF8E1;
+  --color-accent-soft-2: #FFF3D6;
+  --color-danger-soft: #FFF1F1;
+
+  /* Brand partners */
+  --color-whatsapp: #25D366;
+  --color-whatsapp-dark: #1EA952;
+
+  /* Z-index scale */
+  --z-sticky: 20;
+  --z-header: 50;
+  --z-modal-backdrop: 60;
+  --z-menu: 70;
+  --z-toast: 100;
+  --z-confirm: 9999;
+  --z-confetti: 99999;
 }
 
 html, body {
@@ -129,6 +148,24 @@ html, body {
 }
 .btn-duo-ghost:active:not(:disabled) { transform: translateY(1px); }
 
+/* Ghost button with the same 3D shadow as primary buttons.
+   Used for auth options that must look like a button (Google, Phone). */
+.btn-duo-ghost-raised {
+  background: #FFFFFF;
+  color: var(--color-ink);
+  border: 2px solid var(--color-border);
+  padding: calc(0.875rem - 2px) calc(1.5rem - 2px);
+  box-shadow: 0 4px 0 0 var(--color-border);
+}
+.btn-duo-ghost-raised:hover:not(:disabled) {
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-strong);
+}
+.btn-duo-ghost-raised:active:not(:disabled) {
+  box-shadow: 0 0 0 0 var(--color-border);
+  transform: translateY(4px);
+}
+
 .btn-duo:disabled {
   background: var(--color-border);
   color: var(--color-ink-light);
@@ -140,6 +177,15 @@ html, body {
 .btn-duo-ghost:disabled {
   box-shadow: none;
   background: var(--color-bg-soft);
+}
+
+/* Smaller 3D button — same aesthetic as .btn-duo but compact.
+   Use for inline actions next to content (form rows, etc.) when a full-size
+   CTA would be too heavy. */
+.btn-duo-sm {
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 14px;
 }
 
 /* Flat (no 3D shadow) variant for small buttons, chips, close buttons */
@@ -200,6 +246,12 @@ html, body {
   border-color: var(--color-secondary);
   background: #F0F9FF;
 }
+
+/* Compact input — for cramped grids (e.g. 3-col form details on mobile). */
+.input-duo-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
 .input-duo:disabled {
   background: var(--color-bg-soft);
   color: var(--color-ink-light);
@@ -225,7 +277,7 @@ html, body {
 .score-input-duo:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: #F0FFE4;
+  background: var(--color-primary-soft);
 }
 .score-input-duo:disabled {
   background: var(--color-bg-soft);
@@ -310,7 +362,7 @@ html, body {
 
 /* Save flash (border) */
 @keyframes saveFlash {
-  0% { border-color: var(--color-primary); background: #F0FFE4; }
+  0% { border-color: var(--color-primary); background: var(--color-primary-soft); }
   100% { border-color: var(--color-border); background: #FFFFFF; }
 }
 .animate-save-flash { animation: saveFlash 0.8s ease-out forwards; }
@@ -327,6 +379,57 @@ input[type="number"] { -moz-appearance: textfield; }
 input:focus, select:focus, textarea:focus { outline: none; }
 :focus-visible { outline: 3px solid var(--color-secondary); outline-offset: 2px; }
 button:focus-visible { border-radius: 14px; }
+
+/* --------- Reduced motion --------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------- Shared alert / info boxes --------- */
+.alert-primary-soft {
+  background: var(--color-primary-soft);
+  border: 2px solid var(--color-primary);
+  border-radius: 16px;
+  padding: 1rem;
+}
+.alert-accent-soft {
+  background: var(--color-accent-soft);
+  border: 2px solid var(--color-accent);
+  border-radius: 16px;
+  padding: 1rem;
+}
+.alert-danger-soft {
+  background: var(--color-danger-soft);
+  border: 2px solid var(--color-danger);
+  border-radius: 16px;
+  padding: 0.75rem 1rem;
+}
+
+/* --------- Badge (small pill) --------- */
+.badge-duo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.badge-duo-primary { background: var(--color-primary); color: #FFFFFF; }
+.badge-duo-secondary { background: var(--color-secondary); color: #FFFFFF; }
+.badge-duo-accent { background: var(--color-accent); color: #FFFFFF; }
+.badge-duo-danger { background: var(--color-danger); color: #FFFFFF; }
+.badge-duo-muted { background: var(--color-bg-soft); color: var(--color-ink-muted); border: 2px solid var(--color-border); }
 
 /* --------- Scrollbar --------- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

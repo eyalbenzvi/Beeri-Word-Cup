@@ -196,12 +196,12 @@ export default function AdminResultsTab() {
   return (
     <>
       {unresolvedKnockoutTies.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 text-center">
-          <div className="text-sm font-semibold text-red-600">
+        <div className="alert-danger-soft text-center mb-3">
+          <div className="text-sm font-bold text-danger">
             ⚠️ {unresolvedKnockoutTies.length} משחקי נוקאאוט בתיקו ללא בחירת מי
             עולה
           </div>
-          <div className="text-xs text-red-500 mt-1">
+          <div className="text-xs text-danger mt-1">
             יש לבחור מי עולה בכל משחק תיקו כדי שהניקוד יחושב נכון
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function AdminResultsTab() {
         <button
           type="button"
           onClick={handleRandomizeResults}
-          className="flex-1 bg-white text-primary font-semibold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-bg-soft active:bg-bg-soft transition text-sm"
+          className="flex-1 bg-white text-primary font-bold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-bg-soft active:bg-bg-soft transition text-sm"
         >
           🎲 הגרלת כל התוצאות
         </button>
@@ -218,7 +218,7 @@ export default function AdminResultsTab() {
           type="button"
           onClick={undoLast}
           disabled={undoStack.length === 0}
-          className={`px-4 py-2.5 rounded-xl border-2 border-border text-sm font-semibold text-ink hover:bg-bg-soft ${undoStack.length === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
+          className={`px-4 py-2.5 rounded-xl border-2 border-border text-sm font-bold text-ink hover:bg-bg-soft ${undoStack.length === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
           title="בטל את השינוי האחרון בתוצאה בודדת"
         >
           ↩︎ ביטול
@@ -275,17 +275,14 @@ export default function AdminResultsTab() {
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-xl p-3 border ${result ? "border-green-200 bg-green-50/30" : "border-border"}`}
+              className={`bg-white rounded-xl p-3 border-2 ${result ? "border-primary/30" : "border-border"}`}
+              style={result ? { background: "var(--color-primary-soft)" } : undefined}
             >
               <div className="flex justify-end mb-1">
                 {result ? (
-                  <span className="text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                    הוזן
-                  </span>
+                  <span className="badge-duo badge-duo-primary">הוזן</span>
                 ) : (
-                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                    ממתין
-                  </span>
+                  <span className="badge-duo badge-duo-accent">ממתין</span>
                 )}
               </div>
               {match.date && (
@@ -326,7 +323,7 @@ export default function AdminResultsTab() {
                             homeScore: e.target.value,
                           }))
                         }
-                        className="w-12 h-8 text-center border rounded text-sm"
+                        className="w-12 h-8 text-center border-2 border-border rounded-xl text-sm"
                         placeholder="0"
                       />
                       <input
@@ -339,20 +336,23 @@ export default function AdminResultsTab() {
                             awayScore: e.target.value,
                           }))
                         }
-                        className="w-12 h-8 text-center border rounded text-sm"
+                        className="w-12 h-8 text-center border-2 border-border rounded-xl text-sm"
                         placeholder="0"
                       />
                     </div>
                     <div className="flex flex-col gap-1">
                       <button
                         onClick={() => handleSaveResult(match)}
-                        className="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-green-600"
+                        className="btn-duo-flat"
+                        style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
+                        aria-label="שמור"
                       >
                         ✓
                       </button>
                       <button
                         onClick={() => setEditingMatch(null)}
-                        className="text-xs bg-gray-200 text-ink-muted px-2 py-1 rounded hover:bg-gray-300"
+                        className="btn-duo-flat"
+                        aria-label="בטל"
                       >
                         ✕
                       </button>
@@ -375,7 +375,8 @@ export default function AdminResultsTab() {
                           awayScore: result?.awayScore ?? "",
                         });
                       }}
-                      className="text-xs bg-primary text-white px-2 py-1.5 rounded hover:bg-primary-light"
+                      className="btn-duo-flat"
+                      style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                     >
                       {result ? "ערוך" : "הכנס"}
                     </button>
@@ -386,7 +387,8 @@ export default function AdminResultsTab() {
                           if (window.confirm("למחוק תוצאה זו?"))
                             deleteWithUndo(match.id);
                         }}
-                        className="text-xs bg-red-50 text-red-500 px-2 py-1.5 rounded hover:bg-red-100"
+                        className="btn-duo-flat"
+                        style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
                       >
                         מחק
                       </button>
@@ -400,7 +402,7 @@ export default function AdminResultsTab() {
                     מי עולה? (בעיטות הכרעה)
                   </div>
                   {!result?.advancingTeam && (
-                    <div className="text-xs text-red-500 text-center mb-1.5 font-medium">
+                    <div className="text-xs text-danger text-center mb-1.5 font-medium">
                       חובה לבחור מי עולה
                     </div>
                   )}
@@ -413,10 +415,10 @@ export default function AdminResultsTab() {
                           advancingTeam: derived.home,
                         })
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                         result?.advancingTeam === derived.home
                           ? "bg-primary text-white"
-                          : "bg-bg-soft text-ink-muted hover:bg-gray-200"
+                          : "bg-bg-soft text-ink-muted hover:bg-border"
                       }`}
                     >
                       {homeTeam?.name || "טרם נקבע"}
@@ -428,10 +430,10 @@ export default function AdminResultsTab() {
                           advancingTeam: derived.away,
                         })
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                         result?.advancingTeam === derived.away
                           ? "bg-primary text-white"
-                          : "bg-bg-soft text-ink-muted hover:bg-gray-200"
+                          : "bg-bg-soft text-ink-muted hover:bg-border"
                       }`}
                     >
                       {awayTeam?.name || "טרם נקבע"}

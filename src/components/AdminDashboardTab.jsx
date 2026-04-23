@@ -78,19 +78,19 @@ export default function AdminDashboardTab({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-xs mt-3">
-          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">
               {userCount}
             </div>
             <div className="text-ink-muted font-bold">משתמשים</div>
           </div>
-          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">
               {submittedCount}
             </div>
             <div className="text-ink-muted font-bold">הוגשו</div>
           </div>
-          <div className="rounded-xl p-3 border-2 border-accent/30" style={{ background: "#FFF8E1" }}>
+          <div className="rounded-xl p-3 border-2 border-accent/30" style={{ background: "var(--color-accent-soft)" }}>
             <div className="text-2xl font-extrabold text-accent-text tabular-nums">
               {draftCount}
             </div>
@@ -100,7 +100,7 @@ export default function AdminDashboardTab({
       </div>
 
       {missingMatchIds.length > 0 && (
-        <div className="border-2 border-accent rounded-2xl p-4" style={{ background: "#FFF8E1" }}>
+        <div className="border-2 border-accent rounded-2xl p-4" style={{ background: "var(--color-accent-soft)" }}>
           <div className="text-sm font-extrabold text-accent-text mb-1">
             משחקים ללא תוצאה (דוגמה)
           </div>

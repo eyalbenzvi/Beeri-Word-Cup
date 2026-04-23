@@ -26,11 +26,11 @@ export default function ScoringTable() {
         </tbody>
       </table>
       <div className="mt-3 space-y-1.5 text-sm">
-        <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "#FFF8E1" }}>
+        <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "var(--color-accent-soft)" }}>
           <span className="text-ink font-medium">🏆 ניחוש אלופה</span>
           <span className="font-extrabold text-accent-text">9 נק׳</span>
         </div>
-        <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "#FFF8E1" }}>
+        <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "var(--color-accent-soft)" }}>
           <span className="text-ink font-medium">⚽ מלך שערים</span>
           <span className="font-extrabold text-accent-text">8 נק׳</span>
         </div>

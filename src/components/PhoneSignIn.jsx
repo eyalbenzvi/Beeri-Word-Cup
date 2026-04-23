@@ -3,6 +3,7 @@ import { useToast } from "./Toast";
 import { signInWithPhoneOtp } from "../firebase";
 import { captureClientError } from "../sentry";
 import { normalizeIsraeliMobile, sanitizePhoneInput } from "../utils/phone";
+import InlineError from "./InlineError";
 
 export default function PhoneSignIn() {
   const showToast = useToast();
@@ -128,7 +129,7 @@ export default function PhoneSignIn() {
         >
           {loading ? "שולח קוד..." : "שלח קוד אימות ב-SMS"}
         </button>
-        {error && <p className="text-sm text-danger font-bold text-center">{error}</p>}
+        <InlineError align="center">{error}</InlineError>
       </div>
     );
   }
@@ -176,7 +177,7 @@ export default function PhoneSignIn() {
           {cooldown > 0 ? `שלח שוב (${cooldown}s)` : "שלח קוד חדש"}
         </button>
       </div>
-      {error && <p className="text-sm text-danger font-bold text-center">{error}</p>}
+      <InlineError align="center">{error}</InlineError>
     </div>
   );
 }
