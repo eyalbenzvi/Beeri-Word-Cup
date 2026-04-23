@@ -24,7 +24,7 @@ import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
-import { predictAllMatches } from "../utils/fifaPredictor";
+import { predictAllMatches, getPredictedChampion } from "../utils/fifaPredictor";
 import { predictScenario, pickTopScorerForTeam } from "../utils/scenarioPredictor";
 import { normalizeStatus } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
@@ -315,8 +315,11 @@ export default function Predict() {
 
       if (!activeForm?.topScorer) {
         const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
-        const randomPlayer = playerList[Math.floor(Math.random() * playerList.length)];
-        saveBonusPrediction(activeFormId, "topScorer", randomPlayer.nameHe || randomPlayer.name);
+        const champion = getPredictedChampion(allPreds, calcBracketTeams);
+        const player = champion ? pickTopScorerForTeam(champion, playerList) : null;
+        if (player) {
+          saveBonusPrediction(activeFormId, "topScorer", player.nameHe || player.name);
+        }
       }
 
       showToast("הניחושים החסרים מולאו בעזרת AI! 🤖✨");

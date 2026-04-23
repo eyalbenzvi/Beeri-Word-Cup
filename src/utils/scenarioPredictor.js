@@ -211,12 +211,19 @@ function predictFinal(homeTeam, awayTeam, champion) {
   return { homeScore: lo, awayScore: hi };
 }
 
-// Pick a top scorer from the champion's squad. Falls back to any player if the
-// champion has no players in the list.
+// Pick a top scorer from the champion's squad, preferring striker-flagged
+// attackers. Falls back to the full team squad if no strikers are flagged
+// (e.g. admin-uploaded custom list without the flag), and to the whole list
+// as a last resort.
 export function pickTopScorerForTeam(teamCode, playerList) {
   if (!Array.isArray(playerList) || playerList.length === 0) return null;
   const teamPlayers = playerList.filter((p) => p.team === teamCode);
-  const pool = teamPlayers.length > 0 ? teamPlayers : playerList;
+  const strikers = teamPlayers.filter((p) => p.striker === true);
+  const pool = strikers.length > 0
+    ? strikers
+    : teamPlayers.length > 0
+      ? teamPlayers
+      : playerList;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
