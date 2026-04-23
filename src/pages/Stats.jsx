@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import EmptyState from "../components/EmptyState";
 import {
   useAllPredictions,
   useMatchResults,
@@ -27,10 +28,10 @@ function Bar({ label, count, total, color = "bg-primary" }) {
           className={`${color} h-full rounded-full transition-all duration-500 flex items-center justify-end px-2`}
           style={{ width: `${count > 0 ? Math.max(pct, 8) : 0}%` }}
         >
-          <span className="text-white text-[11px] font-extrabold">{count}</span>
+          <span className="text-white text-xs font-extrabold">{count}</span>
         </div>
       </div>
-      <span className="w-10 text-left text-ink-muted text-[11px] font-bold">
+      <span className="w-10 text-left text-ink-muted text-xs font-bold">
         {pct.toFixed(0)}%
       </span>
     </div>
@@ -188,7 +189,7 @@ function MatchPredictions({ forms }) {
                 X תיקו
               </div>
             </div>
-            <div className="rounded-xl p-3 border-2 border-danger/30" style={{ background: "#FFF1F1" }}>
+            <div className="rounded-xl p-3 border-2 border-danger/30" style={{ background: "var(--color-danger-soft)" }}>
               <div className="text-xl font-extrabold text-danger">
                 {matchStats.awayWin}
               </div>
@@ -327,7 +328,7 @@ function GeneralStats({ forms, results }) {
   return (
     <StatCard title="מספרים" icon="📊">
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
           <div className="text-3xl font-extrabold text-primary-dark">
             {stats.totalForms}
           </div>
@@ -335,7 +336,7 @@ function GeneralStats({ forms, results }) {
             טפסים הוגשו
           </div>
         </div>
-        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
           <div className="text-3xl font-extrabold text-primary-dark">
             {stats.playedResults}/{stats.totalPossible}
           </div>
@@ -343,7 +344,7 @@ function GeneralStats({ forms, results }) {
             משחקים שוחקו
           </div>
         </div>
-        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
           <div className="text-3xl font-extrabold text-primary-dark">
             {stats.avgGoals}
           </div>
@@ -351,7 +352,7 @@ function GeneralStats({ forms, results }) {
             ממוצע שערים לניחוש
           </div>
         </div>
-        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+        <div className="rounded-xl p-3 text-center border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
           <div className="text-3xl font-extrabold text-primary-dark">
             {stats.drawPct}%
           </div>
@@ -535,12 +536,7 @@ export default function Stats() {
       </h1>
 
       {submittedForms.length === 0 ? (
-        <div className="text-center py-12 card-duo-lg">
-          <div className="text-6xl mb-3">📊</div>
-          <p className="text-ink-muted text-sm font-medium">
-            אין מספיק נתונים להצגת סטטיסטיקות
-          </p>
-        </div>
+        <EmptyState icon="📊" title="אין מספיק נתונים להצגת סטטיסטיקות" />
       ) : (
         <>
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">

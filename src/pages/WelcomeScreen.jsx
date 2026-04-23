@@ -6,7 +6,7 @@ import UpcomingMatches from "../components/UpcomingMatches";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
-import { Menu } from "lucide-react";
+import { Menu, Phone, ArrowRight } from "lucide-react";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
@@ -24,7 +24,7 @@ export default function WelcomeScreen() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-lg hover:bg-bg-soft"
+              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-xl hover:bg-bg-soft"
               aria-label="תפריט"
             >
               <Menu size={24} />
@@ -77,9 +77,10 @@ export default function WelcomeScreen() {
               <GoogleSignInButton />
               <button
                 onClick={() => setAuthMethod("phone")}
-                className="w-full text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer py-1 hover:text-secondary-dark"
+                className="btn-duo btn-duo-ghost-raised w-full"
               >
-                📱 התחבר עם מספר טלפון
+                <Phone size={20} aria-hidden="true" />
+                התחבר עם מספר טלפון
               </button>
             </>
           ) : (
@@ -87,9 +88,10 @@ export default function WelcomeScreen() {
               <PhoneSignIn />
               <button
                 onClick={() => setAuthMethod("google")}
-                className="w-full text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer py-1 hover:text-secondary-dark"
+                className="w-full text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer py-1 hover:text-secondary-dark flex items-center justify-center gap-1"
               >
-                ← חזור להתחברות עם Google
+                <ArrowRight size={16} aria-hidden="true" />
+                חזור להתחברות עם Google
               </button>
             </>
           )}

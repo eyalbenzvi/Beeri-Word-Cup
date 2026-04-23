@@ -54,12 +54,12 @@ export default function GroupTable({ matchData, group }) {
                 key={team.code}
                 className="border-b border-border"
                 style={qualifies
-                  ? { background: "#F0FFE4" }
+                  ? { background: "var(--color-primary-soft)" }
                   : thirdPlace
-                    ? { background: "#FFF3D6" }
+                    ? { background: "var(--color-accent-soft-2)" }
                     : undefined}
               >
-                <td className="py-1.5 pr-1 text-ink-light font-extrabold text-[11px]">
+                <td className="py-1.5 pr-1 text-ink-light font-extrabold text-xs">
                   {i + 1}
                 </td>
                 <td className="py-1.5">
@@ -93,10 +93,10 @@ export default function GroupTable({ matchData, group }) {
       </div>
       <div className="flex gap-4 mt-2 text-[10px] text-ink-muted font-bold">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#F0FFE4", border: "1px solid var(--color-primary)" }} /> עולה
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--color-primary-soft)", border: "1px solid var(--color-primary)" }} /> עולה
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#FFF3D6", border: "1px solid var(--color-accent)" }} /> מקום 3
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--color-accent-soft-2)", border: "1px solid var(--color-accent)" }} /> מקום 3
           (אפשרי)
         </span>
       </div>

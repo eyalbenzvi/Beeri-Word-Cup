@@ -77,7 +77,7 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
         <button
           type="button"
           onClick={downloadCsv}
-          className="w-full bg-primary text-white py-2 rounded-xl text-sm font-semibold"
+          className="btn-duo btn-duo-primary w-full"
         >
           הורד CSV
         </button>
@@ -89,7 +89,8 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
         <button
           type="button"
           onClick={downloadPerUserJson}
-          className="w-full bg-white border-2 border-primary text-primary py-2 rounded-xl text-sm font-semibold"
+          className="btn-duo btn-duo-ghost w-full"
+          style={{ color: "var(--color-primary)", borderColor: "var(--color-primary)" }}
         >
           הורד JSON
         </button>
@@ -104,7 +105,7 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
         <button
           type="button"
           onClick={() => window.print()}
-          className="w-full bg-bg-soft text-ink py-2 rounded-xl text-sm font-semibold"
+          className="btn-duo btn-duo-ghost w-full"
         >
           הדפס / PDF
         </button>
@@ -140,7 +141,7 @@ export default function AdminToolsTab() {
             key={t.id}
             type="button"
             onClick={() => setSub(t.id)}
-            className={`px-3 py-2 rounded-lg text-xs font-semibold ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold ${
               sub === t.id
                 ? "bg-primary text-white"
                 : "bg-bg-soft text-ink-muted"

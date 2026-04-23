@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import InlineError from "./InlineError";
 
 const analysisCache = {};
 
@@ -80,7 +81,7 @@ export default function MatchAnalysis({
 
       {error && (
         <div className="text-center py-2">
-          <p className="text-sm text-danger font-bold mb-3">{error}</p>
+          <InlineError align="center" className="mb-3">{error}</InlineError>
           <div className="flex justify-center gap-2">
             <button onClick={fetchAnalysis} className="btn-duo-flat" style={{ background: "var(--color-secondary)", color: "white" }}>
               נסה שוב
@@ -113,10 +114,10 @@ export default function MatchAnalysis({
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => onAccept(result.homeScore, result.awayScore)} className="btn-duo btn-duo-blue flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
+            <button onClick={() => onAccept(result.homeScore, result.awayScore)} className="btn-duo btn-duo-blue btn-duo-sm flex-1">
               ✅ קבל תוצאה
             </button>
-            <button onClick={onClose} className="btn-duo btn-duo-ghost flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
+            <button onClick={onClose} className="btn-duo btn-duo-ghost btn-duo-sm flex-1">
               ❌ דחה
             </button>
           </div>

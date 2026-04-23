@@ -5,11 +5,13 @@ import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
 import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
 import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmModal";
 
 const totalMatches = groupMatches.length + knockoutMatches.length;
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
+  const confirm = useConfirm();
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
@@ -41,7 +43,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-extrabold text-ink tracking-tight">הטפסים שלך</h1>
           {!locked && (
-            <button onClick={() => setShowNewForm(true)} className="btn-duo btn-duo-primary" style={{ padding: "0.6rem 1rem", fontSize: "0.85rem" }}>
+            <button onClick={() => setShowNewForm(true)} className="btn-duo btn-duo-primary btn-duo-sm">
               + טופס חדש
             </button>
           )}
@@ -100,7 +102,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   </div>
                 </div>
                 <span
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-extrabold ${
+                  className={`text-xs px-2.5 py-1 rounded-full font-extrabold ${
                     formStatus === "submitted"
                       ? "bg-primary text-white"
                       : form.status === "pending"
@@ -113,22 +115,27 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
-                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary flex-1" style={{ padding: "0.65rem 1rem", fontSize: "0.85rem" }}>
+                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm flex-1">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
                 {formStatus === "submitted" && !settings.predictionsLocked && (
-                  <button onClick={() => reopenForm(form.formId)} className="btn-duo btn-duo-orange" style={{ padding: "0.65rem 1rem", fontSize: "0.8rem" }}>
+                  <button onClick={() => reopenForm(form.formId)} className="btn-duo btn-duo-orange btn-duo-sm">
                     פתח לעריכה
                   </button>
                 )}
                 {(formStatus === "draft" || form.status === "pending") && (
                   <button
-                    onClick={() => {
-                      if (window.confirm(`למחוק את "${form.formName}"?`))
-                        handleDeleteForm(form.formId);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "מחיקת טופס",
+                        message: `למחוק את "${form.formName}"`,
+                        confirmLabel: "מחק",
+                        variant: "danger",
+                      });
+                      if (ok) handleDeleteForm(form.formId);
                     }}
                     className="btn-duo-flat"
-                    style={{ background: "#FFF1F1", color: "var(--color-danger)" }}
+                    style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
                   >
                     מחק
                   </button>
@@ -152,6 +159,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
             onChange={(e) => setNewFormName(e.target.value)}
             placeholder={`טופס ${forms.length + 1}`}
             className="input-duo mb-3"
+            maxLength={50}
             autoFocus
           />
           <div className="flex gap-2">

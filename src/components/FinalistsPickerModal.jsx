@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 const ALL_TEAMS_SORTED = Object.entries(GROUPS)
   .flatMap(([group, teams]) => teams.map((t) => ({ ...t, group })))
@@ -34,14 +35,27 @@ export default function FinalistsPickerModal({
 }) {
   const [champion, setChampion] = useState(initialChampion || null);
   const [runnerUp, setRunnerUp] = useState(initialRunnerUp || null);
+  const dialogRef = useRef(null);
+  useFocusTrap(dialogRef, true);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
 
   const canSubmit = champion && runnerUp && champion !== runnerUp;
   const championTeam = champion ? getTeamByCode(champion) : null;
   const runnerUpTeam = runnerUp ? getTeamByCode(runnerUp) : null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full border-2 border-border animate-pop-in">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="בחירת אלופה וסגנית"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div ref={dialogRef} className="bg-white rounded-3xl p-6 max-w-md w-full border-2 border-border animate-pop-in">
         <div className="text-center mb-4">
           <div className="text-5xl mb-2">✨</div>
           <h2 className="text-xl font-extrabold text-ink">יצירת תרחיש עם AI</h2>
@@ -66,7 +80,7 @@ export default function FinalistsPickerModal({
         </div>
 
         {championTeam && runnerUpTeam && (
-          <div className="border-2 border-accent rounded-2xl p-3 mb-4 text-center text-sm text-accent-text font-bold" style={{ background: "#FFF8E1" }}>
+          <div className="border-2 border-accent rounded-2xl p-3 mb-4 text-center text-sm text-accent-text font-bold" style={{ background: "var(--color-accent-soft)" }}>
             <div className="font-extrabold mb-1">הגמר יהיה:</div>
             <div>
               {championTeam.flag} {championTeam.name}

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 export default function MatchSearch({
   groupMatches,
@@ -12,6 +13,8 @@ export default function MatchSearch({
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
+  const dialogRef = useRef(null);
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -21,6 +24,12 @@ export default function MatchSearch({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const allMatches = useMemo(
     () => [...groupMatches, ...knockoutMatches],
@@ -66,8 +75,14 @@ export default function MatchSearch({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center pt-16 px-4 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl max-w-md w-full border-2 border-border max-h-[70vh] flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center pt-16 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="חיפוש משחק"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div ref={dialogRef} className="bg-white rounded-3xl max-w-md w-full border-2 border-border max-h-[70vh] flex flex-col">
         <div className="p-4 pb-2 flex items-center gap-3 border-b-2 border-border">
           <input
             ref={inputRef}
@@ -76,10 +91,12 @@ export default function MatchSearch({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="חפש קבוצה או שלב..."
             className="input-duo flex-1"
+            aria-label="חיפוש משחק"
           />
           <button
             onClick={onClose}
             className="text-ink-muted text-xl bg-transparent border-none cursor-pointer p-1 hover:text-ink font-bold"
+            aria-label="סגור"
           >
             ✕
           </button>

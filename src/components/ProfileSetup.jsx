@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { updateUserProfile } from "../store";
+import InlineError from "./InlineError";
 
 export default function ProfileSetup({ user, onComplete }) {
   const googleName = user.displayName || "";
@@ -47,7 +48,7 @@ export default function ProfileSetup({ user, onComplete }) {
         <p className="text-sm text-ink-muted mb-6 font-medium">בוא נגדיר את הפרופיל שלך</p>
 
         <div className="flex justify-center mb-6">
-          <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-4xl font-extrabold border-4 border-primary-dark" style={{ marginBottom: 4 }}>
+          <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-4xl font-extrabold border-4 border-primary-dark">
             {initials}
           </div>
         </div>
@@ -61,6 +62,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="שם פרטי"
               className="input-duo"
+              maxLength={30}
             />
           </div>
           <div>
@@ -71,6 +73,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setLastName(e.target.value)}
               placeholder="שם משפחה"
               className="input-duo"
+              maxLength={30}
             />
           </div>
           <div>
@@ -81,6 +84,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setNickname(e.target.value)}
               placeholder="כינוי"
               className="input-duo"
+              maxLength={20}
             />
           </div>
         </div>
@@ -97,9 +101,7 @@ export default function ProfileSetup({ user, onComplete }) {
           דלג
         </button>
 
-        {error && (
-          <p className="text-sm text-danger font-bold mt-3" role="alert">{error}</p>
-        )}
+        <InlineError className="mt-3" align="center">{error}</InlineError>
       </div>
     </div>
   );

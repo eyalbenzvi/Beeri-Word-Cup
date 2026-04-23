@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmModal";
 import ErrorBoundary from "./components/ErrorBoundary";
+import Spinner from "./components/Spinner";
 import Home from "./pages/Home";
 import WelcomeScreen from "./pages/WelcomeScreen";
 import ProfileSetup from "./components/ProfileSetup";
@@ -69,7 +70,11 @@ function Loading({ reason = "unknown", compact = false }) {
   };
 
   if (compact && !stuck) {
-    return <div className="text-center py-8 text-ink-muted font-bold">טוען...</div>;
+    return (
+      <div className="text-center py-8 text-ink-muted font-bold">
+        <Spinner label="טוען..." />
+      </div>
+    );
   }
 
   return (

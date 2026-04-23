@@ -34,7 +34,6 @@ export default function Home() {
             navigate("predict");
           }}
           className="btn-duo btn-duo-primary w-full mb-4"
-          style={{ padding: "1rem 1.5rem", fontSize: "1rem" }}
         >
           צור את הטופס המנצח שלך
         </button>
@@ -76,8 +75,8 @@ export default function Home() {
       <div
         className="rounded-2xl border-2 p-3"
         style={settings.predictionsLocked
-          ? { background: "#FFF3D6", borderColor: "var(--color-accent)" }
-          : { background: "#F0FFE4", borderColor: "var(--color-primary)" }}
+          ? { background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }
+          : { background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
       >
         <div className="flex items-center justify-center gap-2">
           <span

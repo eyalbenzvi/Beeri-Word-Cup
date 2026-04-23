@@ -50,7 +50,7 @@ export default function ProgressHub({
         <span className="text-ink-muted text-xs">{expanded ? "▲" : "▼"}</span>
         <div className="flex items-center gap-3">
           <span className="text-sm font-extrabold text-ink">מפת השלמה</span>
-          <div className="flex gap-1.5 text-[11px] font-extrabold">
+          <div className="flex gap-1.5 text-xs font-extrabold">
             <span
               className={`px-2 py-0.5 rounded-full text-white ${filledGroups === totalGroups ? "bg-primary" : "bg-accent"}`}
             >
@@ -69,7 +69,7 @@ export default function ProgressHub({
         <div className="px-3.5 pb-3.5 space-y-3">
           {/* Groups grid */}
           <div>
-            <div className="text-[11px] font-extrabold text-ink-muted mb-2">
+            <div className="text-xs font-extrabold text-ink-muted mb-2">
               שלב הבתים
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
@@ -83,13 +83,13 @@ export default function ProgressHub({
                     onClick={() => onSelectGroup(group)}
                     className="relative flex flex-col items-center py-2.5 px-1.5 min-h-[44px] rounded-xl border-2 cursor-pointer transition"
                     style={{
-                      background: isDone ? "#F0FFE4" : isEmpty ? "var(--color-bg-soft)" : "#FFF3D6",
+                      background: isDone ? "var(--color-primary-soft)" : isEmpty ? "var(--color-bg-soft)" : "var(--color-accent-soft-2)",
                       borderColor: isDone ? "var(--color-primary)" : isEmpty ? "var(--color-border)" : "var(--color-accent)",
                       color: isDone ? "var(--color-primary-dark)" : isEmpty ? "var(--color-ink-muted)" : "var(--color-accent-text)",
                     }}
                   >
                     <span className="text-sm font-extrabold">{group}</span>
-                    <span className="text-[11px] font-bold mt-0.5">
+                    <span className="text-xs font-bold mt-0.5">
                       {filled}/{total}
                     </span>
                     <div className="w-full h-1 bg-white/70 rounded-full mt-1">
@@ -106,7 +106,7 @@ export default function ProgressHub({
 
           {/* Knockout stages */}
           <div>
-            <div className="text-[11px] font-extrabold text-ink-muted mb-2">
+            <div className="text-xs font-extrabold text-ink-muted mb-2">
               שלב הנוקאאוט
             </div>
             <div className="space-y-1">
@@ -123,7 +123,7 @@ export default function ProgressHub({
                       {label}
                     </span>
                     <span
-                      className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${isDone ? "bg-primary text-white" : "bg-bg-soft text-ink-muted"}`}
+                      className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${isDone ? "bg-primary text-white" : "bg-bg-soft text-ink-muted"}`}
                     >
                       {filled}/{total}
                     </span>

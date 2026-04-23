@@ -40,7 +40,7 @@ export default function SaveIndicator() {
 
   if (state === "error") {
     return (
-      <div className="border-2 border-danger rounded-2xl px-3 py-2 flex items-center justify-between gap-2 mb-3" style={{ background: "#FFF1F1" }}>
+      <div className="border-2 border-danger rounded-2xl px-3 py-2 flex items-center justify-between gap-2 mb-3" style={{ background: "var(--color-danger-soft)" }}>
         <span className="text-xs font-bold text-danger">
           {errorMsg}
         </span>
@@ -60,12 +60,12 @@ export default function SaveIndicator() {
 
   return (
     <div
-      className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all ${
+      className={`text-xs font-extrabold px-2.5 py-1 rounded-xl transition-all ${
         state === "saving"
           ? "text-accent-text"
           : "text-white bg-primary"
       }`}
-      style={state === "saving" ? { background: "#FFF3D6" } : undefined}
+      style={state === "saving" ? { background: "var(--color-accent-soft-2)" } : undefined}
     >
       {state === "saving" ? "שומר..." : "נשמר ✓"}
     </div>

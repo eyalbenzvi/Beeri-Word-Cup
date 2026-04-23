@@ -88,7 +88,7 @@ function MatchCard({
 
   const nameStyles = {
     group: "text-sm font-medium",
-    knockout: "text-[15px] font-medium",
+    knockout: "text-base font-medium",
     showcase: "text-base font-medium",
   };
 
@@ -164,12 +164,12 @@ function MatchCard({
         <div className="flex justify-between items-center mb-2">
           {showLabel ? (
             <span
-              className={`text-[11px] font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
+              className={`text-xs font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
             >
               {match.label}
             </span>
           ) : <span />}
-          <span className="text-[11px] text-ink-muted/60">
+          <span className="text-xs text-ink-muted/60">
             {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
           </span>
         </div>
@@ -178,7 +178,7 @@ function MatchCard({
       {showPoints && points !== null && (
         <div className="flex justify-end mb-1.5">
           <span
-            className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full ${
+            className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${
               points.points > 0
                 ? "text-white bg-primary"
                 : "bg-bg-soft text-ink-muted"
@@ -211,7 +211,7 @@ function MatchCard({
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>+</button>
+                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
                     type="number"
@@ -221,24 +221,24 @@ function MatchCard({
                     aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-20)`}
                     value={predHome}
                     onChange={handleHomeChange}
-                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-[#F0FFE4] ${
+                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-primary-soft ${
                       hasPrediction ? "border-primary/50" : "border-border"
                     }`}
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>−</button>
+                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>−</button>
                 </div>
-                <span className="relative text-ink-muted font-black text-xs bg-bg-soft px-1.5 py-0.5 rounded-md">
+                <span className="relative text-ink-muted font-black text-xs bg-bg-soft px-1.5 py-0.5 rounded-xl">
                   {justSaved ? (
-                    <span className="text-primary text-[11px] animate-pop-in">✓</span>
+                    <span className="text-primary text-xs animate-pop-in">✓</span>
                   ) : (
                     ":"
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>+</button>
+                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
                     type="number"
@@ -249,19 +249,19 @@ function MatchCard({
                     aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-20)`}
                     value={predAway}
                     onChange={handleAwayChange}
-                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-[#F0FFE4] ${
+                    className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-primary-soft ${
                       hasPrediction ? "border-primary/50" : "border-border"
                     }`}
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-6 h-6 text-xs bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold" disabled={!editable}>−</button>
+                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>−</button>
                 </div>
               </div>
               {homeTeam && awayTeam && (
                 <button
                   onClick={() => setShowAnalysis(!showAnalysis)}
-                  className={`text-[11px] font-extrabold px-3 py-1 rounded-full border-none cursor-pointer transition-all ${
+                  className={`text-xs font-extrabold px-3 py-1 rounded-full border-none cursor-pointer transition-all ${
                     showAnalysis
                       ? "bg-secondary text-white"
                       : "bg-bg-soft text-ink-muted hover:bg-secondary/10 hover:text-secondary"
@@ -283,7 +283,7 @@ function MatchCard({
           )}
 
           {hasResult && !editable && predHome !== "" && (
-            <div className="text-[11px] text-ink-muted font-medium tabular-nums">
+            <div className="text-xs text-ink-muted font-medium tabular-nums">
               ניחוש: <span dir="ltr">{predAway} – {predHome}</span>
             </div>
           )}
@@ -304,7 +304,7 @@ function MatchCard({
         parseInt(predHome) === parseInt(predAway) &&
         (editable ? (
           <div className="mt-3 pt-3 border-t border-border">
-            <div className="text-[11px] text-ink-muted text-center mb-2 font-medium">
+            <div className="text-xs text-ink-muted text-center mb-2 font-medium">
               {match.stage === "F" ? "מי האלופה?" : "מי עולה?"}
             </div>
             <div className="flex gap-2 justify-center">
@@ -325,7 +325,7 @@ function MatchCard({
             </div>
           </div>
         ) : prediction?.advancingTeam ? (
-          <div className="mt-1.5 text-[11px] text-ink-muted text-center font-medium">
+          <div className="mt-1.5 text-xs text-ink-muted text-center font-medium">
             {match.stage === "F" ? "אלופה:" : "עולה:"}{" "}
             {prediction.advancingTeam === homeCode ? homeName : awayName}
           </div>

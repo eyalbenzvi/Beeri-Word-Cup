@@ -4,6 +4,7 @@
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 LOADER="$DIR/loader.mjs"
+JSX_LOADER="$DIR/loader-jsx.mjs"
 TOTAL_PASS=0
 TOTAL_FAIL=0
 
@@ -18,7 +19,9 @@ run_test() {
   local needs_loader="$3"
 
   echo -n "$name: "
-  if [ "$needs_loader" = "yes" ]; then
+  if [ "$needs_loader" = "jsx" ]; then
+    result=$(node --loader "$JSX_LOADER" "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+  elif [ "$needs_loader" = "yes" ]; then
     result=$(node --loader "$LOADER" "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
   else
     result=$(node "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
@@ -71,6 +74,9 @@ run_test "36. Player Display (Hebrew canonical)" "test-player-display.mjs" "yes"
 run_test "37. Scoring (Hebrew topScorer)" "test-scoring-he.mjs" "yes"
 run_test "38. AI Fill + Leaderboard Display + Simulator Layout" "test-ai-fill-and-display.mjs" "yes"
 run_test "39. Scenario Predictor (champion + runner-up auto-fill)" "test-scenario-predictor.mjs" "yes"
+run_test "40. Shared UI Components (Spinner, InlineError, ErrorBanner, EmptyState, Badge)" "test-shared-components.mjs" "jsx"
+run_test "41. Focus Trap Hook" "test-focus-trap.mjs" "no"
+run_test "42. Confirm Modal Contract" "test-confirm-modal.mjs" "no"
 
 echo ""
 echo "==========================================="

@@ -13,7 +13,7 @@ export default function CountdownUnit({ value, label, accent }) {
       >
         {String(value).padStart(2, "0")}
       </div>
-      <span className="text-[11px] md:text-xs text-ink-muted font-bold mt-2">
+      <span className="text-xs md:text-xs text-ink-muted font-bold mt-2">
         {label}
       </span>
     </div>

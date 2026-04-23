@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "./Toast";
 import { signInWithGoogle } from "../firebase";
 import { captureClientError } from "../sentry";
+import ErrorBanner from "./ErrorBanner";
 
 export default function GoogleSignInButton({ onSuccess }) {
   const showToast = useToast();
@@ -45,10 +46,9 @@ export default function GoogleSignInButton({ onSuccess }) {
       <button
         onClick={handleSignIn}
         disabled={loading}
-        className="w-full bg-white text-ink font-extrabold min-h-[56px] py-4 rounded-2xl border-2 border-border hover:border-border-strong transition text-base cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50"
-        style={{ boxShadow: "0 4px 0 0 var(--color-border)", marginBottom: 4 }}
+        className="btn-duo btn-duo-ghost-raised w-full"
       >
-        <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
+        <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
           <path
             fill="#4285F4"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
@@ -70,16 +70,9 @@ export default function GoogleSignInButton({ onSuccess }) {
       </button>
 
       {error && (
-        <div className="text-sm text-danger font-bold flex items-center justify-between gap-2 mt-2">
-          <span>{error}</span>
-          <button
-            onClick={handleSignIn}
-            className="btn-duo-flat flex-shrink-0"
-            style={{ background: "#FFF1F1", color: "var(--color-danger)" }}
-          >
-            נסה שוב
-          </button>
-        </div>
+        <ErrorBanner className="mt-2" onRetry={handleSignIn}>
+          {error}
+        </ErrorBanner>
       )}
     </>
   );

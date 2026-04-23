@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
+import { ArrowRight } from "lucide-react";
 import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers, useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { updateUserProfile } from "../store";
 import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { useToast } from "../components/Toast";
 
 export default function Profile() {
   const { user, logout } = useCurrentUser();
   const { navigate } = useNavigation();
+  const showToast = useToast();
   const forms = useUserForms(user?.id);
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
@@ -57,6 +60,7 @@ export default function Profile() {
       displayName: nickname || firstName || displayName,
     });
     setEditing(false);
+    showToast("הפרופיל נשמר");
   };
 
   const handleCancel = () => {
@@ -72,12 +76,13 @@ export default function Profile() {
         onClick={() => navigate("home")}
         className="text-sm text-secondary mb-4 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
       >
-        → חזרה לבית
+        <ArrowRight size={16} aria-hidden="true" />
+        חזרה לבית
       </button>
 
       <div className="card-duo-lg text-center mb-4">
         <div className="flex justify-center mb-3">
-          <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-4xl font-extrabold border-4 border-primary-dark" style={{ marginBottom: 4 }}>
+          <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-4xl font-extrabold border-4 border-primary-dark">
             {initials}
           </div>
         </div>
@@ -86,15 +91,15 @@ export default function Profile() {
           <div className="space-y-3 text-right">
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">שם פרטי</label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" />
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" maxLength={30} />
             </div>
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">שם משפחה</label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" />
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" maxLength={30} />
             </div>
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">כינוי</label>
-              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" />
+              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" maxLength={20} />
             </div>
             {email && (
               <div>
@@ -133,11 +138,11 @@ export default function Profile() {
       <div className="card-duo mb-4">
         <h3 className="font-extrabold text-base text-ink mb-3">📊 סטטיסטיקות</h3>
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">{forms.length}</div>
             <div className="text-ink-muted font-bold">טפסים</div>
           </div>
-          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "#F0FFE4" }}>
+          <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">{totalExact}</div>
             <div className="text-ink-muted font-bold">מדויקים</div>
           </div>
@@ -168,7 +173,7 @@ export default function Profile() {
                   <span className="text-2xl">{icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold text-sm truncate text-ink">{form.formName || "טופס ללא שם"}</div>
-                    <div className="text-[11px] text-ink-muted font-medium">
+                    <div className="text-xs text-ink-muted font-medium">
                       {champion && <span>🏆 אלופה: {champion} </span>}
                       {form.topScorer && <span>⚽ מלך: {getPlayerDisplayName(form.topScorer, playerList)}</span>}
                     </div>
