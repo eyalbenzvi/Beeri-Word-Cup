@@ -27,8 +27,8 @@
 
   /* Ink (text) */
   --color-ink: #3C3C3C;
-  --color-ink-muted: #777777;
-  --color-ink-light: #AFAFAF;
+  --color-ink-muted: #5E5E5E; /* WCAG AA: 5.74:1 on bg-soft (#F7F7F7) */
+  --color-ink-light: #8E8E8E;
 
   /* Surface */
   --color-bg: #FFFFFF;

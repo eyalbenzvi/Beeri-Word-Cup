@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ArrowRight } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
   useAllPredictions,
@@ -219,7 +220,8 @@ export default function AllFormsView({ onBack }) {
           className="btn-duo-flat"
           style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
         >
-          חזרה →
+          חזרה
+          <ArrowRight size={16} aria-hidden="true" />
         </button>
       </div>
 
@@ -258,6 +260,7 @@ export default function AllFormsView({ onBack }) {
               onChange={(e) => setFilterText(e.target.value)}
               placeholder="חפש לפי שם טופס..."
               className="input-duo"
+              maxLength={50}
             />
           </div>
 

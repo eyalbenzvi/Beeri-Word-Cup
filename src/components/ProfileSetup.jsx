@@ -62,6 +62,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="שם פרטי"
               className="input-duo"
+              maxLength={30}
             />
           </div>
           <div>
@@ -72,6 +73,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setLastName(e.target.value)}
               placeholder="שם משפחה"
               className="input-duo"
+              maxLength={30}
             />
           </div>
           <div>
@@ -82,6 +84,7 @@ export default function ProfileSetup({ user, onComplete }) {
               onChange={(e) => setNickname(e.target.value)}
               placeholder="כינוי"
               className="input-duo"
+              maxLength={20}
             />
           </div>
         </div>

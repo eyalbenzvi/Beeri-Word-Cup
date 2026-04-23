@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
   useCurrentUser,
@@ -36,6 +37,7 @@ import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 const AllFormsView = React.lazy(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/ConfirmModal";
 import SaveIndicator from "../components/SaveIndicator";
 import ReviewScreen from "../components/ReviewScreen";
 import MatchSearch from "../components/MatchSearch";
@@ -53,6 +55,7 @@ export default function Predict() {
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
   const showToast = useToast();
+  const confirm = useConfirm();
   const forms = useUserForms(user?.id);
   const activeFormId = useActiveFormId();
   const formData = useFormData(activeFormId);
@@ -132,6 +135,14 @@ export default function Predict() {
     () => getFilteredMatches(selectedStage, selectedGroup),
     [selectedStage, selectedGroup]);
 
+  // Live validation: errors visible while the user is filling, so they know
+  // what's missing before they try to submit.
+  const liveErrors = useMemo(() => {
+    if (!activeForm) return [];
+    return validateForm(activeForm, activeFormId, allPredictions, settings);
+  }, [activeForm, activeFormId, allPredictions, settings]);
+  const isFormValid = liveErrors.length === 0;
+
   // Focus the first unfilled match when the user switches tabs (stage or group).
   // If everything in the tab is filled: scroll to the group table for the group
   // stage, or to the first match for knockout stages. Skip on initial mount so
@@ -205,23 +216,31 @@ export default function Predict() {
     setShowConfirm(false);
     setValidationErrors([]);
     showToast("הטופס הוגש בהצלחה! 🎉");
+    // Respect the user's motion preference: skip confetti if they asked for
+    // reduced motion at the OS level.
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     try {
-      confetti({
-        particleCount: 140,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ["#58CC02", "#1CB0F6", "#FF9600", "#FFC800", "#CE82FF"],
-        zIndex: 99999,
-      });
-      setTimeout(() => {
+      if (!prefersReducedMotion) {
         confetti({
-          particleCount: 80,
-          spread: 100,
-          origin: { y: 0.4 },
-          colors: ["#58CC02", "#1CB0F6", "#FF9600"],
+          particleCount: 140,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ["#58CC02", "#1CB0F6", "#FF9600", "#FFC800", "#CE82FF"],
           zIndex: 99999,
         });
-      }, 250);
+        setTimeout(() => {
+          confetti({
+            particleCount: 80,
+            spread: 100,
+            origin: { y: 0.4 },
+            colors: ["#58CC02", "#1CB0F6", "#FF9600"],
+            zIndex: 99999,
+          });
+        }, 250);
+      }
     } catch { /* confetti is cosmetic — never block submit */ }
     setSubmitting(false);
     setActiveFormId(null); // return to form list
@@ -259,7 +278,12 @@ export default function Predict() {
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
-    if (!window.confirm("הניחושים החסרים ימולאו בעזרת AI. ניחושים קיימים ומלך שערים שנבחר יישמרו. להמשיך?")) return;
+    const ok = await confirm({
+      title: "מילוי עם AI",
+      message: "הניחושים החסרים ימולאו בעזרת AI. ניחושים קיימים ומלך שערים שנבחר יישמרו",
+      confirmLabel: "מלא",
+    });
+    if (!ok) return;
 
     const totalSteps = 3;
 
@@ -301,7 +325,7 @@ export default function Predict() {
     } finally {
       setAiProgress(null);
     }
-  }, [activeFormId, canEdit, activeForm, settings, showToast]);
+  }, [activeFormId, canEdit, activeForm, settings, showToast, confirm]);
 
   const handleScenarioFill = useCallback(async (champion, runnerUp) => {
     if (!activeFormId || !canEdit) return;
@@ -407,9 +431,10 @@ export default function Predict() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveFormId(null)}
-            className="text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer p-0 hover:text-secondary-dark"
+            className="text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer p-0 hover:text-secondary-dark inline-flex items-center gap-1"
           >
-            הטפסים שלי →
+            הטפסים שלי
+            <ArrowLeft size={16} aria-hidden="true" />
           </button>
           <span className="text-ink-light">|</span>
           <h1 className="text-lg font-extrabold text-ink truncate">
@@ -456,7 +481,7 @@ export default function Predict() {
       <div id="form-details-section" className="card-duo-tight mb-3">
         <div className="grid grid-cols-3 gap-2">
           <div id="field-formName">
-            <label className="text-xs font-extrabold text-ink-muted">שם הטופס</label>
+            <label className="text-xs font-extrabold text-ink-muted">שם הטופס (חובה)</label>
             <input
               value={activeForm.formName || ""}
               onChange={(e) => updateFormDetails(activeFormId, { formName: e.target.value })}
@@ -465,6 +490,7 @@ export default function Predict() {
               maxLength={50}
               className="input-duo input-duo-sm"
               disabled={!canEdit}
+              required
             />
           </div>
           <div id="field-budget">
@@ -474,12 +500,14 @@ export default function Predict() {
               onChange={(e) => updateFormDetails(activeFormId, { budgetNumber: e.target.value })}
               inputMode="numeric"
               placeholder="100-9999"
+              maxLength={4}
               className="input-duo input-duo-sm"
               disabled={!canEdit}
+              required
             />
           </div>
           <div id="field-topScorer">
-            <label className="text-xs font-extrabold text-ink-muted">מלך שערים</label>
+            <label className="text-xs font-extrabold text-ink-muted">מלך שערים (חובה)</label>
             <PlayerAutocomplete
               value={activeForm.topScorer || ""}
               onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
@@ -545,8 +573,14 @@ export default function Predict() {
               >
                 🤖 מלא הכל עם AI
               </button>
-              <button onClick={handleTrySubmit} className="btn-duo btn-duo-primary w-full">
-                הגש טופס
+              <button
+                onClick={handleTrySubmit}
+                className="btn-duo btn-duo-primary w-full"
+                title={isFormValid ? "הגש את הטופס" : `חסרים ${liveErrors.length} פרטים`}
+              >
+                {isFormValid
+                  ? "הגש טופס ✓"
+                  : `הגש טופס (חסרים ${liveErrors.length})`}
               </button>
             </div>
           )}

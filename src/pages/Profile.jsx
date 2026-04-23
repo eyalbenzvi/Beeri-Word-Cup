@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
+import { ArrowRight } from "lucide-react";
 import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers, useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { updateUserProfile } from "../store";
 import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { useToast } from "../components/Toast";
 
 export default function Profile() {
   const { user, logout } = useCurrentUser();
   const { navigate } = useNavigation();
+  const showToast = useToast();
   const forms = useUserForms(user?.id);
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
@@ -57,6 +60,7 @@ export default function Profile() {
       displayName: nickname || firstName || displayName,
     });
     setEditing(false);
+    showToast("הפרופיל נשמר");
   };
 
   const handleCancel = () => {
@@ -72,7 +76,8 @@ export default function Profile() {
         onClick={() => navigate("home")}
         className="text-sm text-secondary mb-4 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
       >
-        → חזרה לבית
+        <ArrowRight size={16} aria-hidden="true" />
+        חזרה לבית
       </button>
 
       <div className="card-duo-lg text-center mb-4">
@@ -86,15 +91,15 @@ export default function Profile() {
           <div className="space-y-3 text-right">
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">שם פרטי</label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" />
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" maxLength={30} />
             </div>
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">שם משפחה</label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" />
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" maxLength={30} />
             </div>
             <div>
               <label className="block text-xs font-extrabold text-ink mb-1">כינוי</label>
-              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" />
+              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" maxLength={20} />
             </div>
             {email && (
               <div>

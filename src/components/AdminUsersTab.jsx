@@ -1,19 +1,33 @@
 import { useMemo, useState } from "react";
-import { updateUser, demoteAdmin, deleteUser, setAdminClaim } from "../store";
+import { deleteUser, setAdminClaim } from "../store";
 import { useCurrentUser } from "../hooks/useStore";
+import { useConfirm } from "./ConfirmModal";
+import { useToast } from "./Toast";
 
 export default function AdminUsersTab({ users, allPredictions }) {
   const { user: currentUser } = useCurrentUser();
+  const confirm = useConfirm();
+  const showToast = useToast();
   const [pendingClaim, setPendingClaim] = useState(null);
 
   async function handleAdminToggle(uid, displayName, action) {
-    const label = action === "promote" ? "להפוך למנהל" : "להסיר הרשאות מנהל מ";
-    if (!window.confirm(`${label}${action === "demote" ? "־" : " את "}${displayName}?`)) return;
+    const title = action === "promote" ? "קידום למנהל" : "הסרת הרשאות מנהל";
+    const message =
+      action === "promote"
+        ? `להפוך את ${displayName} למנהל`
+        : `להסיר הרשאות מנהל מ־${displayName}`;
+    const ok = await confirm({
+      title,
+      message,
+      confirmLabel: action === "promote" ? "קדם" : "הסר",
+      variant: action === "demote" ? "danger" : "primary",
+    });
+    if (!ok) return;
     setPendingClaim(uid);
     const result = await setAdminClaim(uid, action);
     setPendingClaim(null);
     if (result.error) {
-      alert(`שגיאה: ${result.error}`);
+      showToast(`שגיאה: ${result.error}`, "error");
     }
   }
 
@@ -110,18 +124,18 @@ export default function AdminUsersTab({ users, allPredictions }) {
             )}
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (uid === currentUser?.id) {
-                  alert("לא ניתן למחוק את המשתמש הנוכחי");
+                  showToast("לא ניתן למחוק את המשתמש הנוכחי", "error");
                   return;
                 }
-                if (
-                  window.confirm(
-                    `למחוק את ${u.displayName} ואת כל הטפסים שלו? פעולה בלתי הפיכה.`,
-                  )
-                ) {
-                  deleteUser(uid);
-                }
+                const ok = await confirm({
+                  title: "מחיקת משתמש",
+                  message: `למחוק את ${u.displayName} ואת כל הטפסים שלו\nפעולה בלתי הפיכה`,
+                  confirmLabel: "מחק",
+                  variant: "danger",
+                });
+                if (ok) deleteUser(uid);
               }}
               className="text-xs text-danger px-2 py-1 font-bold"
             >

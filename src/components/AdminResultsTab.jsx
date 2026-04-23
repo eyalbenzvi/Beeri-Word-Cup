@@ -7,11 +7,13 @@ import { calcBracketTeams } from "../utils/bracket";
 import { randomScore } from "../utils/helpers";
 import GroupTable from "./GroupTable";
 import GroupSelector from "./GroupSelector";
+import { useConfirm } from "./ConfirmModal";
 
 const ADMIN_STAGES = { all: "הכל", ...STAGES };
 
 export default function AdminResultsTab() {
   const results = useMatchResults();
+  const confirm = useConfirm();
   const [undoStack, setUndoStack] = useState([]);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
@@ -131,11 +133,14 @@ export default function AdminResultsTab() {
     setEditScores({ homeScore: "", awayScore: "" });
   };
 
-  const handleRandomizeResults = () => {
-    if (
-      !window.confirm("פעולה זו תדרוס את כל התוצאות בתוצאות אקראיות. להמשיך?")
-    )
-      return;
+  const handleRandomizeResults = async () => {
+    const ok = await confirm({
+      title: "הגרלת תוצאות",
+      message: "פעולה זו תדרוס את כל התוצאות בתוצאות אקראיות",
+      confirmLabel: "הגרל",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     const allResults = {};
 
@@ -383,9 +388,14 @@ export default function AdminResultsTab() {
                     {result && (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm("למחוק תוצאה זו?"))
-                            deleteWithUndo(match.id);
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: "מחיקת תוצאה",
+                            message: "למחוק תוצאה זו",
+                            confirmLabel: "מחק",
+                            variant: "danger",
+                          });
+                          if (ok) deleteWithUndo(match.id);
                         }}
                         className="btn-duo-flat"
                         style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}

@@ -52,7 +52,7 @@ export default function AdminSettingsTab({
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
         // Validate schema
@@ -72,7 +72,13 @@ export default function AdminSettingsTab({
           const count = typeof data[k] === "object" ? Object.keys(data[k]).length : "?";
           return `${k}: ${count} רשומות`;
         }).join("\n");
-        if (!window.confirm(`ייבוא ידרוס את הנתונים הקיימים.\n\nתוכן הקובץ:\n${preview}\n\nלהמשיך?`)) return;
+        const ok = await confirm({
+          title: "ייבוא נתונים",
+          message: `ייבוא ידרוס את הנתונים הקיימים\n\nתוכן הקובץ:\n${preview}`,
+          confirmLabel: "ייבא",
+          variant: "danger",
+        });
+        if (!ok) return;
         importAllData(data);
         showToast("כל הנתונים הוחלפו בהצלחה");
       } catch {
@@ -219,11 +225,16 @@ export default function AdminSettingsTab({
       <div className="bg-white rounded-xl p-4 border-2 border-danger/30">
         <h3 className="font-bold text-sm text-danger mb-2">אזור מסוכן</h3>
         <button
-          onClick={() => {
-            if (window.confirm("בטוח? פעולה זו תמחק את כל תוצאות האמת.")) {
-              downloadBackup("before-clear-results");
-              clearMatchResults();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              title: "מחיקת תוצאות אמת",
+              message: "פעולה זו תמחק את כל תוצאות האמת\n(גיבוי יורד אוטומטית לפני המחיקה)",
+              confirmLabel: "מחק תוצאות",
+              variant: "danger",
+            });
+            if (!ok) return;
+            downloadBackup("before-clear-results");
+            clearMatchResults();
           }}
           className="btn-duo btn-duo-orange w-full mb-3"
         >
@@ -233,10 +244,22 @@ export default function AdminSettingsTab({
           מחיקת כל הנתונים: משתמשים, ניחושים, תוצאות. לא ניתן לבטל.
         </p>
         <button
-          onClick={() => {
-            if (!window.confirm("בטוח? פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות.")) return;
-            const typed = window.prompt("הקלד DELETE לאישור סופי:");
-            if (typed !== "DELETE") return;
+          onClick={async () => {
+            const firstOk = await confirm({
+              title: "מחיקת כל הנתונים",
+              message: "פעולה זו תמחק את כל הנתונים — משתמשים, ניחושים ותוצאות\n(גיבוי יורד אוטומטית)",
+              confirmLabel: "המשך למחיקה",
+              variant: "danger",
+            });
+            if (!firstOk) return;
+            const secondOk = await confirm({
+              title: "אישור סופי",
+              message: "האם אתה בטוח לחלוטין\n\nמחיקה מלאה של כל הנתונים בבסיס הנתונים.\nלחיצה על \"מחק הכל\" תשמיד את כל הנתונים.",
+              confirmLabel: "מחק הכל",
+              cancelLabel: "בטל",
+              variant: "danger",
+            });
+            if (!secondOk) return;
             downloadBackup("before-clear-all");
             clearAllData();
             navigate("home");

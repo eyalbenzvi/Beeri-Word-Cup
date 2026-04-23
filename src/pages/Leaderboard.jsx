@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ArrowRight } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
   useCurrentUser,
@@ -98,7 +99,8 @@ export default function Leaderboard({
           onClick={() => setSelectedForm(null)}
           className="text-sm text-secondary mb-3 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
         >
-          חזרה לטבלת הדירוג →
+          <ArrowRight size={16} aria-hidden="true" />
+          חזרה לטבלת הדירוג
         </button>
 
         <h2 className="text-xl font-extrabold text-ink mb-2">

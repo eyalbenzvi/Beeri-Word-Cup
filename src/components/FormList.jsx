@@ -5,11 +5,13 @@ import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
 import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
 import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmModal";
 
 const totalMatches = groupMatches.length + knockoutMatches.length;
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
+  const confirm = useConfirm();
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
@@ -123,9 +125,14 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 )}
                 {(formStatus === "draft" || form.status === "pending") && (
                   <button
-                    onClick={() => {
-                      if (window.confirm(`למחוק את "${form.formName}"?`))
-                        handleDeleteForm(form.formId);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "מחיקת טופס",
+                        message: `למחוק את "${form.formName}"`,
+                        confirmLabel: "מחק",
+                        variant: "danger",
+                      });
+                      if (ok) handleDeleteForm(form.formId);
                     }}
                     className="btn-duo-flat"
                     style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
@@ -152,6 +159,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
             onChange={(e) => setNewFormName(e.target.value)}
             placeholder={`טופס ${forms.length + 1}`}
             className="input-duo mb-3"
+            maxLength={50}
             autoFocus
           />
           <div className="flex gap-2">
