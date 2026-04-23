@@ -1,5 +1,11 @@
 // Tests for phone authentication feature — OTP logic, UID handling, security, privacy
 import crypto from "crypto";
+import {
+  normalizeIsraeliMobile,
+  isValidIsraeliMobile,
+  sanitizePhoneInput,
+  ISRAELI_MOBILE_PREFIXES,
+} from "../src/utils/phone.js";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -352,6 +358,176 @@ console.log("--- 14. OTP uniqueness ---");
     tokens.add(token);
   }
   assert(tokens.size === 20, `20 OTP requests produce 20 unique tokens (got ${tokens.size})`);
+}
+
+// ============ 15. Israeli mobile normalizer — accepted formats ============
+console.log("--- 15. normalizeIsraeliMobile: accepted formats ---");
+{
+  const accepted = [
+    ["0501234567", "0501234567"],
+    ["050-123-4567", "0501234567"],
+    ["050 123 4567", "0501234567"],
+    ["050.123.4567", "0501234567"],
+    ["(050) 123-4567", "0501234567"],
+    ["  0501234567  ", "0501234567"],
+    ["+972501234567", "0501234567"],
+    ["+972-50-123-4567", "0501234567"],
+    ["+972 50 123 4567", "0501234567"],
+    ["+972-50-1234567", "0501234567"],
+    ["972501234567", "0501234567"],
+    ["00972501234567", "0501234567"],
+    ["0521234567", "0521234567"],
+    ["0531234567", "0531234567"],
+    ["0541234567", "0541234567"],
+    ["0551234567", "0551234567"],
+    ["0581234567", "0581234567"],
+  ];
+  for (const [inp, exp] of accepted) {
+    assert(normalizeIsraeliMobile(inp) === exp, `normalize "${inp}" → "${exp}"`);
+  }
+  assert(isValidIsraeliMobile("+972501234567"), "isValid +972501234567");
+  assert(isValidIsraeliMobile("050-123-4567"), "isValid 050-123-4567");
+}
+
+// ============ 16. Israeli mobile normalizer — rejected inputs ============
+console.log("--- 16. normalizeIsraeliMobile: rejections ---");
+{
+  const rejected = [
+    ["", "empty string"],
+    [null, "null"],
+    [undefined, "undefined"],
+    ["0511234567", "051 prefix (not active carrier)"],
+    ["0561234567", "056 prefix (not active carrier)"],
+    ["0571234567", "057 prefix (not active carrier)"],
+    ["0591234567", "059 prefix (not active carrier)"],
+    ["0401234567", "040 prefix (landline/bad)"],
+    ["0301234567", "030 prefix (landline)"],
+    ["0201234567", "020 prefix (not mobile)"],
+    ["050123456", "9 digits (too short)"],
+    ["05012345678", "11 digits (too long)"],
+    ["+972401234567", "+972 with invalid mobile prefix (040)"],
+    ["+972511234567", "+972 with invalid mobile prefix (051)"],
+    ["+15012345678", "foreign country code"],
+    ["+44501234567", "UK country code"],
+    ["abc", "letters only"],
+    ["05abcdefgh", "letters after 05"],
+    ["050-abc-4567", "letters in middle"],
+    ["050!!1234567", "exclamation marks"],
+    ["050@1234567", "at sign"],
+    ["٠٥٠١٢٣٤٥٦٧", "Arabic-Indic digits"],
+    ["۰۵۰۱۲۳۴۵۶۷", "Persian digits"],
+    ["050 123 4567 extra", "trailing text"],
+    ["hello 0501234567", "leading text"],
+    ["9720501234567", "13 digits starting with 972 (ambiguous)"],
+    ["+9720501234567", "13 digits with + prefix (ambiguous)"],
+    ["05012345", "too short (8 digits)"],
+    ["0", "single digit"],
+    ["+", "plus only"],
+    ["()", "formatting only"],
+    ["   ", "whitespace only"],
+    ["050\n1234567", "newline in middle still ok?"], // actually \s allowed — will normalize — check
+  ];
+  for (const [inp, label] of rejected) {
+    // newline is \s which is in the accepted formatting class → would normalize.
+    // Remove that case — accepted formatting.
+    if (inp === "050\n1234567") {
+      assert(normalizeIsraeliMobile(inp) === "0501234567", `normalize across newline → canonical (${label})`);
+      continue;
+    }
+    assert(normalizeIsraeliMobile(inp) === null, `reject: ${label} (${JSON.stringify(inp)})`);
+    assert(!isValidIsraeliMobile(inp), `isValid rejects: ${label}`);
+  }
+}
+
+// ============ 17. UID stability across equivalent formats ============
+console.log("--- 17. UID stability across formats ---");
+{
+  const inputs = [
+    "0501234567",
+    "050-123-4567",
+    "050 123 4567",
+    "050.123.4567",
+    "(050) 123-4567",
+    "+972501234567",
+    "+972-50-123-4567",
+    "972501234567",
+    "00972501234567",
+    "  0501234567  ",
+  ];
+  const uids = inputs.map((i) => `phone_${normalizeIsraeliMobile(i)}`);
+  const unique = new Set(uids);
+  assert(unique.size === 1, `All equivalent inputs → single UID (got ${unique.size} distinct)`);
+  assert(uids[0] === "phone_0501234567", `UID is canonical: ${uids[0]}`);
+}
+
+// ============ 18. sanitizePhoneInput — live input filtering ============
+console.log("--- 18. sanitizePhoneInput ---");
+{
+  assert(sanitizePhoneInput("") === "", "empty stays empty");
+  assert(sanitizePhoneInput(null) === "", "null → empty");
+  assert(sanitizePhoneInput(undefined) === "", "undefined → empty");
+  assert(sanitizePhoneInput("0501234567") === "0501234567", "digits pass through");
+  assert(sanitizePhoneInput("050-123-4567") === "050-123-4567", "dashes kept");
+  assert(sanitizePhoneInput("050 123 4567") === "050 123 4567", "spaces kept");
+  assert(sanitizePhoneInput("(050) 123-4567") === "(050) 123-4567", "parens kept");
+  assert(sanitizePhoneInput("+972-50-1234567") === "+972-50-1234567", "plus kept");
+  assert(sanitizePhoneInput("050.123.4567") === "050.123.4567", "dots kept");
+  assert(sanitizePhoneInput("abc050def") === "050", "letters stripped");
+  assert(sanitizePhoneInput("050😀1234") === "0501234", "emoji stripped");
+  assert(sanitizePhoneInput("<script>0501234567</script>") === "0501234567", "html/tags stripped");
+  assert(sanitizePhoneInput("050@1234#567") === "0501234567", "special chars stripped");
+  assert(sanitizePhoneInput("٠٥٠١٢٣٤٥٦٧") === "", "Arabic-Indic digits stripped");
+  // Length cap
+  const long = "0".repeat(100);
+  assert(sanitizePhoneInput(long).length === 20, "length capped at 20");
+  // Invisible chars stripped (zero-width + LRM)
+  assert(sanitizePhoneInput("0501234567‎") === "0501234567", "LRM stripped");
+  assert(sanitizePhoneInput("​050​1234567") === "0501234567", "zero-width space stripped");
+  assert(sanitizePhoneInput("050 1234567") === "0501234567" || sanitizePhoneInput("050 1234567") === "050 1234567", "NBSP stripped or converted");
+}
+
+// ============ 19. Prefix whitelist sanity ============
+console.log("--- 19. prefix whitelist ---");
+{
+  assert(Array.isArray(ISRAELI_MOBILE_PREFIXES), "prefix list exported");
+  assert(ISRAELI_MOBILE_PREFIXES.length >= 6, "at least 6 prefixes (050/052/053/054/055/058)");
+  for (const p of ["050", "052", "053", "054", "055", "058"]) {
+    assert(ISRAELI_MOBILE_PREFIXES.includes(p), `${p} in whitelist`);
+  }
+  for (const p of ISRAELI_MOBILE_PREFIXES) {
+    assert(/^05\d$/.test(p), `prefix ${p} matches 05X format`);
+    assert(isValidIsraeliMobile(`${p}1234567`), `a number with prefix ${p} is valid`);
+  }
+  for (const bad of ["051", "056", "057", "059"]) {
+    assert(!ISRAELI_MOBILE_PREFIXES.includes(bad), `${bad} correctly excluded`);
+    assert(!isValidIsraeliMobile(`${bad}1234567`), `a number with prefix ${bad} is invalid`);
+  }
+}
+
+// ============ 20. HMAC + UID round-trip with normalized input ============
+console.log("--- 20. HMAC consistency across input formats ---");
+{
+  const SECRET = "test-secret-key-hmac";
+  const code = "654321";
+  const expiresAt = Date.now() + 300000;
+
+  function hmacFor(phoneInput) {
+    const clean = normalizeIsraeliMobile(phoneInput);
+    const data = `${clean}:${code}:${expiresAt}`;
+    return crypto.createHmac("sha256", SECRET).update(data).digest("hex");
+  }
+
+  const t1 = hmacFor("0501234567");
+  const t2 = hmacFor("050-123-4567");
+  const t3 = hmacFor("+972-50-123-4567");
+  const t4 = hmacFor("(050) 123-4567");
+  assert(t1 === t2, "HMAC identical: dashed input");
+  assert(t1 === t3, "HMAC identical: +972 input");
+  assert(t1 === t4, "HMAC identical: parens input");
+
+  // A different number produces a different HMAC
+  const t5 = hmacFor("0521234567");
+  assert(t1 !== t5, "HMAC differs for different phone");
 }
 
 // ============ Summary ============

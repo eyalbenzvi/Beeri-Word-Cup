@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useToast } from "./Toast";
 import { signInWithPhoneOtp } from "../firebase";
 import { captureClientError } from "../sentry";
+import { normalizeIsraeliMobile, sanitizePhoneInput } from "../utils/phone";
 
 export default function PhoneSignIn() {
   const showToast = useToast();
@@ -39,9 +40,9 @@ export default function PhoneSignIn() {
   }, [step]);
 
   const handleSendOtp = async () => {
-    const cleanPhone = phone.replace(/[-\s]/g, "");
-    if (!/^05\d{8}$/.test(cleanPhone)) {
-      setError("מספר טלפון לא תקין (05XXXXXXXX)");
+    const cleanPhone = normalizeIsraeliMobile(phone);
+    if (!cleanPhone) {
+      setError("מספר נייד ישראלי לא תקין (למשל 050-1234567 או ‎+972-50-1234567)");
       return;
     }
     setLoading(true);
@@ -74,7 +75,12 @@ export default function PhoneSignIn() {
     setLoading(true);
     setError("");
     try {
-      const cleanPhone = phone.replace(/[-\s]/g, "");
+      const cleanPhone = normalizeIsraeliMobile(phone);
+      if (!cleanPhone) {
+        setError("מספר נייד ישראלי לא תקין");
+        setLoading(false);
+        return;
+      }
       const res = await fetch("/.netlify/functions/phone-verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,11 +110,13 @@ export default function PhoneSignIn() {
           <label className="text-xs font-extrabold text-ink block mb-1">מספר טלפון</label>
           <input
             type="tel"
-            inputMode="numeric"
+            inputMode="tel"
+            autoComplete="tel"
             dir="ltr"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
             placeholder="050-1234567"
+            maxLength={20}
             className="input-duo text-center"
             disabled={loading}
           />
