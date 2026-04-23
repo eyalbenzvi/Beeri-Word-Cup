@@ -80,10 +80,15 @@ service cloud.firestore {
       // Users can create their own forms only when predictions not locked.
       // H29: new forms must have correct userId and start as draft.
       // H14: only the whitelisted fields may be present on create.
-      allow create: if isAuth() && formId.matches(request.auth.uid + '__.*') && !isLocked()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'draft'
-        && request.resource.data.keys().hasOnly(userCreateFields());
+      // Admins may create any form (needed for full-database restore from backup).
+      allow create: if isAuth() && (
+        isAdmin() || (
+          formId.matches(request.auth.uid + '__.*') && !isLocked()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.status == 'draft'
+          && request.resource.data.keys().hasOnly(userCreateFields())
+        )
+      );
 
       // Updates:
       //   - Admin: may change anything except userId (immutable).

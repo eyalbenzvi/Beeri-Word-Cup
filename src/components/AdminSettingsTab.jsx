@@ -3,7 +3,6 @@ import { useNavigation } from "../hooks/useNavigation";
 import {
   updateSettings,
   exportAllData,
-  importAllData,
   clearAllData,
   clearMatchResults,
 } from "../store";
@@ -18,7 +17,6 @@ export default function AdminSettingsTab({
   results,
 }) {
   const { navigate } = useNavigation();
-  const fileInputRef = useRef(null);
   const playerFileRef = useRef(null);
   const [playerCount, setPlayerCount] = useState(settings.topScorerPlayers?.length || 0);
   const showToast = useToast();
@@ -33,59 +31,6 @@ export default function AdminSettingsTab({
     a.download = `beeri-worldcup-${label}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleExport = () => {
-    const data = exportAllData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `beeri-worldcup-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        const data = JSON.parse(ev.target.result);
-        // Validate schema
-        const validKeys = ["users", "predictions", "matchResults", "settings", "actualBonuses", "actualAdvancing"];
-        const dataKeys = Object.keys(data);
-        if (dataKeys.length === 0 || !dataKeys.some(k => validKeys.includes(k))) {
-          showToast("קובץ לא תקין — חסרים שדות נדרשים", "error");
-          return;
-        }
-        const invalidKeys = dataKeys.filter(k => !validKeys.includes(k));
-        if (invalidKeys.length > 0) {
-          showToast(`שדות לא מוכרים בקובץ: ${invalidKeys.join(", ")}`, "error");
-          return;
-        }
-        // Confirm with preview
-        const preview = dataKeys.map(k => {
-          const count = typeof data[k] === "object" ? Object.keys(data[k]).length : "?";
-          return `${k}: ${count} רשומות`;
-        }).join("\n");
-        const ok = await confirm({
-          title: "ייבוא נתונים",
-          message: `ייבוא ידרוס את הנתונים הקיימים\n\nתוכן הקובץ:\n${preview}`,
-          confirmLabel: "ייבא",
-          variant: "danger",
-        });
-        if (!ok) return;
-        importAllData(data);
-        showToast("כל הנתונים הוחלפו בהצלחה");
-      } catch {
-        showToast("קובץ לא תקין — שגיאה בפרסור JSON", "error");
-      }
-    };
-    reader.readAsText(file);
   };
 
   return (
@@ -193,31 +138,6 @@ export default function AdminSettingsTab({
               reader.readAsText(file);
               e.target.value = "";
             }}
-          />
-        </div>
-      </div>
-
-      <div className="card-duo">
-        <h3 className="font-bold text-sm mb-3">גיבוי נתונים</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExport}
-            className="flex-1 bg-primary text-white text-sm py-2 rounded-xl hover:bg-primary-light transition"
-          >
-            ייצוא
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 bg-white text-primary text-sm py-2 rounded-xl border-2 border-primary hover:bg-bg-soft transition"
-          >
-            ייבוא
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
           />
         </div>
       </div>

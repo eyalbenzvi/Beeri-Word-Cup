@@ -10,8 +10,9 @@ import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import Leaderboard from "../pages/Leaderboard";
 import SimulatorPanel from "./SimulatorPanel";
+import AdminBackupRestore from "./AdminBackupRestore";
 
-function AdminExportReports({ leaderboard, users, allPredictions, playerList }) {
+function AdminExportReports({ leaderboard, allPredictions, playerList }) {
   const downloadCsv = () => {
     const header = "מקום,שם טופס,משתמש,תקציב,אלופה,מלך שערים,נקודות,מדויקים,הכרעות\n";
     const lines = leaderboard.map((e, i) => {
@@ -42,29 +43,6 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
     URL.revokeObjectURL(url);
   };
 
-  const downloadPerUserJson = () => {
-    const byUser = {};
-    for (const [fid, p] of Object.entries(allPredictions)) {
-      const uid = p.userId;
-      if (!byUser[uid]) {
-        byUser[uid] = {
-          displayName: users[uid]?.displayName || uid,
-          forms: [],
-        };
-      }
-      byUser[uid].forms.push({ formId: fid, ...p });
-    }
-    const blob = new Blob([JSON.stringify(byUser, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `predictions-by-user-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="space-y-4">
       <div className="card-duo">
@@ -80,34 +58,6 @@ function AdminExportReports({ leaderboard, users, allPredictions, playerList }) 
           className="btn-duo btn-duo-primary w-full"
         >
           הורד CSV
-        </button>
-      </div>
-      <div className="card-duo">
-        <h3 className="font-extrabold text-base text-ink mb-2">
-          סיכום ניחושים לפי משתמש (JSON)
-        </h3>
-        <button
-          type="button"
-          onClick={downloadPerUserJson}
-          className="btn-duo btn-duo-ghost w-full"
-          style={{ color: "var(--color-primary)", borderColor: "var(--color-primary)" }}
-        >
-          הורד JSON
-        </button>
-      </div>
-      <div className="card-duo">
-        <h3 className="font-extrabold text-base text-ink mb-2">
-          הדפסה / שמירה כ-PDF
-        </h3>
-        <p className="text-xs text-ink-muted mb-2">
-          יפתח חלון הדפסה — אפשר &quot;שמור כ-PDF&quot; בדפדפן
-        </p>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="btn-duo btn-duo-ghost w-full"
-        >
-          הדפס / PDF
         </button>
       </div>
     </div>
@@ -136,6 +86,7 @@ export default function AdminToolsTab() {
           { id: "preview", label: "תצוגת דירוג" },
           { id: "sim", label: "סימולטור" },
           { id: "export", label: "ייצוא" },
+          { id: "backup", label: "גיבוי / שחזור" },
         ].map((t) => (
           <button
             key={t.id}
@@ -160,11 +111,11 @@ export default function AdminToolsTab() {
       {sub === "export" && (
         <AdminExportReports
           leaderboard={leaderboard}
-          users={users}
           allPredictions={allPredictions}
           playerList={playerList}
         />
       )}
+      {sub === "backup" && <AdminBackupRestore />}
     </div>
   );
 }

@@ -1330,16 +1330,79 @@ export function updateSettings(newSettings) {
 
 // ============ DATA EXPORT/IMPORT ============
 
+export const BACKUP_SCHEMA_VERSION = 1;
+
 export function exportAllData() {
+  const users = getUsers();
+  const predictions = getAllPredictions();
+  const matchResults = getMatchResults();
   return {
-    users: getUsers(),
-    predictions: getAllPredictions(),
-    matchResults: getMatchResults(),
+    version: BACKUP_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    exportedBy: getCurrentUser()?.id || null,
+    counts: {
+      users: Object.keys(users).length,
+      predictions: Object.keys(predictions).length,
+      matchResults: Object.keys(matchResults).length,
+    },
+    users,
+    predictions,
+    matchResults,
     actualAdvancing: cache.actualAdvancing || {},
     actualBonuses: getActualBonuses(),
     settings: getSettings(),
-    exportedAt: new Date().toISOString(),
   };
+}
+
+// Shape check for a backup file — used by the restore UI for preview/validation.
+// Returns { ok, errors, counts } where errors is a list of human-readable strings.
+export function validateBackupShape(data) {
+  const errors = [];
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ok: false, errors: ["הקובץ אינו אובייקט JSON תקין"], counts: null };
+  }
+  const requiredObjectKeys = ["users", "predictions", "matchResults"];
+  for (const k of requiredObjectKeys) {
+    if (data[k] == null) {
+      errors.push(`חסר השדה "${k}"`);
+    } else if (typeof data[k] !== "object" || Array.isArray(data[k])) {
+      errors.push(`מבנה לא תקין לשדה "${k}"`);
+    }
+  }
+  const optionalObjectKeys = ["actualAdvancing", "actualBonuses", "settings"];
+  for (const k of optionalObjectKeys) {
+    if (data[k] != null && (typeof data[k] !== "object" || Array.isArray(data[k]))) {
+      errors.push(`מבנה לא תקין לשדה "${k}"`);
+    }
+  }
+
+  // Validate formIds & userId consistency
+  if (data.predictions && typeof data.predictions === "object") {
+    const formIdPattern = /^.+__\d+$/;
+    let badFormIds = 0;
+    let orphanForms = 0;
+    const users = data.users && typeof data.users === "object" ? data.users : {};
+    for (const [formId, form] of Object.entries(data.predictions)) {
+      if (!formIdPattern.test(formId)) badFormIds++;
+      if (!form || typeof form !== "object") {
+        orphanForms++;
+        continue;
+      }
+      if (form.userId && !users[form.userId]) orphanForms++;
+    }
+    if (badFormIds > 0) errors.push(`${badFormIds} מזהי טפסים בפורמט לא תקין`);
+    if (orphanForms > 0) errors.push(`${orphanForms} טפסים ללא משתמש תואם בקובץ`);
+  }
+
+  const counts = {
+    users: data.users ? Object.keys(data.users).length : 0,
+    predictions: data.predictions ? Object.keys(data.predictions).length : 0,
+    matchResults: data.matchResults ? Object.keys(data.matchResults).length : 0,
+    actualBonuses: data.actualBonuses ? 1 : 0,
+    settings: data.settings ? 1 : 0,
+  };
+
+  return { ok: errors.length === 0, errors, counts };
 }
 
 export async function clearAllData() {
@@ -1369,48 +1432,117 @@ export async function clearAllData() {
 }
 
 export async function importAllData(data) {
-  if (!requireAdmin()) return;
-  writeAuditLog("import-data", { keys: Object.keys(data) });
+  if (!requireAdmin()) {
+    throw new Error("נדרשת הרשאת מנהל");
+  }
 
-  // Validate imported data structure
-  if (!data || typeof data !== "object") throw new Error("נתונים לא תקינים");
-  if (data.users && typeof data.users !== "object")
-    throw new Error("מבנה משתמשים לא תקין");
-  if (data.predictions && typeof data.predictions !== "object")
-    throw new Error("מבנה ניחושים לא תקין");
-  if (data.matchResults && typeof data.matchResults !== "object")
-    throw new Error("מבנה תוצאות לא תקין");
+  const shape = validateBackupShape(data);
+  if (!shape.ok) {
+    throw new Error(`קובץ גיבוי לא תקין: ${shape.errors.join(", ")}`);
+  }
+
+  writeAuditLog("import-data-start", {
+    keys: Object.keys(data),
+    counts: shape.counts,
+  });
+
+  // Preserve admin rights: every user marked `isAdmin: true` in the current
+  // live cache stays admin after restore, even if the backup lists them as
+  // non-admin (or omits them). This is a safety net — a restore should never
+  // accidentally demote existing admins and lock the board out of the system.
+  const liveUsers = getUsers();
+  const currentAdminIds = Object.keys(liveUsers).filter(
+    (uid) => liveUsers[uid]?.isAdmin === true,
+  );
+  const importedUsers = { ...(data.users || {}) };
+  for (const uid of currentAdminIds) {
+    if (importedUsers[uid]) {
+      importedUsers[uid] = { ...importedUsers[uid], isAdmin: true };
+    } else {
+      // Admin was not in the backup at all — re-inject their live record.
+      importedUsers[uid] = { ...liveUsers[uid], isAdmin: true };
+    }
+  }
+
+  // Also make sure the current user (the one running the restore) keeps admin.
+  const current = getCurrentUser();
+  if (current?.id && current?.isAdmin) {
+    importedUsers[current.id] = {
+      ...(importedUsers[current.id] || liveUsers[current.id] || {
+        id: current.id,
+        displayName: current.displayName || "מנהל",
+      }),
+      isAdmin: true,
+    };
+  }
 
   const ops = [];
 
-  // Write gameData docs
-  const gameKeys = [
-    "users",
-    "matchResults",
-    "actualAdvancing",
-    "actualBonuses",
-    "settings",
-  ];
-  for (const key of gameKeys) {
-    if (data[key]) {
-      cache[key] = data[key];
-      ops.push({ type: "set", ref: gameDocRef(key), data: { data: structuredClone(data[key]) } });
+  // gameData single-doc writes
+  const gameDocMap = {
+    users: importedUsers,
+    matchResults: data.matchResults,
+    actualAdvancing: data.actualAdvancing,
+    actualBonuses: data.actualBonuses,
+    settings: data.settings,
+  };
+  for (const [key, value] of Object.entries(gameDocMap)) {
+    if (value != null && typeof value === "object") {
+      ops.push({
+        type: "set",
+        ref: gameDocRef(key),
+        data: { data: structuredClone(value) },
+      });
     }
   }
 
-  // Write prediction forms as individual docs
+  // Predictions: delete existing, then write from backup
+  const existing = await getDocs(predictionsCollectionRef);
+  existing.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
   if (data.predictions) {
-    // First delete existing forms
-    const existing = await getDocs(predictionsCollectionRef);
-    existing.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
-
-    // Then create new ones
     for (const [formId, formData] of Object.entries(data.predictions)) {
-      ops.push({ type: "set", ref: formDocRef(formId), data: structuredClone(formData) });
+      if (!formData || typeof formData !== "object") continue;
+      ops.push({
+        type: "set",
+        ref: formDocRef(formId),
+        data: structuredClone(formData),
+      });
     }
-    cache.predictions = data.predictions;
   }
 
-  notifyListeners();
-  await commitInBatches(ops);
+  try {
+    await commitInBatches(ops);
+  } catch (err) {
+    console.error("Import commit failed:", err);
+    captureClientError(err, {
+      source: "importAllData.commit",
+      code: err?.code,
+      counts: shape.counts,
+    });
+    writeAuditLog("import-data-failed", {
+      code: err?.code || null,
+      message: err?.message || String(err),
+    });
+    throw err;
+  }
+
+  // Only update cache after Firestore commit succeeds. The realtime listeners
+  // will also refresh the cache from the server snapshots — this just makes
+  // the UI reflect the new state immediately.
+  cache.users = importedUsers;
+  if (data.matchResults) cache.matchResults = data.matchResults;
+  if (data.actualAdvancing) cache.actualAdvancing = data.actualAdvancing;
+  if (data.actualBonuses) cache.actualBonuses = data.actualBonuses;
+  if (data.settings) cache.settings = data.settings;
+  if (data.predictions) cache.predictions = data.predictions;
+  rebuildUserFormIndex();
+  notifyAndEmit("users");
+  notifyAndEmit("predictions");
+  notifyAndEmit("matchResults");
+  notifyAndEmit("settings");
+  notifyAndEmit("actualBonuses");
+
+  writeAuditLog("import-data-success", { counts: shape.counts });
+
+  return { success: true, counts: shape.counts };
 }
