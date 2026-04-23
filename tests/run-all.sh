@@ -77,6 +77,7 @@ run_test "39. Scenario Predictor (champion + runner-up auto-fill)" "test-scenari
 run_test "40. Shared UI Components (Spinner, InlineError, ErrorBanner, EmptyState, Badge)" "test-shared-components.mjs" "jsx"
 run_test "41. Focus Trap Hook" "test-focus-trap.mjs" "no"
 run_test "42. Confirm Modal Contract" "test-confirm-modal.mjs" "no"
+run_test "43. AI Top Scorer Selection (striker filter + champion anchor)" "test-top-scorer-selection.mjs" "yes"
 
 echo ""
 echo "==========================================="

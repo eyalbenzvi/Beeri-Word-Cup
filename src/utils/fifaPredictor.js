@@ -130,15 +130,18 @@ export function predictAllMatches(
   return allPreds;
 }
 
-// Pick a random top scorer from a weighted list
-const TOP_SCORER_CANDIDATES = [
-  "Mbappé", "Haaland", "Vinicius Jr", "Kane", "Salah",
-  "Lewandowski", "Lautaro Martínez", "Isak", "Gyökeres",
-  "Son", "Osimhen", "Yamal", "Saka", "Álvarez",
-  "Retegui", "Pulisic", "David", "Rashford", "Morata",
-  "Havertz", "Nunez", "Depay",
-];
-
-export function predictTopScorer() {
-  return TOP_SCORER_CANDIDATES[Math.floor(Math.random() * TOP_SCORER_CANDIDATES.length)];
+// Derive the predicted champion from a completed `allPreds` map produced by
+// `predictAllMatches`. Returns the team code, or null if the final isn't
+// computable yet (missing scores / teams). `predictAllMatches` guarantees
+// `advancingTeam` is set on knockout draws, including the final.
+export function getPredictedChampion(allPreds, calcBracketTeams) {
+  if (!allPreds || typeof calcBracketTeams !== "function") return null;
+  const bracket = calcBracketTeams(allPreds);
+  const teams = bracket["F-1"];
+  if (!teams?.home || !teams?.away) return null;
+  const pred = allPreds["F-1"];
+  if (!pred || typeof pred.homeScore !== "number" || typeof pred.awayScore !== "number") return null;
+  if (pred.homeScore > pred.awayScore) return teams.home;
+  if (pred.awayScore > pred.homeScore) return teams.away;
+  return pred.advancingTeam || null;
 }
