@@ -96,6 +96,7 @@ run_test "58. Profile Consistency (derived champion + shared rank)" "test-profil
 run_test "59. Rank Consistency (Leaderboard ↔ Profile parity)" "test-rank-consistency.mjs" "yes"
 run_test "60. Labels Consistency (centralised Hebrew copy)" "test-labels-consistency.mjs" "no"
 run_test "61. Form Row Consistency (FormAvatar + FormSummaryLines)" "test-form-row-consistency.mjs" "no"
+run_test "62. Layout Fixes (Home+Welcome+UpcomingMatches)" "test-layout-fixes.mjs" "no"
 
 echo ""
 echo "==========================================="

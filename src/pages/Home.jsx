@@ -1,8 +1,6 @@
-import { useMemo } from "react";
 import { useSettings, useCurrentUser, useMatchResults } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
-import { useRightRail } from "../hooks/useRail";
 import { createForm } from "../store";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
@@ -17,11 +15,6 @@ export default function Home() {
   const countdown = useCountdown();
   const results = useMatchResults();
   const showToast = useToast();
-
-  // On xl:, put UpcomingMatches in the right-rail when predictions are locked.
-  // `dense` → single-column grid (rail is ~320px wide).
-  const rail = useMemo(() => settings.predictionsLocked ? <UpcomingMatches dense /> : null, [settings.predictionsLocked]);
-  useRightRail(rail);
 
   return (
     <div className="text-center max-w-xl mx-auto">
@@ -51,7 +44,7 @@ export default function Home() {
       )}
 
       {settings.predictionsLocked ? (
-        <div className="mb-3 xl:hidden">
+        <div className="mb-3">
           <UpcomingMatches />
         </div>
       ) : (

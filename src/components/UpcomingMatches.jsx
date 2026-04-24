@@ -121,29 +121,29 @@ function MatchRow({ match, actualTeams }) {
   const stageLabel = STAGE_LABELS[match.stage] || "";
   const meta = [match.date, match.time, match.venue].filter(Boolean).join(" · ");
 
+  // Stacked + centered layout: stage label on top, teams in the middle,
+  // date/time/venue on the bottom. Keeps everything visually balanced in
+  // narrow containers (two-column grid cards are ~240px wide on desktop).
   return (
     <>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-secondary/90">
-          {stageLabel}
-          {match.group ? ` · ${match.group}` : ""}
-        </span>
-        <span className="text-xs text-ink-muted">{meta}</span>
+      <div className="text-xs font-medium text-secondary/90 text-center mb-1">
+        {stageLabel}
+        {match.group ? ` · ${match.group}` : ""}
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex-1 text-center">
+      <div className="flex items-center justify-center gap-2">
+        <div className="flex-1 min-w-0 text-center">
           <div
-            className={`text-sm font-medium ${
+            className={`text-sm font-medium truncate ${
               home ? "text-ink" : "text-ink-muted italic"
             }`}
           >
             <bdi>{home?.name || "טרם נקבע"}</bdi>
           </div>
         </div>
-        <div className="text-sm text-ink-muted font-black">–</div>
-        <div className="flex-1 text-center">
+        <div className="text-sm text-ink-muted font-black shrink-0">–</div>
+        <div className="flex-1 min-w-0 text-center">
           <div
-            className={`text-sm font-medium ${
+            className={`text-sm font-medium truncate ${
               away ? "text-ink" : "text-ink-muted italic"
             }`}
           >
@@ -151,14 +151,17 @@ function MatchRow({ match, actualTeams }) {
           </div>
         </div>
       </div>
+      {meta && (
+        <div className="text-xs text-ink-muted text-center mt-1">{meta}</div>
+      )}
     </>
   );
 }
 
-// `dense` collapses the grid to a single column at xl breakpoint — used when
-// rendered inside the right-rail (~320px wide) where two columns would squash.
-// Inline placements (Home mobile, WelcomeScreen) keep the two-column layout.
-export default function UpcomingMatches({ dense = false } = {}) {
+// Rendered inline in the main content column on both Home and WelcomeScreen.
+// Grid switches to two columns on md+ so multiple matches fit without
+// sprawling vertically.
+export default function UpcomingMatches() {
   const { user } = useCurrentUser();
   const userForms = useUserForms(user?.id || null);
   const matches = useUpcomingMatches();
@@ -193,7 +196,7 @@ export default function UpcomingMatches({ dense = false } = {}) {
         המשחקים הבאים
         {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
       </div>
-      <div className={`space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 ${dense ? "xl:grid-cols-1" : "xl:grid-cols-2"}`}>
+      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
         {matches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
           return (
