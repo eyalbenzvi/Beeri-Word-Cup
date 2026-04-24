@@ -55,7 +55,7 @@ function AdminExportReports({ leaderboard, allPredictions, playerList }) {
         <button
           type="button"
           onClick={downloadCsv}
-          className="btn-duo btn-duo-primary w-full"
+          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[200px]"
         >
           הורד CSV
         </button>
