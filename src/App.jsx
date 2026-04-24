@@ -21,6 +21,7 @@ const Results = lazyWithRetry(() => import("./pages/Results"));
 const Stats = lazyWithRetry(() => import("./pages/Stats"));
 const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
+const DailySummary = lazyWithRetry(() => import("./pages/DailySummary"));
 
 const PAGES = {
   home: Home,
@@ -30,6 +31,7 @@ const PAGES = {
   stats: Stats,
   admin: Admin,
   profile: Profile,
+  blog: DailySummary,
 };
 
 // After STUCK_THRESHOLD_MS, the spinner surfaces recovery options. Without

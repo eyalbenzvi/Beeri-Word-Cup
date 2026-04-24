@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { useCurrentUser } from "../hooks/useStore";
+import { useCurrentUser, useSummaries } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import MenuOverlay from "./MenuOverlay";
 import DesktopSideNav from "./DesktopSideNav";
-import { Menu, Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings } from "lucide-react";
+import { Menu, Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Newspaper } from "lucide-react";
 
 export default function Layout({ children, rightRail = null }) {
   const { user } = useCurrentUser();
   const { page, navigate } = useNavigation();
+  const summaries = useSummaries();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -15,6 +16,12 @@ export default function Layout({ children, rightRail = null }) {
     document.addEventListener("open-info-drawer", handler);
     return () => document.removeEventListener("open-info-drawer", handler);
   }, []);
+
+  // Show the blog tab only when there's a published summary (or the admin has
+  // any drafts to manage). This keeps the nav empty before the admin writes.
+  const hasVisibleSummary = Object.values(summaries || {}).some(
+    (s) => s.status === "published" || user?.isAdmin,
+  );
 
   const allNavItems = user
     ? [
@@ -25,6 +32,9 @@ export default function Layout({ children, rightRail = null }) {
         { id: "stats", label: "נתונים", Icon: BarChart3 },
       ]
     : [{ id: "home", label: "בית", Icon: HomeIcon }];
+  if (user && hasVisibleSummary) {
+    allNavItems.push({ id: "blog", label: "יומן", Icon: Newspaper });
+  }
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול", Icon: Settings });
 
   return (

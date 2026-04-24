@@ -112,6 +112,36 @@ service cloud.firestore {
       );
     }
 
+    // summaries collection — one document per blog post
+    // Read: published summaries are public (shareable via link, no auth
+    //       required for the doc); listing requires status filter on client.
+    // Write: admin only, with shape validation.
+    function summaryAllowedFields() {
+      return [
+        'number', 'title', 'subtitle', 'intro', 'conclusion',
+        'coveredMatchIds', 'matchNotes', 'status',
+        'authorUid', 'createdAt', 'updatedAt', 'publishedAt'
+      ];
+    }
+    function validSummaryStatus(s) {
+      return s == 'draft' || s == 'published';
+    }
+    function validSummaryShape(d) {
+      return d.keys().hasOnly(summaryAllowedFields())
+        && d.title is string
+        && d.status is string && validSummaryStatus(d.status)
+        && d.number is number
+        && d.coveredMatchIds is list
+        && d.matchNotes is map;
+    }
+    match /summaries/{summaryId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin() && validSummaryShape(request.resource.data);
+      allow update: if isAdmin() && validSummaryShape(request.resource.data)
+        && request.resource.data.number == resource.data.number;
+      allow delete: if isAdmin();
+    }
+
     // Audit log — append-only for authenticated users, read for admins
     // Validates: userId must match auth, action and timestamp required
     match /auditLog/{logId} {

@@ -202,3 +202,7 @@ export function useActualBonuses() {
 export function useSettings() {
   return useStoreValue(store.getSettings);
 }
+
+export function useSummaries() {
+  return useStoreValue(store.getSummaries);
+}

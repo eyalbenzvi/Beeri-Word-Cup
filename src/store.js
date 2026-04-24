@@ -12,6 +12,7 @@ import {
   getDocs,
   query,
   where,
+  addDoc,
 } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "./sentry";
 import { generateDefaultFormName } from "./utils/formNameGenerator";
@@ -107,6 +108,7 @@ const cache = {
   actualAdvancing: {},
   actualBonuses: { champion: null, topScorers: [] },
   settings: { predictionsLocked: false },
+  summaries: {}, // summaryId -> summaryData
   _ready: {},
 };
 
@@ -155,6 +157,12 @@ function formDocRef(formId) {
 }
 
 const predictionsCollectionRef = collection(db, "predictions");
+
+function summaryDocRef(summaryId) {
+  return doc(db, "summaries", summaryId);
+}
+
+const summariesCollectionRef = collection(db, "summaries");
 
 async function writeGameDoc(docName, data, { force = false } = {}) {
   // Safety guard: block writes that would dramatically shrink shared data.
@@ -404,6 +412,7 @@ let predictionsUnsub = null;
 let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
+let summariesUnsub = null;
 const retryState = {}; // key -> { count, inProgress }
 
 function getRetryState(key) {
@@ -633,6 +642,9 @@ export function initRealtimeListeners(userId) {
           if (key === "settings" || key === "users") {
             maybeUpgradePredictionsListener();
           }
+          if (key === "users") {
+            maybeUpgradeSummariesListener();
+          }
         },
         (err) => {
           console.error(`Listener error for ${docName}:`, err);
@@ -663,6 +675,59 @@ export function initRealtimeListeners(userId) {
 
   // Start with filtered predictions (own forms only)
   setupPredictionsListener(userId, false);
+
+  // Summaries listener — all summaries (reads filtered server-side by rules:
+  // published for everyone, drafts only for admins)
+  setupSummariesListener();
+}
+
+// The Firestore rule allows non-admins to read only `status == 'published'`
+// docs. A list query that could return a draft gets rejected outright by
+// Firestore (rules can't filter — they gate the whole query). So non-admins
+// must constrain the query to published, and admins can read everything.
+// We re-subscribe whenever the admin flag flips (e.g. after users doc loads
+// or admin-claim changes).
+let summariesShowAll = false;
+function setupSummariesListener() {
+  if (summariesUnsub) summariesUnsub();
+  const isUserAdmin =
+    !!currentListenerUserId &&
+    cache.users?.[currentListenerUserId]?.isAdmin === true;
+  summariesShowAll = isUserAdmin;
+  const q = isUserAdmin
+    ? summariesCollectionRef
+    : query(summariesCollectionRef, where("status", "==", "published"));
+  summariesUnsub = onSnapshot(
+    q,
+    (snapshot) => {
+      getRetryState("summaries").count = 0;
+      const map = {};
+      snapshot.forEach((docSnap) => {
+        map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+      });
+      cache.summaries = map;
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+    },
+    (err) => {
+      console.error("Listener error for summaries:", err);
+      reportListenerError(err, "summariesListener", {
+        retryCount: getRetryState("summaries").count,
+      });
+      maybeRefreshToken(err);
+      // Non-fatal: summaries are optional; mark ready so UI doesn't block.
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+    },
+  );
+}
+
+function maybeUpgradeSummariesListener() {
+  if (!currentListenerUserId) return;
+  const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
+  if (isUserAdmin !== summariesShowAll) {
+    setupSummariesListener();
+  }
 }
 
 export function isStoreReady() {
@@ -988,6 +1053,10 @@ export function logoutUser() {
     predictionsUnsub();
     predictionsUnsub = null;
   }
+  if (summariesUnsub) {
+    summariesUnsub();
+    summariesUnsub = null;
+  }
   gameDocUnsubs.forEach((u) => u());
   gameDocUnsubs = [];
   currentListenerUserId = null;
@@ -998,6 +1067,7 @@ export function logoutUser() {
   cache.actualAdvancing = {};
   cache.actualBonuses = { champion: null, topScorers: [] };
   cache.settings = { predictionsLocked: false };
+  cache.summaries = {};
   cache._ready = {};
   rebuildUserFormIndex();
   localStorage.removeItem(CURRENT_USER_KEY);
@@ -1556,4 +1626,164 @@ export async function importAllData(data) {
   writeAuditLog("import-data-success", { counts: shape.counts });
 
   return { success: true, counts: shape.counts };
+}
+
+// ============ SUMMARIES (BLOG) ============
+
+const EMPTY_SUMMARIES = {};
+
+export function getSummaries() {
+  return cache.summaries || EMPTY_SUMMARIES;
+}
+
+export function getSummary(summaryId) {
+  return getSummaries()[summaryId] || null;
+}
+
+// Returns published summaries ordered by `number` ascending.
+export function getPublishedSummariesSorted() {
+  return Object.values(getSummaries())
+    .filter((s) => s.status === "published")
+    .sort((a, b) => (a.number || 0) - (b.number || 0));
+}
+
+// Returns the latest published summary (highest `number`), or null.
+export function getLatestPublishedSummary() {
+  const sorted = getPublishedSummariesSorted();
+  return sorted.length > 0 ? sorted[sorted.length - 1] : null;
+}
+
+// Finds a summary by its sequential number (string or number).
+export function getSummaryByNumber(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return null;
+  return Object.values(getSummaries()).find((s) => s.number === num) || null;
+}
+
+// Compute the union of matchIds already referenced in any summary (drafts + published).
+export function getCoveredMatchIds() {
+  const covered = new Set();
+  for (const s of Object.values(getSummaries())) {
+    for (const mid of s.coveredMatchIds || []) covered.add(mid);
+  }
+  return covered;
+}
+
+function nextSummaryNumber() {
+  const all = Object.values(getSummaries());
+  if (all.length === 0) return 1;
+  return Math.max(...all.map((s) => s.number || 0)) + 1;
+}
+
+const DEFAULT_SUMMARY = {
+  title: "",
+  subtitle: "",
+  intro: "",
+  conclusion: "",
+  coveredMatchIds: [],
+  matchNotes: {},
+  status: "draft",
+};
+
+/**
+ * Create a new summary (draft). Returns the new document id.
+ * Auto-assigns the next sequential `number`.
+ */
+export async function createSummary(fields = {}) {
+  if (!requireAdmin()) return null;
+  const now = new Date().toISOString();
+  const payload = {
+    ...DEFAULT_SUMMARY,
+    ...fields,
+    number: nextSummaryNumber(),
+    status: "draft",
+    authorUid: getCurrentUser()?.id || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    const ref = await addDoc(summariesCollectionRef, payload);
+    cache.summaries = { ...cache.summaries, [ref.id]: { id: ref.id, ...payload } };
+    notifyAndEmit("summaries");
+    writeAuditLog("summary-create", { summaryId: ref.id, number: payload.number });
+    return ref.id;
+  } catch (err) {
+    console.error("Failed to create summary:", err);
+    captureClientError(err, { source: "createSummary", code: err?.code });
+    return null;
+  }
+}
+
+/**
+ * Update an existing summary's fields. `fields.status` can be omitted;
+ * pass "published" / "draft" to change visibility.
+ */
+export async function updateSummary(summaryId, fields = {}) {
+  if (!requireAdmin()) return false;
+  const existing = getSummary(summaryId);
+  if (!existing) return false;
+  const now = new Date().toISOString();
+  // `id` and `number` are never mutated after creation.
+  const { id: _dropId, number: _dropNumber, ...safeFields } = fields;
+  // Sanity: status must stay on the allowed set if provided.
+  if (
+    safeFields.status != null &&
+    safeFields.status !== "draft" &&
+    safeFields.status !== "published"
+  ) {
+    console.warn(`Invalid summary status: ${safeFields.status}`);
+    return false;
+  }
+  const patch = { ...safeFields, updatedAt: now };
+  if (fields.status === "published" && existing.status !== "published") {
+    patch.publishedAt = now;
+  }
+  try {
+    await updateDoc(summaryDocRef(summaryId), patch);
+    cache.summaries = {
+      ...cache.summaries,
+      [summaryId]: { ...existing, ...patch },
+    };
+    notifyAndEmit("summaries");
+    writeAuditLog("summary-update", {
+      summaryId,
+      number: existing.number,
+      status: patch.status || existing.status,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to update summary:", err);
+    captureClientError(err, { source: "updateSummary", summaryId, code: err?.code });
+    return false;
+  }
+}
+
+export async function publishSummary(summaryId) {
+  return updateSummary(summaryId, { status: "published" });
+}
+
+export async function unpublishSummary(summaryId) {
+  return updateSummary(summaryId, { status: "draft" });
+}
+
+export async function deleteSummary(summaryId) {
+  if (!requireAdmin()) return false;
+  const existing = getSummary(summaryId);
+  if (!existing) return false;
+  try {
+    await deleteDoc(summaryDocRef(summaryId));
+    const next = { ...cache.summaries };
+    delete next[summaryId];
+    cache.summaries = next;
+    notifyAndEmit("summaries");
+    writeAuditLog("summary-delete", {
+      summaryId,
+      number: existing.number,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to delete summary:", err);
+    captureClientError(err, { source: "deleteSummary", summaryId, code: err?.code });
+    return false;
+  }
 }
