@@ -7,7 +7,6 @@ import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
 import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
-import Beeri from "../components/Beeri";
 import { useToast } from "../components/Toast";
 
 export default function Home() {
@@ -24,12 +23,9 @@ export default function Home() {
 
   return (
     <div className="text-center max-w-xl mx-auto xl:max-w-none xl:mx-0">
-      <div className="pt-2 pb-3 md:pt-8 md:pb-5">
-        <div className="mb-3 flex justify-center animate-pop-in">
-          <Beeri mood={settings.predictionsLocked ? "trophy" : "excited"} size={92} />
-        </div>
-        <h1 className="font-heading text-3xl md:text-5xl xl:text-6xl font-extrabold text-ink mb-1 tracking-tight">
-          טורניר הניחושים של בארי
+      <div className="pt-2 pb-3 md:pt-4 md:pb-4">
+        <h1 className="font-heading text-3xl md:text-4xl xl:text-5xl font-extrabold text-ink mb-1 tracking-tight">
+          <span aria-hidden="true">⚽</span> טורניר הניחושים של בארי
         </h1>
         <p className="text-sm md:text-base font-bold text-ink-muted">
           מונדיאל 2026
@@ -46,7 +42,7 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[280px] md:mx-auto xl:mx-0 mb-4"
+          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[240px] mb-4"
         >
           קדימה, מלאו טופס
         </button>
@@ -57,17 +53,17 @@ export default function Home() {
           <UpcomingMatches />
         </div>
       ) : (
-        <div className="card-duo-lg mb-4">
+        <div className="card-duo mb-3">
           {countdown.started ? (
             <div className="text-xl md:text-2xl font-extrabold text-primary">
               המונדיאל רץ
             </div>
           ) : (
             <>
-              <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
+              <p className="text-xs md:text-sm font-extrabold text-ink-muted mb-2">
                 עוד עד שריקת הפתיחה
               </p>
-              <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
+              <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
                 <CountdownUnit
                   value={countdown.days}
                   label="ימים"
@@ -77,7 +73,7 @@ export default function Home() {
                 <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
                 <CountdownUnit value={countdown.seconds} label="שניות" />
               </div>
-              <p className="text-xs text-ink-muted mt-3 font-medium">
+              <p className="text-[11px] text-ink-muted mt-2 font-medium">
                 11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה
               </p>
             </>
@@ -86,7 +82,7 @@ export default function Home() {
       )}
 
       <div
-        className="rounded-2xl border-2 p-3"
+        className="rounded-2xl border-2 p-2.5"
         style={settings.predictionsLocked
           ? { background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }
           : { background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
