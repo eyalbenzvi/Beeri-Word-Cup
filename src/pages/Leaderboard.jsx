@@ -293,56 +293,30 @@ export default function Leaderboard({
       ) : (
         <>
           {rankedLeaderboard.length >= 3 && !embedded && (
-            <div className="card-duo-lg mb-4">
-              <div className="text-xs text-ink-muted font-extrabold text-center mb-3">
-                🏆 שלושת המובילים
-              </div>
-              <div className="flex items-end justify-center gap-2">
-                {/* Silver (2nd) */}
-                <div className="flex flex-col items-center flex-1 max-w-[110px]">
-                  <div className="w-14 h-14 rounded-full podium-silver text-white flex items-center justify-center text-2xl font-extrabold mb-1.5">
-                    🥈
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { e: rankedLeaderboard[0], medal: "🥇", cls: "podium-gold", rank: 1 },
+                { e: rankedLeaderboard[1], medal: "🥈", cls: "podium-silver", rank: 2 },
+                { e: rankedLeaderboard[2], medal: "🥉", cls: "podium-bronze", rank: 3 },
+              ].map(({ e, medal, cls, rank }) => (
+                <div key={e.formId} className="flex items-center gap-2 min-w-0 rounded-xl p-2 border border-border bg-white">
+                  <div className={`w-9 h-9 rounded-full ${cls} text-white flex items-center justify-center text-base font-extrabold flex-shrink-0 ${rank === 1 ? "animate-pop-in" : ""}`}>
+                    {medal}
                   </div>
-                  <div className="text-xs font-extrabold text-ink truncate w-full text-center">
-                    {rankedLeaderboard[1].formName}
-                  </div>
-                  <div className="text-xs text-ink-muted tabular-nums font-bold">
-                    {rankedLeaderboard[1].totalPoints} נק׳
-                  </div>
-                </div>
-                {/* Gold (1st) */}
-                <div className="flex flex-col items-center flex-1 max-w-[120px]">
-                  <div className="w-20 h-20 rounded-full podium-gold text-white flex items-center justify-center text-3xl font-extrabold mb-1.5 animate-pop-in">
-                    🥇
-                  </div>
-                  <div className="text-sm font-extrabold text-ink truncate w-full text-center">
-                    {rankedLeaderboard[0].formName}
-                  </div>
-                  <div className="text-sm text-primary-dark tabular-nums font-extrabold">
-                    {rankedLeaderboard[0].totalPoints} נק׳
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-extrabold text-ink truncate">{e.formName}</div>
+                    <div className="text-xs text-ink-muted tabular-nums font-bold">
+                      <bdi>{e.totalPoints}</bdi> נק׳
+                    </div>
                   </div>
                 </div>
-                {/* Bronze (3rd) */}
-                <div className="flex flex-col items-center flex-1 max-w-[110px]">
-                  <div className="w-14 h-14 rounded-full podium-bronze text-white flex items-center justify-center text-2xl font-extrabold mb-1.5">
-                    🥉
-                  </div>
-                  <div className="text-xs font-extrabold text-ink truncate w-full text-center">
-                    {rankedLeaderboard[2].formName}
-                  </div>
-                  <div className="text-xs text-ink-muted tabular-nums font-bold">
-                    {rankedLeaderboard[2].totalPoints} נק׳
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           )}
 
-          <div className="card-duo-tight mb-4">
-            <div className="text-sm text-ink-muted text-center font-bold">
-              {Object.keys(results).length} משחקים שוחקו • {leaderboard.length}{" "}
-              טפסים
-            </div>
+          <div className="text-xs text-ink-muted text-center font-bold mb-3">
+            {Object.keys(results).length} משחקים שוחקו • {leaderboard.length}{" "}
+            טפסים
           </div>
 
           <div className="space-y-2">
