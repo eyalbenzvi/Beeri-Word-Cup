@@ -175,12 +175,16 @@ console.log("--- 6. Home page 'winning form' CTA visibility ---");
 console.log("--- 7. Reopen button gated by lock (existing behaviour) ---");
 
 {
+  // Reopen is offered for pending OR submitted forms when not locked.
+  // Locking always hides it; a draft has nothing to reopen.
   function shouldShowReopen(formStatus, locked) {
-    return formStatus === "submitted" && !locked;
+    return (formStatus === "submitted" || formStatus === "pending") && !locked;
   }
 
   assert(shouldShowReopen("submitted", false) === true, "Submitted + unlocked: show reopen");
   assert(shouldShowReopen("submitted", true) === false, "Submitted + locked: hide reopen");
+  assert(shouldShowReopen("pending", false) === true, "Pending + unlocked: show reopen");
+  assert(shouldShowReopen("pending", true) === false, "Pending + locked: hide reopen");
   assert(shouldShowReopen("draft", false) === false, "Draft + unlocked: no reopen");
   assert(shouldShowReopen("draft", true) === false, "Draft + locked: no reopen");
 }

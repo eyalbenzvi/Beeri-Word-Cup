@@ -35,9 +35,13 @@ service cloud.firestore {
       ];
     }
     // Allowed FSM transitions of `status` for a non-admin user.
+    // `submitted -> draft` is permitted so that users can reopen an admin-
+    // approved form for editing before tournament lock. `allow update` still
+    // gates the whole transition on !isLocked().
     function validUserStatusTransition(oldStatus, newStatus) {
       return (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'pending')) ||
-             (oldStatus == 'pending' && newStatus == 'draft');
+             (oldStatus == 'pending' && newStatus == 'draft') ||
+             (oldStatus == 'submitted' && newStatus == 'draft');
     }
 
     // gameData collection — single documents

@@ -84,6 +84,7 @@ run_test "46. Layout Shell Structure" "test-layout-shell.mjs" "no"
 run_test "47. Leaderboard Embedded Mode" "test-leaderboard-embedded.mjs" "no"
 run_test "48. Micro-Copy Contract" "test-micro-copy.mjs" "no"
 run_test "49. Desktop Design Static Audit" "test-desktop-audit.mjs" "no"
+run_test "50. Reopen Form (pending/submitted → draft)" "test-reopen-form.mjs" "no"
 
 echo ""
 echo "==========================================="
