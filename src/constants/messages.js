@@ -22,3 +22,27 @@ export const BRAND = {
   countdownHeader: "הזמן שנותר לפתיחה",
 };
 
+// Canonical Hebrew labels for the bonus/leaderboard vocabulary. Used everywhere
+// a form, row, card, or CSV needs one of these terms — prevents the historical
+// drift between "מלך שערים" / "מלך השערים" and "מדויקים" / "מדויקות".
+// Canonical choices:
+//   • "מלך השערים" (definite form, standard Hebrew idiom)
+//   • "מדויקים"   (masculine, agrees with "ניחושים")
+const TOP_SCORER = "מלך השערים";
+const CHAMPION = "אלופה";
+export const LABELS = {
+  topScorer: TOP_SCORER,
+  guessTopScorer: `ניחוש ${TOP_SCORER}`,
+  champion: CHAMPION,
+  guessChampion: `ניחוש ${CHAMPION}`,
+  exactCount: "מדויקים",
+  outcomeCount: "הכרעות",
+  forms: "טפסים",
+  formsMine: "הטפסים שלי",
+  rank: "מקום",
+  pointsShort: "נק׳",
+  pointsTotalShort: "סה״כ",
+  topScorerAria: (name) => `${TOP_SCORER}: ${name}`,
+  championAria: (name) => `${CHAMPION}: ${name}`,
+};
+

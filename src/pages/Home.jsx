@@ -18,8 +18,9 @@ export default function Home() {
   const results = useMatchResults();
   const showToast = useToast();
 
-  // On xl:, put UpcomingMatches in the right-rail when predictions are locked
-  const rail = useMemo(() => settings.predictionsLocked ? <UpcomingMatches /> : null, [settings.predictionsLocked]);
+  // On xl:, put UpcomingMatches in the right-rail when predictions are locked.
+  // `dense` → single-column grid (rail is ~320px wide).
+  const rail = useMemo(() => settings.predictionsLocked ? <UpcomingMatches dense /> : null, [settings.predictionsLocked]);
   useRightRail(rail);
 
   return (
@@ -43,7 +44,7 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[240px] md:max-w-[320px] md:mx-auto md:block mb-7"
+          className="btn-duo btn-duo-primary btn-duo-cta mb-7"
         >
           קדימה, מלאו טופס
         </button>

@@ -200,6 +200,24 @@ html, body {
   border-radius: 14px;
 }
 
+/* Primary CTA width pattern: full-width on mobile, centered and comfortably
+   bounded on desktop. Replaces the copy-pasted
+   `w-full md:w-auto md:min-w-[...] md:mx-auto md:block` strings that had
+   drifted across pages (Home/Profile/FormList/Leaderboard used different
+   min/max widths). Use alongside the colour variant, e.g.
+   `btn-duo btn-duo-primary btn-duo-cta`. */
+.btn-duo-cta { width: 100%; }
+@media (min-width: 768px) {
+  .btn-duo-cta {
+    display: block;
+    width: auto;
+    min-width: 260px;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* Flat (no 3D shadow) variant for small buttons, chips, close buttons */
 .btn-duo-flat {
   display: inline-flex;

@@ -49,7 +49,7 @@ import AIFillOverlay from "../components/AIFillOverlay";
 import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
-import { AUTH_COPY } from "../constants/messages";
+import { AUTH_COPY, LABELS } from "../constants/messages";
 
 import { KNOCKOUT_STAGE_ORDER as knockoutStageOrder, getStageLabel, STAGE_LABELS } from "../utils/constants";
 const EMPTY_MATCHES = {};
@@ -284,7 +284,7 @@ export default function Predict() {
     if (!activeFormId || !canEdit) return;
     const ok = await confirm({
       title: "מילוי עם AI",
-      message: "הניחושים החסרים ימולאו בעזרת AI. ניחושים קיימים ומלך שערים שנבחר יישמרו",
+      message: `הניחושים החסרים ימולאו בעזרת AI. ניחושים קיימים ו${LABELS.topScorer} שנבחר יישמרו`,
       confirmLabel: "מלא",
     });
     if (!ok) return;
@@ -548,7 +548,7 @@ export default function Predict() {
             />
           </div>
           <div id="field-topScorer">
-            <label className="text-xs font-extrabold text-ink-muted">מלך שערים (חובה)</label>
+            <label className="text-xs font-extrabold text-ink-muted">{LABELS.topScorer} (חובה)</label>
             <PlayerAutocomplete
               value={activeForm.topScorer || ""}
               onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
@@ -559,7 +559,7 @@ export default function Predict() {
         </div>
         {championName && (
           <div className="mt-2 pt-2 border-t-2 border-border text-center text-sm text-accent-text font-extrabold">
-            🏆 אלופה: {championName}
+            🏆 {LABELS.champion}: {championName}
           </div>
         )}
       </div>

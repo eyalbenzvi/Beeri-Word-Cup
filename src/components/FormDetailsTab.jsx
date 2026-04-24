@@ -1,5 +1,6 @@
 import { saveBonusPrediction, updateFormDetails } from "../store";
 import PlayerAutocomplete from "./PlayerAutocomplete";
+import { LABELS } from "../constants/messages";
 
 export default function FormDetailsTab({ activeForm, activeFormId, canEdit, championName }) {
   return (
@@ -45,10 +46,10 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
 
       <div className="card-duo">
         <h3 className="font-extrabold text-base text-ink mb-1">
-          ⚽ מלך השערים (8 נק׳)
+          ⚽ {LABELS.topScorer} (8 {LABELS.pointsShort})
         </h3>
         <p className="text-xs text-ink-muted mb-3">
-          מי יהיה מלך השערים? שערים מבעיטות הכרעה לא נספרים.
+          מי יהיה {LABELS.topScorer}? שערים מבעיטות הכרעה לא נספרים.
         </p>
         <PlayerAutocomplete
           value={activeForm.topScorer || ""}
@@ -61,7 +62,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
 
       <div className="card-duo">
         <h3 className="font-extrabold text-base text-ink mb-1">
-          🏆 אלופה (10 נק׳)
+          🏆 {LABELS.champion} (10 {LABELS.pointsShort})
         </h3>
         <p className="text-xs text-ink-muted mb-3">
           נגזר מתוצאות הגמר שמילאת בטופס.

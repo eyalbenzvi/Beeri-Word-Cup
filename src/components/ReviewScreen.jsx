@@ -4,6 +4,7 @@ import { getPlayerDisplayName } from "../utils/playerSearch";
 import { useSettings } from "../hooks/useStore";
 import { resolvePlayerList } from "../utils/playerSearch";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { LABELS } from "../constants/messages";
 
 export default function ReviewScreen({
   errors,
@@ -67,7 +68,7 @@ export default function ReviewScreen({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-ink-muted font-medium">מלך שערים:</span>
+                <span className="text-ink-muted font-medium">{LABELS.topScorer}:</span>
                 <span
                   className={`font-extrabold ${topScorerDisplay ? "text-ink" : "text-danger"}`}
                 >
@@ -83,7 +84,7 @@ export default function ReviewScreen({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-ink-muted font-medium">אלופה:</span>
+                <span className="text-ink-muted font-medium">{LABELS.champion}:</span>
                 <span
                   className={`font-extrabold ${championName ? "text-accent-text" : "text-ink-muted"}`}
                 >

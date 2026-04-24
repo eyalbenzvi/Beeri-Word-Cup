@@ -42,14 +42,21 @@ assert(
   "Home h1 consumes BRAND.tournamentTitle",
 );
 
-// --- Home: CTA has breathing room on desktop (max-w-[320px] + mx-auto) ---
+// --- Home: CTA uses the shared .btn-duo-cta utility (max-width + centered
+// block on md+). Utility lives in src/index.css; migrated from the
+// ad-hoc `md:max-w-[320px] md:mx-auto md:block` pattern. ---
 assert(
-  /md:max-w-\[320px\]/.test(home),
-  "Home CTA caps width on md+ (md:max-w-[320px])",
+  /btn-duo-cta/.test(home),
+  "Home CTA uses shared btn-duo-cta utility",
+);
+const indexCss = fs.readFileSync("src/index.css", "utf8");
+assert(
+  /\.btn-duo-cta[\s\S]*?max-width:\s*320px/.test(indexCss),
+  "btn-duo-cta utility caps width to 320px",
 );
 assert(
-  /md:mx-auto/.test(home) && /md:block/.test(home),
-  "Home CTA centered on md+ (mx-auto + block)",
+  /\.btn-duo-cta[\s\S]*?margin-left:\s*auto/.test(indexCss),
+  "btn-duo-cta utility centers on md+ via auto margins",
 );
 
 // --- Home: countdown header pulled from BRAND ---
