@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>אימות חישוב נקודות — בארי מונדיאל 2026</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Heebo", Arial, sans-serif; background: #f7f7fb; margin: 0; padding: 24px; color: #222; line-height: 1.55; }
+  header { max-width: 1100px; margin: 0 auto 24px; }
+  header h1 { margin: 0 0 8px; font-size: 24px; }
+  header p { margin: 0; color: #555; max-width: 720px; }
+  section { max-width: 1100px; margin: 0 auto 24px; background: #fff; border-radius: 12px; padding: 18px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border-right: 6px solid #ccc; }
+  section.pass { border-right-color: #16a34a; }
+  section.fail { border-right-color: #dc2626; background: #fff4f4; }
+  section h2 { margin: 0 0 4px; font-size: 18px; }
+  section .desc { margin: 0 0 12px; color: #555; font-size: 14px; }
+  section h3 { margin: 14px 0 6px; font-size: 13px; color: #444; text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid #eee; vertical-align: top; }
+  th { background: #fafafa; font-weight: 600; color: #555; }
+  tfoot td { background: #fafafa; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .muted { color: #888; font-size: 12px; }
+  .totals { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #ddd; font-size: 14px; }
+  .ok { display: inline-block; margin-top: 6px; padding: 4px 10px; background: #dcfce7; color: #166534; border-radius: 6px; font-weight: 700; }
+  .bad { display: inline-block; margin-top: 6px; padding: 4px 10px; background: #fee2e2; color: #991b1b; border-radius: 6px; font-weight: 700; }
+  summary { cursor: pointer; padding: 8px; background: #fafafa; border-radius: 8px; }
+  .legend { background: #fff; border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin: 0 auto 18px; max-width: 1100px; font-size: 13px; }
+  .legend table { font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>אימות חישוב נקודות — בארי מונדיאל 2026</h1>
+  <p>
+    כל תרחיש מציג: ניחושים והתוצאות בפועל ⇐ פירוק ידני של הנקודות לפי הספק ⇐ הסכום שמחזירה המערכת
+    (calculateFullScore). ירוק = שתי הספירות תואמות. אדום = פער בין החישוב הידני למערכת.
+  </p>
+</header>
+<div class="legend">
+  <b>טבלת נקודות (לפי שלב)</b>
+  <table>
+    <thead><tr><th>שלב</th><th>הכרעה</th><th>מדויק (נוסף להכרעה)</th><th>עלייה לשלב הבא</th></tr></thead>
+    <tbody>
+      <tr><td>בתים</td><td>1</td><td>3</td><td>2</td></tr><tr><td>שלב 32</td><td>3</td><td>3</td><td>4</td></tr><tr><td>שמינית</td><td>5</td><td>3</td><td>6</td></tr><tr><td>רבע</td><td>7</td><td>3</td><td>8</td></tr><tr><td>חצי</td><td>9</td><td>3</td><td>10</td></tr><tr><td>מקום 3</td><td>9</td><td>3</td><td>0</td></tr><tr><td>גמר</td><td>11</td><td>3</td><td>0</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:8px;">בונוסים: אלופה = 9 · מלך שערים = 8</div>
+</div>
+<section class="pass">
+    <h2>1. ניחוש מושלם בשלב הבתים</h2>
+    <p class="desc">שני משחקים בשלב הבתים, שני הניחושים מדויקים. מצופה: 4 + 4 = 8.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>2-1</td>
+      <td>2-1</td>
+      <td><b>4</b> <span class="muted">— הכרעה 1 + מדויק 3 = 4</span></td>
+    </tr><tr>
+      <td><code>g2</code> <span class="muted">בתים</span></td>
+      <td>0-0</td>
+      <td>0-0</td>
+      <td><b>4</b> <span class="muted">— הכרעה 1 + מדויק 3 = 4</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>8</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>8</b> (משחקים 8 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>8</b></div>
+      <div class="ok">✅ 8 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>2. הכרעה נכונה אבל לא מדויק</h2>
+    <p class="desc">ניחוש 2-0 בפועל 1-0 בשלב הבתים. ניחוש הכרעה נכון בלי בונוס מדויק. מצופה: 1.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>2-0</td>
+      <td>1-0</td>
+      <td><b>1</b> <span class="muted">— הכרעה 1</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>1</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>1</b> (משחקים 1 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>1</b></div>
+      <div class="ok">✅ 1 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>3. הכרעה שגויה</h2>
+    <p class="desc">ניחוש 1-0 בפועל 0-1. אפס נקודות.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>1-0</td>
+      <td>0-1</td>
+      <td><b>0</b> <span class="muted">— הכרעה שגויה (ניחוש 1-0 ↔ בפועל 0-1)</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>0</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>4. תיקו ניחשנו ותיקו יצא — לא מדויק</h2>
+    <p class="desc">ניחוש 1-1 בפועל 0-0 בשלב הבתים. הכרעה (תיקו) נכונה. מצופה: 1.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>1-1</td>
+      <td>0-0</td>
+      <td><b>1</b> <span class="muted">— הכרעה 1</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>1</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>1</b> (משחקים 1 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>1</b></div>
+      <div class="ok">✅ 1 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>5. ניחוש מדויק ברבע גמר</h2>
+    <p class="desc">ניחוש 2-1 ברבע, בפועל 2-1, הקבוצות זהות. מצופה: 7 + 3 = 10.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>qf</code> <span class="muted">רבע</span></td>
+      <td>2-1 <span class="muted">(BRA–ARG)</span></td>
+      <td>2-1 <span class="muted">(BRA–ARG)</span></td>
+      <td><b>10</b> <span class="muted">— הכרעה 7 + מדויק 3 = 10</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>10</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>10</b> (משחקים 10 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>10</b></div>
+      <div class="ok">✅ 10 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>6. ניחוש &#39;מדויק&#39; אך משחק אחר ברבע גמר</h2>
+    <p class="desc">צייר ברזיל-ארגנטינה ברבע, בפועל גרמניה-צרפת. הניקוד אמור להיות 0 גם כשהציון זהה.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>qf</code> <span class="muted">רבע</span></td>
+      <td>2-1 <span class="muted">(BRA–ARG)</span></td>
+      <td>2-1 <span class="muted">(GER–FRA)</span></td>
+      <td><b>0</b> <span class="muted">— משחק שונה (ניחוש BRA-ARG, בפועל GER-FRA)</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>0</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>7. גמר מדויק</h2>
+    <p class="desc">גמר: ניחוש 2-1, בפועל 2-1. הקבוצות זהות. מצופה: 11 + 3 = 14.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>F-1</code> <span class="muted">גמר</span></td>
+      <td>2-1 <span class="muted">(BRA–ARG)</span></td>
+      <td>2-1 <span class="muted">(BRA–ARG)</span></td>
+      <td><b>14</b> <span class="muted">— הכרעה 11 + מדויק 3 = 14</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>14</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>14</b> (משחקים 14 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>14</b></div>
+      <div class="ok">✅ 14 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>8. בונוס אלופה בלבד</h2>
+    <p class="desc">אין משחקים. אלופה ניחוש = ARG, בפועל = ARG. מצופה: 9.</p>
+    
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>ARG</td><td>ARG</td><td><b>9</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>9</b> (משחקים 0 + עולים 0 + אלופה 9 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>9</b></div>
+      <div class="ok">✅ 9 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>9. בונוס מלך שערים — שם בעברית כשהאדמין הזין באנגלית</h2>
+    <p class="desc">ניחוש &#39;ליאו מסי&#39; (עברית), בפועל הוזן &#39;Lionel Messi&#39;. אמור לקבל 8 (ההתאמה לפי אליאס דו־לשוני).</p>
+    
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>ליאו מסי</td><td>Lionel Messi</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>10. מלך שערים — שם שאינו ברשימה</h2>
+    <p class="desc">ניחוש &#39;איזה שם בודה&#39;, בפועל &#39;Lionel Messi&#39;. אפס נקודות.</p>
+    
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>Some Random Name</td><td>Lionel Messi</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>11. עולה לרבע — חלק מהניחושים נכונים</h2>
+    <p class="desc">ניחוש 4 קבוצות לרבע, 2 מהן נכונות. נקודות לכל קבוצה = R16.advancing = 6. מצופה: 12.</p>
+    
+    
+    <h3>עולים לשלב הבא</h3>
+    <table>
+      <thead><tr><th>שלב</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+    <td>QF</td>
+    <td>BRA, ARG, GER, ITA</td>
+    <td>BRA, ARG, FRA, ESP</td>
+    <td><b>12</b> <span class="muted">— 2 פגיעות × 6 = 12 (BRA, ARG)</span></td>
+  </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום עולים</b></td><td><b>12</b></td></tr></tfoot>
+    </table>
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>12</b> (משחקים 0 + עולים 12 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>12</b></div>
+      <div class="ok">✅ 12 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>12. עולה לשמינית — שלב 32 פותחים בקבוצות</h2>
+    <p class="desc">ניחוש 32 קבוצות לשלב 32, 32 נכונות. נקודות לכל קבוצה = group.advancing = 2. מצופה: 64.</p>
+    
+    
+    <h3>עולים לשלב הבא</h3>
+    <table>
+      <thead><tr><th>שלב</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+    <td>R32</td>
+    <td>T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31</td>
+    <td>T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31</td>
+    <td><b>64</b> <span class="muted">— 32 פגיעות × 2 = 64 (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31)</span></td>
+  </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום עולים</b></td><td><b>64</b></td></tr></tfoot>
+    </table>
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>64</b> (משחקים 0 + עולים 64 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>64</b></div>
+      <div class="ok">✅ 64 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>13. גמר עולה — 2 קבוצות נכונות</h2>
+    <p class="desc">ניחוש 2 קבוצות לגמר, שתיהן נכונות. נקודות לכל קבוצה = SF.advancing = 10. מצופה: 20.</p>
+    
+    
+    <h3>עולים לשלב הבא</h3>
+    <table>
+      <thead><tr><th>שלב</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+    <td>F</td>
+    <td>BRA, ARG</td>
+    <td>BRA, ARG</td>
+    <td><b>20</b> <span class="muted">— 2 פגיעות × 10 = 20 (BRA, ARG)</span></td>
+  </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום עולים</b></td><td><b>20</b></td></tr></tfoot>
+    </table>
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>20</b> (משחקים 0 + עולים 20 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>20</b></div>
+      <div class="ok">✅ 20 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>14. תרחיש מלא קומפקטי</h2>
+    <p class="desc">שני משחקי בתים (אחד מדויק, אחד הכרעה בלבד), אחד שמינית-גמר מדויק עם הקבוצות הנכונות, אלופה נכונה, מלך שערים נכון, ועלייה לשמינית עם פגיעה אחת. נחשב ידנית: 4 + 1 + 8 (5 הכרעה + 3 מדויק) + 9 + 8 + 4 (R16 advancing משתמש ב־R32.advancing=4 ולפיכך פגיעה אחת = 4) = 34.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>2-1</td>
+      <td>2-1</td>
+      <td><b>4</b> <span class="muted">— הכרעה 1 + מדויק 3 = 4</span></td>
+    </tr><tr>
+      <td><code>g2</code> <span class="muted">בתים</span></td>
+      <td>1-0</td>
+      <td>3-1</td>
+      <td><b>1</b> <span class="muted">— הכרעה 1</span></td>
+    </tr><tr>
+      <td><code>k1</code> <span class="muted">שמינית</span></td>
+      <td>1-0 <span class="muted">(BRA–ARG)</span></td>
+      <td>1-0 <span class="muted">(BRA–ARG)</span></td>
+      <td><b>8</b> <span class="muted">— הכרעה 5 + מדויק 3 = 8</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>13</b></td></tr></tfoot>
+    </table>
+    
+    <h3>עולים לשלב הבא</h3>
+    <table>
+      <thead><tr><th>שלב</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+    <td>R16</td>
+    <td>BRA, XX2</td>
+    <td>BRA, ARG</td>
+    <td><b>4</b> <span class="muted">— 1 פגיעות × 4 = 4 (BRA)</span></td>
+  </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום עולים</b></td><td><b>4</b></td></tr></tfoot>
+    </table>
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>BRA</td><td>BRA</td><td><b>9</b></td></tr>
+        <tr><td>מלך שערים</td><td>Lionel Messi</td><td>Lionel Messi</td><td><b>8</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>34</b> (משחקים 13 + עולים 4 + אלופה 9 + מלך שערים 8)</div>
+      <div>סה"כ מערכת: <b>34</b></div>
+      <div class="ok">✅ 34 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>15. ניחוש ריק (אין משחק נחוש)</h2>
+    <p class="desc">המשחק שוחק אבל המשתמש לא הגיש ניחוש. אפס נקודות.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>—</td>
+      <td>1-0</td>
+      <td><b>0</b> <span class="muted">— אין ניחוש</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>0</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<section class="pass">
+    <h2>16. תוצאה ריקה (משחק טרם שוחק)</h2>
+    <p class="desc">ניחוש 1-0 קיים, אבל התוצאה עדיין null. אפס נקודות, סטטוס &#39;טרם שוחק&#39;.</p>
+    
+    <h3>משחקים</h3>
+    <table>
+      <thead><tr><th>משחק</th><th>ניחוש</th><th>בפועל</th><th>נקודות (חישוב ידני)</th></tr></thead>
+      <tbody><tr>
+      <td><code>g1</code> <span class="muted">בתים</span></td>
+      <td>1-0</td>
+      <td>—</td>
+      <td><b>0</b> <span class="muted">— טרם שוחק</span></td>
+    </tr></tbody>
+      <tfoot><tr><td colspan="3"><b>סיכום משחקים</b></td><td><b>0</b></td></tr></tfoot>
+    </table>
+    
+    <h3>בונוסים</h3>
+    <table>
+      <thead><tr><th>בונוס</th><th>ניחוש</th><th>בפועל</th><th>נקודות</th></tr></thead>
+      <tbody>
+        <tr><td>אלופה</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+        <tr><td>מלך שערים</td><td>—</td><td>—</td><td><b>0</b></td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div>סה"כ ידני: <b>0</b> (משחקים 0 + עולים 0 + אלופה 0 + מלך שערים 0)</div>
+      <div>סה"כ מערכת: <b>0</b></div>
+      <div class="ok">✅ 0 (התאמה)</div>
+    </div>
+  </section>
+<footer style="max-width:1100px;margin:24px auto 0;color:#666;font-size:13px;text-align:center;">
+  הופק ע"י <code>tests/generate-scoring-verification.mjs</code>. ריצה מחדש לאחר כל שינוי בלוגיקת הניקוד.
+</footer>
+</body>
+</html>
