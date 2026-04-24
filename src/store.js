@@ -415,6 +415,19 @@ function retryDelay(attempt) {
   return Math.min(2000 * Math.pow(2, attempt), 30000);
 }
 
+// Transient permission-denied on listeners/reads is expected on iOS Safari
+// (ITP invalidating the Firebase Auth IndexedDB store) and during admin /
+// lock-state churn. The retry + token-refresh + fallback path handles it
+// silently; this helper routes to captureClientMessage so one deduped event
+// per session surfaces persistent cases without spamming Sentry.
+function reportListenerError(err, source, context = {}) {
+  if (err?.code === "permission-denied") {
+    captureClientMessage(`${source}-permission-denied`, { ...context, code: err?.code }, "warning");
+    return;
+  }
+  captureClientError(err, { source, ...context, code: err?.code });
+}
+
 // Fallback: one-shot read when realtime listener fails, then schedule next retry
 async function fallbackLoadGameDoc(key, docName) {
   try {
@@ -428,11 +441,9 @@ async function fallbackLoadGameDoc(key, docName) {
     }
   } catch (err) {
     console.error(`Fallback load failed for ${docName}:`, err);
-    captureClientError(err, {
-      source: "fallbackLoadGameDoc",
+    reportListenerError(err, "fallbackLoadGameDoc", {
       key,
       docName,
-      code: err?.code,
       retryCount: getRetryState(key).count,
     });
     await maybeRefreshToken(err);
@@ -457,10 +468,8 @@ async function fallbackLoadPredictions(userId) {
     notifyAndEmit("predictions");
   } catch (err) {
     console.error("Fallback load failed for predictions:", err);
-    captureClientError(err, {
-      source: "fallbackLoadPredictions",
+    reportListenerError(err, "fallbackLoadPredictions", {
       userId,
-      code: err?.code,
       retryCount: getRetryState("predictions").count,
     });
     await maybeRefreshToken(err);
@@ -520,9 +529,7 @@ function setupPredictionsListener(userId, showAll) {
     },
     (err) => {
       console.error("Listener error for predictions:", err);
-      captureClientError(err, {
-        source: "predictionsListener",
-        code: err?.code,
+      reportListenerError(err, "predictionsListener", {
         retryCount: getRetryState("predictions").count,
         showAll: predictionsShowAll,
       });
@@ -628,11 +635,9 @@ export function initRealtimeListeners(userId) {
         },
         (err) => {
           console.error(`Listener error for ${docName}:`, err);
-          captureClientError(err, {
-            source: "gameDocListener",
+          reportListenerError(err, "gameDocListener", {
             docName,
             key,
-            code: err?.code,
             retryCount: getRetryState(key).count,
           });
           maybeRefreshToken(err);

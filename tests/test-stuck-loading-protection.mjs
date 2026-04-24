@@ -291,6 +291,53 @@ console.log("--- 12. captureClientMessage dedups by key ---");
   assert(capture("store-watchdog-timeout") === true, "Different key still sent");
 }
 
+// ============ 13. Listener error routing: permission-denied vs other codes ============
+console.log("--- 13. reportListenerError dedups permission-denied; other codes go through captureClientError ---");
+
+{
+  // Contract: permission-denied from listeners/fallback loaders is routed
+  // through captureClientMessage (dedup'd per session) so iOS Safari ITP
+  // token invalidation + admin/lock-state churn don't flood Sentry. The
+  // retry + token-refresh + fallback loader path still drives recovery.
+  // Other error codes (network, unavailable, etc.) keep full exception
+  // reporting so they remain debuggable.
+  const errors = [];
+  const messages = new Set();
+
+  function captureClientError(err, ctx) {
+    errors.push({ code: err?.code, ctx });
+  }
+  function captureClientMessage(key) {
+    if (messages.has(key)) return false;
+    messages.add(key);
+    return true;
+  }
+
+  function reportListenerError(err, source, context = {}) {
+    if (err?.code === "permission-denied") {
+      captureClientMessage(`${source}-permission-denied`, { ...context, code: err?.code });
+      return;
+    }
+    captureClientError(err, { source, ...context, code: err?.code });
+  }
+
+  reportListenerError({ code: "permission-denied" }, "predictionsListener", { retryCount: 0 });
+  reportListenerError({ code: "permission-denied" }, "predictionsListener", { retryCount: 1 });
+  reportListenerError({ code: "permission-denied" }, "predictionsListener", { retryCount: 2 });
+  assert(errors.length === 0, "permission-denied never hits captureClientError");
+  assert(messages.size === 1, "permission-denied dedup'd to a single captureClientMessage per source");
+
+  reportListenerError({ code: "permission-denied" }, "gameDocListener", { docName: "users" });
+  assert(messages.size === 2, "Different source keeps its own dedup key");
+
+  reportListenerError({ code: "unavailable", message: "offline" }, "predictionsListener", {});
+  assert(errors.length === 1, "unavailable goes through captureClientError");
+  assert(errors[0].code === "unavailable", "captureClientError receives the original code");
+
+  reportListenerError({ code: "deadline-exceeded" }, "fallbackLoadPredictions", { userId: "dad" });
+  assert(errors.length === 2, "Other non-permission codes reach captureClientError");
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
