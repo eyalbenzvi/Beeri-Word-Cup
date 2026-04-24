@@ -222,6 +222,10 @@ html, body {
 
 /* --------- Cards --------- */
 
+/* .card-duo       — default panel. Use for standalone sections.
+   .card-duo-tight — denser padding, for stacked rows in one view
+                     (e.g. form-details grid in Predict, selector bars).
+   .card-duo-lg    — hero / empty-state card with extra breathing room. */
 .card-duo {
   background: var(--color-card);
   border: 2px solid var(--color-border);
@@ -452,6 +456,17 @@ button:focus-visible { border-radius: 14px; }
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* --------- Tap targets ---------
+   On touch devices, enforce a minimum 44×44 hit area per WCAG 2.2 AA 2.5.8.
+   On pointer:fine (mouse/trackpad) we leave sizes alone to keep dense UI
+   (e.g. MatchCard +/- buttons) visually compact. */
+@media (pointer: coarse) {
+  .tap-44 {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* --------- a11y --------- */
