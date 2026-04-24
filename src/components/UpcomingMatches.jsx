@@ -161,11 +161,14 @@ function MatchRow({ match, actualTeams }) {
 // Rendered inline in the main content column on both Home and WelcomeScreen.
 // Grid switches to two columns on md+ so multiple matches fit without
 // sprawling vertically.
-export default function UpcomingMatches() {
+// `matchResultsOverride` is used by the logged-out WelcomeScreen path, which
+// has no Firestore listeners and must get results from the public endpoint.
+export default function UpcomingMatches({ matchResultsOverride } = {}) {
   const { user } = useCurrentUser();
   const userForms = useUserForms(user?.id || null);
-  const matches = useUpcomingMatches();
-  const matchResults = useMatchResults();
+  const matches = useUpcomingMatches(matchResultsOverride);
+  const storeResults = useMatchResults();
+  const matchResults = matchResultsOverride ?? storeResults;
 
   const actualBracket = useMemo(
     () => getCachedBracket(matchResults || {}),
@@ -196,7 +199,13 @@ export default function UpcomingMatches() {
         המשחקים הבאים
         {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
       </div>
-      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+      <div
+        className={
+          matches.length === 1
+            ? "space-y-3"
+            : "space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0"
+        }
+      >
         {matches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
           return (

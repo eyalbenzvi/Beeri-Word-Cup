@@ -232,46 +232,74 @@ console.log("--- 8. Started flag is monotonic at the boundary ---");
 console.log("--- 9. Netlify function response shape ---");
 {
   // Mirrors netlify/functions/get-public-settings.js handler logic.
-  function handle({ httpMethod, snapExists, snapData }) {
+  function handle({ httpMethod, settingsSnap, resultsSnap }) {
     if (httpMethod === "OPTIONS") return { statusCode: 204, body: "" };
     if (httpMethod !== "GET") return { statusCode: 405, body: { error: "Method Not Allowed" } };
-    const data = snapExists ? snapData?.data : null;
+    const settingsData = settingsSnap?.exists ? settingsSnap.data?.data : null;
+    const resultsData = resultsSnap?.exists ? resultsSnap.data?.data : null;
     return {
       statusCode: 200,
-      body: { predictionsLocked: !!(data && data.predictionsLocked) },
+      body: {
+        predictionsLocked: !!(settingsData && settingsData.predictionsLocked),
+        matchResults:
+          resultsData && typeof resultsData === "object" ? resultsData : {},
+      },
     };
   }
 
+  const noResults = { exists: false, data: null };
+
   // Locked
   {
-    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: true } } });
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: true } } },
+      resultsSnap: noResults,
+    });
     assert(r.statusCode === 200, "Locked: 200");
     assert(r.body.predictionsLocked === true, "Locked: returns true");
+    assert(typeof r.body.matchResults === "object", "Response always has matchResults object");
   }
 
   // Unlocked
   {
-    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: false } } });
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: false } } },
+      resultsSnap: noResults,
+    });
     assert(r.body.predictionsLocked === false, "Unlocked: returns false");
   }
 
   // Missing field → false
   {
-    const r = handle({ httpMethod: "GET", snapExists: true, snapData: { data: {} } });
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: {} } },
+      resultsSnap: noResults,
+    });
     assert(r.body.predictionsLocked === false, "Missing field: false");
   }
 
   // Document doesn't exist → false (safe default)
   {
-    const r = handle({ httpMethod: "GET", snapExists: false, snapData: null });
+    const r = handle({ httpMethod: "GET", settingsSnap: { exists: false, data: null }, resultsSnap: noResults });
     assert(r.body.predictionsLocked === false, "No doc: false");
   }
 
   // Truthy/falsy coercion
   {
-    const truthy = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: "yes" } } });
+    const truthy = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: "yes" } } },
+      resultsSnap: noResults,
+    });
     assert(truthy.body.predictionsLocked === true, "Truthy string -> true");
-    const falsy = handle({ httpMethod: "GET", snapExists: true, snapData: { data: { predictionsLocked: 0 } } });
+    const falsy = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: 0 } } },
+      resultsSnap: noResults,
+    });
     assert(falsy.body.predictionsLocked === false, "Falsy 0 -> false");
   }
 
@@ -282,6 +310,44 @@ console.log("--- 9. Netlify function response shape ---");
     const post = handle({ httpMethod: "POST" });
     assert(post.statusCode === 405, "POST: 405 Method Not Allowed");
   }
+
+  // matchResults returned when document exists with real results
+  {
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: true } } },
+      resultsSnap: {
+        exists: true,
+        data: { data: { m1: { homeScore: 2, awayScore: 1 }, m2: { homeScore: 0, awayScore: 0 } } },
+      },
+    });
+    assert(r.body.matchResults.m1?.homeScore === 2, "matchResults propagate home score");
+    assert(Object.keys(r.body.matchResults).length === 2, "matchResults propagate all keys");
+  }
+
+  // matchResults defaults to {} when doc missing
+  {
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: true } } },
+      resultsSnap: { exists: false, data: null },
+    });
+    assert(
+      r.body.matchResults && Object.keys(r.body.matchResults).length === 0,
+      "matchResults defaults to {} when document missing",
+    );
+  }
+
+  // matchResults defaults to {} when data is not an object
+  {
+    const r = handle({
+      httpMethod: "GET",
+      settingsSnap: { exists: true, data: { data: { predictionsLocked: true } } },
+      resultsSnap: { exists: true, data: { data: null } },
+    });
+    assert(typeof r.body.matchResults === "object", "matchResults null -> empty object");
+    assert(Object.keys(r.body.matchResults).length === 0, "matchResults null -> no keys");
+  }
 }
 
 // ============================================================
@@ -291,7 +357,7 @@ console.log("--- 10. usePublicSettings polling logic ---");
 {
   // Simulates the effect body in src/hooks/usePublicSettings.js
   async function driveHook(responses) {
-    let settings = { predictionsLocked: false };
+    let state = { predictionsLocked: false, matchResults: {} };
     let fetchCount = 0;
     let cancelled = false;
 
@@ -300,7 +366,13 @@ console.log("--- 10. usePublicSettings polling logic ---");
       const res = responses[fetchCount++];
       try {
         if (!res.ok) return;
-        settings = { predictionsLocked: !!res.body?.predictionsLocked };
+        state = {
+          predictionsLocked: !!res.body?.predictionsLocked,
+          matchResults:
+            res.body?.matchResults && typeof res.body.matchResults === "object"
+              ? res.body.matchResults
+              : {},
+        };
       } catch {
         // swallow
       }
@@ -312,14 +384,14 @@ console.log("--- 10. usePublicSettings polling logic ---");
       await fetchOnce();
     }
 
-    return { settings, fetchCount };
+    return { settings: state, fetchCount };
   }
 
   // First poll locks, stays locked
   {
     const p = driveHook([
-      { ok: true, body: { predictionsLocked: true } },
-      { ok: true, body: { predictionsLocked: true } },
+      { ok: true, body: { predictionsLocked: true, matchResults: {} } },
+      { ok: true, body: { predictionsLocked: true, matchResults: {} } },
     ]);
     const { settings, fetchCount } = await p;
     assert(settings.predictionsLocked === true, "First poll locks the UI");
@@ -329,8 +401,8 @@ console.log("--- 10. usePublicSettings polling logic ---");
   // Unlock → lock transition propagates
   {
     const { settings } = await driveHook([
-      { ok: true, body: { predictionsLocked: false } },
-      { ok: true, body: { predictionsLocked: true } },
+      { ok: true, body: { predictionsLocked: false, matchResults: {} } },
+      { ok: true, body: { predictionsLocked: true, matchResults: {} } },
     ]);
     assert(settings.predictionsLocked === true, "Transition unlocked→locked surfaces");
   }
@@ -338,11 +410,12 @@ console.log("--- 10. usePublicSettings polling logic ---");
   // Fetch error keeps last-known value
   {
     const { settings } = await driveHook([
-      { ok: true, body: { predictionsLocked: true } },
+      { ok: true, body: { predictionsLocked: true, matchResults: { m1: { homeScore: 1, awayScore: 0 } } } },
       { ok: false },
       { ok: false },
     ]);
     assert(settings.predictionsLocked === true, "Network failure keeps last-known locked state");
+    assert(settings.matchResults.m1?.homeScore === 1, "Network failure keeps last-known match results");
   }
 
   // Initial default before any response
@@ -352,7 +425,97 @@ console.log("--- 10. usePublicSettings polling logic ---");
       { ok: false },
     ]);
     assert(settings.predictionsLocked === false, "All failures: safe default (unlocked)");
+    assert(
+      settings.matchResults && Object.keys(settings.matchResults).length === 0,
+      "All failures: match results default to {}",
+    );
   }
+
+  // matchResults surface from the endpoint
+  {
+    const { settings } = await driveHook([
+      {
+        ok: true,
+        body: {
+          predictionsLocked: true,
+          matchResults: { 1: { homeScore: 2, awayScore: 1 } },
+        },
+      },
+    ]);
+    assert(settings.matchResults["1"]?.homeScore === 2, "matchResults from endpoint surface to state");
+  }
+
+  // matchResults malformed (not an object) -> fallback to {}
+  {
+    const { settings } = await driveHook([
+      { ok: true, body: { predictionsLocked: true, matchResults: null } },
+    ]);
+    assert(Object.keys(settings.matchResults).length === 0, "Null matchResults -> empty object");
+  }
+}
+
+// ============================================================
+// 11. Upcoming matches filter: logged-out path uses public matchResults
+// ============================================================
+console.log("--- 11. Logged-out upcoming matches filter ---");
+{
+  // Verifies the core fix: when the store cache is empty (no auth listeners),
+  // an explicit matchResults override filters out already-played matches.
+  // Real-world scenario reproducing the bug: admin has locked predictions
+  // and entered a result for match #1 *before* the real kickoff time (e.g.
+  // test data). For a logged-in user, the Firestore listener delivers the
+  // result and match #1 is correctly filtered out of "next matches". For a
+  // logged-out user without the public override, matchResults is {} so
+  // match #1 is still shown — which is exactly what the user reported.
+
+  // Simulate "now" before kickoff so kickoff-time filtering doesn't mask
+  // the results-based filter. The bug is about the result check failing.
+  const preKickoff = Date.UTC(2026, 3, 24, 12, 0); // Apr 24 2026, matches CLAUDE.md currentDate
+
+  // Find whichever match is selected as the "first upcoming" at that time
+  // without any results, then mark it as played in the override and verify
+  // it disappears. Keyed by match.id (matches how the store writes results).
+  const baseline = selectUpcomingMatches(ALL_MATCHES, {}, preKickoff);
+  assert(baseline.length >= 1, "Baseline has at least one upcoming match");
+  const firstId = baseline[0].id;
+
+  const playedFirstMatch = { [firstId]: { homeScore: 1, awayScore: 0 } };
+  const withResults = selectUpcomingMatches(ALL_MATCHES, playedFirstMatch, preKickoff);
+  const withoutResults = selectUpcomingMatches(ALL_MATCHES, {}, preKickoff);
+
+  assert(
+    !withResults.some((m) => m.id === firstId),
+    "With public results: already-scored match is filtered out",
+  );
+  assert(
+    withoutResults.some((m) => m.id === firstId),
+    "Reproduces bug: without public results, already-scored match still appears",
+  );
+  // The two code paths must diverge — proving the override matters.
+  assert(
+    withResults[0]?.id !== withoutResults[0]?.id,
+    "Logged-in and logged-out paths yield different first match when result exists",
+  );
+}
+
+// ============================================================
+// 12. UpcomingMatches grid layout centers a single match
+// ============================================================
+console.log("--- 12. UpcomingMatches grid layout ---");
+{
+  // Mirrors the className logic in UpcomingMatches.jsx: a single match
+  // must NOT use the two-column grid (which leaves one column empty and
+  // makes the card appear off-center on desktop).
+  function gridClass(count) {
+    return count === 1
+      ? "space-y-3"
+      : "space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0";
+  }
+
+  assert(gridClass(1) === "space-y-3", "Single match: no grid (centered)");
+  assert(!gridClass(1).includes("md:grid-cols-2"), "Single match: no md:grid-cols-2");
+  assert(gridClass(2).includes("md:grid-cols-2"), "Two matches: grid applied");
+  assert(gridClass(5).includes("md:grid-cols-2"), "Many matches: grid applied");
 }
 
 // ============================================================

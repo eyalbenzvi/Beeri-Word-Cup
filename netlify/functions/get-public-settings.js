@@ -1,9 +1,10 @@
-// Public endpoint that exposes the `predictionsLocked` flag so the
-// welcome screen can decide what to show for logged-out visitors.
+// Public endpoint that exposes `predictionsLocked` and `matchResults` so the
+// welcome screen can decide what to show for logged-out visitors and filter
+// out already-played matches from the "next matches" widget.
 //
 // Uses the Firebase Admin SDK (bypasses Firestore security rules), so
 // this works even when the rules haven't granted unauth reads of
-// `gameData/settings`.
+// `gameData/settings` or `gameData/matchResults`.
 
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
@@ -46,13 +47,19 @@ async function getPublicSettingsHandler(event) {
 
   try {
     initAdmin();
-    const snap = await admin.firestore().collection("gameData").doc("settings").get();
-    const data = snap.exists ? snap.data()?.data : null;
+    const col = admin.firestore().collection("gameData");
+    const [settingsSnap, resultsSnap] = await Promise.all([
+      col.doc("settings").get(),
+      col.doc("matchResults").get(),
+    ]);
+    const settingsData = settingsSnap.exists ? settingsSnap.data()?.data : null;
+    const resultsData = resultsSnap.exists ? resultsSnap.data()?.data : null;
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        predictionsLocked: !!(data && data.predictionsLocked),
+        predictionsLocked: !!(settingsData && settingsData.predictionsLocked),
+        matchResults: resultsData && typeof resultsData === "object" ? resultsData : {},
       }),
     };
   } catch (err) {
