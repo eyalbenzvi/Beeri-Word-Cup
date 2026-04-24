@@ -6,6 +6,7 @@ import { getFilteredMatches } from "../utils/matchFiltering";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
+import PageHeader from "../components/PageHeader";
 
 export default function Results() {
   const results = useMatchResults();
@@ -19,15 +20,14 @@ export default function Results() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold text-ink mb-4 tracking-tight">
-        ⚽ תוצאות אמת
-      </h1>
+      <PageHeader
+        eyebrow="מה קרה בפועל"
+        title="תוצאות"
+        subtitle={`${playedCount} מתוך ${totalMatches} משחקים שוחקו`}
+      />
 
-      <div className="card-duo mb-4">
-        <div className="text-sm text-ink-muted text-center font-bold">
-          {playedCount} / {totalMatches} משחקים שוחקו
-        </div>
-        <div className="w-full bg-bg-soft rounded-full h-3 mt-2 overflow-hidden border-2 border-border">
+      <div className="mb-4">
+        <div className="w-full bg-bg-soft rounded-full h-2 overflow-hidden">
           <div
             className="bg-primary rounded-full h-full transition-all"
             style={{ width: `${(playedCount / totalMatches) * 100}%` }}
@@ -52,7 +52,7 @@ export default function Results() {
         <GroupTable matchData={results} group={selectedGroup} />
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 md:grid md:grid-cols-2 xl:grid-cols-2 md:gap-3 md:space-y-0">
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== "group";
           const result = results[match.id];
@@ -68,8 +68,8 @@ export default function Results() {
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-2xl p-4 border-2 card-duo-hover ${
-                result ? "border-primary/50" : "border-border"
+              className={`bg-white rounded-2xl p-4 card-duo-hover ${
+                result ? "border-2 border-primary/50" : "border border-border"
               }`}
             >
               {match.date && (

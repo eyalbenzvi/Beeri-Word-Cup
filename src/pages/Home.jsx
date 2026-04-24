@@ -1,9 +1,13 @@
-import { useSettings, useCurrentUser } from "../hooks/useStore";
+import { useMemo } from "react";
+import { useSettings, useCurrentUser, useMatchResults } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
+import { useRightRail } from "../hooks/useRail";
 import { createForm } from "../store";
 import CountdownUnit from "../components/CountdownUnit";
 import UpcomingMatches from "../components/UpcomingMatches";
+import MatchdayHero from "../components/MatchdayHero";
+import Beeri from "../components/Beeri";
 import { useToast } from "../components/Toast";
 
 export default function Home() {
@@ -11,19 +15,28 @@ export default function Home() {
   const { user } = useCurrentUser();
   const { navigate } = useNavigation();
   const countdown = useCountdown();
+  const results = useMatchResults();
   const showToast = useToast();
 
+  // On xl:, put UpcomingMatches in the right-rail when predictions are locked
+  const rail = useMemo(() => settings.predictionsLocked ? <UpcomingMatches /> : null, [settings.predictionsLocked]);
+  useRightRail(rail);
+
   return (
-    <div className="text-center max-w-xl mx-auto">
+    <div className="text-center max-w-xl mx-auto xl:max-w-none xl:mx-0">
       <div className="pt-2 pb-3 md:pt-8 md:pb-5">
-        <div className="text-5xl md:text-7xl mb-3 animate-pop-in">⚽🏆</div>
-        <h1 className="text-2xl md:text-4xl font-extrabold text-ink mb-1 tracking-tight">
+        <div className="mb-3 flex justify-center animate-pop-in">
+          <Beeri mood={settings.predictionsLocked ? "trophy" : "excited"} size={92} />
+        </div>
+        <h1 className="font-heading text-3xl md:text-5xl xl:text-6xl font-extrabold text-ink mb-1 tracking-tight">
           טורניר הניחושים של בארי
         </h1>
         <p className="text-sm md:text-base font-bold text-ink-muted">
           מונדיאל 2026
         </p>
       </div>
+
+      {settings.predictionsLocked && <MatchdayHero results={results} />}
 
       {!settings.predictionsLocked && (
         <button
@@ -33,26 +46,26 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="btn-duo btn-duo-primary w-full mb-4"
+          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[280px] md:mx-auto xl:mx-0 mb-4"
         >
-          צור את הטופס המנצח שלך
+          קדימה, מלאו טופס
         </button>
       )}
 
       {settings.predictionsLocked ? (
-        <div className="mb-3">
+        <div className="mb-3 xl:hidden">
           <UpcomingMatches />
         </div>
       ) : (
         <div className="card-duo-lg mb-4">
           {countdown.started ? (
             <div className="text-xl md:text-2xl font-extrabold text-primary">
-              🎉 המונדיאל התחיל!
+              המונדיאל רץ
             </div>
           ) : (
             <>
               <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
-                שריקת הפתיחה בעוד
+                עוד עד שריקת הפתיחה
               </p>
               <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
                 <CountdownUnit
@@ -65,7 +78,7 @@ export default function Home() {
                 <CountdownUnit value={countdown.seconds} label="שניות" />
               </div>
               <p className="text-xs text-ink-muted mt-3 font-medium">
-                11 ביוני 2026 · 22:00 שעון ישראל · ארה״ב • מקסיקו • קנדה
+                11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה
               </p>
             </>
           )}

@@ -9,6 +9,7 @@ import WelcomeScreen from "./pages/WelcomeScreen";
 import ProfileSetup from "./components/ProfileSetup";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
+import { RailProvider, useRailContent } from "./hooks/useRail";
 import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
@@ -126,7 +127,16 @@ function AppContent() {
   const Page = PAGES[page] || Home;
 
   return (
-    <Layout>
+    <RailProvider>
+      <AppShell page={page} Page={Page} />
+    </RailProvider>
+  );
+}
+
+function AppShell({ page, Page }) {
+  const rail = useRailContent();
+  return (
+    <Layout rightRail={rail}>
       <Suspense fallback={<Loading reason="lazy-page" compact />}>
         <div key={page} className="animate-fade-in">
           <Page />

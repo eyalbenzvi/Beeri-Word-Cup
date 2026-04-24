@@ -60,7 +60,7 @@ export default function Profile() {
       displayName: nickname || firstName || displayName,
     });
     setEditing(false);
-    showToast("הפרופיל נשמר");
+    showToast("עדכנתי. יאללה.");
   };
 
   const handleCancel = () => {
@@ -71,10 +71,10 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-md mx-auto xl:max-w-none xl:grid xl:grid-cols-[360px_1fr] xl:gap-6 xl:items-start">
       <button
         onClick={() => navigate("home")}
-        className="text-sm text-secondary mb-4 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
+        className="text-sm text-secondary mb-4 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark xl:col-span-2"
       >
         <ArrowRight size={16} aria-hidden="true" />
         חזרה לבית
@@ -190,7 +190,7 @@ export default function Profile() {
         </div>
       )}
 
-      <button onClick={logout} className="btn-duo btn-duo-danger w-full">
+      <button onClick={logout} className="btn-duo btn-duo-danger w-full md:w-auto md:min-w-[200px] xl:col-span-2">
         התנתק
       </button>
     </div>

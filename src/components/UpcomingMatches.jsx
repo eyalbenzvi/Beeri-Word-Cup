@@ -51,13 +51,13 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
     >
       <span className="flex-1 min-w-0 truncate font-medium">{formLabel}</span>
       {showPrediction ? (
-        <span className="tabular-nums font-bold" dir="ltr">
-          {aligned.awayScore} – {aligned.homeScore}
-        </span>
+        <bdi className="tabular-nums font-bold">
+          {aligned.homeScore}–{aligned.awayScore}
+        </bdi>
       ) : bracketMismatch ? (
         <span className="text-xs">קבוצות שונות בטופס</span>
       ) : (
-        <span className="text-ink-muted/60">—</span>
+        <span className="text-ink-muted">—</span>
       )}
       {showPrediction &&
         isKnockout &&
@@ -128,23 +128,23 @@ function MatchRow({ match, actualTeams }) {
           {stageLabel}
           {match.group ? ` · ${match.group}` : ""}
         </span>
-        <span className="text-xs text-ink-muted/60">{meta}</span>
+        <span className="text-xs text-ink-muted">{meta}</span>
       </div>
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-center">
           <div
             className={`text-sm font-medium ${
-              home ? "text-ink" : "text-ink-muted/60 italic"
+              home ? "text-ink" : "text-ink-muted italic"
             }`}
           >
             <bdi>{home?.name || "טרם נקבע"}</bdi>
           </div>
         </div>
-        <div className="text-sm text-ink-muted/60 font-black">–</div>
+        <div className="text-sm text-ink-muted font-black">–</div>
         <div className="flex-1 text-center">
           <div
             className={`text-sm font-medium ${
-              away ? "text-ink" : "text-ink-muted/60 italic"
+              away ? "text-ink" : "text-ink-muted italic"
             }`}
           >
             <bdi>{away?.name || "טרם נקבע"}</bdi>
@@ -190,13 +190,13 @@ export default function UpcomingMatches() {
         המשחקים הבאים
         {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
       </div>
-      <div className="space-y-3">
+      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 xl:grid-cols-1">
         {matches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
           return (
             <div
               key={match.id}
-              className="rounded-xl border-2 border-border p-3 bg-white"
+              className="rounded-xl border border-border p-3 bg-white"
             >
               <MatchRow match={match} actualTeams={actualTeams} />
               {user && (

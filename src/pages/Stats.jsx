@@ -12,6 +12,7 @@ import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
+import PageHeader from "../components/PageHeader";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 
 const allMatches = [...groupMatches, ...knockoutMatches];
@@ -513,7 +514,7 @@ export default function Stats() {
       <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
         <div className="text-6xl mb-4">🔒</div>
         <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted font-medium">הנתונים יהיו זמינים לאחר תחילת המשחקים</p>
+        <p className="text-sm text-ink-muted font-medium">הנתונים יתגלו כשהמשחקים יתחילו.</p>
       </div>
     );
   }
@@ -531,9 +532,12 @@ export default function Stats() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold text-ink mb-4 tracking-tight">
-        📈 סטטיסטיקות
-      </h1>
+      <PageHeader
+        eyebrow="המספרים מאחורי הטפסים"
+        title="סטטיסטיקות"
+        subtitle={submittedForms.length > 0 ? `${submittedForms.length} טפסים הוגשו` : undefined}
+      />
+
 
       {submittedForms.length === 0 ? (
         <EmptyState icon="📊" title="אין מספיק נתונים להצגת סטטיסטיקות" />

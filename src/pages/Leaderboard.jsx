@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { ArrowRight } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
   useCurrentUser,
@@ -13,6 +13,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
+import PageHeader from "../components/PageHeader";
 import { compareTiebreaker } from "../utils/scoring";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
@@ -58,6 +59,29 @@ export default function Leaderboard({
     }
     return result;
   }, [leaderboard]);
+
+  // Rank delta: compare current rank per formId with the rank we saw last
+  // visit. Stored in localStorage under "beeri:prevRanks". Deltas show for 3s
+  // before we overwrite the snapshot.
+  const [prevRanks, setPrevRanks] = useState({});
+  useEffect(() => {
+    if (embedded) return;
+    try {
+      const raw = localStorage.getItem("beeri:prevRanks");
+      if (raw) setPrevRanks(JSON.parse(raw));
+    } catch { /* Private mode / quota — ignore */ }
+  }, [embedded]);
+  useEffect(() => {
+    if (embedded || rankedLeaderboard.length === 0) return;
+    const t = setTimeout(() => {
+      try {
+        const snap = {};
+        for (const e of rankedLeaderboard) snap[e.formId] = e.rank;
+        localStorage.setItem("beeri:prevRanks", JSON.stringify(snap));
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [rankedLeaderboard, embedded]);
 
   const renderFormDetail = () => {
     if (!selectedForm) return null;
@@ -110,19 +134,19 @@ export default function Leaderboard({
         <div className="card-duo mb-4 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-bg-soft rounded-xl p-3">
             <div className="text-2xl font-extrabold text-primary tabular-nums">
-              <span dir="ltr">{score.totalPoints}</span>
+              <bdi>{score.totalPoints}</bdi>
             </div>
             <div className="text-ink-muted font-bold">סה״כ</div>
           </div>
           <div className="bg-bg-soft rounded-xl p-3">
             <div className="text-2xl font-extrabold text-primary tabular-nums">
-              <span dir="ltr">{score.exactScoreCount}</span>
+              <bdi>{score.exactScoreCount}</bdi>
             </div>
             <div className="text-ink-muted font-bold">מדויקות</div>
           </div>
           <div className="bg-bg-soft rounded-xl p-3">
             <div className="text-2xl font-extrabold text-secondary tabular-nums">
-              <span dir="ltr">{score.outcomeCount}</span>
+              <bdi>{score.outcomeCount}</bdi>
             </div>
             <div className="text-ink-muted font-bold">הכרעות</div>
           </div>
@@ -148,7 +172,7 @@ export default function Leaderboard({
                     key={round}
                     className="bg-primary text-white font-extrabold px-2.5 py-1 rounded-full"
                   >
-                    {label}: <span dir="ltr">+{pts}</span>
+                    {label}: <bdi>+{pts}</bdi>
                   </span>
                 );
               })}
@@ -230,7 +254,7 @@ export default function Leaderboard({
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
                       {prediction
-                        ? <>{" "}<span dir="ltr">({prediction.homeScore}-{prediction.awayScore})</span></>
+                        ? <>{" "}<bdi>({prediction.homeScore}-{prediction.awayScore})</bdi></>
                         : ""}
                     </div>
                   )}
@@ -252,9 +276,11 @@ export default function Leaderboard({
   return (
     <div>
       {!embedded && (
-        <h1 className="text-2xl font-extrabold text-ink mb-4 tracking-tight">
-          🏆 טבלת דירוג
-        </h1>
+        <PageHeader
+          eyebrow="המקום שלך"
+          title="טבלת דירוג"
+          subtitle={leaderboard.length > 0 ? `${leaderboard.length} טפסים מדורגים` : undefined}
+        />
       )}
       {embedded && (
         <p className="text-sm font-extrabold text-ink mb-3">
@@ -411,18 +437,34 @@ export default function Leaderboard({
                       </div>
                     )}
                     <div className="text-xs text-ink-muted tabular-nums font-bold">
-                      <span dir="ltr">{entry.exactScoreCount}</span> מדויקים • <span dir="ltr">{entry.outcomeCount}</span>{" "}
+                      <bdi>{entry.exactScoreCount}</bdi> מדויקים • <bdi>{entry.outcomeCount}</bdi>{" "}
                       הכרעות
                     </div>
                   </div>
 
-                  <div className="text-left min-w-[50px]" dir="ltr">
+                  <div className="text-left min-w-[50px] flex flex-col items-start gap-0.5">
+                    {!embedded && prevRanks[entry.formId] != null && prevRanks[entry.formId] !== currentRank && (() => {
+                      const delta = prevRanks[entry.formId] - currentRank;
+                      if (delta === 0) return null;
+                      const up = delta > 0;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-0.5 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full tabular-nums animate-pop-in ${
+                            up ? "bg-primary/10 text-primary-dark" : "bg-danger/10 text-danger"
+                          }`}
+                          aria-label={up ? `עלית ${delta} מקומות` : `ירדת ${-delta} מקומות`}
+                        >
+                          {up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          {Math.abs(delta)}
+                        </span>
+                      );
+                    })()}
                     <div
                       className={`text-2xl font-extrabold tabular-nums ${isTop3 ? "text-primary" : "text-ink"}`}
                     >
-                      {entry.totalPoints}
+                      <bdi>{entry.totalPoints}</bdi>
                     </div>
-                    <div className="text-xs text-ink-muted font-bold" dir="rtl">נק׳</div>
+                    <div className="text-xs text-ink-muted font-bold">נק׳</div>
                   </div>
                 </button>
               );

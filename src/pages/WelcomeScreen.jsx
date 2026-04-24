@@ -6,6 +6,7 @@ import UpcomingMatches from "../components/UpcomingMatches";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
+import Beeri from "../components/Beeri";
 import { Menu, Phone, ArrowRight } from "lucide-react";
 
 export default function WelcomeScreen() {
@@ -41,8 +42,10 @@ export default function WelcomeScreen() {
       <div className={`flex-1 flex flex-col items-center px-4 py-4 min-h-0 ${tournamentStarted ? "justify-start" : "justify-center"}`}>
       <div className="w-full max-w-md text-center space-y-4">
         <div>
-          <div className="text-5xl md:text-6xl mb-2 animate-pop-in">⚽🏆</div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1">
+          <div className="mb-2 flex justify-center animate-pop-in">
+            <Beeri mood="excited" size={80} />
+          </div>
+          <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1">
             טורניר הניחושים של בארי
           </h1>
           <p className="text-ink-muted text-sm font-bold">מונדיאל 2026</p>
@@ -53,7 +56,7 @@ export default function WelcomeScreen() {
         ) : (
           <div className="card-duo-lg">
             <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
-              שריקת הפתיחה בעוד
+              עוד עד שריקת הפתיחה
             </p>
             <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
               <CountdownUnit
