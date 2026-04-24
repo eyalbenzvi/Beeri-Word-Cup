@@ -461,15 +461,6 @@ export default function Predict() {
           <div className="text-xs text-accent-text mt-1 font-medium">
             הטופס עדיין לא מופיע בטבלת הדירוג עד לאישור מנהל.
           </div>
-        </div>
-      )}
-      {status === "submitted" && activeForm?.status !== "pending" && (
-        <div className="border-2 border-primary rounded-2xl p-4 mb-4 text-center" style={{ background: "var(--color-primary-soft)" }}>
-          <div className="text-3xl mb-1">✅</div>
-          <div className="text-base font-extrabold text-primary-dark">הטופס הוגש</div>
-          <div className="text-xs text-primary-dark mt-1 font-medium">
-            הניחושים נעולים ויחושבו כאשר משחקים יתקיימו.
-          </div>
           {!settings.predictionsLocked && (
             <button
               onClick={() => reopenForm(activeFormId)}
@@ -479,6 +470,15 @@ export default function Predict() {
               פתח לעריכה
             </button>
           )}
+        </div>
+      )}
+      {status === "submitted" && activeForm?.status !== "pending" && (
+        <div className="border-2 border-primary rounded-2xl p-4 mb-4 text-center" style={{ background: "var(--color-primary-soft)" }}>
+          <div className="text-3xl mb-1">✅</div>
+          <div className="text-base font-extrabold text-primary-dark">הטופס הוגש</div>
+          <div className="text-xs text-primary-dark mt-1 font-medium">
+            הניחושים נעולים ויחושבו כאשר משחקים יתקיימו.
+          </div>
         </div>
       )}
 

@@ -118,7 +118,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm flex-1">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
-                {formStatus === "submitted" && !settings.predictionsLocked && (
+                {form.status === "pending" && !settings.predictionsLocked && (
                   <button onClick={() => reopenForm(form.formId)} className="btn-duo btn-duo-orange btn-duo-sm">
                     פתח לעריכה
                   </button>
