@@ -13,6 +13,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import GroupSelector from "./GroupSelector";
+import { LABELS } from "../constants/messages";
 import PlayerAutocomplete from "./PlayerAutocomplete";
 
 function AdminFormEditModal({ formId, form, onClose }) {
@@ -105,7 +106,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                 />
               </div>
               <div>
-                <label className="text-xs text-ink-muted">מלך שערים</label>
+                <label className="text-xs text-ink-muted">{LABELS.topScorer}</label>
                 <div className="mt-0.5">
                   <PlayerAutocomplete
                     value={topScorer}

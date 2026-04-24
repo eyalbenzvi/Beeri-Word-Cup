@@ -317,22 +317,34 @@ section('4. Source-level regression guards');
     'utf8',
   );
 
-  // Fix 2 guards: champion/top-scorer display is gated by canView
+  // Fix 2 guards: champion/top-scorer display is gated by canView. The
+  // champion + top-scorer lines now live inside the shared
+  // <FormSummaryLines> component, so the guard wraps the whole element
+  // rather than each prop individually.
   assert(
-    /canView\s*&&\s*championName/.test(leaderboardSrc),
-    'Leaderboard: champion display is guarded by canView',
+    /canView\s*&&\s*\(?\s*<FormSummaryLines/.test(leaderboardSrc),
+    'Leaderboard: FormSummaryLines display is guarded by canView',
   );
   assert(
-    /canView\s*&&\s*topScorerDisplay/.test(leaderboardSrc),
-    'Leaderboard: top-scorer display is guarded by canView',
+    /championName=\{championName\}/.test(leaderboardSrc),
+    'Leaderboard passes championName to FormSummaryLines',
   );
   assert(
-    leaderboardSrc.includes('🏆 '),
-    'Leaderboard row renders the champion medal emoji',
+    /topScorerName=\{topScorerDisplay\}/.test(leaderboardSrc),
+    'Leaderboard passes topScorerName to FormSummaryLines',
+  );
+  // Icons now live in the shared FormSummaryLines component.
+  const summarySrc = fs.readFileSync(
+    path.resolve('/home/user/Beeri-World-Cup/src/components/FormSummaryLines.jsx'),
+    'utf8',
   );
   assert(
-    leaderboardSrc.includes('⚽ '),
-    'Leaderboard row renders the top-scorer ball emoji',
+    summarySrc.includes('🏆 '),
+    'FormSummaryLines renders the champion medal emoji',
+  );
+  assert(
+    summarySrc.includes('⚽ '),
+    'FormSummaryLines renders the top-scorer ball emoji',
   );
   // The canView definition should exist once inside the row block
   assert(

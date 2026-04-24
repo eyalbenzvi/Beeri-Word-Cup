@@ -14,8 +14,10 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
 import PageHeader from "../components/PageHeader";
-import { compareTiebreaker } from "../utils/scoring";
+import FormAvatar from "../components/FormAvatar";
+import FormSummaryLines from "../components/FormSummaryLines";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { LABELS } from "../constants/messages";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -39,26 +41,8 @@ export default function Leaderboard({
   const [selectedForm, setSelectedForm] = useState(null);
   const [showCount, setShowCount] = useState(20);
 
-  const { formBracketMap, scoredForms, leaderboard, actualBracket } =
+  const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
-
-  // Pre-compute ranks lazily — only create rank entries up to showCount
-  // Ranks are cumulative so we must iterate from the start, but avoid spreading
-  // entries beyond what we display
-  const rankedLeaderboard = useMemo(() => {
-    const result = [];
-    let currentRank = 1;
-    for (let i = 0; i < leaderboard.length; i++) {
-      if (i > 0) {
-        const prev = leaderboard[i - 1];
-        if (leaderboard[i].totalPoints !== prev.totalPoints || compareTiebreaker(leaderboard[i], prev) !== 0) {
-          currentRank = i + 1;
-        }
-      }
-      result.push({ ...leaderboard[i], rank: currentRank });
-    }
-    return result;
-  }, [leaderboard]);
 
   // Rank delta: compare current rank per formId with the rank we saw last
   // visit. Stored in localStorage under "beeri:prevRanks". Deltas show for 3s
@@ -142,13 +126,13 @@ export default function Leaderboard({
             <div className="text-2xl font-extrabold text-primary tabular-nums">
               <bdi>{score.exactScoreCount}</bdi>
             </div>
-            <div className="text-ink-muted font-bold">מדויקות</div>
+            <div className="text-ink-muted font-bold">{LABELS.exactCount}</div>
           </div>
           <div className="bg-bg-soft rounded-xl p-3">
             <div className="text-2xl font-extrabold text-secondary tabular-nums">
               <bdi>{score.outcomeCount}</bdi>
             </div>
-            <div className="text-ink-muted font-bold">הכרעות</div>
+            <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
         </div>
 
@@ -182,7 +166,7 @@ export default function Leaderboard({
 
         <div className="card-duo mb-4 text-sm">
           <div className="flex justify-between py-1.5 border-b border-border">
-            <span className="text-ink-muted font-bold">ניחוש אלופה:</span>
+            <span className="text-ink-muted font-bold">{LABELS.guessChampion}:</span>
             <span className="font-extrabold text-ink">
               {derivedChampion
                 ? getTeamByCode(derivedChampion)?.name || "טרם נקבע"
@@ -191,7 +175,7 @@ export default function Leaderboard({
             </span>
           </div>
           <div className="flex justify-between py-1.5">
-            <span className="text-ink-muted font-bold">ניחוש מלך שערים:</span>
+            <span className="text-ink-muted font-bold">{LABELS.guessTopScorer}:</span>
             <span className="font-extrabold text-ink">
               {predData.topScorer ? getPlayerDisplayName(predData.topScorer, playerList) : "אין"}
               {score.correctTopScorer ? " ✅" : ""}
@@ -378,15 +362,10 @@ export default function Leaderboard({
                           : currentRank}
                   </span>
 
-                  <div className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center text-base font-extrabold flex-shrink-0 border-2 border-primary-dark">
-                    {(users[entry.userId]?.firstName || users[entry.userId]?.displayName || entry.formName || "?").charAt(0).toUpperCase()}
-                  </div>
+                  <FormAvatar form={{ formName: entry.formName, status: "submitted" }} size="md" />
 
                   <div className="flex-1 min-w-0">
-                    <div
-                      className={`font-extrabold text-sm truncate ${isTop3 ? "text-ink" : "text-ink"}`}
-                    >
-                      <span className="ml-1">📋</span>
+                    <div className="font-extrabold text-sm truncate text-ink">
                       {entry.formName}
                     </div>
                     {(() => {
@@ -398,19 +377,15 @@ export default function Leaderboard({
                         <div className="text-xs text-ink-muted font-medium truncate">{name}</div>
                       ) : null;
                     })()}
-                    {canView && championName && (
-                      <div className="text-xs text-accent-text font-bold truncate" aria-label={`אלופה: ${championName}`}>
-                        🏆 {championName}
-                      </div>
-                    )}
-                    {canView && topScorerDisplay && (
-                      <div className="text-xs text-ink-muted font-medium truncate" aria-label={`מלך שערים: ${topScorerDisplay}`}>
-                        ⚽ {topScorerDisplay}
-                      </div>
+                    {canView && (
+                      <FormSummaryLines
+                        championName={championName}
+                        topScorerName={topScorerDisplay}
+                      />
                     )}
                     <div className="text-xs text-ink-muted tabular-nums font-bold">
-                      <bdi>{entry.exactScoreCount}</bdi> מדויקים • <bdi>{entry.outcomeCount}</bdi>{" "}
-                      הכרעות
+                      <bdi>{entry.exactScoreCount}</bdi> {LABELS.exactCount} • <bdi>{entry.outcomeCount}</bdi>{" "}
+                      {LABELS.outcomeCount}
                     </div>
                   </div>
 
@@ -436,14 +411,14 @@ export default function Leaderboard({
                     >
                       <bdi>{entry.totalPoints}</bdi>
                     </div>
-                    <div className="text-xs text-ink-muted font-bold">נק׳</div>
+                    <div className="text-xs text-ink-muted font-bold">{LABELS.pointsShort}</div>
                   </div>
                 </button>
               );
             })}
 
             {showCount < leaderboard.length && (
-              <button onClick={() => setShowCount(s => s + 20)} className="btn-duo btn-duo-ghost w-full md:w-auto md:min-w-[320px] md:mx-auto md:block mt-2">
+              <button onClick={() => setShowCount(s => s + 20)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
                 הצג {Math.min(20, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
               </button>
             )}

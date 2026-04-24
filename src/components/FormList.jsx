@@ -6,6 +6,9 @@ import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
+import FormAvatar from "./FormAvatar";
+import FormSummaryLines from "./FormSummaryLines";
+import EmptyState from "./EmptyState";
 import { LOCK_MESSAGES } from "../constants/messages";
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
@@ -77,18 +80,22 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       </div>
 
       {forms.length === 0 && !showNewForm && !locked && (
-        <div className="text-center py-12 card-duo-lg">
-          <div className="text-6xl mb-3">📋</div>
-          <p className="font-extrabold text-ink text-lg mb-1">ברוך הבא!</p>
-          <p className="text-ink-muted text-sm">צור טופס ניחושים ראשון כדי להתחיל לנחש תוצאות משחקים</p>
+        <div className="card-duo-lg">
+          <EmptyState
+            icon="📋"
+            title="ברוך הבא!"
+            description="צור טופס ניחושים ראשון כדי להתחיל לנחש תוצאות משחקים"
+          />
         </div>
       )}
 
       {forms.length === 0 && locked && (
-        <div className="text-center py-12 card-duo-lg">
-          <div className="text-6xl mb-3">🔒</div>
-          <p className="font-extrabold text-ink text-lg mb-1">ההגשה נסגרה</p>
-          <p className="text-ink-muted text-sm">{LOCK_MESSAGES.formsUnavailable}</p>
+        <div className="card-duo-lg">
+          <EmptyState
+            icon="🔒"
+            title="ההגשה נסגרה"
+            description={LOCK_MESSAGES.formsUnavailable}
+          />
         </div>
       )}
 
@@ -97,6 +104,9 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
           const formStatus = normalizeStatus(form.status);
           const championCode = getCachedChampion(form.matches || {});
           const championName = championCode ? getTeamByCode(championCode)?.name : null;
+          const topScorerName = form.topScorer
+            ? getPlayerDisplayName(form.topScorer, playerList)
+            : null;
           return (
             <div
               key={form.formId}
@@ -107,29 +117,12 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
               }`}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-11 h-11 rounded-full flex items-center justify-center font-extrabold text-xl flex-shrink-0 ${
-                    formStatus === "submitted"
-                      ? "bg-primary text-white"
-                      : "bg-bg-soft text-ink-muted"
-                  }`}
-                >
-                  {formStatus === "submitted" ? "✓" : "📋"}
-                </div>
+                <FormAvatar form={form} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="font-extrabold text-base truncate text-ink">
                     {form.formName || "טופס ללא שם"}
                   </div>
-                  {championName && (
-                    <div className="text-xs text-accent-text font-bold mt-0.5" aria-label={`אלופה: ${championName}`}>
-                      🏆 {championName}
-                    </div>
-                  )}
-                  {form.topScorer && (
-                    <div className="text-xs text-ink-muted font-medium mt-0.5" aria-label={`מלך שערים: ${getPlayerDisplayName(form.topScorer, playerList)}`}>
-                      ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
-                    </div>
-                  )}
+                  <FormSummaryLines championName={championName} topScorerName={topScorerName} />
                 </div>
                 <span
                   className={`text-xs px-2.5 py-1 rounded-full font-extrabold ${
@@ -176,7 +169,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         })}
       </div>
 
-      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost w-full md:w-auto md:min-w-[260px] md:mx-auto md:block">
+      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost btn-duo-cta">
         צפייה בטפסים של כולם
       </button>
 

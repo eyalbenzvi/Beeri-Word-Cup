@@ -6,7 +6,7 @@ export default function EmptyState({
   className = "",
 }) {
   return (
-    <div className={`text-center py-12 ${className}`}>
+    <div className={`text-center py-12 max-w-md mx-auto ${className}`}>
       {icon && (
         <div className="text-5xl mb-3" aria-hidden="true">
           {icon}

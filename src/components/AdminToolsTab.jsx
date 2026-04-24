@@ -7,25 +7,32 @@ import {
   useSettings,
 } from "../hooks/useStore";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { getCachedChampion } from "../utils/bracketCache";
+import { getTeamByCode } from "../data/teams";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import Leaderboard from "../pages/Leaderboard";
 import SimulatorPanel from "./SimulatorPanel";
 import AdminBackupRestore from "./AdminBackupRestore";
+import { LABELS } from "../constants/messages";
 
 function AdminExportReports({ leaderboard, allPredictions, playerList }) {
   const downloadCsv = () => {
-    const header = "מקום,שם טופס,משתמש,תקציב,אלופה,מלך שערים,נקודות,מדויקים,הכרעות\n";
+    const header = `${LABELS.rank},שם טופס,משתמש,תקציב,${LABELS.champion},${LABELS.topScorer},נקודות,${LABELS.exactCount},${LABELS.outcomeCount}\n`;
     const lines = leaderboard.map((e, i) => {
       const pred = allPredictions[e.formId] || {};
       const topScorerDisplay = pred.topScorer
         ? getPlayerDisplayName(pred.topScorer, playerList)
+        : "";
+      const championCode = getCachedChampion(pred.matches || {});
+      const championName = championCode
+        ? getTeamByCode(championCode)?.name || championCode
         : "";
       return [
         i + 1,
         `"${(e.formName || "").replace(/"/g, '""')}"`,
         `"${(e.userName || "").replace(/"/g, '""')}"`,
         `"${pred.budgetNumber || ""}"`,
-        `"${pred.champion || ""}"`,
+        `"${championName.replace(/"/g, '""')}"`,
         `"${topScorerDisplay.replace(/"/g, '""')}"`,
         e.totalPoints,
         e.exactScoreCount,

@@ -89,6 +89,28 @@ export function useLeaderboardComputed(
     }));
   }, [scoredForms, users]);
 
+  // Dense-ranking with ties: forms tied on totalPoints + tiebreaker share a rank,
+  // and the next distinct form's rank reflects the number of entries above it
+  // (standard "1,1,3" ranking). Shared here so Leaderboard, Profile, and any
+  // future consumer report identical positions.
+  const rankedLeaderboard = useMemo(() => {
+    const result = [];
+    let currentRank = 1;
+    for (let i = 0; i < leaderboard.length; i++) {
+      if (i > 0) {
+        const prev = leaderboard[i - 1];
+        if (
+          leaderboard[i].totalPoints !== prev.totalPoints ||
+          compareTiebreaker(leaderboard[i], prev) !== 0
+        ) {
+          currentRank = i + 1;
+        }
+      }
+      result.push({ ...leaderboard[i], rank: currentRank });
+    }
+    return result;
+  }, [leaderboard]);
+
   return {
     actualBracket,
     actualDerivedAdvancing,
@@ -96,5 +118,6 @@ export function useLeaderboardComputed(
     formBracketMap,
     scoredForms,
     leaderboard,
+    rankedLeaderboard,
   };
 }

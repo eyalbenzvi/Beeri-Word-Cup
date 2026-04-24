@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
+import FormAvatar from "../components/FormAvatar";
+import FormSummaryLines from "../components/FormSummaryLines";
 import {
   useAllPredictions,
   useUsers,
@@ -17,7 +19,7 @@ import {
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
-import { LOCK_MESSAGES } from "../constants/messages";
+import { LOCK_MESSAGES, LABELS } from "../constants/messages";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -40,12 +42,16 @@ function MatchRow({ match, prediction }) {
 
   return (
     <div className="py-1.5 border-b border-border last:border-0 text-xs">
-      <div className="flex items-center justify-between">
-        <span className="flex-1 text-right truncate text-ink font-medium">{homeName}</span>
-        <span className="w-16 text-center font-extrabold text-ink tabular-nums">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 text-center truncate text-ink font-medium">
+          <bdi>{homeName}</bdi>
+        </div>
+        <div className="w-14 text-center font-extrabold text-ink tabular-nums">
           {hasScore ? <bdi>{prediction.homeScore}–{prediction.awayScore}</bdi> : "–"}
-        </span>
-        <span className="flex-1 text-left truncate text-ink font-medium">{awayName}</span>
+        </div>
+        <div className="flex-1 text-center truncate text-ink font-medium">
+          <bdi>{awayName}</bdi>
+        </div>
       </div>
       {isTie && (
         <div className="text-[10px] text-ink-muted font-bold text-center mt-0.5">
@@ -66,15 +72,17 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
     [predictions, expanded],
   );
 
+  const topScorerName = form.topScorer
+    ? getPlayerDisplayName(form.topScorer, playerList)
+    : null;
+
   return (
     <div className="bg-white rounded-2xl border-2 border-border overflow-hidden">
       <button
         onClick={() => canExpand && setExpanded(!expanded)}
         className={`w-full flex items-center gap-3 p-4 text-right bg-transparent border-none ${canExpand ? "cursor-pointer hover:bg-bg-soft" : "cursor-default"}`}
       >
-        <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-extrabold text-sm flex-shrink-0 border-2 border-primary-dark">
-          {(form.formName || "?")[0]}
-        </div>
+        <FormAvatar form={form} size="md" />
         <div className="flex-1 min-w-0">
           <div className="font-extrabold text-sm truncate text-ink">
             {form.formName || "טופס ללא שם"}
@@ -83,18 +91,10 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
             <div className="text-xs text-ink-muted font-medium truncate">{userName}</div>
           )}
           {canExpand ? (
-            <>
-              {championDisplay && (
-                <div className="text-xs text-accent-text font-bold mt-0.5" aria-label={`אלופה: ${championDisplay}`}>
-                  🏆 {championDisplay}
-                </div>
-              )}
-              {form.topScorer && (
-                <div className="text-xs text-ink-muted font-medium mt-0.5" aria-label={`מלך שערים: ${getPlayerDisplayName(form.topScorer, playerList)}`}>
-                  ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
-                </div>
-              )}
-            </>
+            <FormSummaryLines
+              championName={championDisplay}
+              topScorerName={topScorerName}
+            />
           ) : (
             <div className="text-xs text-ink-muted font-medium mt-0.5">
               🔒 {LOCK_MESSAGES.predictionsHiddenBeforeLock}
@@ -156,7 +156,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
 
           <div className="pt-2 border-t-2 border-border">
             <div className="flex justify-between text-sm">
-              <span className="text-ink-muted font-bold">⚽ מלך שערים</span>
+              <span className="text-ink-muted font-bold">⚽ {LABELS.topScorer}</span>
               <span className="font-extrabold text-ink">
                 {form.topScorer ? getPlayerDisplayName(form.topScorer, playerList) : "לא הוכנס"}
               </span>

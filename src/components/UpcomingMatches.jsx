@@ -155,7 +155,10 @@ function MatchRow({ match, actualTeams }) {
   );
 }
 
-export default function UpcomingMatches() {
+// `dense` collapses the grid to a single column at xl breakpoint — used when
+// rendered inside the right-rail (~320px wide) where two columns would squash.
+// Inline placements (Home mobile, WelcomeScreen) keep the two-column layout.
+export default function UpcomingMatches({ dense = false } = {}) {
   const { user } = useCurrentUser();
   const userForms = useUserForms(user?.id || null);
   const matches = useUpcomingMatches();
@@ -190,7 +193,7 @@ export default function UpcomingMatches() {
         המשחקים הבאים
         {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
       </div>
-      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 xl:grid-cols-1">
+      <div className={`space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 ${dense ? "xl:grid-cols-1" : "xl:grid-cols-2"}`}>
         {matches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
           return (

@@ -5,9 +5,13 @@ import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { updateUserProfile } from "../store";
 import { getTeamByCode } from "../data/teams";
+import { getCachedChampion } from "../utils/bracketCache";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useToast } from "../components/Toast";
 import EmptyState from "../components/EmptyState";
+import FormAvatar from "../components/FormAvatar";
+import FormSummaryLines from "../components/FormSummaryLines";
+import { LABELS } from "../constants/messages";
 
 export default function Profile() {
   const { user, logout } = useCurrentUser();
@@ -33,7 +37,7 @@ export default function Profile() {
     }
   }, [user?.firstName, user?.lastName, user?.displayName, editing]);
 
-  const { scoredForms, leaderboard } = useLeaderboardComputed(results, allPredictions, users, actualBonuses);
+  const { scoredForms, rankedLeaderboard } = useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
   if (!user) return null;
 
@@ -141,15 +145,15 @@ export default function Profile() {
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">{forms.length}</div>
-            <div className="text-ink-muted font-bold">טפסים</div>
+            <div className="text-ink-muted font-bold">{LABELS.forms}</div>
           </div>
           <div className="rounded-xl p-3 border-2 border-primary/30" style={{ background: "var(--color-primary-soft)" }}>
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">{totalExact}</div>
-            <div className="text-ink-muted font-bold">מדויקים</div>
+            <div className="text-ink-muted font-bold">{LABELS.exactCount}</div>
           </div>
           <div className="rounded-xl p-3 border-2 border-secondary/30" style={{ background: "#F0F9FF" }}>
             <div className="text-2xl font-extrabold text-secondary-dark tabular-nums">{totalOutcome}</div>
-            <div className="text-ink-muted font-bold">הכרעות</div>
+            <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
         </div>
       </div>
@@ -171,30 +175,22 @@ export default function Profile() {
           <h3 className="font-extrabold text-base text-ink mb-3">📋 הטפסים שלי</h3>
           <div className="space-y-2">
             {forms.map((form) => {
-              const icon = "📋";
-              const champion = form.champion
-                ? getTeamByCode(form.champion)?.name || form.champion
+              const championCode = getCachedChampion(form.matches || {});
+              const champion = championCode
+                ? getTeamByCode(championCode)?.name || championCode
                 : null;
-              const lbEntry = leaderboard.find((e) => e.formId === form.formId);
-              const position = lbEntry
-                ? leaderboard.indexOf(lbEntry) + 1
+              const topScorerName = form.topScorer
+                ? getPlayerDisplayName(form.topScorer, playerList)
                 : null;
+              const lbEntry = rankedLeaderboard.find((e) => e.formId === form.formId);
+              const position = lbEntry ? lbEntry.rank : null;
 
               return (
                 <div key={form.formId} className="bg-bg-soft rounded-xl p-3 flex items-center gap-3 border-2 border-border">
-                  <span className="text-2xl">{icon}</span>
+                  <FormAvatar form={form} size="md" />
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold text-sm truncate text-ink">{form.formName || "טופס ללא שם"}</div>
-                    {champion && (
-                      <div className="text-xs text-accent-text font-bold mt-0.5" aria-label={`אלופה: ${champion}`}>
-                        🏆 {champion}
-                      </div>
-                    )}
-                    {form.topScorer && (
-                      <div className="text-xs text-ink-muted font-medium mt-0.5" aria-label={`מלך שערים: ${getPlayerDisplayName(form.topScorer, playerList)}`}>
-                        ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
-                      </div>
-                    )}
+                    <FormSummaryLines championName={champion} topScorerName={topScorerName} />
                   </div>
                   {position && (
                     <div className="text-xs font-extrabold text-white bg-primary px-2.5 py-1 rounded-full">
@@ -208,7 +204,7 @@ export default function Profile() {
         </div>
       )}
 
-      <button onClick={logout} className="btn-duo btn-duo-danger w-full md:w-auto md:min-w-[200px] xl:col-span-2">
+      <button onClick={logout} className="btn-duo btn-duo-danger btn-duo-cta xl:col-span-2">
         התנתק
       </button>
     </div>
