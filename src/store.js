@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "./sentry";
+import { generateDefaultFormName } from "./utils/formNameGenerator";
 
 // ============ AUDIT LOG ============
 const AUDIT_LOG_KEY = "wc2026_audit_log";
@@ -1089,11 +1090,16 @@ export function createForm(userId, formName) {
     throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
   }
   const formId = `${userId}__${Date.now()}`;
-  const displayIndex = userForms.length + 1;
+  const user = getUser(userId);
+  const defaultName = generateDefaultFormName({
+    nickname: user?.displayName,
+    userForms,
+    allPredictions: cache.predictions,
+  });
 
   const formData = {
     userId,
-    formName: formName || `טופס ${displayIndex}`,
+    formName: (typeof formName === "string" && formName.trim()) ? formName : defaultName,
     budgetNumber: "",
     ...DEFAULT_FORM,
     createdAt: new Date().toISOString(),

@@ -4,6 +4,8 @@ import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
 import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { generateDefaultFormName } from "../utils/formNameGenerator";
+import { useAllPredictions } from "../hooks/useStore";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 import FormAvatar from "./FormAvatar";
@@ -14,6 +16,7 @@ import { LOCK_MESSAGES } from "../constants/messages";
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
   const confirm = useConfirm();
+  const allPredictions = useAllPredictions();
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
@@ -22,9 +25,19 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     [settings?.topScorerPlayers],
   );
 
+  const defaultFormName = useMemo(
+    () =>
+      generateDefaultFormName({
+        nickname: user?.displayName,
+        userForms: forms,
+        allPredictions,
+      }),
+    [user?.displayName, forms, allPredictions],
+  );
+
   const handleCreateForm = useCallback(() => {
     if (!user || locked) return;
-    const name = newFormName.trim() || `טופס ${forms.length + 1}`;
+    const name = newFormName.trim() || defaultFormName;
     try {
       createForm(user.id, name);
       setNewFormName("");
@@ -33,7 +46,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     } catch (err) {
       showToast(err.message, "error");
     }
-  }, [user, locked, newFormName, forms.length, showToast]);
+  }, [user, locked, newFormName, defaultFormName, showToast]);
 
   const handleDeleteForm = useCallback(
     (formId) => {
@@ -180,7 +193,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
             type="text"
             value={newFormName}
             onChange={(e) => setNewFormName(e.target.value)}
-            placeholder={`טופס ${forms.length + 1}`}
+            placeholder={defaultFormName}
             className="input-duo mb-3"
             maxLength={50}
             autoFocus

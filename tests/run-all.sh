@@ -99,6 +99,7 @@ run_test "61. Form Row Consistency (FormAvatar + FormSummaryLines)" "test-form-r
 run_test "62. Layout Fixes (Home+Welcome+UpcomingMatches)" "test-layout-fixes.mjs" "no"
 run_test "63. Scoring Differential (independent calc, 5000 random + edge cases)" "test-scoring-differential.mjs" "yes"
 run_test "64. Scoring Verification HTML (regenerate + check 16 visible scenarios)" "generate-scoring-verification.mjs" "yes"
+run_test "65. Form Name Default (auto-populate from nickname + dedup)" "test-form-name-default.mjs" "yes"
 
 echo ""
 echo "==========================================="
