@@ -29,7 +29,7 @@ export default function GroupTable({ matchData, group }) {
     <div data-group-table className="mb-3">
       <h4 className="text-xs font-extrabold text-ink-muted mb-2 uppercase tracking-wider">טבלת בית {group}</h4>
       <div className="overflow-x-auto scroll-smooth -mx-1">
-      <table className="w-full text-xs min-w-[400px]">
+      <table className="w-full text-[11px] sm:text-xs min-w-[340px]">
         <thead>
           <tr className="text-ink-muted border-b-2 border-border">
             <th scope="col" className="text-right py-1.5 pr-1 w-5 font-bold">#</th>
