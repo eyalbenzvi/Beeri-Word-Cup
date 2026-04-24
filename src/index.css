@@ -225,7 +225,12 @@ html, body {
 /* .card-duo       — default panel. Use for standalone sections.
    .card-duo-tight — denser padding, for stacked rows in one view
                      (e.g. form-details grid in Predict, selector bars).
-   .card-duo-lg    — hero / empty-state card with extra breathing room. */
+   .card-duo-lg    — hero / empty-state card with extra breathing room.
+   .card-duo-hover — reserved for cards that are themselves the interactive
+                     target (the whole card handles click). Do NOT use on a
+                     card that contains internal buttons — the lift transform
+                     competes with button focus rings. For such cards, apply
+                     `focus-within:ring-*` on the wrapper instead. */
 .card-duo {
   background: var(--color-card);
   border: 2px solid var(--color-border);
@@ -241,6 +246,14 @@ html, body {
     transform: translateY(-2px);
     border-color: var(--color-border-strong);
   }
+}
+
+/* When a card uses focus-within for its ring, drop the per-button outline
+   inside it — otherwise the card ring and the button outline stack, which
+   visually "breaks" the card border on the first Tab press. */
+.focus-within\:ring-2:focus-within button:focus-visible,
+.focus-within\:ring-2:focus-within a:focus-visible {
+  outline: none;
 }
 
 /* --------- Inputs --------- */

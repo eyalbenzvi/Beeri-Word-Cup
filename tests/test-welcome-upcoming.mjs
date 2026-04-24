@@ -94,22 +94,19 @@ console.log("--- 2. WelcomeScreen widget switch ---");
   assert(welcomeWidget(false) === "countdown", "Before kickoff: countdown");
   assert(welcomeWidget(true) === "upcoming-matches", "After kickoff: upcoming matches");
 
-  // Layout: when tournament started, we drop overflow-hidden + h-dvh
-  function rootClasses(tournamentStarted) {
-    return tournamentStarted
-      ? "min-h-dvh bg-bg flex flex-col"
-      : "min-h-dvh bg-bg flex flex-col h-dvh overflow-hidden";
+  // Layout: single-column centered card on ALL breakpoints (redesign).
+  // Root is always scrollable — no lg:h-dvh / overflow-hidden clipping.
+  function rootClasses() {
+    return "min-h-dvh bg-bg flex flex-col";
   }
+  assert(!rootClasses().includes("overflow-hidden"), "Root never clips overflow (scroll-safe in landscape)");
+  assert(rootClasses().includes("min-h-dvh"), "Root uses min-h-dvh");
 
-  assert(rootClasses(false).includes("overflow-hidden"), "Before: clips overflow (single-screen)");
-  assert(!rootClasses(true).includes("overflow-hidden"), "After: scrollable (upcoming list may be tall)");
-  assert(rootClasses(true).includes("min-h-dvh"), "After: still full-height minimum");
-
-  function justify(tournamentStarted) {
-    return tournamentStarted ? "justify-start" : "justify-center";
+  // Main column is always top-aligned so tall content doesn't get clipped.
+  function justify() {
+    return "justify-start";
   }
-  assert(justify(false) === "justify-center", "Before: vertically centered");
-  assert(justify(true) === "justify-start", "After: top-aligned (no clipping of tall list)");
+  assert(justify() === "justify-start", "Main column top-aligned (single-column redesign)");
 }
 
 // ============================================================

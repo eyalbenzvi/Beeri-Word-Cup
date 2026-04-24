@@ -11,3 +11,14 @@ export const AUTH_COPY = {
   loginRequiredSubtitle: "צריך לבחור שם כדי למלא ניחושים",
   loginCta: "התחבר למשחק",
 };
+
+// Brand strings — single source of truth. Changing the tagline here
+// updates Home, WelcomeScreen (mobile + desktop panels) in one shot.
+export const BRAND = {
+  tournamentTitle: "טורניר הניחושים של בארי",
+  subtitle: "מונדיאל 2026",
+  hosts: "ארה״ב • מקסיקו • קנדה",
+  tagline: "מונדיאל 2026 · ארה״ב • מקסיקו • קנדה",
+  countdownHeader: "הזמן שנותר לפתיחה",
+};
+

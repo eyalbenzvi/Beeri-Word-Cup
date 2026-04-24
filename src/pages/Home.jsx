@@ -8,7 +8,7 @@ import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
 import { useToast } from "../components/Toast";
-import { LOCK_MESSAGES } from "../constants/messages";
+import { LOCK_MESSAGES, BRAND } from "../constants/messages";
 
 export default function Home() {
   const settings = useSettings();
@@ -24,12 +24,12 @@ export default function Home() {
 
   return (
     <div className="text-center max-w-xl mx-auto">
-      <div className="pt-2 pb-3 md:pt-4 md:pb-4">
-        <h1 className="font-heading text-3xl md:text-4xl xl:text-5xl font-extrabold text-ink mb-1 tracking-tight">
-          <span aria-hidden="true">⚽</span> טורניר הניחושים של בארי
+      <div className="pt-2 pb-3 md:pt-6 md:pb-6">
+        <h1 className="font-heading text-3xl md:text-4xl font-extrabold text-ink mb-1 tracking-tight leading-tight text-balance">
+          <span aria-hidden="true">⚽</span> {BRAND.tournamentTitle}
         </h1>
         <p className="text-sm md:text-base font-bold text-ink-muted">
-          מונדיאל 2026
+          {BRAND.subtitle}
         </p>
       </div>
 
@@ -43,7 +43,7 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[240px] mb-7"
+          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[240px] md:max-w-[320px] md:mx-auto md:block mb-7"
         >
           קדימה, מלאו טופס
         </button>
@@ -63,8 +63,8 @@ export default function Home() {
             <TournamentCountdown
               countdown={countdown}
               variant="compact"
-              headerText="עוד עד שריקת הפתיחה"
-              footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה</>}
+              headerText={BRAND.countdownHeader}
+              footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
             />
           )}
         </div>

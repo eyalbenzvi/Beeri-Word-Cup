@@ -7,6 +7,7 @@ import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
 import { Menu, Phone, ArrowRight, Info } from "lucide-react";
+import { BRAND } from "../constants/messages";
 
 export default function WelcomeScreen() {
   const countdown = useCountdown();
@@ -23,8 +24,8 @@ export default function WelcomeScreen() {
       <TournamentCountdown
         countdown={countdown}
         variant="large"
-        headerText="עוד עד שריקת הפתיחה"
-        footerText={<>12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה</>}
+        headerText={BRAND.countdownHeader}
+        footerText={<>12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · {BRAND.hosts}</>}
       />
     </div>
   );
@@ -58,7 +59,7 @@ export default function WelcomeScreen() {
   );
 
   return (
-    <div className={`min-h-dvh bg-bg flex flex-col ${tournamentStarted ? "" : "lg:h-dvh lg:overflow-hidden"}`}>
+    <div className="min-h-dvh bg-bg flex flex-col">
       {/* Header */}
       <header className="header-duo sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
@@ -88,46 +89,25 @@ export default function WelcomeScreen() {
       </header>
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      {/* Main — mobile: centered column, lg+: two-column split */}
-      <div className={`flex-1 px-4 md:px-6 py-4 md:py-6 min-h-0 flex flex-col items-center ${tournamentStarted ? "justify-start" : "justify-center lg:justify-start"}`}>
-        <div className="w-full max-w-md lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 lg:items-center lg:pt-4">
-          {/* LEFT (RTL: appears on LEFT visually) — tournament hype panel */}
-          <div className="hidden lg:flex lg:flex-col lg:gap-4 lg:order-last">
-            <div className="text-center lg:text-right">
-              <div className="text-6xl mb-3" aria-hidden="true">⚽🏆</div>
-              <h1 className="font-heading text-3xl xl:text-4xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
-                טורניר הניחושים של בארי
-              </h1>
-              <p className="text-ink-muted font-bold mb-4">מונדיאל 2026 · ארה״ב • מקסיקו • קנדה</p>
-            </div>
-            {countdownPanel}
+      {/* Main — single centered column on all breakpoints. */}
+      <div className="flex-1 px-4 md:px-6 py-4 md:py-8 min-h-0 flex flex-col items-center justify-start">
+        <div className="w-full max-w-md space-y-4">
+          {/* Branding */}
+          <div className="text-center">
+            <div className="text-5xl md:text-6xl mb-2 animate-pop-in" aria-hidden="true">⚽🏆</div>
+            <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
+              {BRAND.tournamentTitle}
+            </h1>
+            <p className="text-ink-muted text-sm md:text-base font-bold">{BRAND.tagline}</p>
           </div>
 
-          {/* RIGHT (RTL: appears on RIGHT visually) — auth card */}
-          <div className="text-center space-y-4 lg:bg-white lg:border-2 lg:border-border lg:rounded-3xl lg:p-6 lg:shadow-sm lg:order-first">
-            {/* Mobile-only branding (desktop has it in left panel) */}
-            <div className="lg:hidden">
-              <div className="text-5xl md:text-6xl mb-2 animate-pop-in" aria-hidden="true">⚽🏆</div>
-              <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1">
-                טורניר הניחושים של בארי
-              </h1>
-              <p className="text-ink-muted text-sm font-bold">מונדיאל 2026 · ארה״ב • מקסיקו • קנדה</p>
-            </div>
-            {/* Desktop-only auth heading */}
-            <div className="hidden lg:block text-right">
-              <h2 className="font-heading text-2xl font-extrabold text-ink tracking-tight">
-                התחברות
-              </h2>
-              <p className="text-ink-muted text-sm font-medium mt-1">
-                חברו עם גוגל או עם מספר טלפון כדי להתחיל לנחש
-              </p>
-            </div>
-
-            {/* Mobile-only countdown (desktop has it in left panel) */}
-            <div className="lg:hidden">{countdownPanel}</div>
-
+          {/* Auth card */}
+          <div className="text-center space-y-4 bg-white border-2 border-border rounded-3xl p-5 md:p-6 shadow-sm">
             {authPanel}
           </div>
+
+          {/* Countdown (secondary info below auth) */}
+          {countdownPanel}
         </div>
       </div>
     </div>

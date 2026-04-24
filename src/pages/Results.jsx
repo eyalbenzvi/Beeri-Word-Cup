@@ -68,7 +68,7 @@ export default function Results() {
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-2xl p-4 card-duo-hover ${
+              className={`bg-white rounded-2xl p-4 ${
                 result ? "border-2 border-primary/50" : "border border-border"
               }`}
             >
