@@ -25,7 +25,7 @@ export default function WelcomeScreen() {
         countdown={countdown}
         variant="large"
         headerText={BRAND.countdownHeader}
-        footerText={<>12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · {BRAND.hosts}</>}
+        footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
       />
     </div>
   );
@@ -89,8 +89,7 @@ export default function WelcomeScreen() {
       </header>
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      {/* Main — single centered column on all breakpoints. */}
-      <div className="flex-1 px-4 md:px-6 py-4 md:py-8 min-h-0 flex flex-col items-center justify-start">
+      <div className="flex-1 px-4 md:px-6 py-4 md:py-8 min-h-0 flex flex-col items-center justify-start gap-4">
         <div className="w-full max-w-md space-y-4">
           {/* Branding */}
           <div className="text-center">
@@ -105,8 +104,10 @@ export default function WelcomeScreen() {
           <div className="text-center space-y-4 bg-white border-2 border-border rounded-3xl p-5 md:p-6 shadow-sm">
             {authPanel}
           </div>
+        </div>
 
-          {/* Countdown (secondary info below auth) */}
+        {/* Countdown card widens on xl — 4 timer units reach 432px at xl:w-24, too wide for max-w-md. */}
+        <div className="w-full max-w-md xl:max-w-xl">
           {countdownPanel}
         </div>
       </div>
