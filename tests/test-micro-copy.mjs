@@ -34,10 +34,18 @@ assert(
   "Home no longer uses AI-translated 'צור את הטופס המנצח שלך'"
 );
 
-// Home countdown
+// Home countdown — header now comes through BRAND.countdownHeader
 assert(
-  homeSrc.includes("עוד עד שריקת הפתיחה") || homeSrc.includes("עד שריקת הפתיחה"),
-  "Home countdown copy updated"
+  lockMessagesSrc.includes("הזמן שנותר לפתיחה"),
+  "BRAND.countdownHeader contains natural-Hebrew countdown header"
+);
+assert(
+  homeSrc.includes("BRAND.countdownHeader") || homeSrc.includes("countdownHeader"),
+  "Home consumes BRAND.countdownHeader"
+);
+assert(
+  !homeSrc.includes("עוד עד שריקת הפתיחה"),
+  "Home no longer uses broken 'עוד עד שריקת הפתיחה'"
 );
 
 // Predict submit toast

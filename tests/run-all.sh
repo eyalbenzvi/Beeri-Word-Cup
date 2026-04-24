@@ -90,6 +90,8 @@ run_test "52. Empty States (Profile/Stats/AllForms)" "test-empty-states.mjs" "no
 run_test "53. Auth Copy Consistency" "test-auth-copy.mjs" "no"
 run_test "54. Lock Messages Centralised" "test-lock-messages.mjs" "no"
 run_test "55. Icon Buttons Aria Labels" "test-icon-buttons-aria.mjs" "no"
+run_test "56. Home Desktop Typography" "test-home-desktop-typography.mjs" "no"
+run_test "57. Card Focus / Hover Contract" "test-card-focus.mjs" "no"
 
 echo ""
 echo "==========================================="
