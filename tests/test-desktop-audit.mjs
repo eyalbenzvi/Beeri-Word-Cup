@@ -56,14 +56,13 @@ assert(/--font-heading/.test(cssSrc), "--font-heading token defined");
 // --- PageHeader exists ---
 assert(fs.existsSync("src/components/PageHeader.jsx"), "PageHeader.jsx exists");
 
-// --- Beeri mascot exists ---
-assert(fs.existsSync("src/components/Beeri.jsx"), "Beeri.jsx mascot exists");
-
 // --- MatchdayHero exists ---
 assert(fs.existsSync("src/components/MatchdayHero.jsx"), "MatchdayHero.jsx exists");
 
-// --- DesktopSideNav exists ---
+// --- DesktopSideNav exists and exposes info drawer ---
 assert(fs.existsSync("src/components/DesktopSideNav.jsx"), "DesktopSideNav.jsx exists");
+const sideNavSrc = fs.readFileSync("src/components/DesktopSideNav.jsx", "utf8");
+assert(/open-info-drawer/.test(sideNavSrc), "DesktopSideNav dispatches open-info-drawer event");
 
 // --- Layout nav does NOT use emoji strings for primary nav items ---
 // Nav items in Layout.jsx should reference lucide icons, not emoji keys

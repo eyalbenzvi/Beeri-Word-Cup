@@ -577,26 +577,26 @@ export default function Predict() {
           </div>
 
           {status === "draft" && !settings.predictionsLocked && (
-            <div className="mb-4 space-y-3 md:max-w-md md:mx-auto xl:max-w-none xl:mx-0 xl:flex xl:flex-wrap xl:gap-3 xl:space-y-0">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
               <button
                 onClick={() => setShowScenarioModal(true)}
                 disabled={!!aiProgress}
                 title="בחר אלופה וסגנית — הטופס ימולא כך שהן ייפגשו בגמר"
-                className="btn-duo btn-duo-orange w-full xl:w-auto xl:min-w-[220px]"
+                className="btn-duo btn-duo-orange btn-duo-sm w-full md:w-auto"
               >
-                ✨ יצירת תרחיש עם AI
+                ✨ תרחיש עם AI
               </button>
               <button
                 onClick={handleAIFill}
                 disabled={!!aiProgress}
                 title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
-                className="btn-duo btn-duo-blue w-full xl:w-auto xl:min-w-[200px]"
+                className="btn-duo btn-duo-blue btn-duo-sm w-full md:w-auto"
               >
-                🤖 מלא הכל עם AI
+                🤖 מלא הכל
               </button>
               <button
                 onClick={handleTrySubmit}
-                className="btn-duo btn-duo-primary w-full xl:w-auto xl:min-w-[240px] xl:ms-auto"
+                className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[200px]"
                 title={isFormValid ? "הגש את הטופס" : `חסרים ${liveErrors.length} פרטים`}
               >
                 {isFormValid

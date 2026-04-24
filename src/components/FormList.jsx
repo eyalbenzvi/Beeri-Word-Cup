@@ -114,8 +114,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין" : "טיוטה"}
                 </span>
               </div>
-              <div className="flex gap-2 mt-3">
-                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm flex-1">
+              <div className="flex gap-2 mt-3 justify-end">
+                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
                 {formStatus === "submitted" && !settings.predictionsLocked && (
@@ -146,8 +146,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         })}
       </div>
 
-      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost w-full">
-        👀 צפייה בטפסים של כולם
+      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost w-full md:w-auto md:min-w-[260px] md:mx-auto md:block">
+        צפייה בטפסים של כולם
       </button>
 
       {showNewForm && !locked && (
