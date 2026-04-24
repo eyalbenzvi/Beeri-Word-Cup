@@ -59,11 +59,12 @@ assert(/editingDoc\s*\?\s*BLOG\.editor\.editSummary/.test(adminTab),
   "admin tab uses conditional header label");
 
 // ============ BUG 4. client-side number collision fix ============
-console.log("--- BUG 4: transactional number reservation ---");
-assert(/reserveNextSummaryNumber/.test(store), "number reserved via transaction");
-assert(/runTransaction/.test(store), "transaction API imported");
+console.log("--- BUG 4: number reservation reads server max ---");
+assert(/reserveNextSummaryNumber/.test(store), "number reserved via helper");
+// Client SDK transactions can't read queries, so the reservation uses getDocs.
+assert(!/runTransaction/.test(store), "runTransaction not used (unsupported with queries)");
 assert(/orderBy\("number", "desc"\)/.test(store),
-  "transaction reads current max by desc order");
+  "reservation reads current max by desc order");
 assert(/await\s+withTimeout\(reserveNextSummaryNumber\(\)/.test(store),
   "reservation is wrapped in withTimeout");
 assert(!/nextSummaryNumber\(\)\s*,\s*\n\s*status:\s*"draft"/.test(store),

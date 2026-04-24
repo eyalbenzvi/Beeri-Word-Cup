@@ -13,7 +13,6 @@ import {
   query,
   where,
   addDoc,
-  runTransaction,
   orderBy,
   limit,
 } from "firebase/firestore";
@@ -1764,20 +1763,17 @@ export function getCoveredMatchIds() {
   return covered;
 }
 
-// Atomically reserve the next summary number. Uses a Firestore transaction
-// that reads the current max `number` directly from the server, so two
-// admins creating summaries at the same time (or one admin in two tabs)
-// can't collide on the same number. The transaction reads `orderBy(number
-// desc) limit(1)` — cheap, and Firestore's optimistic concurrency retries
-// for us under contention.
+// Reserve the next summary number by reading the current max from the
+// server. The Firestore client SDK's Transaction.get() only accepts a
+// DocumentReference (queries are Admin-SDK only), so a transactional
+// read-by-query isn't possible here. Concurrent admin writes are rare;
+// if collisions become a real concern, switch to a counter document.
 async function reserveNextSummaryNumber() {
-  return runTransaction(db, async (tx) => {
-    const snap = await tx.get(
-      query(summariesCollectionRef, orderBy("number", "desc"), limit(1)),
-    );
-    const maxNumber = snap.empty ? 0 : Number(snap.docs[0].data()?.number || 0);
-    return Math.max(0, Number.isFinite(maxNumber) ? maxNumber : 0) + 1;
-  });
+  const snap = await getDocs(
+    query(summariesCollectionRef, orderBy("number", "desc"), limit(1)),
+  );
+  const maxNumber = snap.empty ? 0 : Number(snap.docs[0].data()?.number || 0);
+  return Math.max(0, Number.isFinite(maxNumber) ? maxNumber : 0) + 1;
 }
 
 const DEFAULT_SUMMARY = {
