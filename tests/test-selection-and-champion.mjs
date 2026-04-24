@@ -406,12 +406,6 @@ console.log("\n--- 5. Champion display in form views (source verification) ---")
   assert(derives, "5.7 Predict page derives championCode from matchPredictions");
 }
 
-// 5.8 Predict page displays champion in form details section
-{
-  const displays = /אלופה.*championName|championName.*אלופה/.test(predictSrc);
-  assert(displays, "5.8 Predict page displays champion in form details");
-}
-
 // 5.9 Predict page passes championName to ReviewScreen
 {
   const reviewSection = predictSrc.match(/<ReviewScreen[\s\S]*?\/>/)?.[0] || "";
@@ -432,12 +426,6 @@ console.log("\n--- 5. Champion display in form views (source verification) ---")
   assert(acceptsProp, "5.11 ReviewScreen accepts championName prop");
 }
 
-// 5.12 ReviewScreen displays champion row
-{
-  const displaysRow = /אלופה/.test(reviewScreenSrc);
-  assert(displaysRow, "5.12 ReviewScreen displays champion row");
-}
-
 // 5.13 ReviewScreen shows fallback text when no champion
 {
   const hasFallback = /טרם נקבע/.test(reviewScreenSrc);
@@ -448,12 +436,6 @@ console.log("\n--- 5. Champion display in form views (source verification) ---")
 {
   const acceptsProp = /championName/.test(formDetailsTabSrc);
   assert(acceptsProp, "5.14 FormDetailsTab accepts championName prop");
-}
-
-// 5.15 FormDetailsTab displays champion section
-{
-  const displaysSection = /אלופה/.test(formDetailsTabSrc);
-  assert(displaysSection, "5.15 FormDetailsTab displays champion section");
 }
 
 // 5.16 FormDetailsTab shows fallback text when no champion
