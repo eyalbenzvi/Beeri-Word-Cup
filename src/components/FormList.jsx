@@ -1,14 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { normalizeStatus } from "../utils/helpers";
-import { groupMatches, knockoutMatches } from "../data/matches";
 import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
 import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
+import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 import { LOCK_MESSAGES } from "../constants/messages";
-
-const totalMatches = groupMatches.length + knockoutMatches.length;
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
@@ -16,6 +14,10 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
+  const playerList = useMemo(
+    () => resolvePlayerList(settings?.topScorerPlayers),
+    [settings?.topScorerPlayers],
+  );
 
   const handleCreateForm = useCallback(() => {
     if (!user || locked) return;
@@ -118,12 +120,16 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                   <div className="font-extrabold text-base truncate text-ink">
                     {form.formName || "טופס ללא שם"}
                   </div>
-                  <div className="text-xs text-ink-muted mt-0.5 font-medium">
-                    {Object.keys(form.matches || {}).length}/{totalMatches}{" "}
-                    משחקים
-                    {form.budgetNumber ? ` • תקציב: ${form.budgetNumber}` : ""}
-                    {championName ? ` • 🏆 ${championName}` : ""}
-                  </div>
+                  {championName && (
+                    <div className="text-xs text-accent-text font-bold mt-0.5">
+                      🏆 {championName}
+                    </div>
+                  )}
+                  {form.topScorer && (
+                    <div className="text-xs text-ink-muted font-medium mt-0.5">
+                      ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
+                    </div>
+                  )}
                 </div>
                 <span
                   className={`text-xs px-2.5 py-1 rounded-full font-extrabold ${
