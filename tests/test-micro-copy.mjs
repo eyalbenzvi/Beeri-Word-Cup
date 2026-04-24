@@ -9,11 +9,18 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 console.log("=== MICRO-COPY CONTRACT TESTS ===\n");
 
 const homeSrc = fs.readFileSync("src/pages/Home.jsx", "utf8");
+const lockMessagesSrc = fs.readFileSync("src/constants/messages.js", "utf8");
 
 // --- LOCKED STRINGS (per CLAUDE.md) ---
+// The canonical copy now lives in constants/messages.js; Home consumes it via
+// LOCK_MESSAGES.tournamentStarted. Both conditions must hold.
 assert(
-  homeSrc.includes("המשחקים התחילו — ההגשה נסגרה"),
-  "Home still contains the locked lock-state string"
+  lockMessagesSrc.includes("המשחקים התחילו — ההגשה נסגרה"),
+  "LOCK_MESSAGES.tournamentStarted contains the canonical lock-state string"
+);
+assert(
+  homeSrc.includes("LOCK_MESSAGES.tournamentStarted"),
+  "Home references LOCK_MESSAGES.tournamentStarted"
 );
 
 // --- NEW COPY in place ---
