@@ -30,7 +30,7 @@ function getCorsHeaders(event) {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Cache-Control": "public, max-age=15",
+    "Cache-Control": "no-store",
     "Content-Type": "application/json",
   };
 }
