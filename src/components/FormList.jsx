@@ -121,12 +121,12 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                     {form.formName || "טופס ללא שם"}
                   </div>
                   {championName && (
-                    <div className="text-xs text-accent-text font-bold mt-0.5">
+                    <div className="text-xs text-accent-text font-bold mt-0.5" aria-label={`אלופה: ${championName}`}>
                       🏆 {championName}
                     </div>
                   )}
                   {form.topScorer && (
-                    <div className="text-xs text-ink-muted font-medium mt-0.5">
+                    <div className="text-xs text-ink-muted font-medium mt-0.5" aria-label={`מלך שערים: ${getPlayerDisplayName(form.topScorer, playerList)}`}>
                       ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
                     </div>
                   )}

@@ -399,12 +399,12 @@ export default function Leaderboard({
                       ) : null;
                     })()}
                     {canView && championName && (
-                      <div className="text-xs text-accent-text font-bold truncate">
+                      <div className="text-xs text-accent-text font-bold truncate" aria-label={`אלופה: ${championName}`}>
                         🏆 {championName}
                       </div>
                     )}
                     {canView && topScorerDisplay && (
-                      <div className="text-xs text-ink-muted font-medium truncate">
+                      <div className="text-xs text-ink-muted font-medium truncate" aria-label={`מלך שערים: ${topScorerDisplay}`}>
                         ⚽ {topScorerDisplay}
                       </div>
                     )}

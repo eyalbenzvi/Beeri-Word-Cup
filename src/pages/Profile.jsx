@@ -185,10 +185,16 @@ export default function Profile() {
                   <span className="text-2xl">{icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold text-sm truncate text-ink">{form.formName || "טופס ללא שם"}</div>
-                    <div className="text-xs text-ink-muted font-medium">
-                      {champion && <span>🏆 אלופה: {champion} </span>}
-                      {form.topScorer && <span>⚽ מלך: {getPlayerDisplayName(form.topScorer, playerList)}</span>}
-                    </div>
+                    {champion && (
+                      <div className="text-xs text-accent-text font-bold mt-0.5" aria-label={`אלופה: ${champion}`}>
+                        🏆 {champion}
+                      </div>
+                    )}
+                    {form.topScorer && (
+                      <div className="text-xs text-ink-muted font-medium mt-0.5" aria-label={`מלך שערים: ${getPlayerDisplayName(form.topScorer, playerList)}`}>
+                        ⚽ {getPlayerDisplayName(form.topScorer, playerList)}
+                      </div>
+                    )}
                   </div>
                   {position && (
                     <div className="text-xs font-extrabold text-white bg-primary px-2.5 py-1 rounded-full">
