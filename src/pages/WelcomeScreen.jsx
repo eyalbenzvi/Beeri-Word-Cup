@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import { usePublicSettings } from "../hooks/usePublicSettings";
-import { useMatchResults } from "../hooks/useStore";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
@@ -14,7 +13,10 @@ import { BRAND } from "../constants/messages";
 export default function WelcomeScreen() {
   const countdown = useCountdown();
   const publicSettings = usePublicSettings();
-  const results = useMatchResults();
+  // Logged-out users have no Firestore listeners, so the store's match
+  // results are empty. Use the public endpoint's results instead so the
+  // "next match" widget correctly hides already-played matches.
+  const results = publicSettings.matchResults;
   const [menuOpen, setMenuOpen] = useState(false);
   const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
   // Show upcoming matches when predictions are admin-locked OR kickoff has passed.
@@ -27,7 +29,7 @@ export default function WelcomeScreen() {
   const countdownPanel = tournamentStarted ? (
     <>
       <MatchdayHero results={results} />
-      <UpcomingMatches />
+      <UpcomingMatches matchResultsOverride={results} />
     </>
   ) : (
     <div className="card-duo">

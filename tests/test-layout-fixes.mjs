@@ -72,9 +72,16 @@ assert(
   /<MatchdayHero\s+results=\{results\}\s*\/>/.test(welcome),
   "WelcomeScreen renders MatchdayHero (with results) when tournamentStarted",
 );
+// Logged-out visitors have no Firestore listeners, so the store's
+// useMatchResults would be empty. WelcomeScreen must source match results
+// from the public endpoint via usePublicSettings instead.
 assert(
-  /useMatchResults/.test(welcome),
-  "WelcomeScreen wires useMatchResults for MatchdayHero",
+  /usePublicSettings/.test(welcome),
+  "WelcomeScreen uses usePublicSettings (also carries matchResults) for MatchdayHero",
+);
+assert(
+  !/from\s+["']\.\.\/hooks\/useStore["'][^;]*useMatchResults/.test(welcome),
+  "WelcomeScreen does not import useMatchResults from the store (empty for logged-out users)",
 );
 // The hero must be conditionally rendered inside the tournamentStarted branch
 // (so logged-out users before kickoff still see the countdown card).
