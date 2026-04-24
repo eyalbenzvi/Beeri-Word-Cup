@@ -13,6 +13,9 @@ import {
   query,
   where,
   addDoc,
+  runTransaction,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "./sentry";
 import { generateDefaultFormName } from "./utils/formNameGenerator";
@@ -702,6 +705,11 @@ let publicSummariesUnsub = null;
 let publicSettingsTimer = null;
 
 async function fetchPublicSettingsOnce() {
+  // Capture the mode flag at call time. If the user signs in while the
+  // request is in flight, teardownPublicReadonlyMode flips this to false
+  // and we must NOT overwrite the authenticated listener's cache with stale
+  // public-mode data.
+  if (!publicModeInitialized) return;
   try {
     const res = await fetch(`/.netlify/functions/get-public-settings?t=${Date.now()}`, {
       credentials: "omit",
@@ -709,6 +717,8 @@ async function fetchPublicSettingsOnce() {
     });
     if (!res.ok) return;
     const data = await res.json();
+    // Re-check after the await: teardown may have happened during the fetch.
+    if (!publicModeInitialized) return;
     cache.settings = {
       ...(cache.settings || {}),
       predictionsLocked: !!data?.predictionsLocked,
@@ -1754,10 +1764,20 @@ export function getCoveredMatchIds() {
   return covered;
 }
 
-function nextSummaryNumber() {
-  const all = Object.values(getSummaries());
-  if (all.length === 0) return 1;
-  return Math.max(...all.map((s) => s.number || 0)) + 1;
+// Atomically reserve the next summary number. Uses a Firestore transaction
+// that reads the current max `number` directly from the server, so two
+// admins creating summaries at the same time (or one admin in two tabs)
+// can't collide on the same number. The transaction reads `orderBy(number
+// desc) limit(1)` — cheap, and Firestore's optimistic concurrency retries
+// for us under contention.
+async function reserveNextSummaryNumber() {
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(
+      query(summariesCollectionRef, orderBy("number", "desc"), limit(1)),
+    );
+    const maxNumber = snap.empty ? 0 : Number(snap.docs[0].data()?.number || 0);
+    return Math.max(0, Number.isFinite(maxNumber) ? maxNumber : 0) + 1;
+  });
 }
 
 const DEFAULT_SUMMARY = {
@@ -1815,18 +1835,19 @@ export async function createSummary(fields = {}) {
     console.warn("createSummary size validation:", sizeErr);
     throw new Error(sizeErr);
   }
-  const now = new Date().toISOString();
-  const payload = {
-    ...DEFAULT_SUMMARY,
-    ...fields,
-    number: nextSummaryNumber(),
-    status: "draft",
-    authorUid: getCurrentUser()?.id || null,
-    createdAt: now,
-    updatedAt: now,
-  };
   try {
-    const ref = await addDoc(summariesCollectionRef, payload);
+    const nextNumber = await withTimeout(reserveNextSummaryNumber(), 10000);
+    const now = new Date().toISOString();
+    const payload = {
+      ...DEFAULT_SUMMARY,
+      ...fields,
+      number: nextNumber,
+      status: "draft",
+      authorUid: getCurrentUser()?.id || null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const ref = await withTimeout(addDoc(summariesCollectionRef, payload), 10000);
     cache.summaries = { ...cache.summaries, [ref.id]: { id: ref.id, ...payload } };
     notifyAndEmit("summaries");
     writeAuditLog("summary-create", { summaryId: ref.id, number: payload.number });
@@ -1874,7 +1895,7 @@ export async function updateSummary(summaryId, fields = {}) {
     patch.publishedAt = now;
   }
   try {
-    await updateDoc(summaryDocRef(summaryId), patch);
+    await withTimeout(updateDoc(summaryDocRef(summaryId), patch), 10000);
     cache.summaries = {
       ...cache.summaries,
       [summaryId]: { ...existing, ...patch },
@@ -1889,6 +1910,14 @@ export async function updateSummary(summaryId, fields = {}) {
   } catch (err) {
     console.error("Failed to update summary:", err);
     captureClientError(err, { source: "updateSummary", summaryId, code: err?.code });
+    // Surface permission-denied / timeout with a user-friendly Hebrew
+    // message rather than the generic "שמירה נכשלה".
+    if (err?.code === "permission-denied") {
+      throw new Error("אין הרשאה לשמור — ייתכן שההרשאות שלך עודכנו. רענן את הדף.");
+    }
+    if (err?.message === "timeout") {
+      throw new Error("השמירה לא הושלמה בזמן — בדוק את החיבור ונסה שוב.");
+    }
     return false;
   }
 }
@@ -1906,7 +1935,7 @@ export async function deleteSummary(summaryId) {
   const existing = getSummary(summaryId);
   if (!existing) return false;
   try {
-    await deleteDoc(summaryDocRef(summaryId));
+    await withTimeout(deleteDoc(summaryDocRef(summaryId)), 10000);
     const next = { ...cache.summaries };
     delete next[summaryId];
     cache.summaries = next;

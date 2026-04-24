@@ -5,18 +5,19 @@ import { deleteSummary } from "../store";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 import SummaryEditor from "./SummaryEditor";
+import { BLOG } from "../constants/messages";
 
 function statusBadge(status) {
   if (status === "published") {
     return (
       <span className="text-[10px] font-extrabold bg-primary text-white px-2 py-0.5 rounded-full">
-        פורסם
+        {BLOG.status.publishedBadge}
       </span>
     );
   }
   return (
     <span className="text-[10px] font-extrabold bg-accent-soft-2 text-accent-text px-2 py-0.5 rounded-full">
-      טיוטה
+      {BLOG.status.draftBadge}
     </span>
   );
 }
@@ -55,17 +56,21 @@ export default function AdminSummariesTab() {
     });
     if (!yes) return;
     const ok = await deleteSummary(summary.id);
-    if (ok) showToast("הסיכום נמחק", "success");
-    else showToast("מחיקה נכשלה", "error");
+    if (ok) showToast(BLOG.editor.deleted, "success");
+    else showToast(BLOG.editor.deleteFailed, "error");
   };
 
   if (editingId || creating) {
+    const editingDoc = editingId ? summaries[editingId] : null;
+    const headerLabel = creating
+      ? BLOG.editor.newSummary
+      : editingDoc
+        ? BLOG.editor.editSummary(editingDoc.number)
+        : BLOG.editor.editSummary("");
     return (
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-extrabold text-lg text-ink">
-            {creating ? "סיכום חדש" : `עריכת סיכום #${summaries[editingId]?.number}`}
-          </h3>
+          <h3 className="font-extrabold text-lg text-ink">{headerLabel}</h3>
         </div>
         <SummaryEditor
           summaryId={editingId}

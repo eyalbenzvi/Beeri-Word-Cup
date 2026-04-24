@@ -4,6 +4,7 @@ import { useNavigation } from "../hooks/useNavigation";
 import MenuOverlay from "./MenuOverlay";
 import DesktopSideNav from "./DesktopSideNav";
 import { Menu, Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Newspaper } from "lucide-react";
+import { BLOG } from "../constants/messages";
 
 export default function Layout({ children, rightRail = null }) {
   const { user } = useCurrentUser();
@@ -33,7 +34,7 @@ export default function Layout({ children, rightRail = null }) {
       ]
     : [{ id: "home", label: "בית", Icon: HomeIcon }];
   if (user && hasVisibleSummary) {
-    allNavItems.push({ id: "blog", label: "יומן", Icon: Newspaper });
+    allNavItems.push({ id: "blog", label: BLOG.navLabel, Icon: Newspaper });
   }
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול", Icon: Settings });
 

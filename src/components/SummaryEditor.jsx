@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import * as summaryAI from "../utils/summaryAI";
+import { BLOG } from "../constants/messages";
 import {
   createSummary,
   updateSummary,
@@ -121,7 +122,9 @@ export default function SummaryEditor({ summaryId, onClose }) {
   const confirm = useConfirm();
 
   const existing = summaryId ? summaries[summaryId] : null;
-  const isEditing = !!existing;
+  // `summaryId && !existing` means the doc hasn't loaded yet OR was deleted
+  // by another session while we're open. We distinguish the two states below.
+  const isExistingSummary = !!summaryId;
   const isPublished = existing?.status === "published";
 
   // Draft state in this form. We do NOT write to Firestore on every keystroke
@@ -139,20 +142,43 @@ export default function SummaryEditor({ summaryId, onClose }) {
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(null); // null | 'title' | 'intro' | 'conclusion' | match-id
 
-  // Reset local drafts only when the user actually switches between summaries,
-  // not whenever the live snapshot for the *same* doc is replaced by the
-  // Firestore listener — otherwise a remote update mid-edit wipes unsaved work.
-  const lastLoadedIdRef = useRef(summaryId);
+  // Hydrate local drafts from the loaded doc. We intentionally do NOT re-run
+  // on every `existing` identity change, because the Firestore listener
+  // replaces the object reference on every snapshot and would wipe unsaved
+  // edits. The ref tracks the id we've already initialized for — and we only
+  // count it as "hydrated" once `existing` has actually arrived, which
+  // prevents the cold-mount case where we ran with null data first and then
+  // refused to adopt the real doc when the listener caught up.
+  const hydratedForIdRef = useRef(null);
   useEffect(() => {
-    if (lastLoadedIdRef.current === summaryId) return;
-    lastLoadedIdRef.current = summaryId;
-    setTitle(existing?.title || "");
-    setSubtitle(existing?.subtitle || "");
-    setIntro(existing?.intro || "");
-    setConclusion(existing?.conclusion || "");
-    setCoveredMatchIds(existing?.coveredMatchIds ? [...existing.coveredMatchIds] : []);
-    setMatchNotes(existing?.matchNotes ? { ...existing.matchNotes } : {});
+    if (!summaryId) {
+      // "New summary" form — reset once on open.
+      if (hydratedForIdRef.current !== "__new__") {
+        hydratedForIdRef.current = "__new__";
+        setTitle(""); setSubtitle(""); setIntro(""); setConclusion("");
+        setCoveredMatchIds([]); setMatchNotes({});
+      }
+      return;
+    }
+    if (!existing) return; // listener hasn't populated yet (or doc was deleted)
+    if (hydratedForIdRef.current === summaryId) return;
+    hydratedForIdRef.current = summaryId;
+    setTitle(existing.title || "");
+    setSubtitle(existing.subtitle || "");
+    setIntro(existing.intro || "");
+    setConclusion(existing.conclusion || "");
+    setCoveredMatchIds(existing.coveredMatchIds ? [...existing.coveredMatchIds] : []);
+    setMatchNotes(existing.matchNotes ? { ...existing.matchNotes } : {});
   }, [summaryId, existing]);
+
+  // Deleted-while-editing guard: once we've hydrated for this id and the
+  // doc has since vanished from the listener, don't let Save create a new
+  // summary silently. The return below renders an explicit error state.
+  const wasDeletedMidEdit =
+    isExistingSummary && !existing && hydratedForIdRef.current === summaryId;
+  // Waiting for the initial snapshot on a cold cache.
+  const isHydrating =
+    isExistingSummary && !existing && hydratedForIdRef.current !== summaryId;
 
   // The matches that have a result. Exclude from this list any that are
   // already covered in OTHER summaries (but keep the ones this summary already
@@ -224,57 +250,75 @@ export default function SummaryEditor({ summaryId, onClose }) {
   };
 
   const handleSaveDraft = async () => {
+    // If we opened this editor for an existing summaryId but the doc is
+    // gone (deleted in another session), refuse to save. Otherwise we'd
+    // fall through to createSummary and spawn a new doc.
+    if (wasDeletedMidEdit) {
+      showToast(BLOG.editor.deletedMidEditToast, "error");
+      return;
+    }
     const err = validate();
     if (err) { showToast(err, "error"); return; }
     setSaving(true);
     try {
-      if (isEditing) {
+      if (existing) {
         // Preserve the existing status on plain saves. Going to draft is a
         // separate explicit action via "החזר לטיוטה".
         const ok = await updateSummary(summaryId, {
           ...buildPayload(),
           status: existing.status,
         });
-        if (!ok) showToast("שמירה נכשלה", "error");
-        else showToast("נשמר", "success");
-      } else {
+        if (!ok) showToast(BLOG.editor.saveFailed, "error");
+        else showToast(BLOG.editor.saved, "success");
+      } else if (!isExistingSummary) {
         const id = await createSummary(buildPayload());
-        if (!id) showToast("יצירה נכשלה", "error");
+        if (!id) showToast(BLOG.editor.createFailed, "error");
         else {
-          showToast("טיוטה נשמרה", "success");
+          showToast(BLOG.editor.draftSaved, "success");
           onClose?.(id);
           return;
         }
       }
     } catch (e) {
-      showToast(e?.message || "שמירה נכשלה", "error");
+      showToast(e?.message || BLOG.editor.saveFailed, "error");
     } finally {
       setSaving(false);
     }
   };
 
   const handlePublish = async () => {
+    if (wasDeletedMidEdit) {
+      showToast(BLOG.editor.deletedMidEditToast, "error");
+      return;
+    }
     const err = validate();
     if (err) { showToast(err, "error"); return; }
     setSaving(true);
     try {
+      // Single round-trip: write fields + publish in one update when editing
+      // an existing doc. For a brand new summary, create (as draft) then
+      // publish — createSummary intentionally forces status:"draft" at rule
+      // level so we can't skip the second step.
       let idForStatus = summaryId;
-      if (!isEditing) {
+      if (!existing && !isExistingSummary) {
         idForStatus = await createSummary(buildPayload());
         if (!idForStatus) {
-          showToast("שמירה נכשלה", "error");
+          showToast(BLOG.editor.saveFailed, "error");
           return;
         }
-      } else {
-        const ok = await updateSummary(summaryId, buildPayload());
-        if (!ok) { showToast("שמירה נכשלה", "error"); return; }
+        const ok = await publishSummary(idForStatus);
+        if (!ok) { showToast(BLOG.editor.publishFailed, "error"); return; }
+      } else if (existing) {
+        const ok = await updateSummary(summaryId, {
+          ...buildPayload(),
+          status: "published",
+        });
+        if (!ok) { showToast(BLOG.editor.publishFailed, "error"); return; }
       }
-      const ok = await publishSummary(idForStatus);
-      if (!ok) { showToast("פרסום נכשל", "error"); return; }
-      showToast("הסיכום פורסם", "success");
+      showToast(BLOG.editor.published, "success");
       onClose?.(idForStatus);
     } catch (e) {
-      showToast(e?.message || "פרסום נכשל", "error");
+      showToast(e?.message || BLOG.editor.publishFailed, "error");
     } finally {
       setSaving(false);
     }
@@ -285,7 +329,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
     try {
       return await fn();
     } catch (err) {
-      showToast(err?.message || "AI נכשל", "error");
+      showToast(err?.message || BLOG.editor.aiFailed, "error");
       return null;
     } finally {
       setAiLoading(null);
@@ -294,7 +338,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
 
   const handleSuggestTitle = async () => {
     if (!intro.trim() && !conclusion.trim()) {
-      showToast("כתוב קודם הקדמה או סיכום", "error");
+      showToast(BLOG.editor.aiEmptyInput, "error");
       return;
     }
     const res = await runAI("title", () =>
@@ -307,13 +351,13 @@ export default function SummaryEditor({ summaryId, onClose }) {
     if (!res) return;
     if (res.title) setTitle(res.title);
     if (res.subtitle) setSubtitle(res.subtitle);
-    showToast("הכותרת עודכנה", "success");
+    showToast(BLOG.editor.aiTitleUpdated, "success");
   };
 
   const handlePolish = async (kind) => {
     const current = kind === "intro" ? intro : conclusion;
     if (!current.trim()) {
-      showToast("אין מה לשפר — הטקסט ריק", "error");
+      showToast(BLOG.editor.aiEmptyTextInput, "error");
       return;
     }
     const res = await runAI(kind, () =>
@@ -322,7 +366,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
     if (!res?.text) return;
     if (kind === "intro") setIntro(res.text);
     else setConclusion(res.text);
-    showToast("נוסח משופר", "success");
+    showToast(BLOG.editor.aiPolished, "success");
   };
 
   const handleMatchCommentary = async (mid) => {
@@ -345,11 +389,11 @@ export default function SummaryEditor({ summaryId, onClose }) {
     );
     if (!res?.text) return;
     setMatchNotes((prev) => ({ ...prev, [mid]: res.text }));
-    showToast("טיוטה מוכנה", "success");
+    showToast(BLOG.editor.aiDraftReady, "success");
   };
 
   const handleUnpublish = async () => {
-    if (!isEditing) return;
+    if (!existing) return;
     const yes = await confirm({
       title: "להחזיר לטיוטה?",
       message: "הסיכום יוסתר מהמבקרים עד שתפרסם שוב.",
@@ -359,12 +403,37 @@ export default function SummaryEditor({ summaryId, onClose }) {
     setSaving(true);
     try {
       const ok = await unpublishSummary(summaryId);
-      if (ok) showToast("הוחזר לטיוטה", "success");
-      else showToast("פעולה נכשלה", "error");
+      if (ok) showToast(BLOG.editor.unpublished, "success");
+      else showToast(BLOG.editor.saveFailed, "error");
     } finally {
       setSaving(false);
     }
   };
+
+  if (wasDeletedMidEdit) {
+    return (
+      <div className="card-duo-lg text-center">
+        <div className="text-5xl mb-3">🗑️</div>
+        <h3 className="text-base font-extrabold text-ink mb-1">
+          {BLOG.editor.deletedMidEditTitle}
+        </h3>
+        <p className="text-sm text-ink-muted font-medium mb-4">
+          {BLOG.editor.deletedMidEditBody}
+        </p>
+        {onClose && (
+          <button onClick={() => onClose()} className="btn-duo btn-duo-primary">
+            {BLOG.editor.back}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (isHydrating) {
+    return (
+      <div className="text-center py-8 text-ink-muted font-bold">טוען...</div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -531,33 +600,22 @@ export default function SummaryEditor({ summaryId, onClose }) {
           disabled={saving}
           className="btn-duo btn-duo-ghost-raised"
         >
-          שמור טיוטה
+          {BLOG.editor.saveDraft}
         </button>
-        {!isPublished && (
-          <button
-            onClick={handlePublish}
-            disabled={saving}
-            className="btn-duo btn-duo-primary"
-          >
-            פרסם
-          </button>
-        )}
+        <button
+          onClick={handlePublish}
+          disabled={saving}
+          className="btn-duo btn-duo-primary"
+        >
+          {isPublished ? BLOG.editor.republish : BLOG.editor.publish}
+        </button>
         {isPublished && (
           <button
             onClick={handleUnpublish}
             disabled={saving}
             className="btn-duo btn-duo-ghost-raised"
           >
-            החזר לטיוטה
-          </button>
-        )}
-        {isPublished && (
-          <button
-            onClick={handlePublish}
-            disabled={saving}
-            className="btn-duo btn-duo-primary"
-          >
-            שמור שינויים
+            {BLOG.editor.unpublish}
           </button>
         )}
         {onClose && (
@@ -565,7 +623,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
             onClick={() => onClose()}
             className="btn-duo btn-duo-ghost mr-auto"
           >
-            חזרה
+            {BLOG.editor.back}
           </button>
         )}
       </div>

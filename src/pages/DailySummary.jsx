@@ -16,6 +16,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useActualBonuses } from "../hooks/useStore";
 import { getMatchById } from "../data/matches";
 import { useRightRail } from "../hooks/useRail";
+import { BLOG } from "../constants/messages";
 
 function formatDateHe(iso) {
   if (!iso) return "";
@@ -78,7 +79,7 @@ function LatestCountdown({ sortedSummaries, currentNumber }) {
       style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
     >
       <p className="text-sm font-extrabold text-primary-dark">
-        📰 יש סיכום חדש יותר: #{latestNumber}
+        {BLOG.public.latestBadge(latestNumber)}
       </p>
     </div>
   );
@@ -140,7 +141,10 @@ export default function DailySummary() {
     const cur = Number(raw);
     const hasValidN = raw != null && raw !== "" && Number.isFinite(cur) && cur > 0;
     if (!hasValidN && cur !== active.number) {
-      navigate("blog", { n: active.number });
+      // Replace (not push) — we're fixing up the URL rather than taking the
+      // user somewhere new, so we don't want Back to bounce them into the
+      // no-param state they never meant to land on.
+      navigate("blog", { n: active.number }, { replace: true });
     }
     // navigate intentionally omitted — it's stable from the provider
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,32 +166,36 @@ export default function DailySummary() {
   if (visibleSummaries.length === 0) {
     return (
       <div>
-        <PageHeader eyebrow="יומן המונדיאל" title="סיכומים יומיים" />
+        <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
         <EmptyState
           icon="📰"
-          title="אין עדיין סיכומים"
-          description="ברגע שהאדמין יפרסם את הסיכום הראשון, הוא יופיע כאן."
+          title={BLOG.public.emptyTitle}
+          description={BLOG.public.emptyBody}
         />
       </div>
     );
   }
 
   // URL asked for a specific n that doesn't exist — show graceful not-found.
-  const requestedN = Number(params?.n);
-  if (Number.isFinite(requestedN) && requestedN > 0 && !visibleSummaries.find((s) => s.number === requestedN)) {
+  // Tighten to digits-only so "1e9" / hex / empty strings fall through to
+  // the latest-summary path instead of showing a bogus "not found" card.
+  const rawN = params?.n;
+  const isStrictInt = typeof rawN === "string" && /^\d+$/.test(rawN);
+  const requestedN = isStrictInt ? Number(rawN) : NaN;
+  if (isStrictInt && requestedN > 0 && !visibleSummaries.find((s) => s.number === requestedN)) {
     return (
       <div>
-        <PageHeader eyebrow="יומן המונדיאל" title="סיכום לא נמצא" />
+        <PageHeader eyebrow={BLOG.pageTitle} title="סיכום לא נמצא" />
         <EmptyState
           icon="🔎"
-          title={`לא מצאנו סיכום #${requestedN}`}
-          description="ייתכן שהקישור פג תוקף או שהסיכום נמחק."
+          title={BLOG.public.notFoundTitle(requestedN)}
+          description={BLOG.public.notFoundBody}
           cta={
             <button
               onClick={() => navigate("blog")}
               className="btn-duo btn-duo-primary"
             >
-              לסיכום האחרון
+              {BLOG.public.notFoundCta}
             </button>
           }
         />
@@ -206,7 +214,7 @@ export default function DailySummary() {
   return (
     <div>
       <PageHeader
-        eyebrow={`יומן המונדיאל · סיכום #${active.number}${dateLabel ? ` · ${dateLabel}` : ""}`}
+        eyebrow={`${BLOG.pageTitle} · סיכום #${active.number}${dateLabel ? ` · ${dateLabel}` : ""}`}
         title={active.title || `סיכום #${active.number}`}
         subtitle={active.subtitle || undefined}
         action={<ShareSummaryButton summary={active} size="sm" />}
@@ -218,7 +226,7 @@ export default function DailySummary() {
           style={{ background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }}
         >
           <p className="text-sm font-extrabold text-accent-text">
-            ⚠️ תצוגת טיוטה — רק אדמין רואה את זה.
+            {BLOG.public.draftBanner}
           </p>
         </div>
       )}
@@ -229,16 +237,16 @@ export default function DailySummary() {
           style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
         >
           <p className="text-sm font-extrabold text-primary-dark mb-1">
-            👋 ברוך הבא ליומן המונדיאל של בארי
+            {BLOG.public.guestTitle}
           </p>
           <p className="text-xs text-ink-muted font-medium">
-            התחבר כדי לראות את הדירוג ומי קלע מדויק.
+            {BLOG.public.guestBody}
           </p>
           <button
             onClick={() => navigate("home")}
             className="btn-duo btn-duo-primary btn-duo-sm mt-2"
           >
-            כניסה למונדיאל
+            {BLOG.public.guestCta}
           </button>
         </div>
       )}
@@ -317,7 +325,7 @@ export default function DailySummary() {
       {/* Archive grid */}
       {visibleSummaries.length > 1 && (
         <div className="mt-6">
-          <h3 className="font-extrabold text-base text-ink mb-2">כל הסיכומים</h3>
+          <h3 className="font-extrabold text-base text-ink mb-2">{BLOG.archiveHeader}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[...visibleSummaries].reverse().map((s) => {
               const isCurrent = s.number === active.number;

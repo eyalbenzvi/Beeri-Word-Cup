@@ -28,8 +28,7 @@ function readInitialFromURL() {
   }
 }
 
-function writeURL(page, params) {
-  if (typeof window === "undefined") return;
+function buildURL(page, params) {
   try {
     const url = new URL(window.location.href);
     const sp = url.searchParams;
@@ -39,11 +38,28 @@ function writeURL(page, params) {
     if (page && page !== "home") sp.set("page", page);
     for (const [k, v] of Object.entries(params || {})) {
       if (v == null || v === "") continue;
+      if (typeof v !== "string" && typeof v !== "number") continue;
       sp.set(k, String(v));
     }
     const search = sp.toString();
-    const newURL = `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
-    window.history.replaceState({}, "", newURL);
+    return `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+// `replace` controls browser history: push (default) creates a new entry so
+// Back/Forward works across in-app navigation; replace is for URL-sync where
+// no new entry is desired (e.g. upgrading `?page=blog` to `?page=blog&n=3`).
+function writeURL(page, params, { replace = false } = {}) {
+  if (typeof window === "undefined") return;
+  const newURL = buildURL(page, params);
+  if (!newURL) return;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (newURL === current) return; // no-op, keep the stack clean
+  try {
+    if (replace) window.history.replaceState({}, "", newURL);
+    else window.history.pushState({}, "", newURL);
   } catch {
     // noop — URL updates are best-effort
   }
@@ -54,12 +70,8 @@ export function NavigationProvider({ children }) {
   const [page, setPage] = useState(initial.page);
   const [params, setParams] = useState(initial.params);
 
-  // Sync URL on state change
-  useEffect(() => {
-    writeURL(page, params);
-  }, [page, params]);
-
-  // Handle back/forward browser navigation
+  // Handle back/forward browser navigation — read straight from the URL so
+  // we don't get out of sync if another script mutated history.
   useEffect(() => {
     const onPop = () => {
       const next = readInitialFromURL();
@@ -70,9 +82,12 @@ export function NavigationProvider({ children }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const navigate = useCallback((p, nextParams = {}) => {
+  // `options.replace`: true for URL-sync (e.g. auto-jump to latest summary);
+  // default (false) pushes a new history entry so Back/Forward works.
+  const navigate = useCallback((p, nextParams = {}, options = {}) => {
     setPage(p);
     setParams(nextParams || {});
+    writeURL(p, nextParams || {}, { replace: !!options.replace });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 

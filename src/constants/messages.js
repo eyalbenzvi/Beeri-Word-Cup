@@ -46,3 +46,66 @@ export const LABELS = {
   championAria: (name) => `${CHAMPION}: ${name}`,
 };
 
+// Copy for the daily-summary blog feature. Kept together so tone/wording
+// stays consistent between the admin editor and the public page, and so a
+// future retype is a one-file change.
+export const BLOG = {
+  navLabel: "יומן",
+  pageTitle: "יומן המונדיאל",
+  archiveHeader: "כל הסיכומים",
+  status: {
+    draftBadge: "טיוטה",
+    publishedBadge: "פורסם",
+  },
+  editor: {
+    newSummary: "סיכום חדש",
+    editSummary: (n) => `עריכת סיכום #${n}`,
+    saveDraft: "שמור טיוטה",
+    publish: "פרסם",
+    republish: "שמור ופרסם",
+    unpublish: "החזר לטיוטה",
+    back: "חזרה",
+    saved: "נשמר",
+    draftSaved: "טיוטה נשמרה",
+    published: "הסיכום פורסם",
+    unpublished: "הוחזר לטיוטה",
+    deleted: "הסיכום נמחק",
+    titleRequired: "חובה למלא כותרת",
+    saveFailed: "שמירה נכשלה",
+    createFailed: "יצירה נכשלה",
+    publishFailed: "פרסום נכשל",
+    deleteFailed: "מחיקה נכשלה",
+    deletedMidEditTitle: "הסיכום נמחק",
+    deletedMidEditBody: "מישהו (או אתה בחלון אחר) מחק את הסיכום שערכת.",
+    deletedMidEditToast: "הסיכום נמחק. יש לפתוח סיכום אחר.",
+    aiThinking: "חושב...",
+    aiPolishing: "משפר...",
+    aiSuggestTitle: "הצע כותרת",
+    aiPolish: "שפר נוסח",
+    aiDraftMatch: "הצע טיוטה",
+    aiDraftReady: "טיוטה מוכנה",
+    aiTitleUpdated: "הכותרת עודכנה",
+    aiPolished: "נוסח משופר",
+    aiEmptyInput: "כתוב קודם הקדמה או סיכום",
+    aiEmptyTextInput: "אין מה לשפר — הטקסט ריק",
+    aiFailed: "AI נכשל",
+  },
+  public: {
+    latestBadge: (n) => `📰 יש סיכום חדש יותר: #${n}`,
+    notFoundTitle: (n) => `לא מצאנו סיכום #${n}`,
+    notFoundBody: "ייתכן שהקישור פג תוקף או שהסיכום נמחק.",
+    notFoundCta: "לסיכום האחרון",
+    emptyTitle: "אין עדיין סיכומים",
+    emptyBody: "ברגע שהאדמין יפרסם את הסיכום הראשון, הוא יופיע כאן.",
+    draftBanner: "⚠️ תצוגת טיוטה — רק אדמין רואה את זה.",
+    guestTitle: "👋 ברוך הבא ליומן המונדיאל של בארי",
+    guestBody: "התחבר כדי לראות את הדירוג ומי קלע מדויק.",
+    guestCta: "כניסה למונדיאל",
+  },
+  share: {
+    copied: "הקישור הועתק",
+    shareAria: "שתף",
+    whatsappAria: "שתף בוואטסאפ",
+  },
+};
+

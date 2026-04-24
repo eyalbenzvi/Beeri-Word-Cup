@@ -60,7 +60,8 @@ assert(aiSrc.includes("checkRateLimit"), "rate-limits per uid");
 assert(/collection\("rateLimit"\)/.test(aiSrc), "uses Firestore rateLimit collection");
 assert(/response_format:[\s\S]{0,80}type:\s*"json_object"/.test(aiSrc),
   "forces JSON response format");
-assert(/CONTROL_TOKENS/.test(aiSrc), "strips LLM control tokens from user text");
+assert(/CONTROL_TOKEN_REPLACEMENTS/.test(aiSrc),
+  "neutralizes LLM control tokens in user text");
 assert(aiSrc.includes("USER_CONTENT_BEGIN") || aiSrc.includes("FACTS_BEGIN"),
   "delimits user content to reduce injection risk");
 assert(/MAX_INPUT_CHARS\s*=\s*6000/.test(aiSrc), "input length is clamped");
