@@ -17,8 +17,8 @@ export default function TournamentCountdown({
         <p
           className={
             variant === "large"
-              ? "text-lg md:text-xl font-extrabold text-ink mb-4"
-              : "text-base md:text-lg font-extrabold text-ink mb-3"
+              ? "text-center text-lg md:text-xl font-extrabold text-ink mb-4"
+              : "text-center text-base md:text-lg font-extrabold text-ink mb-3"
           }
         >
           {headerText}
@@ -34,8 +34,8 @@ export default function TournamentCountdown({
         <p
           className={
             variant === "large"
-              ? "text-xs text-ink-muted mt-4 font-medium"
-              : "text-[11px] text-ink-muted mt-3 font-medium"
+              ? "text-center text-xs text-ink-muted mt-4 font-medium"
+              : "text-center text-[11px] text-ink-muted mt-3 font-medium"
           }
         >
           {footerText}
