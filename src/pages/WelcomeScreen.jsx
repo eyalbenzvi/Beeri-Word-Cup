@@ -20,7 +20,7 @@ export default function WelcomeScreen() {
     <UpcomingMatches />
   ) : (
     <div className="card-duo-lg">
-      <p className="text-sm md:text-base font-extrabold text-ink-muted mb-3">
+      <p className="text-lg md:text-xl font-extrabold text-ink mb-4">
         עוד עד שריקת הפתיחה
       </p>
       <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
@@ -33,7 +33,7 @@ export default function WelcomeScreen() {
         <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
         <CountdownUnit value={countdown.seconds} label="שניות" />
       </div>
-      <p className="text-xs text-ink-muted mt-3 font-medium">
+      <p className="text-xs text-ink-muted mt-4 font-medium">
         12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה
       </p>
     </div>
@@ -100,12 +100,12 @@ export default function WelcomeScreen() {
 
       {/* Main — mobile: centered column, lg+: two-column split */}
       <div className={`flex-1 px-4 md:px-6 py-4 md:py-6 min-h-0 flex flex-col items-center ${tournamentStarted ? "justify-start" : "justify-center lg:justify-start"}`}>
-        <div className="w-full max-w-md lg:max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10 lg:items-center lg:pt-4">
+        <div className="w-full max-w-md lg:max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 lg:items-center lg:pt-4">
           {/* LEFT (RTL: appears on LEFT visually) — tournament hype panel */}
           <div className="hidden lg:flex lg:flex-col lg:gap-4 lg:order-last">
             <div className="text-center lg:text-right">
               <div className="text-6xl mb-3" aria-hidden="true">⚽🏆</div>
-              <h1 className="font-heading text-4xl xl:text-5xl font-extrabold text-ink tracking-tight mb-1 leading-tight">
+              <h1 className="font-heading text-3xl xl:text-4xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
                 טורניר הניחושים של בארי
               </h1>
               <p className="text-ink-muted font-bold mb-4">מונדיאל 2026 · ארה״ב • מקסיקו • קנדה</p>
@@ -114,7 +114,7 @@ export default function WelcomeScreen() {
           </div>
 
           {/* RIGHT (RTL: appears on RIGHT visually) — auth card */}
-          <div className="text-center space-y-4 lg:bg-white lg:border-2 lg:border-border lg:rounded-3xl lg:p-8 lg:shadow-sm lg:order-first">
+          <div className="text-center space-y-4 lg:bg-white lg:border-2 lg:border-border lg:rounded-3xl lg:p-6 lg:shadow-sm lg:order-first">
             {/* Mobile-only branding (desktop has it in left panel) */}
             <div className="lg:hidden">
               <div className="text-5xl md:text-6xl mb-2 animate-pop-in" aria-hidden="true">⚽🏆</div>
