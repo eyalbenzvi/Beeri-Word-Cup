@@ -496,6 +496,25 @@ export default function Predict() {
           <div className="text-xs text-primary-dark mt-1 font-medium">
             הניחושים נעולים ויחושבו כאשר משחקים יתקיימו.
           </div>
+          {!settings.predictionsLocked && (
+            <button
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "פתיחת טופס שהוגש",
+                  message:
+                    "הטופס כבר אושר ונכלל בדירוג. פתיחה מחדש תחזיר אותו לטיוטה — תצטרך להגיש שוב, והמנהל יצטרך לאשר מחדש.",
+                  confirmLabel: "פתח לעריכה",
+                });
+                if (!ok) return;
+                reopenForm(activeFormId);
+                showToast("הטופס נפתח לעריכה");
+              }}
+              className="btn-duo-flat mt-3"
+              style={{ background: "var(--color-primary)", color: "white" }}
+            >
+              פתח לעריכה
+            </button>
+          )}
         </div>
       )}
 

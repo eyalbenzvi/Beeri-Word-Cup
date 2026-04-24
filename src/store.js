@@ -1192,9 +1192,9 @@ export function reopenForm(formId) {
   if (getSettings().predictionsLocked) return;
   const form = getForm(formId);
   if (!form) return;
-  // Firestore rules only allow the owner to transition pending -> draft.
-  // A 'submitted' form can only be reopened by an admin (adminReopenForm).
-  if (form.status !== "pending") return;
+  // Users may reopen their own pending or submitted forms back to draft as
+  // long as the tournament isn't locked. Firestore rules enforce the same.
+  if (form.status !== "pending" && form.status !== "submitted") return;
   const updated = {
     ...form,
     status: "draft",

@@ -37,6 +37,26 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     [showToast],
   );
 
+  const handleReopenForm = useCallback(
+    async (form) => {
+      // Submitted forms were admin-approved, so reopening them removes the
+      // form from the leaderboard until re-submission + re-approval.
+      // Pending forms aren't counted yet, so no confirmation is needed.
+      if (normalizeStatus(form.status) === "submitted") {
+        const ok = await confirm({
+          title: "פתיחת טופס שהוגש",
+          message:
+            "הטופס כבר אושר ונכלל בדירוג. פתיחה מחדש תחזיר אותו לטיוטה — תצטרך להגיש שוב, והמנהל יצטרך לאשר מחדש.",
+          confirmLabel: "פתח לעריכה",
+        });
+        if (!ok) return;
+      }
+      reopenForm(form.formId);
+      showToast("הטופס נפתח לעריכה");
+    },
+    [confirm, showToast],
+  );
+
   return (
     <div>
       <div className="sticky top-16 z-10 bg-bg pb-3 pt-1">
@@ -109,7 +129,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                         ? "bg-accent text-white"
                         : "bg-bg-soft text-ink-muted"
                   }`}
-                  title={formStatus === "submitted" ? "הטופס הוגש ולא ניתן לעריכה" : form.status === "pending" ? "הטופס ממתין לאישור מנהל" : "הטופס עדיין בעריכה ולא הוגש"}
+                  title={formStatus === "submitted" ? "הטופס הוגש ואושר" : form.status === "pending" ? "הטופס ממתין לאישור מנהל" : "הטופס עדיין בעריכה ולא הוגש"}
                 >
                   {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין" : "טיוטה"}
                 </span>
@@ -118,8 +138,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
-                {form.status === "pending" && !settings.predictionsLocked && (
-                  <button onClick={() => reopenForm(form.formId)} className="btn-duo btn-duo-orange btn-duo-sm">
+                {(form.status === "pending" || formStatus === "submitted") && !settings.predictionsLocked && (
+                  <button onClick={() => handleReopenForm(form)} className="btn-duo btn-duo-orange btn-duo-sm">
                     פתח לעריכה
                   </button>
                 )}
