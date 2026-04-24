@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 // Poll the public-settings Netlify function so the welcome screen can
 // react to lock-state and match-result changes while a logged-out visitor
@@ -17,22 +17,21 @@ const DEFAULT_STATE = {
 
 export function usePublicSettings() {
   const [state, setState] = useState(DEFAULT_STATE);
-  // Cache the last raw response so identical poll payloads skip setState
-  // and keep downstream memo deps (matchResults identity) stable.
-  const lastBodyRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchOnce() {
       try {
-        const res = await fetch(ENDPOINT, { credentials: "omit" });
+        // Bust any intermediate caches so the client always gets fresh
+        // match results right after the admin updates them.
+        const res = await fetch(`${ENDPOINT}?t=${Date.now()}`, {
+          credentials: "omit",
+          cache: "no-store",
+        });
         if (!res.ok) return;
-        const text = await res.text();
+        const data = await res.json();
         if (cancelled) return;
-        if (text === lastBodyRef.current) return;
-        lastBodyRef.current = text;
-        const data = JSON.parse(text);
         setState({
           predictionsLocked: !!data?.predictionsLocked,
           matchResults:
