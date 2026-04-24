@@ -46,6 +46,13 @@ export function initSentry() {
       tracesSampleRate: 0.1,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 1.0,
+      // Stale chunk after deploy is auto-recovered by lazyWithRetry — drop the
+      // noise so real errors stay visible.
+      ignoreErrors: [
+        /Failed to fetch dynamically imported module/i,
+        /Importing a module script failed/i,
+        /Loading chunk \d+ failed/i,
+      ],
     });
     Sentry.setTag("tabId", getTabId());
     initialized = true;
