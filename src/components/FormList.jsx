@@ -6,6 +6,7 @@ import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
+import { LOCK_MESSAGES } from "../constants/messages";
 
 const totalMatches = groupMatches.length + knockoutMatches.length;
 
@@ -62,11 +63,14 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       <div className="sticky top-16 z-10 bg-bg pb-3 pt-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-extrabold text-ink tracking-tight">הטפסים שלך</h1>
-          {!locked && (
-            <button onClick={() => setShowNewForm(true)} className="btn-duo btn-duo-primary btn-duo-sm">
-              + טופס חדש
-            </button>
-          )}
+          <button
+            onClick={() => setShowNewForm(true)}
+            className="btn-duo btn-duo-primary btn-duo-sm"
+            disabled={locked}
+            title={locked ? LOCK_MESSAGES.tournamentStarted : "צור טופס חדש"}
+          >
+            + טופס חדש
+          </button>
         </div>
       </div>
 
@@ -82,7 +86,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         <div className="text-center py-12 card-duo-lg">
           <div className="text-6xl mb-3">🔒</div>
           <p className="font-extrabold text-ink text-lg mb-1">ההגשה נסגרה</p>
-          <p className="text-ink-muted text-sm">לא ניתן ליצור טפסים חדשים לאחר תחילת המשחקים</p>
+          <p className="text-ink-muted text-sm">{LOCK_MESSAGES.formsUnavailable}</p>
         </div>
       )}
 

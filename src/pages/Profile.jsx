@@ -7,6 +7,7 @@ import { updateUserProfile } from "../store";
 import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { useToast } from "../components/Toast";
+import EmptyState from "../components/EmptyState";
 
 export default function Profile() {
   const { user, logout } = useCurrentUser();
@@ -82,7 +83,7 @@ export default function Profile() {
 
       <div className="card-duo-lg text-center mb-4">
         <div className="flex justify-center mb-3">
-          <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-4xl font-extrabold border-4 border-primary-dark">
+          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary text-white flex items-center justify-center text-3xl md:text-4xl font-extrabold border-4 border-primary-dark">
             {initials}
           </div>
         </div>
@@ -154,6 +155,17 @@ export default function Profile() {
       </div>
 
       {/* Forms */}
+      {forms.length === 0 && (
+        <div className="card-duo mb-4">
+          <h3 className="font-extrabold text-base text-ink mb-3">📋 הטפסים שלי</h3>
+          <EmptyState
+            icon="📋"
+            title="עדיין אין טפסים"
+            description="צור טופס ניחושים כדי להתחיל"
+          />
+        </div>
+      )}
+
       {forms.length > 0 && (
         <div className="card-duo mb-4">
           <h3 className="font-extrabold text-base text-ink mb-3">📋 הטפסים שלי</h3>

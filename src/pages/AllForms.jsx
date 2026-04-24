@@ -17,6 +17,7 @@ import {
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { LOCK_MESSAGES } from "../constants/messages";
 
 const groupMatches = generateGroupMatches();
 const knockoutMatches = generateKnockoutMatches();
@@ -96,7 +97,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
             </>
           ) : (
             <div className="text-xs text-ink-muted font-medium mt-0.5">
-              🔒 הניחושים יוצגו לאחר נעילת הטורניר
+              🔒 {LOCK_MESSAGES.predictionsHiddenBeforeLock}
             </div>
           )}
         </div>

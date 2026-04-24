@@ -4,10 +4,11 @@ import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import { useRightRail } from "../hooks/useRail";
 import { createForm } from "../store";
-import CountdownUnit from "../components/CountdownUnit";
+import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
 import { useToast } from "../components/Toast";
+import { LOCK_MESSAGES } from "../constants/messages";
 
 export default function Home() {
   const settings = useSettings();
@@ -59,24 +60,12 @@ export default function Home() {
               המונדיאל רץ
             </div>
           ) : (
-            <>
-              <p className="text-base md:text-lg font-extrabold text-ink mb-3">
-                עוד עד שריקת הפתיחה
-              </p>
-              <div className="flex justify-center gap-2 md:gap-3" dir="ltr">
-                <CountdownUnit
-                  value={countdown.days}
-                  label="ימים"
-                  accent="bg-secondary"
-                />
-                <CountdownUnit value={countdown.hours} label="שעות" />
-                <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
-                <CountdownUnit value={countdown.seconds} label="שניות" />
-              </div>
-              <p className="text-[11px] text-ink-muted mt-3 font-medium">
-                11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה
-              </p>
-            </>
+            <TournamentCountdown
+              countdown={countdown}
+              variant="compact"
+              headerText="עוד עד שריקת הפתיחה"
+              footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה</>}
+            />
           )}
         </div>
       )}
@@ -94,14 +83,14 @@ export default function Home() {
             aria-hidden="true"
           />
           <span className="sr-only">
-            {settings.predictionsLocked ? "סטטוס: המשחקים התחילו — ההגשה נסגרה" : "סטטוס: ניתן להגיש ולערוך טפסים"}
+            {settings.predictionsLocked ? `סטטוס: ${LOCK_MESSAGES.tournamentStarted}` : "סטטוס: ניתן להגיש ולערוך טפסים"}
           </span>
           <span
             className="text-sm font-extrabold"
             style={{ color: settings.predictionsLocked ? "var(--color-accent-text)" : "var(--color-primary-dark)" }}
           >
             {settings.predictionsLocked
-              ? "המשחקים התחילו — ההגשה נסגרה"
+              ? LOCK_MESSAGES.tournamentStarted
               : "ניתן להגיש ולערוך טפסים"}
           </span>
         </div>

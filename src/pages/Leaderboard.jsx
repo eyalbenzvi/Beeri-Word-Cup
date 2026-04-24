@@ -300,7 +300,7 @@ export default function Leaderboard({
                 { e: rankedLeaderboard[2], medal: "🥉", cls: "podium-bronze", rank: 3 },
               ].map(({ e, medal, cls, rank }) => (
                 <div key={e.formId} className="flex items-center gap-2 min-w-0 rounded-xl p-2 border border-border bg-white">
-                  <div className={`w-9 h-9 rounded-full ${cls} text-white flex items-center justify-center text-base font-extrabold flex-shrink-0 ${rank === 1 ? "animate-pop-in" : ""}`}>
+                  <div className={`w-11 h-11 rounded-full ${cls} text-white flex items-center justify-center text-lg font-extrabold flex-shrink-0 ${rank === 1 ? "animate-pop-in" : ""}`}>
                     {medal}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -347,12 +347,15 @@ export default function Leaderboard({
                   onClick={() => {
                     if (canView) setSelectedForm(entry.formId);
                   }}
+                  aria-disabled={!canView}
+                  tabIndex={canView ? 0 : -1}
+                  title={canView ? undefined : "הניחושים יוצגו לאחר נעילת הטורניר"}
                   className={`w-full bg-white rounded-2xl p-4 border-2 flex items-center gap-3 text-right ${borderColor} ${
-                    entry.userId === user?.id ? "ring-2 ring-primary/40" : ""
+                    entry.userId === user?.id ? "ring-2 ring-primary" : ""
                   } ${
                     canView
                       ? "cursor-pointer card-duo-hover"
-                      : "cursor-default opacity-50"
+                      : "cursor-not-allowed opacity-60"
                   }`}
                 >
                   <span
@@ -385,11 +388,6 @@ export default function Leaderboard({
                     >
                       <span className="ml-1">📋</span>
                       {entry.formName}
-                      {entry.userId === user?.id && (
-                        <span className="text-xs text-primary mr-1 font-extrabold">
-                          (שלי)
-                        </span>
-                      )}
                     </div>
                     {(() => {
                       const u = users[entry.userId];

@@ -211,7 +211,8 @@ function MatchCard({
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>+</button>
+                    aria-label={`הוסף גול ל${homeTeam?.name || match.homeTeam || 'קבוצה ביתית'}`}
+                    className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
                     type="number"
@@ -227,7 +228,8 @@ function MatchCard({
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predHome) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
-                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>−</button>
+                    aria-label={`הורד גול מ${homeTeam?.name || match.homeTeam || 'קבוצה ביתית'}`}
+                    className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>−</button>
                 </div>
                 <span className="relative text-ink-muted font-black text-xs bg-bg-soft px-1.5 py-0.5 rounded-xl">
                   {justSaved ? (
@@ -238,7 +240,8 @@ function MatchCard({
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>+</button>
+                    aria-label={`הוסף גול ל${awayTeam?.name || match.awayTeam || 'קבוצה אורחת'}`}
+                    className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
                     type="number"
@@ -255,7 +258,8 @@ function MatchCard({
                     placeholder="–"
                   />
                   <button type="button" onClick={() => { const v = Math.max(0, (parseInt(predAway) || 0) - 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
-                    className="w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none" disabled={!editable}>−</button>
+                    aria-label={`הורד גול מ${awayTeam?.name || match.awayTeam || 'קבוצה אורחת'}`}
+                    className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>−</button>
                 </div>
               </div>
               {homeTeam && awayTeam && (

@@ -49,6 +49,7 @@ import AIFillOverlay from "../components/AIFillOverlay";
 import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
+import { AUTH_COPY } from "../constants/messages";
 
 import { KNOCKOUT_STAGE_ORDER as knockoutStageOrder, getStageLabel, STAGE_LABELS } from "../utils/constants";
 const EMPTY_MATCHES = {};
@@ -414,13 +415,13 @@ export default function Predict() {
       <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
         <div className="text-6xl mb-4">🔒</div>
         <h2 className="text-xl font-extrabold text-ink mb-2">
-          הצטרף למשחק קודם
+          {AUTH_COPY.loginRequiredTitle}
         </h2>
         <p className="text-ink-muted text-sm mb-6 font-medium">
-          צריך לבחור שם כדי למלא ניחושים
+          {AUTH_COPY.loginRequiredSubtitle}
         </p>
         <button onClick={() => navigate("login")} className="btn-duo btn-duo-primary w-full">
-          התחבר למשחק
+          {AUTH_COPY.loginCta}
         </button>
       </div>
     );
@@ -634,7 +635,7 @@ export default function Predict() {
                 <div
                   key={match.id}
                   id={`match-${match.id}`}
-                  className="scroll-mt-[220px] rounded-2xl"
+                  className="scroll-mt-[180px] md:scroll-mt-[200px] xl:scroll-mt-[140px] rounded-2xl"
                 >
                   <MatchCard
                     match={match}
