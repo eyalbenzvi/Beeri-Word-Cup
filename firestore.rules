@@ -112,6 +112,63 @@ service cloud.firestore {
       );
     }
 
+    // summaries collection — one document per blog post
+    // Read: published summaries are public (shareable via link, no auth
+    //       required for the doc); listing requires status filter on client.
+    // Write: admin only, with shape validation.
+    function summaryAllowedFields() {
+      return [
+        'number', 'title', 'subtitle', 'intro', 'conclusion',
+        'coveredMatchIds', 'matchNotes', 'status',
+        'authorUid', 'createdAt', 'updatedAt', 'publishedAt'
+      ];
+    }
+    function validSummaryStatus(s) {
+      return s == 'draft' || s == 'published';
+    }
+    // Full shape + size validation. Enforces string types on every free-text
+    // field so a malformed/abusive admin write can't bloat documents beyond
+    // Firestore's 1 MB limit or expose large-payload DoS to readers.
+    //
+    // matchNotes value-size check: Firestore rules have no `forEach` over
+    // map values, so we assert the serialized-map size instead. 40 notes
+    // ×  ~5 KB each = ~200 KB ceiling, well under Firestore's 1 MB doc cap.
+    // Individual note length is additionally capped client-side
+    // (SUMMARY_LIMITS.matchNoteText in store.js).
+    function validSummaryShape(d) {
+      return d.keys().hasOnly(summaryAllowedFields())
+        && d.title is string && d.title.size() <= 300
+        && (!('subtitle' in d) || (d.subtitle is string && d.subtitle.size() <= 500))
+        && (!('intro' in d) || (d.intro is string && d.intro.size() <= 20000))
+        && (!('conclusion' in d) || (d.conclusion is string && d.conclusion.size() <= 20000))
+        && d.status is string && validSummaryStatus(d.status)
+        && d.number is number
+        && d.coveredMatchIds is list && d.coveredMatchIds.size() <= 40
+        && d.matchNotes is map && d.matchNotes.size() <= 40
+        && (!('authorUid' in d) || d.authorUid is string)
+        && (!('createdAt' in d) || d.createdAt is string)
+        && (!('updatedAt' in d) || d.updatedAt is string)
+        && (!('publishedAt' in d) || d.publishedAt is string);
+    }
+    // Once publishedAt is set on a summary, it's frozen. A malicious direct
+    // write can't backdate or forward-date the publication timestamp.
+    function publishedAtStable(reqData, resData) {
+      return !('publishedAt' in resData.keys())
+        || ('publishedAt' in reqData.keys() && reqData.publishedAt == resData.publishedAt);
+    }
+    match /summaries/{summaryId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin() && validSummaryShape(request.resource.data);
+      // `number`, `authorUid`, `createdAt` are immutable post-creation.
+      // `publishedAt`, once present, cannot be rewritten.
+      allow update: if isAdmin() && validSummaryShape(request.resource.data)
+        && request.resource.data.number == resource.data.number
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && publishedAtStable(request.resource.data, resource.data);
+      allow delete: if isAdmin();
+    }
+
     // Audit log — append-only for authenticated users, read for admins
     // Validates: userId must match auth, action and timestamp required
     match /auditLog/{logId} {

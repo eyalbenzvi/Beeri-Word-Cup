@@ -13,6 +13,7 @@ import { RailProvider, useRailContent } from "./hooks/useRail";
 import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
+import { initPublicReadonlyMode } from "./store";
 
 // Lazy-load pages that aren't needed on initial render
 const Predict = lazyWithRetry(() => import("./pages/Predict"));
@@ -21,6 +22,7 @@ const Results = lazyWithRetry(() => import("./pages/Results"));
 const Stats = lazyWithRetry(() => import("./pages/Stats"));
 const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
+const DailySummary = lazyWithRetry(() => import("./pages/DailySummary"));
 
 const PAGES = {
   home: Home,
@@ -30,6 +32,7 @@ const PAGES = {
   stats: Stats,
   admin: Admin,
   profile: Profile,
+  blog: DailySummary,
 };
 
 // After STUCK_THRESHOLD_MS, the spinner surfaces recovery options. Without
@@ -108,11 +111,32 @@ function AppContent() {
   const { user, authReady, isLoggedIn } = useCurrentUser();
   const [profileDone, setProfileDone] = useState(false);
 
+  // Kick off the public-readonly listener whenever a logged-out visitor is
+  // on the blog page (shared WhatsApp link). It's a no-op on subsequent
+  // renders and gets torn down once the user actually signs in.
+  useEffect(() => {
+    if (authReady && !isLoggedIn && page === "blog") {
+      initPublicReadonlyMode();
+    }
+  }, [authReady, isLoggedIn, page]);
+
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading reason="auth-init" />;
 
-  // Not logged in at all — show welcome/login screen
-  if (!isLoggedIn) return <WelcomeScreen />;
+  // Not logged in at all — WelcomeScreen for everything except the blog page,
+  // which is intentionally shareable-by-link and readable without an account.
+  // A logged-out reader sees a reduced-privacy view (no exact-hit form
+  // names); DailySummary and the summaries rules already handle that.
+  if (!isLoggedIn) {
+    if (page === "blog") {
+      return (
+        <RailProvider>
+          <AppShell page={page} Page={DailySummary} />
+        </RailProvider>
+      );
+    }
+    return <WelcomeScreen />;
+  }
 
   // Logged in but Firestore data or user record still loading
   // (store.js retries indefinitely with backoff + online/visibility listeners)

@@ -1,6 +1,6 @@
 // Persistent right sidebar navigation for xl: and up.
 // Replaces the hamburger + top-tabs combo on desktop widths.
-import { Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Info } from "lucide-react";
+import { Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Info, Newspaper } from "lucide-react";
 
 const ICON_MAP = {
   home: HomeIcon,
@@ -9,6 +9,7 @@ const ICON_MAP = {
   results: Goal,
   stats: BarChart3,
   admin: Settings,
+  blog: Newspaper,
 };
 
 export default function DesktopSideNav({ items, currentPage, onNavigate, user }) {

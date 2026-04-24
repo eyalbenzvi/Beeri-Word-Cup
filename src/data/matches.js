@@ -485,6 +485,11 @@ export const knockoutMatches = generateKnockoutMatches();
 export const ALL_MATCHES = [...groupMatches, ...knockoutMatches];
 export const TOTAL_MATCH_COUNT = ALL_MATCHES.length;
 
+const MATCH_BY_ID = Object.fromEntries(ALL_MATCHES.map((m) => [m.id, m]));
+export function getMatchById(matchId) {
+  return MATCH_BY_ID[matchId] || null;
+}
+
 export const STAGES = {
   group: "שלב הבתים",
   R32: "שלב ה-32",

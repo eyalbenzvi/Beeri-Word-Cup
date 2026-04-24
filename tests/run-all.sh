@@ -100,6 +100,11 @@ run_test "62. Layout Fixes (Home+Welcome+UpcomingMatches)" "test-layout-fixes.mj
 run_test "63. Scoring Differential (independent calc, 5000 random + edge cases)" "test-scoring-differential.mjs" "yes"
 run_test "64. Scoring Verification HTML (regenerate + check 16 visible scenarios)" "generate-scoring-verification.mjs" "yes"
 run_test "65. Form Name Default (auto-populate from nickname + dedup)" "test-form-name-default.mjs" "yes"
+run_test "66. Summary Stats (per-match prediction breakdown)" "test-summary-stats.mjs" "yes"
+run_test "67. Summary Store + Firestore Rules (blog)" "test-summary-store.mjs" "no"
+run_test "68. Navigation URL Params (page, n)" "test-navigation-url-params.mjs" "no"
+run_test "69. Summary Public Mode + AI Hardening" "test-summary-public-and-ai.mjs" "no"
+run_test "70. Summary Review Fixes (deep review regressions)" "test-summary-review-fixes.mjs" "no"
 
 echo ""
 echo "==========================================="
