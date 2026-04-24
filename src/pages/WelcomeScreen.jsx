@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import { usePublicSettings } from "../hooks/usePublicSettings";
-import CountdownUnit from "../components/CountdownUnit";
+import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
@@ -20,22 +20,12 @@ export default function WelcomeScreen() {
     <UpcomingMatches />
   ) : (
     <div className="card-duo-lg">
-      <p className="text-lg md:text-xl font-extrabold text-ink mb-4">
-        עוד עד שריקת הפתיחה
-      </p>
-      <div className="flex justify-center gap-2.5 md:gap-4" dir="ltr">
-        <CountdownUnit
-          value={countdown.days}
-          label="ימים"
-          accent="bg-secondary"
-        />
-        <CountdownUnit value={countdown.hours} label="שעות" />
-        <CountdownUnit value={countdown.minutes} label="דקות" accent="bg-accent" />
-        <CountdownUnit value={countdown.seconds} label="שניות" />
-      </div>
-      <p className="text-xs text-ink-muted mt-4 font-medium">
-        12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה
-      </p>
+      <TournamentCountdown
+        countdown={countdown}
+        variant="large"
+        headerText="עוד עד שריקת הפתיחה"
+        footerText={<>12 ביוני 2026 · <bdi>00:00</bdi> שעון ישראל · ארה״ב • מקסיקו • קנדה</>}
+      />
     </div>
   );
 
@@ -121,7 +111,7 @@ export default function WelcomeScreen() {
               <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1">
                 טורניר הניחושים של בארי
               </h1>
-              <p className="text-ink-muted text-sm font-bold">מונדיאל 2026</p>
+              <p className="text-ink-muted text-sm font-bold">מונדיאל 2026 · ארה״ב • מקסיקו • קנדה</p>
             </div>
             {/* Desktop-only auth heading */}
             <div className="hidden lg:block text-right">
