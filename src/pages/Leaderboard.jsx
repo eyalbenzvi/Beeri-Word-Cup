@@ -445,7 +445,7 @@ export default function Leaderboard({
             })}
 
             {showCount < leaderboard.length && (
-              <button onClick={() => setShowCount(s => s + 20)} className="btn-duo btn-duo-ghost w-full mt-2">
+              <button onClick={() => setShowCount(s => s + 20)} className="btn-duo btn-duo-ghost w-full md:w-auto md:min-w-[320px] md:mx-auto md:block mt-2">
                 הצג {Math.min(20, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
               </button>
             )}

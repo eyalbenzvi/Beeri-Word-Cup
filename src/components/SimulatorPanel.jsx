@@ -185,7 +185,7 @@ export default function SimulatorPanel({
           type="button"
           onClick={clearSim}
           disabled={overrideCount === 0}
-          className="btn-duo-flat flex-1"
+          className="btn-duo-flat flex-1 md:flex-initial md:min-w-[260px]"
         >
           איפוס סימולציה{overrideCount > 0 ? ` (${overrideCount})` : ""}
         </button>

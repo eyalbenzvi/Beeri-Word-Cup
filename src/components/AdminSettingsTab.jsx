@@ -156,7 +156,7 @@ export default function AdminSettingsTab({
             downloadBackup("before-clear-results");
             clearMatchResults();
           }}
-          className="btn-duo btn-duo-orange w-full mb-3"
+          className="btn-duo btn-duo-orange w-full md:w-auto md:min-w-[240px] mb-3"
         >
           מחק את כל תוצאות האמת
         </button>
@@ -184,7 +184,7 @@ export default function AdminSettingsTab({
             clearAllData();
             navigate("home");
           }}
-          className="btn-duo btn-duo-danger w-full"
+          className="btn-duo btn-duo-danger w-full md:w-auto md:min-w-[240px]"
         >
           מחק את כל הנתונים
         </button>

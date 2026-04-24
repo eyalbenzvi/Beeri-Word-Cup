@@ -151,7 +151,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
       </button>
 
       {showNewForm && !locked && (
-        <div className="card-duo-lg mt-3" style={{ borderColor: "var(--color-primary)" }}>
+        <div className="card-duo-lg mt-3 md:max-w-md md:mx-auto" style={{ borderColor: "var(--color-primary)" }}>
           <h3 className="font-extrabold text-base text-ink mb-3">טופס חדש</h3>
           <input
             type="text"

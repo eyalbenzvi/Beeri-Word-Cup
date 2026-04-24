@@ -122,7 +122,7 @@ export default function AdminBackupRestore() {
           type="button"
           onClick={handleBackup}
           disabled={isRestoring}
-          className="btn-duo btn-duo-primary w-full"
+          className="btn-duo btn-duo-primary w-full md:w-auto md:min-w-[200px]"
         >
           הורד גיבוי
         </button>
@@ -149,7 +149,7 @@ export default function AdminBackupRestore() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isRestoring}
-          className="btn-duo btn-duo-danger w-full"
+          className="btn-duo btn-duo-danger w-full md:w-auto md:min-w-[240px]"
         >
           {isRestoring ? "משחזר..." : "בחר קובץ ושחזר"}
         </button>

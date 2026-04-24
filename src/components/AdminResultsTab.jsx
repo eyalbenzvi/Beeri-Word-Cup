@@ -215,7 +215,7 @@ export default function AdminResultsTab() {
         <button
           type="button"
           onClick={handleRandomizeResults}
-          className="flex-1 bg-white text-primary font-bold py-2.5 rounded-xl border-2 border-primary shadow-sm hover:bg-bg-soft active:bg-bg-soft transition text-sm"
+          className="flex-1 md:flex-initial md:min-w-[240px] bg-white text-primary font-bold py-2.5 px-4 rounded-xl border-2 border-primary shadow-sm hover:bg-bg-soft active:bg-bg-soft transition text-sm"
         >
           🎲 הגרלת כל התוצאות
         </button>
