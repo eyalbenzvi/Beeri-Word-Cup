@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import { usePublicSettings } from "../hooks/usePublicSettings";
+import { useMatchResults } from "../hooks/useStore";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
+import MatchdayHero from "../components/MatchdayHero";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import MenuOverlay from "../components/MenuOverlay";
@@ -12,15 +14,23 @@ import { BRAND } from "../constants/messages";
 export default function WelcomeScreen() {
   const countdown = useCountdown();
   const publicSettings = usePublicSettings();
+  const results = useMatchResults();
   const [menuOpen, setMenuOpen] = useState(false);
   const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
   // Show upcoming matches when predictions are admin-locked OR kickoff has passed.
   const tournamentStarted = !!publicSettings?.predictionsLocked || countdown.started;
 
+  // Parity with Home: when the tournament is running, show the same
+  // MatchdayHero (featured today's match) above the upcoming-matches list
+  // so logged-in and logged-out users see the same current match.
+  // MatchdayHero carries its own mb-4 — no wrapper spacing needed.
   const countdownPanel = tournamentStarted ? (
-    <UpcomingMatches />
+    <>
+      <MatchdayHero results={results} />
+      <UpcomingMatches />
+    </>
   ) : (
-    <div className="card-duo-lg">
+    <div className="card-duo">
       <TournamentCountdown
         countdown={countdown}
         variant="large"
@@ -89,11 +99,11 @@ export default function WelcomeScreen() {
       </header>
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <div className="flex-1 px-4 md:px-6 py-4 md:py-8 min-h-0 flex flex-col items-center justify-start gap-4">
-        <div className="w-full max-w-md space-y-4">
+      <div className="flex-1 px-4 md:px-6 py-3 md:py-6 min-h-0 flex flex-col items-center justify-start gap-3">
+        <div className="w-full max-w-md space-y-3">
           {/* Branding */}
           <div className="text-center">
-            <div className="text-5xl md:text-6xl mb-2 animate-pop-in" aria-hidden="true">⚽🏆</div>
+            <div className="text-4xl md:text-5xl mb-1 animate-pop-in" aria-hidden="true">⚽🏆</div>
             <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
               {BRAND.tournamentTitle}
             </h1>
@@ -101,12 +111,12 @@ export default function WelcomeScreen() {
           </div>
 
           {/* Auth card */}
-          <div className="text-center space-y-4 bg-white border-2 border-border rounded-3xl p-5 md:p-6 shadow-sm">
+          <div className="text-center space-y-3 bg-white border-2 border-border rounded-3xl p-4 md:p-5 shadow-sm">
             {authPanel}
           </div>
         </div>
 
-        {/* Countdown card widens on xl — 4 timer units reach 432px at xl:w-24, too wide for max-w-md. */}
+        {/* Countdown/upcoming-matches panel widens on xl — 4 timer units reach 432px at xl:w-24, too wide for max-w-md. */}
         <div className="w-full max-w-md xl:max-w-xl">
           {countdownPanel}
         </div>
