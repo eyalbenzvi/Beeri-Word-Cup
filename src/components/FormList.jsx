@@ -98,10 +98,10 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
           return (
             <div
               key={form.formId}
-              className={`bg-white rounded-2xl p-4 border-2 card-duo-hover ${
+              className={`bg-white rounded-2xl p-4 border-2 transition-colors duration-150 focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 ${
                 formStatus === "submitted"
-                  ? "border-primary/50"
-                  : "border-border"
+                  ? "border-primary/50 hover:border-primary"
+                  : "border-border hover:border-border-strong"
               }`}
             >
               <div className="flex items-center gap-3">
