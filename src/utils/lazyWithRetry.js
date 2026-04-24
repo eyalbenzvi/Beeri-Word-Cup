@@ -1,0 +1,30 @@
+import { lazy } from "react";
+
+// React.lazy fails when a dynamic import 404s — happens to users who left the
+// tab open across a deploy, since the old chunk hashes no longer exist on the
+// CDN. One forced reload fetches a fresh index.html with the new chunk names.
+// The sessionStorage flag prevents an infinite reload loop if the failure is
+// real (network down, chunk genuinely broken), letting ErrorBoundary handle it.
+const RELOAD_FLAG = "wc_chunkReloaded";
+const CHUNK_ERROR_RE =
+  /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk \d+ failed/i;
+
+export function lazyWithRetry(factory) {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* ignore */ }
+      return mod;
+    } catch (err) {
+      const isChunkError = CHUNK_ERROR_RE.test(err?.message || "");
+      let alreadyReloaded = false;
+      try { alreadyReloaded = sessionStorage.getItem(RELOAD_FLAG) === "1"; } catch { /* ignore */ }
+      if (isChunkError && !alreadyReloaded) {
+        try { sessionStorage.setItem(RELOAD_FLAG, "1"); } catch { /* ignore */ }
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw err;
+    }
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
@@ -35,7 +35,8 @@ import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
-const AllFormsView = React.lazy(() => import("./AllForms"));
+import { lazyWithRetry } from "../utils/lazyWithRetry";
+const AllFormsView = lazyWithRetry(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/ConfirmModal";
 import SaveIndicator from "../components/SaveIndicator";

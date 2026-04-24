@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmModal";
@@ -11,14 +11,15 @@ import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
 import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
+import { lazyWithRetry } from "./utils/lazyWithRetry";
 
 // Lazy-load pages that aren't needed on initial render
-const Predict = lazy(() => import("./pages/Predict"));
-const Leaderboard = lazy(() => import("./pages/Leaderboard"));
-const Results = lazy(() => import("./pages/Results"));
-const Stats = lazy(() => import("./pages/Stats"));
-const Admin = lazy(() => import("./pages/Admin"));
-const Profile = lazy(() => import("./pages/Profile"));
+const Predict = lazyWithRetry(() => import("./pages/Predict"));
+const Leaderboard = lazyWithRetry(() => import("./pages/Leaderboard"));
+const Results = lazyWithRetry(() => import("./pages/Results"));
+const Stats = lazyWithRetry(() => import("./pages/Stats"));
+const Admin = lazyWithRetry(() => import("./pages/Admin"));
+const Profile = lazyWithRetry(() => import("./pages/Profile"));
 
 const PAGES = {
   home: Home,
