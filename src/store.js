@@ -580,6 +580,9 @@ function maybeUpgradePredictionsListener() {
 export function initRealtimeListeners(userId) {
   // Only restart if first time or if previous attempt had errors
   if (listenersInitialized && !listenersHadError) return;
+  // If the visitor was in public-readonly mode (shared blog link), tear that
+  // down before we graduate to a full authenticated listener set.
+  teardownPublicReadonlyMode();
   listenersInitialized = true;
   listenersHadError = false;
   currentListenerUserId = userId;
@@ -688,6 +691,88 @@ export function initRealtimeListeners(userId) {
 // We re-subscribe whenever the admin flag flips (e.g. after users doc loads
 // or admin-claim changes).
 let summariesShowAll = false;
+// ============ PUBLIC (LOGGED-OUT) MODE ============
+// For visitors who arrive at a shared blog link without an account. We set
+// up a minimal read-only listener that fetches only the data a public reader
+// needs (published summaries) and fills matchResults/settings via the
+// existing public-settings function (which uses the Admin SDK server-side).
+// No users, no predictions. Safe to re-enter after login cleanup.
+let publicModeInitialized = false;
+let publicSummariesUnsub = null;
+let publicSettingsTimer = null;
+
+async function fetchPublicSettingsOnce() {
+  try {
+    const res = await fetch(`/.netlify/functions/get-public-settings?t=${Date.now()}`, {
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    cache.settings = {
+      ...(cache.settings || {}),
+      predictionsLocked: !!data?.predictionsLocked,
+    };
+    if (data?.matchResults && typeof data.matchResults === "object") {
+      cache.matchResults = data.matchResults;
+    }
+    cache._ready.settings = true;
+    cache._ready.matchResults = true;
+    notifyAndEmit("settings");
+    notifyAndEmit("matchResults");
+  } catch {
+    // Network error — leave whatever we had.
+  }
+}
+
+export function initPublicReadonlyMode() {
+  if (publicModeInitialized) return;
+  publicModeInitialized = true;
+
+  // Subscribe to published summaries (Firestore rule permits unauth reads).
+  publicSummariesUnsub = onSnapshot(
+    query(summariesCollectionRef, where("status", "==", "published")),
+    (snapshot) => {
+      const map = {};
+      snapshot.forEach((docSnap) => {
+        map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+      });
+      cache.summaries = map;
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+    },
+    (err) => {
+      console.error("Public summaries listener error:", err);
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+    },
+  );
+
+  // Minimal matchResults + settings via the public endpoint.
+  fetchPublicSettingsOnce();
+  publicSettingsTimer = setInterval(fetchPublicSettingsOnce, 30_000);
+
+  // Mark other keys ready so the UI doesn't block on unused streams.
+  for (const key of ["users", "actualAdvancing", "actualBonuses", "predictions"]) {
+    cache._ready[key] = true;
+  }
+  notifyAndEmit("users");
+  notifyAndEmit("predictions");
+}
+
+function teardownPublicReadonlyMode() {
+  if (!publicModeInitialized) return;
+  publicModeInitialized = false;
+  if (publicSummariesUnsub) {
+    publicSummariesUnsub();
+    publicSummariesUnsub = null;
+  }
+  if (publicSettingsTimer) {
+    clearInterval(publicSettingsTimer);
+    publicSettingsTimer = null;
+  }
+}
+
 function setupSummariesListener() {
   if (summariesUnsub) summariesUnsub();
   const isUserAdmin =
@@ -1685,12 +1770,51 @@ const DEFAULT_SUMMARY = {
   status: "draft",
 };
 
+// Mirror of firestore.rules validSummaryShape sizes. A client-side check
+// fails fast with a user-friendly error before the Firestore rule rejects.
+export const SUMMARY_LIMITS = {
+  title: 300,
+  subtitle: 500,
+  intro: 20000,
+  conclusion: 20000,
+  coveredMatchIds: 40,
+  matchNotes: 40,
+  matchNoteText: 5000,
+};
+
+function validateSummaryPayload(p) {
+  if (typeof p.title === "string" && p.title.length > SUMMARY_LIMITS.title)
+    return `הכותרת ארוכה מדי (מקסימום ${SUMMARY_LIMITS.title} תווים)`;
+  if (typeof p.subtitle === "string" && p.subtitle.length > SUMMARY_LIMITS.subtitle)
+    return `תת-הכותרת ארוכה מדי (מקסימום ${SUMMARY_LIMITS.subtitle} תווים)`;
+  if (typeof p.intro === "string" && p.intro.length > SUMMARY_LIMITS.intro)
+    return `ההקדמה ארוכה מדי (מקסימום ${SUMMARY_LIMITS.intro} תווים)`;
+  if (typeof p.conclusion === "string" && p.conclusion.length > SUMMARY_LIMITS.conclusion)
+    return `הסיכום ארוך מדי (מקסימום ${SUMMARY_LIMITS.conclusion} תווים)`;
+  if (Array.isArray(p.coveredMatchIds) && p.coveredMatchIds.length > SUMMARY_LIMITS.coveredMatchIds)
+    return `יותר מדי משחקים (מקסימום ${SUMMARY_LIMITS.coveredMatchIds})`;
+  if (p.matchNotes && Object.keys(p.matchNotes).length > SUMMARY_LIMITS.matchNotes)
+    return `יותר מדי הערות למשחקים (מקסימום ${SUMMARY_LIMITS.matchNotes})`;
+  if (p.matchNotes) {
+    for (const [mid, note] of Object.entries(p.matchNotes)) {
+      if (typeof note === "string" && note.length > SUMMARY_LIMITS.matchNoteText)
+        return `הערה למשחק ${mid} ארוכה מדי (מקסימום ${SUMMARY_LIMITS.matchNoteText} תווים)`;
+    }
+  }
+  return null;
+}
+
 /**
  * Create a new summary (draft). Returns the new document id.
  * Auto-assigns the next sequential `number`.
  */
 export async function createSummary(fields = {}) {
   if (!requireAdmin()) return null;
+  const sizeErr = validateSummaryPayload(fields);
+  if (sizeErr) {
+    console.warn("createSummary size validation:", sizeErr);
+    throw new Error(sizeErr);
+  }
   const now = new Date().toISOString();
   const payload = {
     ...DEFAULT_SUMMARY,
@@ -1723,8 +1847,14 @@ export async function updateSummary(summaryId, fields = {}) {
   const existing = getSummary(summaryId);
   if (!existing) return false;
   const now = new Date().toISOString();
-  // `id` and `number` are never mutated after creation.
-  const { id: _dropId, number: _dropNumber, ...safeFields } = fields;
+  // `id`, `number`, `authorUid`, and `createdAt` are never mutated after creation.
+  const {
+    id: _dropId,
+    number: _dropNumber,
+    authorUid: _dropAuthor,
+    createdAt: _dropCreated,
+    ...safeFields
+  } = fields;
   // Sanity: status must stay on the allowed set if provided.
   if (
     safeFields.status != null &&
@@ -1733,6 +1863,11 @@ export async function updateSummary(summaryId, fields = {}) {
   ) {
     console.warn(`Invalid summary status: ${safeFields.status}`);
     return false;
+  }
+  const sizeErr = validateSummaryPayload(safeFields);
+  if (sizeErr) {
+    console.warn("updateSummary size validation:", sizeErr);
+    throw new Error(sizeErr);
   }
   const patch = { ...safeFields, updatedAt: now };
   if (fields.status === "published" && existing.status !== "published") {

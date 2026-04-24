@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
@@ -34,7 +35,14 @@ function OutcomeBar({ pct, label, count, color }) {
           {count} · {safePct}%
         </span>
       </div>
-      <div className="w-full bg-bg-soft rounded-full h-2 overflow-hidden">
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={safePct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="w-full bg-bg-soft rounded-full h-2 overflow-hidden"
+      >
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${safePct}%`, background: color }}
@@ -56,16 +64,24 @@ export default function MatchDigest({
   allPredictions,
   users,
 }) {
+  // Memo MUST be called unconditionally — keep it above the early return.
+  // A missing `match` becomes a null id; computeMatchStats still returns
+  // empty aggregates, which are never rendered because we bail below.
+  const stats = useMemo(
+    () =>
+      computeMatchStats({
+        matchId: match?.id || "",
+        result,
+        allPredictions,
+        users,
+      }),
+    [match?.id, result, allPredictions, users],
+  );
+
   if (!match) return null;
 
   const home = match.homeTeam ? getTeamByCode(match.homeTeam) : null;
   const away = match.awayTeam ? getTeamByCode(match.awayTeam) : null;
-  const stats = computeMatchStats({
-    matchId: match.id,
-    result,
-    allPredictions,
-    users,
-  });
 
   const homeWin = !!result && result.homeScore > result.awayScore;
   const awayWin = !!result && result.awayScore > result.homeScore;
@@ -157,7 +173,7 @@ export default function MatchDigest({
                   color: "var(--color-primary-dark)",
                 }}
               >
-                {stats.outcomeHitCount} קלעו את ההכרעה
+                {stats.outcomeHitCount} הכרעות
               </span>
               <span
                 className="font-extrabold px-2 py-1 rounded-full"
@@ -166,7 +182,7 @@ export default function MatchDigest({
                   color: "var(--color-accent-text)",
                 }}
               >
-                {stats.exactHitCount} קלעו תוצאה מדויקת
+                {stats.exactHitCount} מדויקים
               </span>
             </div>
           )}

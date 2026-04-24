@@ -126,19 +126,32 @@ service cloud.firestore {
     function validSummaryStatus(s) {
       return s == 'draft' || s == 'published';
     }
+    // Full shape + size validation. Enforces string types on every free-text
+    // field so a malformed/abusive admin write can't bloat documents beyond
+    // Firestore's 1 MB limit or expose large-payload DoS to readers.
     function validSummaryShape(d) {
       return d.keys().hasOnly(summaryAllowedFields())
-        && d.title is string
+        && d.title is string && d.title.size() <= 300
+        && (!('subtitle' in d) || (d.subtitle is string && d.subtitle.size() <= 500))
+        && (!('intro' in d) || (d.intro is string && d.intro.size() <= 20000))
+        && (!('conclusion' in d) || (d.conclusion is string && d.conclusion.size() <= 20000))
         && d.status is string && validSummaryStatus(d.status)
         && d.number is number
-        && d.coveredMatchIds is list
-        && d.matchNotes is map;
+        && d.coveredMatchIds is list && d.coveredMatchIds.size() <= 40
+        && d.matchNotes is map && d.matchNotes.size() <= 40
+        && (!('authorUid' in d) || d.authorUid is string)
+        && (!('createdAt' in d) || d.createdAt is string)
+        && (!('updatedAt' in d) || d.updatedAt is string)
+        && (!('publishedAt' in d) || d.publishedAt is string);
     }
     match /summaries/{summaryId} {
       allow read: if resource.data.status == 'published' || isAdmin();
       allow create: if isAdmin() && validSummaryShape(request.resource.data);
+      // `number`, `authorUid`, `createdAt` are immutable post-creation.
       allow update: if isAdmin() && validSummaryShape(request.resource.data)
-        && request.resource.data.number == resource.data.number;
+        && request.resource.data.number == resource.data.number
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isAdmin();
     }
 

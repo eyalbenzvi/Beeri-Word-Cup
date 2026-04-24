@@ -5,3 +5,12 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Pretty URL for shared blog links — forwards to the OG function which
+# injects Open Graph meta tags so WhatsApp / Slack unfurls look like posts,
+# then redirects the human reader to the SPA.
+[[redirects]]
+  from = "/blog/:n"
+  to = "/.netlify/functions/og-summary?n=:n"
+  status = 200
+  force = true

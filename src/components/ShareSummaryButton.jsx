@@ -10,9 +10,16 @@ export default function ShareSummaryButton({ summary, size = "md" }) {
 
   if (!summary) return null;
 
-  const url = `${window.location.origin}/?page=blog&n=${summary.number}`;
+  // Prefer the "pretty" /blog/:n path which Netlify rewrites to the OG
+  // function — gives WhatsApp/Slack a rich preview card. On localhost there's
+  // no Netlify to do the rewrite, so fall back to the SPA query-param form.
+  const isLocalhost = /^(localhost|127\.|0\.0\.0\.0)/.test(window.location.hostname);
+  const url = isLocalhost
+    ? `${window.location.origin}/?page=blog&n=${summary.number}`
+    : `${window.location.origin}/blog/${summary.number}`;
   const title = summary.title || `סיכום #${summary.number}`;
-  const shareText = `${title}\n${url}`;
+  // Let the unfurler show its own card — don't duplicate the title in the body.
+  const shareText = url;
 
   const handleShare = async () => {
     try {

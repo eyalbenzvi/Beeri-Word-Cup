@@ -103,6 +103,7 @@ run_test "65. Form Name Default (auto-populate from nickname + dedup)" "test-for
 run_test "66. Summary Stats (per-match prediction breakdown)" "test-summary-stats.mjs" "yes"
 run_test "67. Summary Store + Firestore Rules (blog)" "test-summary-store.mjs" "no"
 run_test "68. Navigation URL Params (page, n)" "test-navigation-url-params.mjs" "no"
+run_test "69. Summary Public Mode + AI Hardening" "test-summary-public-and-ai.mjs" "no"
 
 echo ""
 echo "==========================================="

@@ -1,4 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { Sparkles } from "lucide-react";
+import * as summaryAI from "../utils/summaryAI";
 import {
   createSummary,
   updateSummary,
@@ -16,6 +18,61 @@ import { useConfirm } from "./ConfirmModal";
 function teamLabel(code) {
   const t = getTeamByCode(code);
   return t ? `${t.flag} ${t.name}` : code || "—";
+}
+
+// Per-match editor row. Isolated so that a keystroke in one row doesn't
+// re-run computeMatchStats across every row — stats memoize on
+// (matchId, result, allPredictions, users).
+function MatchNoteRow({
+  mid,
+  matchResults,
+  allPredictions,
+  users,
+  value,
+  onChange,
+  onAskAI,
+  aiLoading,
+  aiDisabled,
+}) {
+  const m = getMatchById(mid);
+  const r = matchResults[mid];
+  const stats = useMemo(
+    () => computeMatchStats({ matchId: mid, result: r, allPredictions, users }),
+    [mid, r, allPredictions, users],
+  );
+  if (!m) return null;
+  return (
+    <div className="border-2 border-border rounded-2xl p-3 bg-bg-soft/40">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <span className="text-sm font-extrabold text-ink">
+          {teamLabel(m.homeTeam)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(m.awayTeam)}
+        </span>
+        <span className="text-[11px] font-bold text-ink-muted">
+          {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} מדויקים
+        </span>
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className="w-full p-2 border-2 border-border rounded-xl text-sm leading-relaxed"
+        placeholder="מה הייתה הדרמה? מי קלע בול?"
+        maxLength={5000}
+      />
+      <div className="flex justify-end mt-1">
+        <button
+          type="button"
+          onClick={onAskAI}
+          disabled={aiDisabled}
+          className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
+          aria-label="הצע טיוטה עם AI"
+        >
+          <Sparkles size={14} />
+          <span>{aiLoading ? "חושב..." : "הצע טיוטה"}</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function MatchRow({ match, result, selected, isAlreadyCovered, onToggle }) {
@@ -80,9 +137,15 @@ export default function SummaryEditor({ summaryId, onClose }) {
     existing?.matchNotes ? { ...existing.matchNotes } : {},
   );
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(null); // null | 'title' | 'intro' | 'conclusion' | match-id
 
-  // Reset when switching summaries
+  // Reset local drafts only when the user actually switches between summaries,
+  // not whenever the live snapshot for the *same* doc is replaced by the
+  // Firestore listener — otherwise a remote update mid-edit wipes unsaved work.
+  const lastLoadedIdRef = useRef(summaryId);
   useEffect(() => {
+    if (lastLoadedIdRef.current === summaryId) return;
+    lastLoadedIdRef.current = summaryId;
     setTitle(existing?.title || "");
     setSubtitle(existing?.subtitle || "");
     setIntro(existing?.intro || "");
@@ -166,9 +229,8 @@ export default function SummaryEditor({ summaryId, onClose }) {
     setSaving(true);
     try {
       if (isEditing) {
-        // If it was published, moving back to draft is handled via the
-        // "ביטול פרסום" button; saving an already-published summary keeps it
-        // published. Preserve the existing status here.
+        // Preserve the existing status on plain saves. Going to draft is a
+        // separate explicit action via "החזר לטיוטה".
         const ok = await updateSummary(summaryId, {
           ...buildPayload(),
           status: existing.status,
@@ -184,6 +246,8 @@ export default function SummaryEditor({ summaryId, onClose }) {
           return;
         }
       }
+    } catch (e) {
+      showToast(e?.message || "שמירה נכשלה", "error");
     } finally {
       setSaving(false);
     }
@@ -209,9 +273,79 @@ export default function SummaryEditor({ summaryId, onClose }) {
       if (!ok) { showToast("פרסום נכשל", "error"); return; }
       showToast("הסיכום פורסם", "success");
       onClose?.(idForStatus);
+    } catch (e) {
+      showToast(e?.message || "פרסום נכשל", "error");
     } finally {
       setSaving(false);
     }
+  };
+
+  const runAI = async (kind, fn) => {
+    setAiLoading(kind);
+    try {
+      return await fn();
+    } catch (err) {
+      showToast(err?.message || "AI נכשל", "error");
+      return null;
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleSuggestTitle = async () => {
+    if (!intro.trim() && !conclusion.trim()) {
+      showToast("כתוב קודם הקדמה או סיכום", "error");
+      return;
+    }
+    const res = await runAI("title", () =>
+      summaryAI.suggestTitle({
+        intro,
+        conclusion,
+        dayNumber: existing?.number,
+      }),
+    );
+    if (!res) return;
+    if (res.title) setTitle(res.title);
+    if (res.subtitle) setSubtitle(res.subtitle);
+    showToast("הכותרת עודכנה", "success");
+  };
+
+  const handlePolish = async (kind) => {
+    const current = kind === "intro" ? intro : conclusion;
+    if (!current.trim()) {
+      showToast("אין מה לשפר — הטקסט ריק", "error");
+      return;
+    }
+    const res = await runAI(kind, () =>
+      summaryAI.polishText({ text: current, kind }),
+    );
+    if (!res?.text) return;
+    if (kind === "intro") setIntro(res.text);
+    else setConclusion(res.text);
+    showToast("נוסח משופר", "success");
+  };
+
+  const handleMatchCommentary = async (mid) => {
+    const m = getMatchById(mid);
+    if (!m) return;
+    const r = matchResults[mid];
+    const stats = computeMatchStats({
+      matchId: mid,
+      result: r,
+      allPredictions,
+      users,
+    });
+    const res = await runAI(`m:${mid}`, () =>
+      summaryAI.matchCommentary({
+        match: { home: m.homeTeam, away: m.awayTeam, stage: m.stage, group: m.group },
+        result: r,
+        stats,
+        currentNote: matchNotes[mid] || "",
+      }),
+    );
+    if (!res?.text) return;
+    setMatchNotes((prev) => ({ ...prev, [mid]: res.text }));
+    showToast("טיוטה מוכנה", "success");
   };
 
   const handleUnpublish = async () => {
@@ -236,13 +370,26 @@ export default function SummaryEditor({ summaryId, onClose }) {
     <div className="space-y-4">
       {/* Title + subtitle */}
       <div className="card-duo">
-        <label className="block text-xs font-extrabold text-ink-muted mb-1">כותרת</label>
+        <div className="flex items-center justify-between mb-1 gap-2">
+          <label className="block text-xs font-extrabold text-ink-muted">כותרת</label>
+          <button
+            type="button"
+            onClick={handleSuggestTitle}
+            disabled={!!aiLoading}
+            className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
+            aria-label="הצע כותרת עם AI"
+          >
+            <Sparkles size={14} />
+            <span>{aiLoading === "title" ? "חושב..." : "הצע כותרת"}</span>
+          </button>
+        </div>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full p-2 border-2 border-border rounded-xl font-bold"
           placeholder="למשל: יום הפתיחה"
+          maxLength={200}
         />
         <label className="block text-xs font-extrabold text-ink-muted mt-3 mb-1">
           תת-כותרת (אופציונלי)
@@ -253,12 +400,25 @@ export default function SummaryEditor({ summaryId, onClose }) {
           onChange={(e) => setSubtitle(e.target.value)}
           className="w-full p-2 border-2 border-border rounded-xl"
           placeholder="משפט קצר"
+          maxLength={300}
         />
       </div>
 
       {/* Intro */}
       <div className="card-duo">
-        <label className="block text-xs font-extrabold text-ink-muted mb-1">הקדמה</label>
+        <div className="flex items-center justify-between mb-1 gap-2">
+          <label className="block text-xs font-extrabold text-ink-muted">הקדמה</label>
+          <button
+            type="button"
+            onClick={() => handlePolish("intro")}
+            disabled={!!aiLoading || !intro.trim()}
+            className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
+            aria-label="שפר נוסח עם AI"
+          >
+            <Sparkles size={14} />
+            <span>{aiLoading === "intro" ? "משפר..." : "שפר נוסח"}</span>
+          </button>
+        </div>
         <p className="text-xs text-ink-muted mb-2">
           טקסט חופשי שיופיע בפתיחת הסיכום.
         </p>
@@ -268,6 +428,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
           rows={5}
           className="w-full p-2 border-2 border-border rounded-xl text-base leading-relaxed"
           placeholder="במה נתמקד הפעם? מה קרה היום?"
+          maxLength={20000}
         />
       </div>
 
@@ -315,45 +476,41 @@ export default function SummaryEditor({ summaryId, onClose }) {
             יחושבו אוטומטית בסיכום.
           </p>
           <div className="space-y-3">
-            {coveredMatchIds.map((mid) => {
-              const m = getMatchById(mid);
-              if (!m) return null;
-              const r = matchResults[mid];
-              const stats = computeMatchStats({
-                matchId: mid,
-                result: r,
-                allPredictions,
-                users,
-              });
-              return (
-                <div key={mid} className="border-2 border-border rounded-2xl p-3 bg-bg-soft/40">
-                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                    <span className="text-sm font-extrabold text-ink">
-                      {teamLabel(m.homeTeam)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(m.awayTeam)}
-                    </span>
-                    <span className="text-[11px] font-bold text-ink-muted">
-                      {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} קלעו
-                    </span>
-                  </div>
-                  <textarea
-                    value={matchNotes[mid] || ""}
-                    onChange={(e) =>
-                      setMatchNotes((prev) => ({ ...prev, [mid]: e.target.value }))
-                    }
-                    rows={3}
-                    className="w-full p-2 border-2 border-border rounded-xl text-sm leading-relaxed"
-                    placeholder="מה הייתה הדרמה? מי קלע בול?"
-                  />
-                </div>
-              );
-            })}
+            {coveredMatchIds.map((mid) => (
+              <MatchNoteRow
+                key={mid}
+                mid={mid}
+                matchResults={matchResults}
+                allPredictions={allPredictions}
+                users={users}
+                value={matchNotes[mid] || ""}
+                onChange={(val) =>
+                  setMatchNotes((prev) => ({ ...prev, [mid]: val }))
+                }
+                onAskAI={() => handleMatchCommentary(mid)}
+                aiLoading={aiLoading === `m:${mid}`}
+                aiDisabled={!!aiLoading}
+              />
+            ))}
           </div>
         </div>
       )}
 
       {/* Conclusion */}
       <div className="card-duo">
-        <label className="block text-xs font-extrabold text-ink-muted mb-1">סיכום</label>
+        <div className="flex items-center justify-between mb-1 gap-2">
+          <label className="block text-xs font-extrabold text-ink-muted">סיכום</label>
+          <button
+            type="button"
+            onClick={() => handlePolish("conclusion")}
+            disabled={!!aiLoading || !conclusion.trim()}
+            className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
+            aria-label="שפר נוסח עם AI"
+          >
+            <Sparkles size={14} />
+            <span>{aiLoading === "conclusion" ? "משפר..." : "שפר נוסח"}</span>
+          </button>
+        </div>
         <p className="text-xs text-ink-muted mb-2">
           טקסט סיום — מה מחכה לנו הלאה?
         </p>
@@ -363,6 +520,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
           rows={4}
           className="w-full p-2 border-2 border-border rounded-xl text-base leading-relaxed"
           placeholder="מסקנות, מבט קדימה..."
+          maxLength={20000}
         />
       </div>
 

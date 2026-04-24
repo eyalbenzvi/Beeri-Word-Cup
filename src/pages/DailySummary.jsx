@@ -146,10 +146,15 @@ export default function DailySummary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, params?.n]);
 
-  // Desktop side rail: leaderboard snapshot
+  // Desktop side rail: leaderboard snapshot (skip for logged-out viewers —
+  // we can't compute scores without the full predictions stream, and showing
+  // an empty table would be confusing).
   const rail = useMemo(
-    () => <LeaderboardRail rankedLeaderboard={rankedLeaderboard} users={users} />,
-    [rankedLeaderboard, users],
+    () =>
+      user && rankedLeaderboard && rankedLeaderboard.length > 0
+        ? <LeaderboardRail rankedLeaderboard={rankedLeaderboard} users={users} />
+        : null,
+    [rankedLeaderboard, users, user],
   );
   useRightRail(rail);
 
@@ -215,6 +220,26 @@ export default function DailySummary() {
           <p className="text-sm font-extrabold text-accent-text">
             ⚠️ תצוגת טיוטה — רק אדמין רואה את זה.
           </p>
+        </div>
+      )}
+
+      {!user && (
+        <div
+          className="card-duo-tight mb-3 text-center"
+          style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
+        >
+          <p className="text-sm font-extrabold text-primary-dark mb-1">
+            👋 ברוך הבא ליומן המונדיאל של בארי
+          </p>
+          <p className="text-xs text-ink-muted font-medium">
+            התחבר כדי לראות את הדירוג ומי קלע מדויק.
+          </p>
+          <button
+            onClick={() => navigate("home")}
+            className="btn-duo btn-duo-primary btn-duo-sm mt-2"
+          >
+            כניסה למונדיאל
+          </button>
         </div>
       )}
 
