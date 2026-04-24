@@ -78,6 +78,12 @@ run_test "40. Shared UI Components (Spinner, InlineError, ErrorBanner, EmptyStat
 run_test "41. Focus Trap Hook" "test-focus-trap.mjs" "no"
 run_test "42. Confirm Modal Contract" "test-confirm-modal.mjs" "no"
 run_test "43. AI Top Scorer Selection (striker filter + champion anchor)" "test-top-scorer-selection.mjs" "yes"
+run_test "44. BiDi Scores (static audit)" "test-bidi-scores.mjs" "no"
+run_test "45. Match Card Focus Contract" "test-match-card-focus.mjs" "no"
+run_test "46. Layout Shell Structure" "test-layout-shell.mjs" "no"
+run_test "47. Leaderboard Embedded Mode" "test-leaderboard-embedded.mjs" "no"
+run_test "48. Micro-Copy Contract" "test-micro-copy.mjs" "no"
+run_test "49. Desktop Design Static Audit" "test-desktop-audit.mjs" "no"
 
 echo ""
 echo "==========================================="

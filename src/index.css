@@ -4,8 +4,14 @@
 @import "@fontsource/rubik/700.css";
 @import "@fontsource/rubik/800.css";
 @import "@fontsource/rubik/900.css";
+@import "@fontsource/heebo/700.css";
+@import "@fontsource/heebo/800.css";
 
 @theme {
+  /* Font pairing: Heebo for Hebrew display headings, Rubik for body */
+  --font-heading: "Heebo", "Rubik", "Assistant", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Rubik", "Heebo", "Assistant", -apple-system, BlinkMacSystemFont, sans-serif;
+
   /* Brand — Duolingo-inspired */
   --color-primary: #58CC02;
   --color-primary-light: #7BDB2F;
@@ -28,7 +34,7 @@
   /* Ink (text) */
   --color-ink: #3C3C3C;
   --color-ink-muted: #5E5E5E; /* WCAG AA: 5.74:1 on bg-soft (#F7F7F7) */
-  --color-ink-light: #8E8E8E;
+  --color-ink-light: #737373; /* WCAG AA: 4.83:1 on white */
 
   /* Surface */
   --color-bg: #FFFFFF;
@@ -59,13 +65,19 @@
 }
 
 html, body {
-  font-family: "Rubik", "Assistant", -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   background-color: var(--color-bg);
   color: var(--color-ink);
   margin: 0;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Heebo is visually tighter in Hebrew — use only for display headings */
+.font-heading, h1.font-heading, h2.font-heading, h3.font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.01em;
 }
 
 /* --------- Duolingo-style buttons --------- */

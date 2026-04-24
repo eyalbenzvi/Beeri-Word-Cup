@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import EmptyState from "../components/EmptyState";
+import PageHeader from "../components/PageHeader";
 import {
   useAllPredictions,
   useUsers,
@@ -41,7 +42,7 @@ function MatchRow({ match, prediction }) {
       <div className="flex items-center justify-between">
         <span className="flex-1 text-right truncate text-ink font-medium">{homeName}</span>
         <span className="w-16 text-center font-extrabold text-ink tabular-nums">
-          {hasScore ? <span dir="ltr">{prediction.awayScore} – {prediction.homeScore}</span> : "–"}
+          {hasScore ? <bdi>{prediction.homeScore}–{prediction.awayScore}</bdi> : "–"}
         </span>
         <span className="flex-1 text-left truncate text-ink font-medium">{awayName}</span>
       </div>
@@ -211,22 +212,23 @@ export default function AllFormsView({ onBack }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-extrabold text-ink tracking-tight">
-          כל הטפסים
-        </h1>
-        <button
-          onClick={onBack}
-          className="btn-duo-flat"
-          style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
-        >
-          חזרה
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
-      </div>
+      <PageHeader
+        title="כל הטפסים"
+        subtitle={submittedForms.length > 0 ? `${submittedForms.length} טפסים הוגשו` : undefined}
+        action={
+          <button
+            onClick={onBack}
+            className="btn-duo-flat"
+            style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
+          >
+            חזרה
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        }
+      />
 
       {submittedForms.length === 0 ? (
-        <EmptyState icon="📋" title="אין טפסים שהוגשו עדיין" />
+        <EmptyState icon="📋" title="אף אחד עוד לא הגיש. הראשון קובע את הסטנדרט." />
       ) : (
         <>
           {/* Filter controls */}

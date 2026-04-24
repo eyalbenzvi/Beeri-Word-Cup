@@ -94,7 +94,7 @@ export default function MenuOverlay({ open, onClose }) {
               <p>טורניר הניחושים של קיבוץ בארי למונדיאל 2026.</p>
               <p>ארה״ב 🇺🇸 • מקסיקו 🇲🇽 • קנדה 🇨🇦</p>
               <p>11 ביוני – 19 ביולי 2026</p>
-              <p className="text-ink-muted/60 mt-2">גרסה 1.0</p>
+              <p className="text-ink-muted mt-2">גרסה 1.0</p>
             </div>
           </MenuSection>
 
@@ -118,7 +118,7 @@ export default function MenuOverlay({ open, onClose }) {
                 </svg>
                 שלח ווטסאפ לתמיכה
               </a>
-              <p className="text-ink-muted/60 mt-3">
+              <p className="text-ink-muted mt-3">
                 טיפ: נסה לרענן את הדף אם משהו לא נטען כמו שצריך.
               </p>
             </div>

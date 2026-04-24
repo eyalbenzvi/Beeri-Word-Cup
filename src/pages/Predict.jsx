@@ -35,6 +35,8 @@ import FormList from "../components/FormList";
 import FormDetailsTab from "../components/FormDetailsTab";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
+import ProgressHub from "../components/ProgressHub";
+import { useRightRail } from "../hooks/useRail";
 import { lazyWithRetry } from "../utils/lazyWithRetry";
 const AllFormsView = lazyWithRetry(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
@@ -216,7 +218,7 @@ export default function Predict() {
     submitPredictions(activeFormId);
     setShowConfirm(false);
     setValidationErrors([]);
-    showToast("הטופס הוגש בהצלחה! 🎉");
+    showToast("נקלט. בהצלחה!");
     // Respect the user's motion preference: skip confetti if they asked for
     // reduced motion at the OS level.
     const prefersReducedMotion =
@@ -392,6 +394,21 @@ export default function Predict() {
     }, SCROLL_DELAY);
   }, []);
 
+  // Desktop right-rail: show ProgressHub while actively editing a form.
+  const railNode = useMemo(() => {
+    if (!activeForm) return null;
+    return (
+      <ProgressHub
+        groupMatches={groupMatches}
+        knockoutMatches={knockoutMatches}
+        matchPredictions={matchPredictions}
+        onSelectGroup={(g) => { setSelectedStage("group"); setSelectedGroup(g); }}
+        onSelectStage={(s) => setSelectedStage(s)}
+      />
+    );
+  }, [activeForm, matchPredictions]);
+  useRightRail(railNode);
+
   if (!user) {
     return (
       <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
@@ -560,12 +577,12 @@ export default function Predict() {
           </div>
 
           {status === "draft" && !settings.predictionsLocked && (
-            <div className="mb-4 space-y-3 md:max-w-md md:mx-auto">
+            <div className="mb-4 space-y-3 md:max-w-md md:mx-auto xl:max-w-none xl:mx-0 xl:flex xl:flex-wrap xl:gap-3 xl:space-y-0">
               <button
                 onClick={() => setShowScenarioModal(true)}
                 disabled={!!aiProgress}
                 title="בחר אלופה וסגנית — הטופס ימולא כך שהן ייפגשו בגמר"
-                className="btn-duo btn-duo-orange w-full"
+                className="btn-duo btn-duo-orange w-full xl:w-auto xl:min-w-[220px]"
               >
                 ✨ יצירת תרחיש עם AI
               </button>
@@ -573,13 +590,13 @@ export default function Predict() {
                 onClick={handleAIFill}
                 disabled={!!aiProgress}
                 title="ממלא את כל הניחושים בעזרת בינה מלאכותית"
-                className="btn-duo btn-duo-blue w-full"
+                className="btn-duo btn-duo-blue w-full xl:w-auto xl:min-w-[200px]"
               >
                 🤖 מלא הכל עם AI
               </button>
               <button
                 onClick={handleTrySubmit}
-                className="btn-duo btn-duo-primary w-full"
+                className="btn-duo btn-duo-primary w-full xl:w-auto xl:min-w-[240px] xl:ms-auto"
                 title={isFormValid ? "הגש את הטופס" : `חסרים ${liveErrors.length} פרטים`}
               >
                 {isFormValid

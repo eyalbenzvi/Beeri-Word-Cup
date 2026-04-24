@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { hasPendingWrites } from "../store";
+
+const SAVED_MESSAGES = ["נשמר", "יופי", "עוד אחד", "נרשם"];
 
 export default function SaveIndicator() {
   const [state, setState] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [savedMsg, setSavedMsg] = useState(SAVED_MESSAGES[0]);
+  const msgIdxRef = useRef(0);
 
   useEffect(() => {
     let savedTimer;
@@ -14,6 +18,8 @@ export default function SaveIndicator() {
     };
 
     const onSaved = () => {
+      msgIdxRef.current = (msgIdxRef.current + 1) % SAVED_MESSAGES.length;
+      setSavedMsg(SAVED_MESSAGES[msgIdxRef.current]);
       setState("saved");
       savedTimer = setTimeout(() => {
         if (!hasPendingWrites()) setState("idle");
@@ -67,7 +73,7 @@ export default function SaveIndicator() {
       }`}
       style={state === "saving" ? { background: "var(--color-accent-soft-2)" } : undefined}
     >
-      {state === "saving" ? "שומר..." : "נשמר ✓"}
+      {state === "saving" ? "שומר..." : `${savedMsg} ✓`}
     </div>
   );
 }

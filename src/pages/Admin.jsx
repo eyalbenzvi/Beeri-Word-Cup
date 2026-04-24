@@ -16,6 +16,7 @@ import AdminDashboardTab from "../components/AdminDashboardTab";
 import AdminFormsTab from "../components/AdminFormsTab";
 import AdminToolsTab from "../components/AdminToolsTab";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
+import PageHeader from "../components/PageHeader";
 import { isSamePlayer, getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 export default function Admin() {
@@ -62,7 +63,8 @@ export default function Admin() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold text-ink mb-4">⚙️ לוח ניהול</h1>
+      <PageHeader title="לוח ניהול" />
+
       <div
         className="flex gap-1 mb-4 bg-bg-soft rounded-2xl p-1 overflow-x-auto scroll-smooth border-2 border-border"
         style={{

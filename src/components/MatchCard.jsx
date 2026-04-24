@@ -169,7 +169,7 @@ function MatchCard({
               {match.label}
             </span>
           ) : <span />}
-          <span className="text-xs text-ink-muted/60">
+          <span className="text-xs text-ink-muted">
             {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
           </span>
         </div>
@@ -193,7 +193,7 @@ function MatchCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted/60 italic"}`}
+            className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted italic"}`}
           >
             <bdi>{homeName}</bdi>
           </div>
@@ -202,7 +202,7 @@ function MatchCard({
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
             <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              <span dir="ltr">{actualResult.awayScore} – {actualResult.homeScore}</span>
+              <bdi>{actualResult.homeScore}–{actualResult.awayScore}</bdi>
             </div>
           )}
 
@@ -275,23 +275,23 @@ function MatchCard({
           ) : (
             !hasResult && (
               <div
-                className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted/60"}`}
+                className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted"}`}
               >
-                {hasPrediction ? <span dir="ltr">{predAway} – {predHome}</span> : "– : –"}
+                {hasPrediction ? <bdi>{predHome}–{predAway}</bdi> : "– : –"}
               </div>
             )
           )}
 
           {hasResult && !editable && predHome !== "" && (
             <div className="text-xs text-ink-muted font-medium tabular-nums">
-              ניחוש: <span dir="ltr">{predAway} – {predHome}</span>
+              ניחוש: <bdi>{predHome}–{predAway}</bdi>
             </div>
           )}
         </div>
 
         <div className="flex-1 text-center">
           <div
-            className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted/60 italic"}`}
+            className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted italic"}`}
           >
             <bdi>{awayName}</bdi>
           </div>
