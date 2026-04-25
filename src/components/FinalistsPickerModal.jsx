@@ -19,7 +19,7 @@ function TeamSelect({ label, value, onChange, excludeCode }) {
         <option value="">-- בחר נבחרת --</option>
         {options.map((t) => (
           <option key={t.code} value={t.code}>
-            {t.flag} {t.name} (בית {t.group})
+            {`‏${t.flag} ${t.name} (בית ${t.group})`}
           </option>
         ))}
       </select>

@@ -257,6 +257,16 @@ export default function Leaderboard({
     );
   };
 
+  if (!embedded && !forceUnlockView && !locked) {
+    return (
+      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
+        <div className="text-6xl mb-4">🔒</div>
+        <h2 className="text-2xl font-extrabold text-ink mb-2">טבלת דירוג</h2>
+        <p className="text-sm text-ink-muted font-medium">הדירוג יתגלה כשהמשחקים יתחילו.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       {!embedded && (
