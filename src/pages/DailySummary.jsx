@@ -74,10 +74,7 @@ function LatestCountdown({ sortedSummaries, currentNumber }) {
     : null;
   if (!latestNumber || latestNumber === currentNumber) return null;
   return (
-    <div
-      className="card-duo-tight text-center"
-      style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
-    >
+    <div className="alert-primary-soft text-center mb-3">
       <p className="text-sm font-extrabold text-primary-dark">
         {BLOG.public.latestBadge(latestNumber)}
       </p>
@@ -232,17 +229,33 @@ export default function DailySummary() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow={`${BLOG.pageTitle} · סיכום #${active.number}${dateLabel ? ` · ${dateLabel}` : ""}`}
-        title={active.title || `סיכום #${active.number}`}
-        subtitle={active.subtitle || undefined}
-      />
+      {/* Masthead — replaces PageHeader for the article view so we can run
+          a journalistic kicker + Heebo display headline + a slim byline
+          strip rather than the centered card-style header used elsewhere. */}
+      <header className="mb-6 md:mb-10">
+        <div className="text-xs font-extrabold text-secondary tracking-[0.18em] uppercase mb-2">
+          {BLOG.pageTitle} · סיכום #{active.number}
+        </div>
+        <h1 className="font-heading text-3xl md:text-4xl xl:text-5xl font-extrabold text-ink leading-[1.1] tracking-tight">
+          {active.title || `סיכום #${active.number}`}
+        </h1>
+        {active.subtitle && (
+          <p className="font-heading text-lg md:text-xl text-ink-muted font-bold leading-snug mt-2 max-w-[68ch]">
+            {active.subtitle}
+          </p>
+        )}
+        {(dateLabel || coveredIds.length > 0) && (
+          <div className="mt-3 text-xs font-bold text-ink-light tracking-wider flex items-center gap-2 flex-wrap">
+            {dateLabel && <time>{dateLabel}</time>}
+            {dateLabel && coveredIds.length > 0 && <span aria-hidden="true">·</span>}
+            {coveredIds.length > 0 && <span>{coveredIds.length} משחקים</span>}
+          </div>
+        )}
+        <div className="h-px bg-border mt-4" />
+      </header>
 
       {active.status !== "published" && (
-        <div
-          className="card-duo-tight mb-3 text-center"
-          style={{ background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }}
-        >
+        <div className="alert-accent-soft mb-3 text-center">
           <p className="text-sm font-extrabold text-accent-text">
             {BLOG.public.draftBanner}
           </p>
@@ -250,10 +263,7 @@ export default function DailySummary() {
       )}
 
       {!user && (
-        <div
-          className="card-duo-tight mb-3 text-center"
-          style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
-        >
+        <div className="alert-primary-soft mb-3 text-center">
           <p className="text-sm font-extrabold text-primary-dark mb-1">
             {BLOG.public.guestTitle}
           </p>
@@ -269,24 +279,24 @@ export default function DailySummary() {
         </div>
       )}
 
-      {/* Prev/Next nav */}
-      <div className="flex items-center justify-between gap-2 mb-4">
+      {/* Compact post nav — flat (no 3-D shadow) so the headline still leads. */}
+      <div className="flex items-center justify-between gap-2 mb-6 text-sm">
         <button
           onClick={() => prev && navigate("blog", { n: prev.number })}
           disabled={!prev}
-          className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1 disabled:opacity-40"
+          className="btn-duo-flat disabled:opacity-40"
           aria-label="סיכום קודם"
         >
           <ChevronRight size={16} />
           <span>קודם</span>
         </button>
-        <span className="text-xs text-ink-muted font-bold">
+        <span className="text-xs text-ink-light font-bold tabular-nums">
           {active.number} / {publishedSummaries.length || visibleSummaries.length}
         </span>
         <button
           onClick={() => next && navigate("blog", { n: next.number })}
           disabled={!next}
-          className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1 disabled:opacity-40"
+          className="btn-duo-flat disabled:opacity-40"
           aria-label="סיכום הבא"
         >
           <span>הבא</span>
@@ -296,54 +306,47 @@ export default function DailySummary() {
 
       <LatestCountdown sortedSummaries={publishedSummaries} currentNumber={active.number} />
 
-      {/* Intro */}
-      {active.intro && active.intro.trim() && (
-        <div className="card-duo mt-3">
-          <p className="text-base leading-relaxed text-ink whitespace-pre-wrap">
+      {/* The post itself — capped reading column so prose lines stay
+          ~65–75 Hebrew chars on desktop. No surrounding card chrome:
+          the page background + hairline rules carry the structure. */}
+      <article className="prose-column">
+        {active.intro && active.intro.trim() && (
+          <p className="lede text-lg md:text-xl leading-[1.85] text-ink font-medium whitespace-pre-wrap mt-6 mb-2">
             {active.intro}
           </p>
-        </div>
-      )}
+        )}
 
-      {/* Match sections */}
-      {coveredIds.length > 0 && (
-        <div className="space-y-3 mt-3">
-          {coveredIds.map((mid) => {
-            const m = getMatchById(mid);
-            if (!m) return null;
-            return (
-              <MatchDigest
-                key={mid}
-                match={m}
-                result={matchResults[mid]}
-                note={active.matchNotes?.[mid]}
-                allPredictions={allPredictions}
-                users={users}
-              />
-            );
-          })}
-        </div>
-      )}
+        {coveredIds.length > 0 && coveredIds.map((mid) => {
+          const m = getMatchById(mid);
+          if (!m) return null;
+          return (
+            <MatchDigest
+              key={mid}
+              match={m}
+              result={matchResults[mid]}
+              note={active.matchNotes?.[mid]}
+              allPredictions={allPredictions}
+              users={users}
+            />
+          );
+        })}
 
-      {/* Conclusion */}
-      {active.conclusion && active.conclusion.trim() && (
-        <div
-          className="card-duo mt-3"
-          style={{
-            background: "var(--color-accent-soft-2)",
-            borderColor: "var(--color-accent)",
-          }}
-        >
-          <p className="text-base leading-relaxed text-ink whitespace-pre-wrap">
+        {active.conclusion && active.conclusion.trim() && (
+          <aside
+            className="mt-10 border-r-4 pr-4 text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap"
+            style={{ borderColor: "var(--color-accent)" }}
+          >
             {active.conclusion}
-          </p>
-        </div>
-      )}
+          </aside>
+        )}
+      </article>
 
       {/* Archive grid */}
       {visibleSummaries.length > 1 && (
-        <div className="mt-6">
-          <h3 className="font-extrabold text-base text-ink mb-2">{BLOG.archiveHeader}</h3>
+        <div className="mt-12">
+          <h3 className="font-heading text-base font-extrabold text-ink mb-3">
+            {BLOG.archiveHeader}
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[...visibleSummaries].reverse().map((s) => {
               const isCurrent = s.number === active.number;
