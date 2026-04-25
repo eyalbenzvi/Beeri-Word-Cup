@@ -725,12 +725,22 @@ async function fetchPublicSettingsOnce() {
     if (data?.matchResults && typeof data.matchResults === "object") {
       cache.matchResults = data.matchResults;
     }
-    cache._ready.settings = true;
-    cache._ready.matchResults = true;
     notifyAndEmit("settings");
     notifyAndEmit("matchResults");
   } catch {
     // Network error — leave whatever we had.
+  } finally {
+    // Mark the keys as "ready" even if the fetch failed. The setInterval
+    // retry will refresh them when the network recovers; in the meantime
+    // we don't want to trap a guest viewer on an indefinite loading
+    // spinner (the blog page's pre-tournament gate waits on this flag).
+    // Worst case: a single failed attempt shows the default
+    // predictionsLocked=false → empty state, which is the same behaviour
+    // we had before isSettingsReady existed.
+    if (publicModeInitialized) {
+      cache._ready.settings = true;
+      cache._ready.matchResults = true;
+    }
   }
 }
 
@@ -1495,6 +1505,15 @@ export function saveActualBonuses(bonuses) {
 
 export function getSettings() {
   return cache.settings || DEFAULT_SETTINGS;
+}
+
+// Whether the settings doc has been fetched at least once (authenticated
+// listener landed, or public-readonly endpoint resolved). Used by the blog
+// page so an unauth visitor doesn't briefly see the pre-tournament empty
+// state during the public-settings fetch window — instead we show the
+// loading state until we actually know predictionsLocked.
+export function isSettingsReady() {
+  return !!cache._ready.settings;
 }
 
 export function updateSettings(newSettings) {

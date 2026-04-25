@@ -203,6 +203,10 @@ export function useSettings() {
   return useStoreValue(store.getSettings);
 }
 
+export function useSettingsReady() {
+  return useStoreValue(store.isSettingsReady);
+}
+
 export function useSummaries() {
   return useStoreValue(store.getSummaries);
 }

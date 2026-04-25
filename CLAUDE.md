@@ -53,6 +53,25 @@ tests/           — 16 test suites, 2340+ tests, run via ./tests/run-all.sh
 npx vite build      # Verify build succeeds
 ```
 
+## Side-effect / regression discipline (during development)
+For every code change, before declaring it done, audit these vectors **as
+part of the development**, not after the fact:
+- **Other consumers of changed APIs** — `grep` for every caller of any
+  function/hook/exported symbol that changed. Confirm none silently break.
+- **Failure paths** — for any new conditional that depends on async state
+  (network fetch, listener, store readiness flag), trace the failure case:
+  what does the UI show if the data never arrives? Add a fallback so the
+  user is never trapped on a loading spinner forever.
+- **Auth/state transitions** — if the change touches store cache, listener
+  setup, or `_ready` flags, walk through: guest→login, login→logout, public-
+  readonly→authenticated, and tab-visibility-change. Confirm the new
+  behaviour is correct in each.
+- **Race conditions** — first render vs. async-arrived data. The store
+  defaults are NOT the same as "loaded data" — gates that decide visibility
+  must distinguish "we know it's X" from "we haven't asked yet".
+- **Add a regression test** — at minimum a static assertion in the relevant
+  `tests/test-*.mjs` suite that the fix's pattern is in place.
+
 ## Environment Variables (Netlify)
 - `INFORU_API_TOKEN`, `INFORU_USERNAME`, `INFORU_SENDER` — SMS via Inforu
 - `FIREBASE_SERVICE_ACCOUNT` — Firebase Admin SDK (JSON)

@@ -170,6 +170,46 @@ console.log("--- IMPL: localhost detection covers [::1] and .local ---");
 assert(/::1/.test(shareBtn), "share button detects IPv6 loopback");
 assert(/\.local/.test(shareBtn), "share button detects .local mDNS");
 
+// ============ REGRESSION: guest blog "settings race" ============
+// A logged-out visitor hitting /blog directly was seeing "אין עדיין סיכומים"
+// even when a post was published, because DailySummary's pre-tournament
+// gate fired on the first render — before the public-readonly endpoint
+// populated cache.settings.predictionsLocked. Two-part fix:
+//   (a) DailySummary must wait on a readiness flag before showing the gate.
+//   (b) fetchPublicSettingsOnce must set the readiness flag even on
+//       failure, so a network error doesn't trap the visitor on
+//       a "loading..." spinner forever.
+console.log("--- REGRESSION: guest blog settings-race fix ---");
+
+// (a) DailySummary checks settingsReady before showing the empty state.
+assert(/useSettingsReady/.test(dailyPage),
+  "DailySummary imports useSettingsReady");
+assert(/const\s+settingsReady\s*=\s*useSettingsReady\(\)/.test(dailyPage),
+  "DailySummary calls useSettingsReady()");
+// The pre-tournament gate must guard on (!user.isAdmin) AND (settingsReady)
+// before deciding to render the empty state.
+assert(/if\s*\(!user\?\.isAdmin\)\s*\{[\s\S]*?if\s*\(!settingsReady\)/.test(dailyPage),
+  "DailySummary shows loading state for non-admins until settingsReady");
+assert(/if\s*\(!predictionsLocked\)\s*\{[\s\S]*?BLOG\.public\.emptyTitle/.test(dailyPage),
+  "DailySummary still renders the empty state once settings is ready and lock is off");
+
+// (b) fetchPublicSettingsOnce sets _ready.settings=true even on failure.
+const fetchBlock = store.match(/async function fetchPublicSettingsOnce[\s\S]*?\n\}/)?.[0] || "";
+assert(/finally\s*\{[\s\S]*?cache\._ready\.settings\s*=\s*true/.test(fetchBlock),
+  "fetchPublicSettingsOnce sets _ready.settings in finally (network failure path)");
+assert(/finally\s*\{[\s\S]*?cache\._ready\.matchResults\s*=\s*true/.test(fetchBlock),
+  "fetchPublicSettingsOnce sets _ready.matchResults in finally too");
+// Guard inside finally: don't flip readiness if teardown happened mid-flight.
+assert(/finally\s*\{[\s\S]*?if\s*\(publicModeInitialized\)/.test(fetchBlock),
+  "finally re-checks publicModeInitialized before mutating cache");
+
+// Store exports the readiness checker.
+assert(/export function isSettingsReady\s*\(\)/.test(store),
+  "store exports isSettingsReady");
+const useStoreFile = R("/home/user/Beeri-World-Cup/src/hooks/useStore.js");
+assert(/export function useSettingsReady\s*\(\)/.test(useStoreFile),
+  "hooks/useStore exports useSettingsReady");
+
 // ============ SUMMARY ============
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failures.length) {
