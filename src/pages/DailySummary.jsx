@@ -2,37 +2,20 @@ import { useEffect, useMemo } from "react";
 import { ChevronRight, ChevronLeft, Trophy } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
-import MatchDigest from "../components/MatchDigest";
-import ShareSummaryButton from "../components/ShareSummaryButton";
+import SummaryArticle from "../components/SummaryArticle";
 import {
   useSummaries,
   useMatchResults,
   useAllPredictions,
   useUsers,
   useCurrentUser,
+  useSettings,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useActualBonuses } from "../hooks/useStore";
-import { getMatchById } from "../data/matches";
 import { useRightRail } from "../hooks/useRail";
 import { BLOG } from "../constants/messages";
-
-function formatDateHe(iso) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("he-IL", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "Asia/Jerusalem",
-    });
-  } catch {
-    return "";
-  }
-}
 
 function LeaderboardRail({ rankedLeaderboard, users }) {
   if (!rankedLeaderboard || rankedLeaderboard.length === 0) return null;
@@ -74,10 +57,7 @@ function LatestCountdown({ sortedSummaries, currentNumber }) {
     : null;
   if (!latestNumber || latestNumber === currentNumber) return null;
   return (
-    <div
-      className="card-duo-tight text-center"
-      style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
-    >
+    <div className="alert-primary-soft text-center mb-3">
       <p className="text-sm font-extrabold text-primary-dark">
         {BLOG.public.latestBadge(latestNumber)}
       </p>
@@ -92,6 +72,7 @@ export default function DailySummary() {
   const users = useUsers();
   const actualBonuses = useActualBonuses();
   const { user } = useCurrentUser();
+  const settings = useSettings();
   const { params, navigate } = useNavigation();
 
   const { rankedLeaderboard } = useLeaderboardComputed(
@@ -162,6 +143,24 @@ export default function DailySummary() {
   );
   useRightRail(rail);
 
+  // Pre-tournament: hide the blog from non-admins entirely. Admins can keep
+  // working on drafts. We render an empty-state instead of a hard 404 so the
+  // route still resolves cleanly and the deep-link recovers automatically once
+  // the admin locks predictions.
+  const predictionsLocked = !!settings?.predictionsLocked;
+  if (!predictionsLocked && !user?.isAdmin) {
+    return (
+      <div>
+        <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
+        <EmptyState
+          icon="📰"
+          title={BLOG.public.emptyTitle}
+          description={BLOG.public.emptyBody}
+        />
+      </div>
+    );
+  }
+
   // No summaries at all
   if (visibleSummaries.length === 0) {
     return (
@@ -208,23 +207,10 @@ export default function DailySummary() {
   const prev = visibleSummaries.find((s) => s.number === active.number - 1);
   const next = visibleSummaries.find((s) => s.number === active.number + 1);
 
-  const coveredIds = active.coveredMatchIds || [];
-  const dateLabel = formatDateHe(active.publishedAt || active.updatedAt || active.createdAt);
-
   return (
     <div>
-      <PageHeader
-        eyebrow={`${BLOG.pageTitle} · סיכום #${active.number}${dateLabel ? ` · ${dateLabel}` : ""}`}
-        title={active.title || `סיכום #${active.number}`}
-        subtitle={active.subtitle || undefined}
-        action={<ShareSummaryButton summary={active} size="sm" />}
-      />
-
       {active.status !== "published" && (
-        <div
-          className="card-duo-tight mb-3 text-center"
-          style={{ background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }}
-        >
+        <div className="alert-accent-soft mb-3 text-center">
           <p className="text-sm font-extrabold text-accent-text">
             {BLOG.public.draftBanner}
           </p>
@@ -232,10 +218,7 @@ export default function DailySummary() {
       )}
 
       {!user && (
-        <div
-          className="card-duo-tight mb-3 text-center"
-          style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
-        >
+        <div className="alert-primary-soft mb-3 text-center">
           <p className="text-sm font-extrabold text-primary-dark mb-1">
             {BLOG.public.guestTitle}
           </p>
@@ -251,24 +234,24 @@ export default function DailySummary() {
         </div>
       )}
 
-      {/* Prev/Next nav */}
-      <div className="flex items-center justify-between gap-2 mb-4">
+      {/* Compact post nav — flat (no 3-D shadow) so the headline still leads. */}
+      <div className="flex items-center justify-between gap-2 mb-6 text-sm">
         <button
           onClick={() => prev && navigate("blog", { n: prev.number })}
           disabled={!prev}
-          className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1 disabled:opacity-40"
+          className="btn-duo-flat disabled:opacity-40"
           aria-label="סיכום קודם"
         >
           <ChevronRight size={16} />
           <span>קודם</span>
         </button>
-        <span className="text-xs text-ink-muted font-bold">
+        <span className="text-xs text-ink-light font-bold tabular-nums">
           {active.number} / {publishedSummaries.length || visibleSummaries.length}
         </span>
         <button
           onClick={() => next && navigate("blog", { n: next.number })}
           disabled={!next}
-          className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1 disabled:opacity-40"
+          className="btn-duo-flat disabled:opacity-40"
           aria-label="סיכום הבא"
         >
           <span>הבא</span>
@@ -278,54 +261,20 @@ export default function DailySummary() {
 
       <LatestCountdown sortedSummaries={publishedSummaries} currentNumber={active.number} />
 
-      {/* Intro */}
-      {active.intro && active.intro.trim() && (
-        <div className="card-duo mt-3">
-          <p className="text-base leading-relaxed text-ink whitespace-pre-wrap">
-            {active.intro}
-          </p>
-        </div>
-      )}
-
-      {/* Match sections */}
-      {coveredIds.length > 0 && (
-        <div className="space-y-3 mt-3">
-          {coveredIds.map((mid) => {
-            const m = getMatchById(mid);
-            if (!m) return null;
-            return (
-              <MatchDigest
-                key={mid}
-                match={m}
-                result={matchResults[mid]}
-                note={active.matchNotes?.[mid]}
-                allPredictions={allPredictions}
-                users={users}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Conclusion */}
-      {active.conclusion && active.conclusion.trim() && (
-        <div
-          className="card-duo mt-3"
-          style={{
-            background: "var(--color-accent-soft-2)",
-            borderColor: "var(--color-accent)",
-          }}
-        >
-          <p className="text-base leading-relaxed text-ink whitespace-pre-wrap">
-            {active.conclusion}
-          </p>
-        </div>
-      )}
+      {/* The article itself — pure render, reused by the editor preview. */}
+      <SummaryArticle
+        summary={active}
+        matchResults={matchResults}
+        allPredictions={allPredictions}
+        users={users}
+      />
 
       {/* Archive grid */}
       {visibleSummaries.length > 1 && (
-        <div className="mt-6">
-          <h3 className="font-extrabold text-base text-ink mb-2">{BLOG.archiveHeader}</h3>
+        <div className="mt-12">
+          <h3 className="font-heading text-base font-extrabold text-ink mb-3">
+            {BLOG.archiveHeader}
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[...visibleSummaries].reverse().map((s) => {
               const isCurrent = s.number === active.number;

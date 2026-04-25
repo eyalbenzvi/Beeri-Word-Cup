@@ -2,28 +2,12 @@ import { useMemo } from "react";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { BLOG } from "../constants/messages";
 
-function TeamRow({ team, score, isWinner, placeholder }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="text-2xl flex-shrink-0" aria-hidden="true">
-          {team?.flag || "🏳️"}
-        </span>
-        <span className={`text-base font-bold ${team ? "text-ink" : "text-ink-light italic"} truncate`}>
-          {team?.name || placeholder || "טרם נקבע"}
-        </span>
-      </div>
-      <span
-        className={`text-3xl font-extrabold tabular-nums ${
-          isWinner ? "text-primary" : "text-ink-muted"
-        }`}
-      >
-        {Number.isFinite(score) ? score : "–"}
-      </span>
-    </div>
-  );
-}
+// How many exact-hit names to show inline above the fold before
+// collapsing the rest behind a "+N עוד" label. The full list still
+// appears inside the <details> breakdown when expanded.
+const EXACT_HITS_INLINE_CAP = 3;
 
 function OutcomeBar({ pct, label, count, color }) {
   const safePct = Math.max(0, Math.min(100, pct || 0));
@@ -53,9 +37,12 @@ function OutcomeBar({ pct, label, count, color }) {
 }
 
 /**
- * Renders a single match block inside a daily summary.
- * Computes per-match stats on the fly from allPredictions, so any later
- * result correction is reflected automatically on the next render.
+ * Renders a single match block inside a daily-recap blog post.
+ *
+ * Visual model is a journalistic section — kicker → H2 → slim scoreline →
+ * pull-quote → one-line stat strip → collapsed full breakdown — rather than
+ * a self-contained card. Sections are separated by a hairline rule so the
+ * page reads as continuous prose.
  */
 export default function MatchDigest({
   match,
@@ -86,144 +73,181 @@ export default function MatchDigest({
   const homeWin = !!result && result.homeScore > result.awayScore;
   const awayWin = !!result && result.awayScore > result.homeScore;
 
-  // Stage tag is useful when a summary mixes group + knockout matches
   const stageLabel = STAGES[match.stage] || match.stage;
+  const homeName = home?.name || match.homeFrom || match.thirdFrom || "טרם נקבע";
+  const awayName = away?.name || match.awayFrom || "טרם נקבע";
 
   return (
-    <div className="card-duo space-y-3">
-      {/* Header: stage, venue, date */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <span className="text-[11px] font-extrabold text-secondary uppercase tracking-wider">
-          {stageLabel}
-          {match.group ? ` · בית ${match.group}` : ""}
-        </span>
-        <span className="text-[11px] text-ink-muted font-medium">
-          {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
-        </span>
+    <section className="mt-10 pt-8 border-t border-border first:border-t-0 first:pt-0 first:mt-6">
+      {/* Stage kicker */}
+      <div className="text-[11px] font-extrabold text-secondary uppercase tracking-wider mb-1">
+        {stageLabel}
+        {match.group ? ` · בית ${match.group}` : ""}
       </div>
 
-      {/* Scoreline */}
-      <div>
-        <TeamRow
-          team={home}
-          score={result?.homeScore}
-          isWinner={homeWin}
-          placeholder={match.homeFrom || match.thirdFrom}
-        />
-        <div className="h-px bg-border" />
-        <TeamRow
-          team={away}
-          score={result?.awayScore}
-          isWinner={awayWin}
-          placeholder={match.awayFrom}
-        />
+      {/* H2 — the section anchor. Flags omitted: the kicker carries stage,
+          the slim scoreline carries the visual; flags here read as a
+          scoreboard widget instead of prose. */}
+      <h2 className="font-heading text-xl md:text-2xl font-extrabold text-ink leading-tight tracking-tight">
+        {homeName}
+        <span className="text-ink-light font-bold mx-2">נגד</span>
+        {awayName}
+      </h2>
+
+      {/* Scoreline (slim) */}
+      <div className="flex items-baseline gap-3 mt-2 text-2xl font-extrabold tabular-nums">
+        <span className={homeWin ? "text-primary" : "text-ink-muted"}>
+          {Number.isFinite(result?.homeScore) ? result.homeScore : "–"}
+        </span>
+        <span className="text-ink-light text-lg">—</span>
+        <span className={awayWin ? "text-primary" : "text-ink-muted"}>
+          {Number.isFinite(result?.awayScore) ? result.awayScore : "–"}
+        </span>
         {result && result.homeScore === result.awayScore && result.advancingTeam && (
-          <div className="text-xs text-ink-muted text-center mt-2 pt-2 border-t border-border font-bold">
-            בעיטות הכרעה: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam}
-          </div>
+          <span className="text-xs font-bold text-ink-muted ms-2">
+            (פנדלים: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam})
+          </span>
         )}
       </div>
 
-      {/* Admin's commentary */}
+      {/* Admin commentary as a pull-quote (RTL: border on the right) */}
       {note && note.trim() && (
-        <div
-          className="rounded-2xl p-3 text-sm leading-relaxed text-ink whitespace-pre-wrap border-2"
+        <blockquote
+          className="mt-5 border-r-4 pr-4 font-heading text-lg md:text-xl leading-snug whitespace-pre-wrap"
           style={{
-            background: "var(--color-primary-soft)",
             borderColor: "var(--color-primary)",
+            color: "var(--color-primary-dark)",
           }}
         >
           {note}
-        </div>
+        </blockquote>
       )}
 
-      {/* Stats breakdown */}
-      {stats.totalForms > 0 && (
-        <div className="space-y-2 pt-1">
-          <p className="text-xs font-extrabold text-ink">
-            איך ניחשנו ({stats.totalForms} טפסים):
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <OutcomeBar
-              label={home ? `ניצחון ${home.name}` : "בית"}
-              count={stats.outcomeCounts.home}
-              pct={stats.outcomePct.home}
-              color="var(--color-primary)"
-            />
-            <OutcomeBar
-              label="תיקו"
-              count={stats.outcomeCounts.draw}
-              pct={stats.outcomePct.draw}
-              color="var(--color-accent)"
-            />
-            <OutcomeBar
-              label={away ? `ניצחון ${away.name}` : "חוץ"}
-              count={stats.outcomeCounts.away}
-              pct={stats.outcomePct.away}
-              color="var(--color-secondary)"
-            />
-          </div>
-
-          {result && (
-            <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
-              <span
-                className="font-extrabold px-2 py-1 rounded-full"
-                style={{
-                  background: "var(--color-primary-soft)",
-                  color: "var(--color-primary-dark)",
-                }}
-              >
-                {stats.outcomeHitCount} הכרעות
+      {/* Exact-hit names — surfaced ABOVE the fold (formerly buried inside
+          the collapsed <details>). The single most engaging element of the
+          page: members seeing their name. Cap at 3 inline + "+N עוד" so a
+          big-hit match doesn't run a 30-name line. The full list still
+          appears inside the breakdown disclosure below. */}
+      {result && stats.totalForms > 0 && (
+        <div className="mt-4 text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+          {stats.exactHitForms.length === 0 ? (
+            <span className="text-ink-muted font-medium">
+              {BLOG.public.exactHitsNone}
+            </span>
+          ) : (
+            <>
+              <span className="text-ink-muted font-bold">
+                {BLOG.public.exactHitsLabel(stats.exactHitForms.length)}
               </span>
-              <span
-                className="font-extrabold px-2 py-1 rounded-full"
-                style={{
-                  background: "var(--color-accent-soft-2)",
-                  color: "var(--color-accent-text)",
-                }}
-              >
-                {stats.exactHitCount} מדויקים
-              </span>
-            </div>
-          )}
-
-          {stats.topScores.length > 0 && (
-            <div className="pt-1">
-              <p className="text-xs font-extrabold text-ink-muted mb-1">
-                התוצאות הנפוצות בניחושים:
-              </p>
               <div className="flex flex-wrap gap-1.5">
-                {stats.topScores.map((ts) => (
-                  <span
-                    key={ts.score}
-                    className="text-xs font-extrabold bg-bg-soft text-ink px-2 py-1 rounded-full tabular-nums"
-                  >
-                    {ts.score} · {ts.pct}%
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {stats.exactHitForms.length > 0 && stats.exactHitForms.length <= 8 && (
-            <div className="pt-1">
-              <p className="text-xs font-extrabold text-ink-muted mb-1">
-                מי קלע בדיוק:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {stats.exactHitForms.map((f) => (
+                {stats.exactHitForms.slice(0, EXACT_HITS_INLINE_CAP).map((f) => (
                   <span
                     key={f.formId}
-                    className="text-xs font-bold bg-primary/10 text-primary-dark px-2 py-1 rounded-full truncate max-w-[180px]"
+                    className="text-xs font-extrabold bg-primary/10 text-primary-dark px-2 py-1 rounded-full truncate max-w-[180px]"
                   >
-                    {f.userName}
+                    {f.formName}
                   </span>
                 ))}
+                {stats.exactHitForms.length > EXACT_HITS_INLINE_CAP && (
+                  <span className="text-xs font-bold text-ink-muted px-2 py-1 self-center">
+                    {BLOG.public.exactHitsMore(stats.exactHitForms.length - EXACT_HITS_INLINE_CAP)}
+                  </span>
+                )}
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
-    </div>
+
+      {/* One-line stat strip — always visible, quiet */}
+      {stats.totalForms > 0 && (
+        <p className="mt-5 text-xs font-bold text-ink-muted tabular-nums flex flex-wrap items-center gap-x-1 gap-y-1">
+          <span className="me-1">איך ניחשנו:</span>
+          <span className="text-primary">בית {stats.outcomePct.home}%</span>
+          <span aria-hidden="true">·</span>
+          <span className="text-accent-text">תיקו {stats.outcomePct.draw}%</span>
+          <span aria-hidden="true">·</span>
+          <span className="text-secondary">חוץ {stats.outcomePct.away}%</span>
+          {result && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{stats.outcomeHitCount} הכרעות</span>
+              <span aria-hidden="true">·</span>
+              <span>{stats.exactHitCount} מדויקים</span>
+            </>
+          )}
+          <span className="text-ink-light">({stats.totalForms} טפסים)</span>
+        </p>
+      )}
+
+      {/* Full breakdown — collapsed by default for everyone */}
+      {stats.totalForms > 0 && (
+        <details className="mt-2 group">
+          <summary className="cursor-pointer text-xs font-extrabold text-secondary inline-flex items-center gap-1 select-none list-none [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">כל הנתונים ›</span>
+            <span className="hidden group-open:inline">סגור נתונים ‹</span>
+          </summary>
+
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <OutcomeBar
+                label={home ? `ניצחון ${home.name}` : "בית"}
+                count={stats.outcomeCounts.home}
+                pct={stats.outcomePct.home}
+                color="var(--color-primary)"
+              />
+              <OutcomeBar
+                label="תיקו"
+                count={stats.outcomeCounts.draw}
+                pct={stats.outcomePct.draw}
+                color="var(--color-accent)"
+              />
+              <OutcomeBar
+                label={away ? `ניצחון ${away.name}` : "חוץ"}
+                count={stats.outcomeCounts.away}
+                pct={stats.outcomePct.away}
+                color="var(--color-secondary)"
+              />
+            </div>
+
+            {stats.topScores.length > 0 && (
+              <div className="pt-1">
+                <p className="text-xs font-extrabold text-ink-muted mb-1">
+                  התוצאות הנפוצות בניחושים:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {stats.topScores.map((ts) => (
+                    <span
+                      key={ts.score}
+                      className="text-xs font-extrabold bg-bg-soft text-ink px-2 py-1 rounded-full tabular-nums"
+                    >
+                      {ts.score} · {ts.pct}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stats.exactHitForms.length > EXACT_HITS_INLINE_CAP && (
+              <div className="pt-1">
+                <p className="text-xs font-extrabold text-ink-muted mb-1">
+                  כל מי שקלע בדיוק:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {stats.exactHitForms.map((f) => (
+                    <span
+                      key={f.formId}
+                      className="text-xs font-bold bg-primary/10 text-primary-dark px-2 py-1 rounded-full truncate max-w-[180px]"
+                    >
+                      {f.formName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+    </section>
   );
 }

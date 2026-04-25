@@ -87,7 +87,7 @@ export default function AdminSummariesTab() {
     <div className="space-y-4">
       <div className="card-duo flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="font-extrabold text-base text-ink">יומן המונדיאל</h3>
+          <h3 className="font-extrabold text-base text-ink">בלוג המונדיאל</h3>
           <p className="text-xs text-ink-muted font-medium">
             {sortedSummaries.length} סיכומים · {uncoveredCount} משחקים חדשים עם תוצאה
           </p>

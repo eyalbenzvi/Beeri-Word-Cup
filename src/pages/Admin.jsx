@@ -77,7 +77,7 @@ export default function Admin() {
           { id: "dashboard", label: "סקירה" },
           { id: "forms", label: "טפסים" },
           { id: "results", label: "תוצאות" },
-          { id: "summaries", label: "יומן" },
+          { id: "summaries", label: "בלוג" },
           { id: "topscorer", label: "מלך שערים" },
           { id: "users", label: "משתמשים" },
           { id: "tools", label: "כלים" },

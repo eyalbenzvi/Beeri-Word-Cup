@@ -180,6 +180,214 @@ console.log("--- 7. top 3 scores, sorted descending ---");
   assert(s.topScores[1].score === "2-2" && s.topScores[1].count === 2, "2-2 second");
 }
 
+// ============ NEW: editorial / piquancy hooks ============
+// Hooks added for the suggestion panel in the admin editor. They power the
+// "💡 רעיונות פיקנטיים" chips. Defaults (no result / no forms) must be safe.
+
+console.log("--- 7. piquancy hooks: defaults (no result) ---");
+{
+  const s = computeMatchStats({
+    matchId: "m",
+    result: null,
+    allPredictions: { f1: mkForm("u1", { m: { homeScore: 1, awayScore: 0 } }, "submitted", "טופס א") },
+    users: USERS,
+  });
+  assert(Array.isArray(s.lonePicks) && s.lonePicks.length === 0, "lonePicks empty pre-match");
+  assert(s.consensusFlop === null, "consensusFlop null pre-match");
+  assert(Array.isArray(s.underdogHeroes) && s.underdogHeroes.length === 0, "underdogHeroes empty pre-match");
+  assert(s.wasUnpredictable === false, "wasUnpredictable false pre-match");
+}
+
+console.log("--- 8. lonePicks: 1 form nailed it ---");
+{
+  // 5 forms, only one predicted exact 2-1 (which is the actual result)
+  const allPredictions = {
+    f1: mkForm("u1", { m: { homeScore: 1, awayScore: 0 } }, "submitted", "אלון"),
+    f2: mkForm("u2", { m: { homeScore: 2, awayScore: 1 } }, "submitted", "דנה"),
+    f3: mkForm("u3", { m: { homeScore: 1, awayScore: 1 } }, "submitted", "יוסי"),
+    f4: mkForm("u4", { m: { homeScore: 0, awayScore: 0 } }, "submitted", "רותם"),
+    f5: mkForm("u1", { m: { homeScore: 3, awayScore: 0 } }, "submitted", "אלון2"),
+  };
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 2, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.lonePicks.length === 1, "lonePicks has 1 entry");
+  assert(s.lonePicks[0].formName === "דנה", "lonePicks names דנה");
+}
+
+console.log("--- 9. lonePicks: too many exact hits (>3) → empty ---");
+{
+  // 5 forms all picked the actual scoreline — not "lone" anymore
+  const allPredictions = {};
+  for (let i = 1; i <= 5; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 1, awayScore: 0 } }, "submitted", `טופס ${i}`);
+  }
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 1, awayScore: 0 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.lonePicks.length === 0, "lonePicks empty when >3 hit exact");
+  assert(s.exactHitCount === 5, "but exactHitCount still 5");
+}
+
+console.log("--- 10. consensusFlop: 80% picked wrong outcome ---");
+{
+  // 10 forms: 8 said home win, 2 said away win. Actual: away win.
+  const allPredictions = {};
+  for (let i = 1; i <= 8; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 2, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  for (let i = 9; i <= 10; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 0, awayScore: 1 } }, "submitted", `A${i}`);
+  }
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 0, awayScore: 2 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.consensusFlop !== null, "consensusFlop fires");
+  assert(s.consensusFlop.actualOutcome === "away", "consensusFlop tracks actual outcome");
+  assert(s.consensusFlop.missPct >= 70, `consensusFlop missPct ≥ 70 (got ${s.consensusFlop?.missPct})`);
+}
+
+console.log("--- 11. consensusFlop: only 50% wrong → does NOT fire ---");
+{
+  const allPredictions = {
+    f1: mkForm("u1", { m: { homeScore: 1, awayScore: 0 } }, "submitted", "א"),
+    f2: mkForm("u2", { m: { homeScore: 0, awayScore: 1 } }, "submitted", "ב"),
+  };
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 1, awayScore: 0 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.consensusFlop === null, "consensusFlop does not fire at 50% miss");
+}
+
+console.log("--- 12. underdogHeroes: minority outcome was right ---");
+{
+  // 10 forms: 9 picked home win, 1 picked away win. Actual: away win.
+  const allPredictions = {};
+  for (let i = 1; i <= 9; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 2, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  allPredictions["f10"] = mkForm("u4", { m: { homeScore: 0, awayScore: 3 } }, "submitted", "רותם");
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 0, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.underdogHeroes.length === 1, `underdogHeroes has 1 (got ${s.underdogHeroes.length})`);
+  assert(s.underdogHeroes[0].formName === "רותם", "underdogHeroes names רותם");
+}
+
+console.log("--- 13. underdogHeroes: actual outcome was popular → empty ---");
+{
+  // 8 picked home, actual was home → no underdog story
+  const allPredictions = {};
+  for (let i = 1; i <= 8; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 1, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 2, awayScore: 0 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.underdogHeroes.length === 0, "underdogHeroes empty when actual was popular");
+}
+
+console.log("--- 14. wasUnpredictable: underdog AND ≤2 exacts ---");
+{
+  // 10 forms: 9 picked home, 1 picked away (rotem). Actual: away 0-1. Only rotem matches outcome (and exact).
+  const allPredictions = {};
+  for (let i = 1; i <= 9; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 1, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  allPredictions["f10"] = mkForm("u4", { m: { homeScore: 0, awayScore: 1 } }, "submitted", "רותם");
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 0, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.wasUnpredictable === true, "wasUnpredictable true for underdog+lone-exact");
+}
+
+console.log("--- 15. wasUnpredictable: underdog but many exacts → false ---");
+{
+  // Edge: hypothetically 3 forms picked exact "0-1" away but only because they were the underdog group.
+  // Actually here we just test that >2 exacts kills the unpredictable flag.
+  const allPredictions = {};
+  for (let i = 1; i <= 7; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 1, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  // 3 forms picked exact 0-1
+  for (let i = 8; i <= 10; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i}`, { m: { homeScore: 0, awayScore: 1 } }, "submitted", `A${i}`);
+  }
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 0, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+  });
+  // 3/10 = 30% which is ≥ 25% (underdogOutcomePct threshold) → underdog won't fire
+  // Even if it did, 3 exacts > 2 unpredictableExactMax → still false
+  assert(s.wasUnpredictable === false, "wasUnpredictable false with many exacts");
+}
+
+console.log("--- 16. underdogHeroes: capped at 5 ---");
+{
+  // 100 forms picked home win, 6 picked away win. Actual: away win.
+  // Underdog at 6/106 ≈ 5.7% < 25%, so underdogHeroes should fire and cap at 5.
+  const allPredictions = {};
+  for (let i = 1; i <= 100; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i % 4 + 1}`, { m: { homeScore: 1, awayScore: 0 } }, "submitted", `H${i}`);
+  }
+  for (let i = 101; i <= 106; i++) {
+    allPredictions[`f${i}`] = mkForm(`u${i % 4 + 1}`, { m: { homeScore: 0, awayScore: 2 } }, "submitted", `A${i}`);
+  }
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 0, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+  });
+  assert(s.underdogHeroes.length === 5, `underdogHeroes capped at 5 (got ${s.underdogHeroes.length})`);
+}
+
+console.log("--- 17. backwards compat: existing fields untouched ---");
+{
+  // Sanity: the new fields don't break the old shape.
+  const s = computeMatchStats({
+    matchId: "m",
+    result: { homeScore: 1, awayScore: 0 },
+    allPredictions: {
+      f1: mkForm("u1", { m: { homeScore: 1, awayScore: 0 } }, "submitted", "א"),
+    },
+    users: USERS,
+  });
+  assert("totalForms" in s, "still has totalForms");
+  assert("outcomeCounts" in s, "still has outcomeCounts");
+  assert("outcomePct" in s, "still has outcomePct");
+  assert("topScores" in s, "still has topScores");
+  assert("exactHitCount" in s, "still has exactHitCount");
+  assert("exactHitForms" in s, "still has exactHitForms");
+  assert("outcomeHitCount" in s, "still has outcomeHitCount");
+  assert("actual" in s, "still has actual");
+  assert("actualScoreCount" in s, "still has actualScoreCount");
+  assert("actualScorePct" in s, "still has actualScorePct");
+}
+
 // ============ SUMMARY ============
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failures.length) {

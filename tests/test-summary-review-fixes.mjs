@@ -151,7 +151,7 @@ assert(/isStrictInt\s*=\s*typeof\s+rawN\s*===\s*"string"\s*&&\s*\/\^\\d\+\$\//.t
 // ============ IMPL. BLOG copy block exists and is referenced ============
 console.log("--- IMPL: BLOG copy centralized ---");
 assert(/export const BLOG\s*=\s*\{/.test(messages), "BLOG export exists in messages");
-assert(/navLabel:\s*"יומן"/.test(messages), "BLOG.navLabel defined");
+assert(/navLabel:\s*"בלוג"/.test(messages), "BLOG.navLabel defined");
 assert(/pageTitle:/.test(messages), "BLOG.pageTitle defined");
 assert(/editor:\s*\{/.test(messages), "BLOG.editor defined");
 assert(/public:\s*\{/.test(messages), "BLOG.public defined");

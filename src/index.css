@@ -478,6 +478,24 @@ button:focus-visible { border-radius: 14px; }
 .badge-duo-danger { background: var(--color-danger); color: #FFFFFF; }
 .badge-duo-muted { background: var(--color-bg-soft); color: var(--color-ink-muted); border: 2px solid var(--color-border); }
 
+/* --------- Long-form prose (blog) --------- */
+
+/* Reading column cap — used by long-form prose pages (the blog).
+   Keeps lines ~65–75 Hebrew chars wide on desktop; no-op on mobile. */
+.prose-column { max-width: 68ch; margin-inline: auto; }
+
+/* Lede paragraph: oversized first character without a true CSS drop-cap
+   (Hebrew + Heebo float behaviour is unreliable in WebKit). Modest 1.6×
+   scale keeps misalignment small even on letters with descenders. */
+.lede::first-letter {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.6em;
+  line-height: 1;
+  margin-inline-end: 0.06em;
+  color: var(--color-primary-dark);
+}
+
 /* --------- Scrollbar --------- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }

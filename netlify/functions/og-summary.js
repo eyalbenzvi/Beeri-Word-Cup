@@ -105,7 +105,7 @@ function buildHtml({ title, description, url, image }) {
   <link rel="canonical" href="${safeUrl}">
 </head>
 <body>
-  <p>מעביר אותך ליומן...</p>
+  <p>מעביר אותך לבלוג...</p>
   <script>window.location.replace(${scriptSafeUrl});</script>
 </body>
 </html>`;
@@ -158,7 +158,7 @@ async function ogSummaryHandler(event) {
     const description =
       summary.subtitle
       || (typeof summary.intro === "string" ? summary.intro.slice(0, 200) : "")
-      || "יומן המונדיאל של קיבוץ בארי";
+      || "בלוג המונדיאל של קיבוץ בארי";
     const html = buildHtml({
       title,
       description,
