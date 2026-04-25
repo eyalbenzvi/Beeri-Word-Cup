@@ -38,6 +38,7 @@ tests/           — 16 test suites, 2340+ tests, run via ./tests/run-all.sh
 - `src/hooks/useStore.js` — React hooks wrapping store. `useCurrentUser()` subscribes to both `isStoreReady` AND `getUsers` (needed for new user creation reactivity)
 - `src/data/matches.js` — All 104 matches with Israel times, venues, knockout bracket structure. `MATCH_VENUES` lookup by FIFA match number.
 - `firestore.rules` — Security: `formId.matches(request.auth.uid + '__.*')`, locked predictions guard
+- `docs/brand-book.md` — Visual language source of truth (colors, typography, components, motion, voice). Always consult before UI work.
 
 ## Common Patterns
 - Match times are Israel time (IDT, UTC+3), converted from local host-city times

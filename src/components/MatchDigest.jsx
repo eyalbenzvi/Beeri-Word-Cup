@@ -91,14 +91,11 @@ export default function MatchDigest({
 
   return (
     <div className="card-duo space-y-3">
-      {/* Header: stage, venue, date */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Header: stage only — date/venue are redundant inside a recap blog */}
+      <div className="flex items-center flex-wrap gap-2">
         <span className="text-[11px] font-extrabold text-secondary uppercase tracking-wider">
           {stageLabel}
           {match.group ? ` · בית ${match.group}` : ""}
-        </span>
-        <span className="text-[11px] text-ink-muted font-medium">
-          {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
         </span>
       </div>
 
@@ -216,7 +213,7 @@ export default function MatchDigest({
                     key={f.formId}
                     className="text-xs font-bold bg-primary/10 text-primary-dark px-2 py-1 rounded-full truncate max-w-[180px]"
                   >
-                    {f.userName}
+                    {f.formName}
                   </span>
                 ))}
               </div>

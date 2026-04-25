@@ -50,8 +50,8 @@ export const LABELS = {
 // stays consistent between the admin editor and the public page, and so a
 // future retype is a one-file change.
 export const BLOG = {
-  navLabel: "יומן",
-  pageTitle: "יומן המונדיאל",
+  navLabel: "בלוג",
+  pageTitle: "בלוג המונדיאל",
   archiveHeader: "כל הסיכומים",
   status: {
     draftBadge: "טיוטה",
@@ -98,7 +98,7 @@ export const BLOG = {
     emptyTitle: "אין עדיין סיכומים",
     emptyBody: "ברגע שהאדמין יפרסם את הסיכום הראשון, הוא יופיע כאן.",
     draftBanner: "⚠️ תצוגת טיוטה — רק אדמין רואה את זה.",
-    guestTitle: "👋 ברוך הבא ליומן המונדיאל של בארי",
+    guestTitle: "👋 ברוך הבא לבלוג המונדיאל של בארי",
     guestBody: "התחבר כדי לראות את הדירוג ומי קלע מדויק.",
     guestCta: "כניסה למונדיאל",
   },

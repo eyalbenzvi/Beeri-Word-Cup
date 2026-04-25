@@ -87,7 +87,7 @@ export default function Home() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-extrabold text-secondary tracking-wider uppercase">
-              יומן · סיכום #{latestSummary.number}
+              בלוג · סיכום #{latestSummary.number}
             </div>
             <div className="text-sm font-extrabold text-ink truncate">
               {latestSummary.title || `סיכום #${latestSummary.number}`}
