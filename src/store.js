@@ -703,6 +703,46 @@ let publicModeInitialized = false;
 let publicSummariesUnsub = null;
 let publicSettingsUnsub = null;
 let publicSettingsTimer = null;
+let publicReadinessWatchdog = null;
+
+// Hard upper bound on how long a guest viewer can stay on the blog's
+// "טוען..." spinner before we force-resolve the readiness flags. Past
+// fixes have repeatedly closed individual failure paths (early-return
+// on non-ok fetch, ordering of ready/notify, predictionsLocked source)
+// only for a NEW silent failure mode to surface. The watchdog catches
+// any future unknown mode (Firestore listener never firing, blocked
+// IndexedDB on Safari ITP, browser extension intercepting requests,
+// CSP refinements) — at worst the visitor sees an empty state, never
+// an indefinite spinner. Listeners that arrive later still upgrade the
+// data normally.
+const PUBLIC_READINESS_WATCHDOG_MS = 6000;
+
+function markPublicReadinessForced() {
+  if (!publicModeInitialized) return;
+  let changed = false;
+  if (!cache._ready.summaries) {
+    cache._ready.summaries = true;
+    changed = true;
+  }
+  if (!cache._ready.settings) {
+    cache._ready.settings = true;
+    changed = true;
+  }
+  if (!cache._ready.matchResults) {
+    cache._ready.matchResults = true;
+    changed = true;
+  }
+  if (changed) {
+    captureClientMessage("public-readiness-watchdog", {
+      thresholdMs: PUBLIC_READINESS_WATCHDOG_MS,
+      hadSummaries: Object.keys(cache.summaries || {}).length > 0,
+      hadSettings: cache.settings && "predictionsLocked" in cache.settings,
+    });
+    notifyAndEmit("summaries");
+    notifyAndEmit("settings");
+    notifyAndEmit("matchResults");
+  }
+}
 
 async function fetchPublicSettingsOnce() {
   // Capture the mode flag at call time. If the user signs in while the
@@ -758,14 +798,23 @@ export function initPublicReadonlyMode() {
   publicModeInitialized = true;
 
   // Subscribe to published summaries (Firestore rule permits unauth reads).
+  // Wrapped in try/catch because a throw inside the success handler (e.g.
+  // unexpected snapshot shape) would otherwise leave _ready.summaries
+  // permanently false — and `onSnapshot` would not fire the error
+  // callback for an exception in the success callback.
   publicSummariesUnsub = onSnapshot(
     query(summariesCollectionRef, where("status", "==", "published")),
     (snapshot) => {
-      const map = {};
-      snapshot.forEach((docSnap) => {
-        map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-      });
-      cache.summaries = map;
+      try {
+        const map = {};
+        snapshot.forEach((docSnap) => {
+          map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+        });
+        cache.summaries = map;
+      } catch (err) {
+        console.error("Public summaries snapshot parse error:", err);
+        captureClientError(err, { source: "publicSummariesParse" });
+      }
       cache._ready.summaries = true;
       notifyAndEmit("summaries");
     },
@@ -780,18 +829,22 @@ export function initPublicReadonlyMode() {
   // the Firestore rule explicitly allows unauthenticated reads of that doc
   // (see firestore.rules: `allow read: if isAuth() || docId == 'settings'`).
   // We listen directly so the blog's pre-tournament gate works even when
-  // the Netlify get-public-settings endpoint is unreachable (e.g. host
-  // allowlist edge rejection). matchResults still rides on the function
-  // because the rules don't expose it publicly.
+  // the Netlify get-public-settings endpoint is unreachable. matchResults
+  // still rides on the function because the rules don't expose it publicly.
   publicSettingsUnsub = onSnapshot(
     gameDocRef("settings"),
     (snap) => {
       if (!publicModeInitialized) return;
-      const data = snap.exists() ? snap.data()?.data : null;
-      cache.settings = {
-        ...(cache.settings || {}),
-        predictionsLocked: !!(data && data.predictionsLocked),
-      };
+      try {
+        const data = snap.exists() ? snap.data()?.data : null;
+        cache.settings = {
+          ...(cache.settings || {}),
+          predictionsLocked: !!(data && data.predictionsLocked),
+        };
+      } catch (err) {
+        console.error("Public settings snapshot parse error:", err);
+        captureClientError(err, { source: "publicSettingsParse" });
+      }
       cache._ready.settings = true;
       notifyAndEmit("settings");
     },
@@ -805,6 +858,15 @@ export function initPublicReadonlyMode() {
   // matchResults (and a redundant settings refresh) via the public endpoint.
   fetchPublicSettingsOnce();
   publicSettingsTimer = setInterval(fetchPublicSettingsOnce, 30_000);
+
+  // Hard watchdog: if any of the readiness flags haven't flipped after
+  // PUBLIC_READINESS_WATCHDOG_MS, force them so the blog page exits the
+  // "טוען..." gate. Must come AFTER the listeners are set up so the
+  // happy path always wins the race when network/permissions are fine.
+  publicReadinessWatchdog = setTimeout(
+    markPublicReadinessForced,
+    PUBLIC_READINESS_WATCHDOG_MS,
+  );
 
   // Mark other keys ready so the UI doesn't block on unused streams.
   for (const key of ["users", "actualAdvancing", "actualBonuses", "predictions"]) {
@@ -828,6 +890,10 @@ function teardownPublicReadonlyMode() {
   if (publicSettingsTimer) {
     clearInterval(publicSettingsTimer);
     publicSettingsTimer = null;
+  }
+  if (publicReadinessWatchdog) {
+    clearTimeout(publicReadinessWatchdog);
+    publicReadinessWatchdog = null;
   }
 }
 
