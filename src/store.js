@@ -772,9 +772,21 @@ async function fetchPublicSettingsOnce() {
       notifyAndEmit("settings");
       notifyAndEmit("matchResults");
       succeeded = true;
+    } else {
+      // Surface non-ok responses (deploy misconfig, host_not_allowed at
+      // edge, function 5xx) so we don't keep guessing why the blog hangs.
+      // Deduped by status so an outage produces one event per session.
+      captureClientMessage(`public-settings-fetch-${res.status}`, {
+        status: res.status,
+        statusText: res.statusText,
+      }, "warning");
     }
-  } catch {
-    // Network error — leave whatever we had.
+  } catch (err) {
+    // Network error / CORS / abort. Same rationale: surface it, but don't
+    // throw — the failsafe below still flips readiness so the UI moves.
+    captureClientMessage("public-settings-fetch-threw", {
+      message: err?.message || "unknown",
+    }, "warning");
   }
   // Failure path: still mark the keys as "ready" (with whatever the cache
   // already holds — the direct Firestore listener for `settings` may have
@@ -820,6 +832,13 @@ export function initPublicReadonlyMode() {
     },
     (err) => {
       console.error("Public summaries listener error:", err);
+      // Route to Sentry so a deployed-rules drift (e.g. unauth read denied
+      // on /summaries) surfaces. Without this hook the listener fails
+      // silently — the user passes the loading gate with cache.summaries
+      // empty and sees the "no summaries" empty card, indistinguishable
+      // from the legitimate empty case. reportListenerError downgrades
+      // permission-denied to a deduped warning message.
+      reportListenerError(err, "publicSummariesListener", { code: err?.code });
       cache._ready.summaries = true;
       notifyAndEmit("summaries");
     },
@@ -850,6 +869,7 @@ export function initPublicReadonlyMode() {
     },
     (err) => {
       console.error("Public settings listener error:", err);
+      reportListenerError(err, "publicSettingsListener", { code: err?.code });
       cache._ready.settings = true;
       notifyAndEmit("settings");
     },
