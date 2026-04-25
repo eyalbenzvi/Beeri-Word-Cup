@@ -2,6 +2,23 @@
 // compute how many predicted home/draw/away, the exact-score distribution,
 // the most-common predicted scoreline, and who got the exact score right.
 
+// Editorial thresholds for the "piquant" hooks that drive the suggestion
+// panel in the admin editor. Tuned to surface roughly one or two hooks per
+// match — too tight and nothing fires, too loose and every match looks
+// the same. Documented here so changes are deliberate.
+const HOOK_THRESHOLDS = {
+  // What counts as a "lone pick" — only this many forms predicted the actual
+  // scoreline. 0 means "no one"; 1–3 is the spicy band.
+  lonePickMax: 3,
+  // Consensus flop: at least this fraction of forms picked the WRONG outcome.
+  consensusFlopPct: 70,
+  // Underdog outcome: the actual outcome was picked by less than this %.
+  underdogOutcomePct: 25,
+  // Was-unpredictable: composite — outcome was underdog AND fewer than this
+  // many forms got the exact scoreline.
+  unpredictableExactMax: 2,
+};
+
 function outcomeOf(home, away) {
   const h = Number(home);
   const a = Number(away);
@@ -94,6 +111,58 @@ export function computeMatchStats({
   const actualKey = result ? `${Number(result.homeScore)}-${Number(result.awayScore)}` : null;
   const actualScoreCount = actualKey ? (scoreCounts.get(actualKey) || 0) : 0;
 
+  // ---- Editorial / "piquancy" hooks ----
+  // All gated on `result` — pre-match a hook makes no sense.
+  const outcomeMissPct = result
+    ? 100 - (totalForms > 0 ? Math.round((outcomeHitCount / totalForms) * 100) : 0)
+    : 0;
+  const actualOutcomePct = result && actualOutcome
+    ? Math.round((outcomeCounts[actualOutcome] / Math.max(totalForms, 1)) * 100)
+    : 0;
+
+  // lonePicks: 1–3 forms got the EXACT actual scoreline. The names. The spice.
+  const lonePicks = result && actualScoreCount > 0 && actualScoreCount <= HOOK_THRESHOLDS.lonePickMax
+    ? exactHitForms.slice(0, HOOK_THRESHOLDS.lonePickMax).map((f) => ({
+        formId: f.formId,
+        formName: f.formName,
+      }))
+    : [];
+
+  // consensusFlop: most picked the wrong outcome.
+  const consensusFlop = result && outcomeMissPct >= HOOK_THRESHOLDS.consensusFlopPct
+    ? { missPct: outcomeMissPct, actualOutcome }
+    : null;
+
+  // underdogHeroes: the actual outcome was picked by a small minority,
+  // and they were RIGHT (in outcome — score may differ). Returns the names
+  // of forms who picked the underdog outcome.
+  let underdogHeroes = [];
+  if (result && actualOutcome && actualOutcomePct > 0 && actualOutcomePct < HOOK_THRESHOLDS.underdogOutcomePct) {
+    // We need to re-walk forms to grab names that picked the actual outcome.
+    // Deliberately a second pass — keeps the main loop unchanged.
+    for (const [formId, form] of Object.entries(allPredictions || {})) {
+      if (!isScorableForm(form)) continue;
+      const pred = getFormPrediction(form, matchId);
+      if (!pred) continue;
+      if (outcomeOf(pred.homeScore, pred.awayScore) === actualOutcome) {
+        underdogHeroes.push({
+          formId,
+          formName: form.formName || "טופס",
+        });
+        if (underdogHeroes.length >= 5) break;
+      }
+    }
+  }
+
+  // wasUnpredictable: composite signal — underdog outcome AND ≤2 exacts.
+  // Useful as a single boolean for "this whole match was a surprise".
+  const wasUnpredictable = !!(
+    result
+    && actualOutcomePct > 0
+    && actualOutcomePct < HOOK_THRESHOLDS.underdogOutcomePct
+    && exactHitForms.length <= HOOK_THRESHOLDS.unpredictableExactMax
+  );
+
   return {
     totalForms,
     outcomeCounts,
@@ -116,5 +185,10 @@ export function computeMatchStats({
       : null,
     actualScoreCount,
     actualScorePct: pct(actualScoreCount),
+    // Editorial hooks (added — never remove the fields above)
+    lonePicks,
+    consensusFlop,
+    underdogHeroes,
+    wasUnpredictable,
   };
 }

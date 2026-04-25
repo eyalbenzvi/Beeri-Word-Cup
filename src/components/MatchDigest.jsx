@@ -2,6 +2,12 @@ import { useMemo } from "react";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { BLOG } from "../constants/messages";
+
+// How many exact-hit names to show inline above the fold before
+// collapsing the rest behind a "+N עוד" label. The full list still
+// appears inside the <details> breakdown when expanded.
+const EXACT_HITS_INLINE_CAP = 3;
 
 function OutcomeBar({ pct, label, count, color }) {
   const safePct = Math.max(0, Math.min(100, pct || 0));
@@ -79,13 +85,13 @@ export default function MatchDigest({
         {match.group ? ` · בית ${match.group}` : ""}
       </div>
 
-      {/* H2 — the section anchor */}
+      {/* H2 — the section anchor. Flags omitted: the kicker carries stage,
+          the slim scoreline carries the visual; flags here read as a
+          scoreboard widget instead of prose. */}
       <h2 className="font-heading text-xl md:text-2xl font-extrabold text-ink leading-tight tracking-tight">
-        <span aria-hidden="true">{home?.flag || "🏳️"}</span>{" "}
         {homeName}
         <span className="text-ink-light font-bold mx-2">נגד</span>
-        {awayName}{" "}
-        <span aria-hidden="true">{away?.flag || "🏳️"}</span>
+        {awayName}
       </h2>
 
       {/* Scoreline (slim) */}
@@ -115,6 +121,42 @@ export default function MatchDigest({
         >
           {note}
         </blockquote>
+      )}
+
+      {/* Exact-hit names — surfaced ABOVE the fold (formerly buried inside
+          the collapsed <details>). The single most engaging element of the
+          page: members seeing their name. Cap at 3 inline + "+N עוד" so a
+          big-hit match doesn't run a 30-name line. The full list still
+          appears inside the breakdown disclosure below. */}
+      {result && stats.totalForms > 0 && (
+        <div className="mt-4 text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+          {stats.exactHitForms.length === 0 ? (
+            <span className="text-ink-muted font-medium">
+              {BLOG.public.exactHitsNone}
+            </span>
+          ) : (
+            <>
+              <span className="text-ink-muted font-bold">
+                {BLOG.public.exactHitsLabel(stats.exactHitForms.length)}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {stats.exactHitForms.slice(0, EXACT_HITS_INLINE_CAP).map((f) => (
+                  <span
+                    key={f.formId}
+                    className="text-xs font-extrabold bg-primary/10 text-primary-dark px-2 py-1 rounded-full truncate max-w-[180px]"
+                  >
+                    {f.formName}
+                  </span>
+                ))}
+                {stats.exactHitForms.length > EXACT_HITS_INLINE_CAP && (
+                  <span className="text-xs font-bold text-ink-muted px-2 py-1 self-center">
+                    {BLOG.public.exactHitsMore(stats.exactHitForms.length - EXACT_HITS_INLINE_CAP)}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* One-line stat strip — always visible, quiet */}
@@ -186,10 +228,10 @@ export default function MatchDigest({
               </div>
             )}
 
-            {stats.exactHitForms.length > 0 && stats.exactHitForms.length <= 8 && (
+            {stats.exactHitForms.length > EXACT_HITS_INLINE_CAP && (
               <div className="pt-1">
                 <p className="text-xs font-extrabold text-ink-muted mb-1">
-                  מי קלע בדיוק:
+                  כל מי שקלע בדיוק:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {stats.exactHitForms.map((f) => (

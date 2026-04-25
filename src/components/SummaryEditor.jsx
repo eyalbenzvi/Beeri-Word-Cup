@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect, useRef } from "react";
-import { Sparkles } from "lucide-react";
+import { useMemo, useState, useEffect, useRef, useDeferredValue } from "react";
+import { Sparkles, Eye, Pencil, Plus } from "lucide-react";
 import * as summaryAI from "../utils/summaryAI";
 import { BLOG } from "../constants/messages";
 import {
@@ -13,8 +13,84 @@ import { ALL_MATCHES, getMatchById, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import { getMatchKickoffUTC } from "../utils/matchTime";
 import { computeMatchStats } from "../utils/summaryStats";
+import { getMatchSuggestions, getGlobalSuggestions, pairCoveredMatches } from "../utils/statStarters";
+import SummaryArticle from "./SummaryArticle";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
+
+// Append a suggestion text onto an existing field, separated by a blank
+// line so the result reads as a new paragraph. Empty existing → just the
+// suggestion. Used by both per-match and global piquancy chips.
+function appendSuggestion(existing, addition) {
+  const trimmed = (existing || "").trim();
+  if (!trimmed) return addition;
+  return `${trimmed}\n\n${addition}`;
+}
+
+// Per-match suggestion chips. Quiet by design — small label, no big buttons.
+// Click prepends to that match's note.
+function MatchSuggestionPanel({ suggestions, onInsert }) {
+  if (!suggestions || suggestions.length === 0) return null;
+  return (
+    <div className="mb-2">
+      <div className="flex items-center flex-wrap gap-1.5">
+        {suggestions.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => onInsert(s.text)}
+            title={s.text}
+            aria-label={BLOG.editor.suggestionInsertAria(s.text)}
+            className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-primary-soft text-primary-dark border-2 border-primary/30 hover:border-primary px-2 py-1 rounded-full cursor-pointer transition truncate max-w-[260px]"
+          >
+            <Plus size={12} className="flex-shrink-0" />
+            <span className="truncate">{s.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Global piquancy panel — shown above intro / conclusion. Each chip has TWO
+// insertion targets (intro/conclusion) since the cross-match observations
+// could fit either spot. Hidden when no suggestions fired.
+function GlobalSuggestionPanel({ suggestions, onInsertIntro, onInsertConclusion }) {
+  if (!suggestions || suggestions.length === 0) return null;
+  return (
+    <div className="card-duo">
+      <h3 className="font-extrabold text-sm text-ink mb-2">
+        {BLOG.editor.suggestionsGlobalHeading}
+      </h3>
+      <div className="space-y-2">
+        {suggestions.map((s) => (
+          <div key={s.id} className="flex items-center gap-2 flex-wrap">
+            <span
+              title={s.text}
+              className="inline-flex items-center gap-1 text-xs font-extrabold bg-primary-soft text-primary-dark border-2 border-primary/30 px-2 py-1 rounded-full truncate max-w-[260px] flex-1 min-w-0"
+            >
+              <span className="truncate">{s.label}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onInsertIntro(s.text)}
+              className="btn-duo-flat text-[11px] flex-shrink-0"
+            >
+              להקדמה
+            </button>
+            <button
+              type="button"
+              onClick={() => onInsertConclusion(s.text)}
+              className="btn-duo-flat text-[11px] flex-shrink-0"
+            >
+              לסיכום
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function teamLabel(code) {
   const t = getTeamByCode(code);
@@ -41,6 +117,12 @@ function MatchNoteRow({
     () => computeMatchStats({ matchId: mid, result: r, allPredictions, users }),
     [mid, r, allPredictions, users],
   );
+  // Piquancy chips for THIS match — same memo deps as stats since they're
+  // a derivative of it.
+  const suggestions = useMemo(
+    () => (m && r ? getMatchSuggestions({ match: m, result: r, allPredictions, users }) : []),
+    [m, r, allPredictions, users],
+  );
   if (!m) return null;
   return (
     <div className="border-2 border-border rounded-2xl p-3 bg-bg-soft/40">
@@ -52,12 +134,16 @@ function MatchNoteRow({
           {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} מדויקים
         </span>
       </div>
+      <MatchSuggestionPanel
+        suggestions={suggestions}
+        onInsert={(text) => onChange(appendSuggestion(value, text))}
+      />
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
         className="w-full p-2 border-2 border-border rounded-xl text-sm leading-relaxed"
-        placeholder="מה הייתה הדרמה? מי קלע בול?"
+        placeholder={BLOG.editor.placeholderMatchNote}
         maxLength={5000}
       />
       <div className="flex justify-end mt-1">
@@ -66,10 +152,10 @@ function MatchNoteRow({
           onClick={onAskAI}
           disabled={aiDisabled}
           className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
-          aria-label="הצע טיוטה עם AI"
+          aria-label={BLOG.editor.aiDraftMatch}
         >
           <Sparkles size={14} />
-          <span>{aiLoading ? "חושב..." : "הצע טיוטה"}</span>
+          <span>{aiLoading ? BLOG.editor.aiThinking : BLOG.editor.aiDraftMatch}</span>
         </button>
       </div>
     </div>
@@ -141,6 +227,9 @@ export default function SummaryEditor({ summaryId, onClose }) {
   );
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(null); // null | 'title' | 'intro' | 'conclusion' | match-id
+  // Editor view mode toggle. On xl: both columns are visible regardless of
+  // this state (split view). On smaller screens: this picks which one shows.
+  const [viewMode, setViewMode] = useState("write");
 
   // Hydrate local drafts from the loaded doc. We intentionally do NOT re-run
   // on every `existing` identity change, because the Firestore listener
@@ -217,6 +306,45 @@ export default function SummaryEditor({ summaryId, onClose }) {
       .sort((a, b) => (getMatchKickoffUTC(a) || 0) - (getMatchKickoffUTC(b) || 0));
   }, [matchResults]);
   const shownMatches = showAll ? allMatchesSorted : selectableMatches;
+
+  // Deferred copies of the heavy text fields so a fast typist doesn't trigger
+  // a full preview re-render on every keystroke (React 19 useDeferredValue).
+  const dfTitle = useDeferredValue(title);
+  const dfSubtitle = useDeferredValue(subtitle);
+  const dfIntro = useDeferredValue(intro);
+  const dfConclusion = useDeferredValue(conclusion);
+  const dfMatchNotes = useDeferredValue(matchNotes);
+
+  // Draft snapshot for the live preview. Includes the EXISTING fields
+  // (number, publishedAt, status) on top of in-memory edits so the preview
+  // shows the same masthead/byline the public page will.
+  const draftSummary = useMemo(
+    () => ({
+      ...(existing || {}),
+      title: dfTitle,
+      subtitle: dfSubtitle,
+      intro: dfIntro,
+      conclusion: dfConclusion,
+      coveredMatchIds,
+      matchNotes: dfMatchNotes,
+      // Make the byline date sensible even on a brand-new draft.
+      publishedAt: existing?.publishedAt || null,
+      updatedAt: existing?.updatedAt || new Date().toISOString(),
+      number: existing?.number,
+      status: existing?.status || "draft",
+    }),
+    [existing, dfTitle, dfSubtitle, dfIntro, dfConclusion, coveredMatchIds, dfMatchNotes],
+  );
+
+  // Global ("cross-match") piquancy suggestions for the whole post.
+  const globalSuggestions = useMemo(
+    () => getGlobalSuggestions({
+      coveredMatches: pairCoveredMatches(coveredMatchIds, matchResults),
+      allPredictions,
+      users,
+    }),
+    [coveredMatchIds, matchResults, allPredictions, users],
+  );
 
   const toggleMatch = (matchId, checked) => {
     setCoveredMatchIds((prev) => {
@@ -435,8 +563,14 @@ export default function SummaryEditor({ summaryId, onClose }) {
     );
   }
 
-  return (
+  // The form column (everything that exists today + the new global panel).
+  const writeColumn = (
     <div className="space-y-4">
+      <GlobalSuggestionPanel
+        suggestions={globalSuggestions}
+        onInsertIntro={(text) => setIntro((cur) => appendSuggestion(cur, text))}
+        onInsertConclusion={(text) => setConclusion((cur) => appendSuggestion(cur, text))}
+      />
       {/* Title + subtitle */}
       <div className="card-duo">
         <div className="flex items-center justify-between mb-1 gap-2">
@@ -446,10 +580,10 @@ export default function SummaryEditor({ summaryId, onClose }) {
             onClick={handleSuggestTitle}
             disabled={!!aiLoading}
             className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
-            aria-label="הצע כותרת עם AI"
+            aria-label={BLOG.editor.aiSuggestTitle}
           >
             <Sparkles size={14} />
-            <span>{aiLoading === "title" ? "חושב..." : "הצע כותרת"}</span>
+            <span>{aiLoading === "title" ? BLOG.editor.aiThinking : BLOG.editor.aiSuggestTitle}</span>
           </button>
         </div>
         <input
@@ -457,7 +591,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full p-2 border-2 border-border rounded-xl font-bold"
-          placeholder="למשל: יום הפתיחה"
+          placeholder={BLOG.editor.placeholderTitle}
           maxLength={200}
         />
         <label className="block text-xs font-extrabold text-ink-muted mt-3 mb-1">
@@ -468,7 +602,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
           value={subtitle}
           onChange={(e) => setSubtitle(e.target.value)}
           className="w-full p-2 border-2 border-border rounded-xl"
-          placeholder="משפט קצר"
+          placeholder={BLOG.editor.placeholderSubtitle}
           maxLength={300}
         />
       </div>
@@ -482,21 +616,18 @@ export default function SummaryEditor({ summaryId, onClose }) {
             onClick={() => handlePolish("intro")}
             disabled={!!aiLoading || !intro.trim()}
             className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
-            aria-label="שפר נוסח עם AI"
+            aria-label={BLOG.editor.aiPolish}
           >
             <Sparkles size={14} />
-            <span>{aiLoading === "intro" ? "משפר..." : "שפר נוסח"}</span>
+            <span>{aiLoading === "intro" ? BLOG.editor.aiPolishing : BLOG.editor.aiPolish}</span>
           </button>
         </div>
-        <p className="text-xs text-ink-muted mb-2">
-          טקסט חופשי שיופיע בפתיחת הסיכום.
-        </p>
         <textarea
           value={intro}
           onChange={(e) => setIntro(e.target.value)}
           rows={5}
           className="w-full p-2 border-2 border-border rounded-xl text-base leading-relaxed"
-          placeholder="במה נתמקד הפעם? מה קרה היום?"
+          placeholder={BLOG.editor.placeholderIntro}
           maxLength={20000}
         />
       </div>
@@ -574,21 +705,18 @@ export default function SummaryEditor({ summaryId, onClose }) {
             onClick={() => handlePolish("conclusion")}
             disabled={!!aiLoading || !conclusion.trim()}
             className="btn-duo btn-duo-ghost-raised btn-duo-sm flex items-center gap-1"
-            aria-label="שפר נוסח עם AI"
+            aria-label={BLOG.editor.aiPolish}
           >
             <Sparkles size={14} />
-            <span>{aiLoading === "conclusion" ? "משפר..." : "שפר נוסח"}</span>
+            <span>{aiLoading === "conclusion" ? BLOG.editor.aiPolishing : BLOG.editor.aiPolish}</span>
           </button>
         </div>
-        <p className="text-xs text-ink-muted mb-2">
-          טקסט סיום — מה מחכה לנו הלאה?
-        </p>
         <textarea
           value={conclusion}
           onChange={(e) => setConclusion(e.target.value)}
           rows={4}
           className="w-full p-2 border-2 border-border rounded-xl text-base leading-relaxed"
-          placeholder="מסקנות, מבט קדימה..."
+          placeholder={BLOG.editor.placeholderConclusion}
           maxLength={20000}
         />
       </div>
@@ -626,6 +754,67 @@ export default function SummaryEditor({ summaryId, onClose }) {
             {BLOG.editor.back}
           </button>
         )}
+      </div>
+    </div>
+  );
+
+  // Live preview column. Reuses the public-page article render so the
+  // admin sees exactly what readers will. We strip the page chrome
+  // (banners, prev/next, archive) — those aren't part of the post itself.
+  const previewColumn = (
+    <div className="bg-bg rounded-2xl border-2 border-border p-4 md:p-6 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+      <div className="text-[11px] font-extrabold text-ink-light uppercase tracking-wider mb-3">
+        {BLOG.editor.tabPreview}
+      </div>
+      <SummaryArticle
+        summary={draftSummary}
+        matchResults={matchResults}
+        allPredictions={allPredictions}
+        users={users}
+      />
+    </div>
+  );
+
+  return (
+    <div>
+      {/* View-mode tabs — visible on mobile/tablet only. On xl the split
+          view shows both columns simultaneously, so the toggle is hidden. */}
+      <div className="xl:hidden flex gap-1 mb-3 bg-bg-soft rounded-xl p-1 border-2 border-border">
+        <button
+          type="button"
+          onClick={() => setViewMode("write")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "write"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "write"}
+        >
+          <Pencil size={14} />
+          {BLOG.editor.tabWrite}
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("preview")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "preview"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "preview"}
+        >
+          <Eye size={14} />
+          {BLOG.editor.tabPreview}
+        </button>
+      </div>
+
+      <div className="xl:grid xl:grid-cols-2 xl:gap-6 xl:items-start">
+        <div className={viewMode === "write" ? "" : "hidden xl:block"}>
+          {writeColumn}
+        </div>
+        <div className={viewMode === "preview" ? "" : "hidden xl:block"}>
+          {previewColumn}
+        </div>
       </div>
     </div>
   );

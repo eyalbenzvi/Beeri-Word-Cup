@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { ChevronRight, ChevronLeft, Trophy } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
-import MatchDigest from "../components/MatchDigest";
+import SummaryArticle from "../components/SummaryArticle";
 import {
   useSummaries,
   useMatchResults,
@@ -14,25 +14,8 @@ import {
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useActualBonuses } from "../hooks/useStore";
-import { getMatchById } from "../data/matches";
 import { useRightRail } from "../hooks/useRail";
 import { BLOG } from "../constants/messages";
-
-function formatDateHe(iso) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("he-IL", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "Asia/Jerusalem",
-    });
-  } catch {
-    return "";
-  }
-}
 
 function LeaderboardRail({ rankedLeaderboard, users }) {
   if (!rankedLeaderboard || rankedLeaderboard.length === 0) return null;
@@ -224,36 +207,8 @@ export default function DailySummary() {
   const prev = visibleSummaries.find((s) => s.number === active.number - 1);
   const next = visibleSummaries.find((s) => s.number === active.number + 1);
 
-  const coveredIds = active.coveredMatchIds || [];
-  const dateLabel = formatDateHe(active.publishedAt || active.updatedAt || active.createdAt);
-
   return (
     <div>
-      {/* Masthead — replaces PageHeader for the article view so we can run
-          a journalistic kicker + Heebo display headline + a slim byline
-          strip rather than the centered card-style header used elsewhere. */}
-      <header className="mb-6 md:mb-10">
-        <div className="text-xs font-extrabold text-secondary tracking-[0.18em] uppercase mb-2">
-          {BLOG.pageTitle} · סיכום #{active.number}
-        </div>
-        <h1 className="font-heading text-3xl md:text-4xl xl:text-5xl font-extrabold text-ink leading-[1.1] tracking-tight">
-          {active.title || `סיכום #${active.number}`}
-        </h1>
-        {active.subtitle && (
-          <p className="font-heading text-lg md:text-xl text-ink-muted font-bold leading-snug mt-2 max-w-[68ch]">
-            {active.subtitle}
-          </p>
-        )}
-        {(dateLabel || coveredIds.length > 0) && (
-          <div className="mt-3 text-xs font-bold text-ink-light tracking-wider flex items-center gap-2 flex-wrap">
-            {dateLabel && <time>{dateLabel}</time>}
-            {dateLabel && coveredIds.length > 0 && <span aria-hidden="true">·</span>}
-            {coveredIds.length > 0 && <span>{coveredIds.length} משחקים</span>}
-          </div>
-        )}
-        <div className="h-px bg-border mt-4" />
-      </header>
-
       {active.status !== "published" && (
         <div className="alert-accent-soft mb-3 text-center">
           <p className="text-sm font-extrabold text-accent-text">
@@ -306,40 +261,13 @@ export default function DailySummary() {
 
       <LatestCountdown sortedSummaries={publishedSummaries} currentNumber={active.number} />
 
-      {/* The post itself — capped reading column so prose lines stay
-          ~65–75 Hebrew chars on desktop. No surrounding card chrome:
-          the page background + hairline rules carry the structure. */}
-      <article className="prose-column">
-        {active.intro && active.intro.trim() && (
-          <p className="lede text-lg md:text-xl leading-[1.85] text-ink font-medium whitespace-pre-wrap mt-6 mb-2">
-            {active.intro}
-          </p>
-        )}
-
-        {coveredIds.length > 0 && coveredIds.map((mid) => {
-          const m = getMatchById(mid);
-          if (!m) return null;
-          return (
-            <MatchDigest
-              key={mid}
-              match={m}
-              result={matchResults[mid]}
-              note={active.matchNotes?.[mid]}
-              allPredictions={allPredictions}
-              users={users}
-            />
-          );
-        })}
-
-        {active.conclusion && active.conclusion.trim() && (
-          <aside
-            className="mt-10 border-r-4 pr-4 text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap"
-            style={{ borderColor: "var(--color-accent)" }}
-          >
-            {active.conclusion}
-          </aside>
-        )}
-      </article>
+      {/* The article itself — pure render, reused by the editor preview. */}
+      <SummaryArticle
+        summary={active}
+        matchResults={matchResults}
+        allPredictions={allPredictions}
+        users={users}
+      />
 
       {/* Archive grid */}
       {visibleSummaries.length > 1 && (
