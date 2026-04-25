@@ -1,6 +1,4 @@
-import { useMemo } from "react";
-import { Newspaper } from "lucide-react";
-import { useSettings, useCurrentUser, useMatchResults, useSummaries } from "../hooks/useStore";
+import { useSettings, useCurrentUser, useMatchResults } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCountdown } from "../hooks/useCountdown";
 import { createForm } from "../store";
@@ -16,15 +14,7 @@ export default function Home() {
   const { navigate } = useNavigation();
   const countdown = useCountdown();
   const results = useMatchResults();
-  const summaries = useSummaries();
   const showToast = useToast();
-
-  const latestSummary = useMemo(() => {
-    const published = Object.values(summaries || {})
-      .filter((s) => s.status === "published")
-      .sort((a, b) => (a.number || 0) - (b.number || 0));
-    return published.length > 0 ? published[published.length - 1] : null;
-  }, [summaries]);
 
   return (
     <div className="text-center max-w-xl mx-auto">
@@ -72,29 +62,6 @@ export default function Home() {
             />
           )}
         </div>
-      )}
-
-      {latestSummary && (
-        <button
-          onClick={() => navigate("blog", { n: latestSummary.number })}
-          className="w-full text-right card-duo-tight bg-transparent cursor-pointer transition hover:border-primary mb-3 flex items-center gap-3"
-        >
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--color-primary-soft)" }}
-          >
-            <Newspaper size={20} className="text-primary-dark" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-extrabold text-secondary tracking-wider uppercase">
-              בלוג · סיכום #{latestSummary.number}
-            </div>
-            <div className="text-sm font-extrabold text-ink truncate">
-              {latestSummary.title || `סיכום #${latestSummary.number}`}
-            </div>
-          </div>
-          <span className="text-lg text-ink-muted" aria-hidden="true">‹</span>
-        </button>
       )}
 
       <div

@@ -218,6 +218,19 @@ assert(/if\s*\(!succeeded\s*&&\s*publicModeInitialized\)\s*\{[\s\S]*?cache\._rea
 assert(/if\s*\(!succeeded\s*&&\s*publicModeInitialized\)\s*\{[\s\S]*?cache\._ready\.matchResults\s*=\s*true[\s\S]*?notifyAndEmit\("matchResults"\)/.test(fetchBlock),
   "failure path: _ready.matchResults set + notified too");
 
+// ---- Home page must NOT link to the blog ----
+// Product decision: the blog is reachable only via the nav tab (rendered
+// by Layout / DesktopSideNav, gated on predictionsLocked + a published
+// post) or via an external shared link. Don't surface a "latest summary"
+// callout on Home for any user, in any state.
+const homePage = R("/home/user/Beeri-World-Cup/src/pages/Home.jsx");
+assert(!/navigate\(\s*["']blog["']/.test(homePage),
+  "Home.jsx must not navigate to the blog");
+assert(!/useSummaries/.test(homePage),
+  "Home.jsx must not subscribe to summaries (no blog surface there)");
+assert(!/Newspaper/.test(homePage),
+  "Home.jsx must not import the Newspaper icon (it was only used for the blog callout)");
+
 // (c) store + hooks expose the readiness checkers.
 assert(/export function isSettingsReady\s*\(\)/.test(store),
   "store exports isSettingsReady");
