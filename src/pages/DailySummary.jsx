@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState";
 import SummaryArticle from "../components/SummaryArticle";
 import {
   useSummaries,
+  useSummariesReady,
   useMatchResults,
   useAllPredictions,
   useUsers,
@@ -75,6 +76,7 @@ export default function DailySummary() {
   const { user } = useCurrentUser();
   const settings = useSettings();
   const settingsReady = useSettingsReady();
+  const summariesReady = useSummariesReady();
   const { params, navigate } = useNavigation();
 
   const { rankedLeaderboard } = useLeaderboardComputed(
@@ -145,40 +147,44 @@ export default function DailySummary() {
   );
   useRightRail(rail);
 
-  // Pre-tournament: hide the blog from non-admins entirely. Admins can keep
-  // working on drafts. We render an empty-state instead of a hard 404 so the
-  // route still resolves cleanly and the deep-link recovers automatically once
-  // the admin locks predictions.
-  //
-  // CRUCIAL: don't fire this guard before settings have actually loaded — for
-  // a guest hitting /blog directly, `settings` defaults to {predictionsLocked:
-  // false} until fetchPublicSettingsOnce() resolves a moment later. Without
-  // the readiness gate, the visitor briefly sees "אין עדיין סיכומים" even
-  // when there's a published post and the tournament is locked.
+  // For a guest hitting /blog directly, the store starts with default
+  // values (predictionsLocked: false, summaries: {}) until the public
+  // listeners resolve a moment later. Without readiness gates, the first
+  // render briefly shows "אין עדיין סיכומים" — wrongly — even when there
+  // IS a published post. We hold a loading state until BOTH:
+  //   1. settings is loaded (to know if predictionsLocked is true), AND
+  //   2. summaries listener has fired at least once (to know if there's
+  //      really nothing, vs. just not arrived yet).
+  // Admins go through the full auth flow + App.jsx ready gate, so by the
+  // time they see this component the store is already populated; the
+  // readiness checks below are no-ops for them.
   const predictionsLocked = !!settings?.predictionsLocked;
-  if (!user?.isAdmin) {
-    if (!settingsReady) {
-      return (
-        <div className="text-center py-8 text-ink-muted font-bold">
-          טוען...
-        </div>
-      );
-    }
-    if (!predictionsLocked) {
-      return (
-        <div>
-          <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
-          <EmptyState
-            icon="📰"
-            title={BLOG.public.emptyTitle}
-            description={BLOG.public.emptyBody}
-          />
-        </div>
-      );
-    }
+  const blogDataReady = settingsReady && summariesReady;
+  if (!user?.isAdmin && !blogDataReady) {
+    return (
+      <div className="text-center py-8 text-ink-muted font-bold">
+        טוען...
+      </div>
+    );
   }
 
-  // No summaries at all
+  // Pre-tournament: hide the blog from non-admins entirely. Admins keep
+  // editing drafts.
+  if (!user?.isAdmin && !predictionsLocked) {
+    return (
+      <div>
+        <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
+        <EmptyState
+          icon="📰"
+          title={BLOG.public.emptyTitle}
+          description={BLOG.public.emptyBody}
+        />
+      </div>
+    );
+  }
+
+  // No summaries at all (now safe to evaluate — the summaries listener has
+  // either resolved with data or genuinely returned an empty set).
   if (visibleSummaries.length === 0) {
     return (
       <div>
