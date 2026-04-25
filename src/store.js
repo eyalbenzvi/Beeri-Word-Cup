@@ -701,6 +701,7 @@ let summariesShowAll = false;
 // No users, no predictions. Safe to re-enter after login cleanup.
 let publicModeInitialized = false;
 let publicSummariesUnsub = null;
+let publicSettingsUnsub = null;
 let publicSettingsTimer = null;
 
 async function fetchPublicSettingsOnce() {
@@ -715,32 +716,35 @@ async function fetchPublicSettingsOnce() {
       credentials: "omit",
       cache: "no-store",
     });
-    if (!res.ok) return;
-    const data = await res.json();
-    // Re-check after the await: teardown may have happened during the fetch.
-    if (!publicModeInitialized) return;
-    cache.settings = {
-      ...(cache.settings || {}),
-      predictionsLocked: !!data?.predictionsLocked,
-    };
-    if (data?.matchResults && typeof data.matchResults === "object") {
-      cache.matchResults = data.matchResults;
+    if (res.ok) {
+      const data = await res.json();
+      // Re-check after the await: teardown may have happened during the fetch.
+      if (!publicModeInitialized) return;
+      cache.settings = {
+        ...(cache.settings || {}),
+        predictionsLocked: !!data?.predictionsLocked,
+      };
+      if (data?.matchResults && typeof data.matchResults === "object") {
+        cache.matchResults = data.matchResults;
+      }
+      cache._ready.settings = true;
+      cache._ready.matchResults = true;
+      notifyAndEmit("settings");
+      notifyAndEmit("matchResults");
+      succeeded = true;
     }
-    cache._ready.settings = true;
-    cache._ready.matchResults = true;
-    notifyAndEmit("settings");
-    notifyAndEmit("matchResults");
-    succeeded = true;
   } catch {
     // Network error — leave whatever we had.
   }
-  // Failure path: still mark the keys as "ready" (with the default cache
-  // values) and notify subscribers. Otherwise an outage of the public
-  // settings function would trap a guest viewer on the blog page's
-  // "טוען..." spinner — the readiness gate has no way to distinguish
-  // "first request still in flight" from "first request failed and we
-  // gave up". The 30-second retry will upgrade the data when the network
-  // recovers; this just stops the indefinite loading state in the meantime.
+  // Failure path: still mark the keys as "ready" (with whatever the cache
+  // already holds — the direct Firestore listener for `settings` may have
+  // populated `predictionsLocked` even when the public endpoint is down)
+  // and notify subscribers. Otherwise an outage of the public settings
+  // function would trap a guest viewer on the blog page's "טוען..."
+  // spinner — the readiness gate has no way to distinguish "first request
+  // still in flight" from "first request failed and we gave up". The
+  // 30-second retry will upgrade the data when the network recovers; this
+  // just stops the indefinite loading state in the meantime.
   if (!succeeded && publicModeInitialized) {
     cache._ready.settings = true;
     cache._ready.matchResults = true;
@@ -772,7 +776,33 @@ export function initPublicReadonlyMode() {
     },
   );
 
-  // Minimal matchResults + settings via the public endpoint.
+  // `gameData/settings` is the source of truth for `predictionsLocked`, and
+  // the Firestore rule explicitly allows unauthenticated reads of that doc
+  // (see firestore.rules: `allow read: if isAuth() || docId == 'settings'`).
+  // We listen directly so the blog's pre-tournament gate works even when
+  // the Netlify get-public-settings endpoint is unreachable (e.g. host
+  // allowlist edge rejection). matchResults still rides on the function
+  // because the rules don't expose it publicly.
+  publicSettingsUnsub = onSnapshot(
+    gameDocRef("settings"),
+    (snap) => {
+      if (!publicModeInitialized) return;
+      const data = snap.exists() ? snap.data()?.data : null;
+      cache.settings = {
+        ...(cache.settings || {}),
+        predictionsLocked: !!(data && data.predictionsLocked),
+      };
+      cache._ready.settings = true;
+      notifyAndEmit("settings");
+    },
+    (err) => {
+      console.error("Public settings listener error:", err);
+      cache._ready.settings = true;
+      notifyAndEmit("settings");
+    },
+  );
+
+  // matchResults (and a redundant settings refresh) via the public endpoint.
   fetchPublicSettingsOnce();
   publicSettingsTimer = setInterval(fetchPublicSettingsOnce, 30_000);
 
@@ -790,6 +820,10 @@ function teardownPublicReadonlyMode() {
   if (publicSummariesUnsub) {
     publicSummariesUnsub();
     publicSummariesUnsub = null;
+  }
+  if (publicSettingsUnsub) {
+    publicSettingsUnsub();
+    publicSettingsUnsub = null;
   }
   if (publicSettingsTimer) {
     clearInterval(publicSettingsTimer);
