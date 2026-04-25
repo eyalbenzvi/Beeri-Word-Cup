@@ -709,6 +709,7 @@ async function fetchPublicSettingsOnce() {
   // and we must NOT overwrite the authenticated listener's cache with stale
   // public-mode data.
   if (!publicModeInitialized) return;
+  let succeeded = false;
   try {
     const res = await fetch(`/.netlify/functions/get-public-settings?t=${Date.now()}`, {
       credentials: "omit",
@@ -725,22 +726,26 @@ async function fetchPublicSettingsOnce() {
     if (data?.matchResults && typeof data.matchResults === "object") {
       cache.matchResults = data.matchResults;
     }
+    cache._ready.settings = true;
+    cache._ready.matchResults = true;
     notifyAndEmit("settings");
     notifyAndEmit("matchResults");
+    succeeded = true;
   } catch {
     // Network error — leave whatever we had.
-  } finally {
-    // Mark the keys as "ready" even if the fetch failed. The setInterval
-    // retry will refresh them when the network recovers; in the meantime
-    // we don't want to trap a guest viewer on an indefinite loading
-    // spinner (the blog page's pre-tournament gate waits on this flag).
-    // Worst case: a single failed attempt shows the default
-    // predictionsLocked=false → empty state, which is the same behaviour
-    // we had before isSettingsReady existed.
-    if (publicModeInitialized) {
-      cache._ready.settings = true;
-      cache._ready.matchResults = true;
-    }
+  }
+  // Failure path: still mark the keys as "ready" (with the default cache
+  // values) and notify subscribers. Otherwise an outage of the public
+  // settings function would trap a guest viewer on the blog page's
+  // "טוען..." spinner — the readiness gate has no way to distinguish
+  // "first request still in flight" from "first request failed and we
+  // gave up". The 30-second retry will upgrade the data when the network
+  // recovers; this just stops the indefinite loading state in the meantime.
+  if (!succeeded && publicModeInitialized) {
+    cache._ready.settings = true;
+    cache._ready.matchResults = true;
+    notifyAndEmit("settings");
+    notifyAndEmit("matchResults");
   }
 }
 
@@ -1747,6 +1752,15 @@ const EMPTY_SUMMARIES = {};
 
 export function getSummaries() {
   return cache.summaries || EMPTY_SUMMARIES;
+}
+
+// Whether the summaries listener has fired at least once (success OR
+// permission-denied — both flip the flag). Distinguishes "we haven't asked
+// the server yet" from "we asked and the result is empty", which matters
+// for the public blog page so a guest viewer doesn't briefly see "אין עדיין
+// סיכומים" while the listener is mid-flight.
+export function isSummariesReady() {
+  return !!cache._ready.summaries;
 }
 
 export function getSummary(summaryId) {

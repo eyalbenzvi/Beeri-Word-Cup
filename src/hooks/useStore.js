@@ -210,3 +210,7 @@ export function useSettingsReady() {
 export function useSummaries() {
   return useStoreValue(store.getSummaries);
 }
+
+export function useSummariesReady() {
+  return useStoreValue(store.isSummariesReady);
+}

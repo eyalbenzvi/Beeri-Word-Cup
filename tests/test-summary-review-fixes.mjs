@@ -170,45 +170,64 @@ console.log("--- IMPL: localhost detection covers [::1] and .local ---");
 assert(/::1/.test(shareBtn), "share button detects IPv6 loopback");
 assert(/\.local/.test(shareBtn), "share button detects .local mDNS");
 
-// ============ REGRESSION: guest blog "settings race" ============
-// A logged-out visitor hitting /blog directly was seeing "אין עדיין סיכומים"
-// even when a post was published, because DailySummary's pre-tournament
-// gate fired on the first render — before the public-readonly endpoint
-// populated cache.settings.predictionsLocked. Two-part fix:
-//   (a) DailySummary must wait on a readiness flag before showing the gate.
-//   (b) fetchPublicSettingsOnce must set the readiness flag even on
-//       failure, so a network error doesn't trap the visitor on
-//       a "loading..." spinner forever.
-console.log("--- REGRESSION: guest blog settings-race fix ---");
+// ============ REGRESSION: guest blog readiness race ============
+// A logged-out visitor hitting /blog was seeing "אין עדיין סיכומים" even
+// when a post was published, because DailySummary's two empty-state gates
+// (pre-tournament, no-summaries) fired on the first render — before the
+// public-readonly listeners populated cache.settings or cache.summaries.
+// Three-part fix:
+//   (a) DailySummary waits on BOTH settingsReady AND summariesReady before
+//       showing either empty state.
+//   (b) fetchPublicSettingsOnce always marks _ready.settings AND notifies
+//       — on success and on failure — so a network error doesn't trap
+//       the visitor on a "loading..." spinner forever.
+//   (c) store + hooks expose isSettingsReady / isSummariesReady symbols.
+console.log("--- REGRESSION: guest blog readiness race ---");
 
-// (a) DailySummary checks settingsReady before showing the empty state.
+// (a) DailySummary checks both readiness flags before either empty state.
 assert(/useSettingsReady/.test(dailyPage),
   "DailySummary imports useSettingsReady");
+assert(/useSummariesReady/.test(dailyPage),
+  "DailySummary imports useSummariesReady");
 assert(/const\s+settingsReady\s*=\s*useSettingsReady\(\)/.test(dailyPage),
   "DailySummary calls useSettingsReady()");
-// The pre-tournament gate must guard on (!user.isAdmin) AND (settingsReady)
-// before deciding to render the empty state.
-assert(/if\s*\(!user\?\.isAdmin\)\s*\{[\s\S]*?if\s*\(!settingsReady\)/.test(dailyPage),
-  "DailySummary shows loading state for non-admins until settingsReady");
-assert(/if\s*\(!predictionsLocked\)\s*\{[\s\S]*?BLOG\.public\.emptyTitle/.test(dailyPage),
-  "DailySummary still renders the empty state once settings is ready and lock is off");
+assert(/const\s+summariesReady\s*=\s*useSummariesReady\(\)/.test(dailyPage),
+  "DailySummary calls useSummariesReady()");
+// Combined readiness gate — non-admins see "טוען..." until both flags are true.
+assert(/blogDataReady\s*=\s*settingsReady\s*&&\s*summariesReady/.test(dailyPage),
+  "DailySummary combines settings + summaries readiness");
+assert(/if\s*\(!user\?\.isAdmin\s*&&\s*!blogDataReady\)/.test(dailyPage),
+  "DailySummary holds loading state for non-admins until both flags are ready");
+// Empty-state gates still exist (for after data has loaded).
+assert(/if\s*\(!user\?\.isAdmin\s*&&\s*!predictionsLocked\)/.test(dailyPage),
+  "Pre-tournament gate still fires once settings ready and lock is off");
+assert(/if\s*\(visibleSummaries\.length\s*===\s*0\)/.test(dailyPage),
+  "no-summaries gate still exists for the actually-empty case");
 
-// (b) fetchPublicSettingsOnce sets _ready.settings=true even on failure.
-const fetchBlock = store.match(/async function fetchPublicSettingsOnce[\s\S]*?\n\}/)?.[0] || "";
-assert(/finally\s*\{[\s\S]*?cache\._ready\.settings\s*=\s*true/.test(fetchBlock),
-  "fetchPublicSettingsOnce sets _ready.settings in finally (network failure path)");
-assert(/finally\s*\{[\s\S]*?cache\._ready\.matchResults\s*=\s*true/.test(fetchBlock),
-  "fetchPublicSettingsOnce sets _ready.matchResults in finally too");
-// Guard inside finally: don't flip readiness if teardown happened mid-flight.
-assert(/finally\s*\{[\s\S]*?if\s*\(publicModeInitialized\)/.test(fetchBlock),
-  "finally re-checks publicModeInitialized before mutating cache");
+// (b) fetchPublicSettingsOnce flips readiness AND notifies on both paths.
+const fetchBlock = store.match(/async function fetchPublicSettingsOnce[\s\S]*?\n\}\n/)?.[0] || "";
+// Success path inside the try block: ready THEN notify (correct order so
+// subscribers see ready=true on the re-render triggered by notify).
+const tryBlock = fetchBlock.match(/try\s*\{[\s\S]*?\n  \}/)?.[0] || "";
+assert(/cache\._ready\.settings\s*=\s*true[\s\S]*?notifyAndEmit\("settings"\)/.test(tryBlock),
+  "success path: _ready.settings set BEFORE notifyAndEmit (subscribers must see ready=true)");
+// Failure fallback after the catch: also flips readiness and notifies, so
+// a fetch outage doesn't trap the visitor on the loading spinner.
+assert(/if\s*\(!succeeded\s*&&\s*publicModeInitialized\)\s*\{[\s\S]*?cache\._ready\.settings\s*=\s*true[\s\S]*?notifyAndEmit\("settings"\)/.test(fetchBlock),
+  "failure path: _ready.settings set + notified after catch");
+assert(/if\s*\(!succeeded\s*&&\s*publicModeInitialized\)\s*\{[\s\S]*?cache\._ready\.matchResults\s*=\s*true[\s\S]*?notifyAndEmit\("matchResults"\)/.test(fetchBlock),
+  "failure path: _ready.matchResults set + notified too");
 
-// Store exports the readiness checker.
+// (c) store + hooks expose the readiness checkers.
 assert(/export function isSettingsReady\s*\(\)/.test(store),
   "store exports isSettingsReady");
+assert(/export function isSummariesReady\s*\(\)/.test(store),
+  "store exports isSummariesReady");
 const useStoreFile = R("/home/user/Beeri-World-Cup/src/hooks/useStore.js");
 assert(/export function useSettingsReady\s*\(\)/.test(useStoreFile),
   "hooks/useStore exports useSettingsReady");
+assert(/export function useSummariesReady\s*\(\)/.test(useStoreFile),
+  "hooks/useStore exports useSummariesReady");
 
 // ============ SUMMARY ============
 console.log(`\n${passed} passed, ${failed} failed`);
