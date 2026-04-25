@@ -30,6 +30,31 @@ assert(
 assert(/cache\._ready\[key\]\s*=\s*true/.test(storeSrc),
   "unused keys are marked ready in public mode");
 
+// Regression: when get-public-settings returns a non-ok response (e.g. the
+// production 403 host_not_allowed edge rejection), the failsafe at the end
+// of fetchPublicSettingsOnce must still mark settings/matchResults ready —
+// otherwise the blog page is trapped on the "טוען..." spinner. The bug
+// was an early `if (!res.ok) return;` inside the try block that exited the
+// function before the failsafe could run.
+{
+  const fnMatch = storeSrc.match(/async function fetchPublicSettingsOnce\(\)[\s\S]*?\n\}/);
+  assert(fnMatch, "fetchPublicSettingsOnce found");
+  const body = fnMatch ? fnMatch[0] : "";
+  assert(!/if\s*\(\s*!res\.ok\s*\)\s*return\s*;/.test(body),
+    "fetchPublicSettingsOnce does not early-return on non-ok response (would skip failsafe)");
+  assert(/if\s*\(\s*!succeeded\s*&&\s*publicModeInitialized\s*\)\s*\{[\s\S]*?cache\._ready\.settings\s*=\s*true/.test(body),
+    "fetchPublicSettingsOnce failsafe marks settings ready on failure");
+}
+
+// gameData/settings is publicly readable (firestore.rules), so the blog's
+// predictionsLocked gate must not depend on the Netlify function alone.
+// initPublicReadonlyMode subscribes directly so the blog renders even when
+// the endpoint is blocked.
+assert(/publicSettingsUnsub\s*=\s*onSnapshot\(\s*gameDocRef\("settings"\)/.test(storeSrc),
+  "public mode subscribes to gameData/settings directly via Firestore");
+assert(/teardownPublicReadonlyMode[\s\S]*?publicSettingsUnsub\s*\(\s*\)/.test(storeSrc),
+  "public-mode teardown unsubscribes the direct settings listener");
+
 // ============ 2. App.jsx gating ============
 console.log("--- 2. App.jsx blog bypass ---");
 const appSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/App.jsx", "utf8");
