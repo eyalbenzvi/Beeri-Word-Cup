@@ -1497,6 +1497,15 @@ export function getSettings() {
   return cache.settings || DEFAULT_SETTINGS;
 }
 
+// Whether the settings doc has been fetched at least once (authenticated
+// listener landed, or public-readonly endpoint resolved). Used by the blog
+// page so an unauth visitor doesn't briefly see the pre-tournament empty
+// state during the public-settings fetch window — instead we show the
+// loading state until we actually know predictionsLocked.
+export function isSettingsReady() {
+  return !!cache._ready.settings;
+}
+
 export function updateSettings(newSettings) {
   if (!requireAdmin()) return;
   const settings = { ...getSettings(), ...newSettings };

@@ -10,6 +10,7 @@ import {
   useUsers,
   useCurrentUser,
   useSettings,
+  useSettingsReady,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
@@ -73,6 +74,7 @@ export default function DailySummary() {
   const actualBonuses = useActualBonuses();
   const { user } = useCurrentUser();
   const settings = useSettings();
+  const settingsReady = useSettingsReady();
   const { params, navigate } = useNavigation();
 
   const { rankedLeaderboard } = useLeaderboardComputed(
@@ -147,18 +149,33 @@ export default function DailySummary() {
   // working on drafts. We render an empty-state instead of a hard 404 so the
   // route still resolves cleanly and the deep-link recovers automatically once
   // the admin locks predictions.
+  //
+  // CRUCIAL: don't fire this guard before settings have actually loaded — for
+  // a guest hitting /blog directly, `settings` defaults to {predictionsLocked:
+  // false} until fetchPublicSettingsOnce() resolves a moment later. Without
+  // the readiness gate, the visitor briefly sees "אין עדיין סיכומים" even
+  // when there's a published post and the tournament is locked.
   const predictionsLocked = !!settings?.predictionsLocked;
-  if (!predictionsLocked && !user?.isAdmin) {
-    return (
-      <div>
-        <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
-        <EmptyState
-          icon="📰"
-          title={BLOG.public.emptyTitle}
-          description={BLOG.public.emptyBody}
-        />
-      </div>
-    );
+  if (!user?.isAdmin) {
+    if (!settingsReady) {
+      return (
+        <div className="text-center py-8 text-ink-muted font-bold">
+          טוען...
+        </div>
+      );
+    }
+    if (!predictionsLocked) {
+      return (
+        <div>
+          <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
+          <EmptyState
+            icon="📰"
+            title={BLOG.public.emptyTitle}
+            description={BLOG.public.emptyBody}
+          />
+        </div>
+      );
+    }
   }
 
   // No summaries at all
