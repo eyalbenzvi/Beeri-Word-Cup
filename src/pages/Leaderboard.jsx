@@ -143,8 +143,8 @@ export default function Leaderboard({
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               {[
-                ["R32", "שמינית"],
-                ["R16", "שמינית-16"],
+                ["R32", "שלב ה-32"],
+                ["R16", "שמינית"],
                 ["QF", "רבע"],
                 ["SF", "חצי"],
                 ["F", "גמר"],
