@@ -2,6 +2,10 @@ import { useMemo } from "react";
 import { updateSettings } from "../store";
 import { TOTAL_MATCH_COUNT, ALL_MATCHES } from "../data/matches";
 
+// Preview cap on the "missing matches" list shown on the admin dashboard.
+// Beyond this we truncate — the dashboard is a glance, not a worklist.
+const MISSING_MATCHES_PREVIEW_LIMIT = 8;
+
 export default function AdminDashboardTab({
   settings,
   users,
@@ -29,7 +33,7 @@ export default function AdminDashboardTab({
 
   const missingMatchIds = useMemo(() => {
     const have = new Set(Object.keys(results));
-    return ALL_MATCHES.filter((m) => !have.has(m.id)).slice(0, 8);
+    return ALL_MATCHES.filter((m) => !have.has(m.id)).slice(0, MISSING_MATCHES_PREVIEW_LIMIT);
   }, [results]);
 
   return (

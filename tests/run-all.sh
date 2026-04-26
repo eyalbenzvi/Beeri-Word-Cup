@@ -105,6 +105,7 @@ run_test "67. Summary Store + Firestore Rules (blog)" "test-summary-store.mjs" "
 run_test "68. Navigation URL Params (page, n)" "test-navigation-url-params.mjs" "no"
 run_test "69. Summary Public Mode + AI Hardening" "test-summary-public-and-ai.mjs" "no"
 run_test "70. Summary Review Fixes (deep review regressions)" "test-summary-review-fixes.mjs" "no"
+run_test "71. Constants Dedup (static + runtime audit)" "test-constants-dedup.mjs" "yes"
 
 echo ""
 echo "==========================================="

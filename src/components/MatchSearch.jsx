@@ -3,6 +3,10 @@ import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
+// Cap on rendered match results — anything beyond this is hidden behind a
+// narrower query. Prevents long lists from churning the dropdown on every keystroke.
+const MAX_RESULTS = 20;
+
 export default function MatchSearch({
   groupMatches,
   knockoutMatches,
@@ -113,7 +117,7 @@ export default function MatchSearch({
             </div>
           )}
           <div className="space-y-1">
-            {results.slice(0, 20).map((match) => {
+            {results.slice(0, MAX_RESULTS).map((match) => {
               const isKO = match.stage !== "group";
               const teams =
                 isKO && bracketTeams[match.id]

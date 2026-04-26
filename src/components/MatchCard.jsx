@@ -2,6 +2,11 @@ import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import MatchAnalysis from "./MatchAnalysis";
 
+// Upper bound on a score input. 20 is well above any realistic football
+// scoreline; the cap exists to defend against runaway typing / paste of giant
+// numbers that would break tabular layouts.
+const MAX_SCORE = 20;
+
 function focusNextInput(currentInput) {
   const card = currentInput.closest("[data-match-card]");
   if (!card) return;
@@ -96,7 +101,7 @@ function MatchCard({
     if (raw === "") return null;
     const n = parseInt(raw, 10);
     if (!Number.isFinite(n)) return null;
-    return Math.max(0, Math.min(20, n));
+    return Math.max(0, Math.min(MAX_SCORE, n));
   };
 
   const buildPredictionUpdate = useCallback(
@@ -211,16 +216,16 @@ function MatchCard({
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
+                  <button type="button" onClick={() => { const v = Math.min(MAX_SCORE, (parseInt(predHome) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("home", v)); }}
                     aria-label={`הוסף גול ל${homeTeam?.name || match.homeTeam || 'קבוצה ביתית'}`}
                     className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>+</button>
                   <input
                     ref={homeInputRef}
                     type="number"
                     min="0"
-                    max="20"
+                    max={MAX_SCORE}
                     inputMode="numeric"
-                    aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-20)`}
+                    aria-label={`ניחוש גולים ${homeTeam?.name || match.homeTeam || 'ביתית'} (0-${MAX_SCORE})`}
                     value={predHome}
                     onChange={handleHomeChange}
                     className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-primary-soft ${
@@ -240,17 +245,17 @@ function MatchCard({
                   )}
                 </span>
                 <div className="flex flex-col items-center gap-0.5">
-                  <button type="button" onClick={() => { const v = Math.min(20, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
+                  <button type="button" onClick={() => { const v = Math.min(MAX_SCORE, (parseInt(predAway) || 0) + 1); onPredictionChange?.(buildPredictionUpdate("away", v)); }}
                     aria-label={`הוסף גול ל${awayTeam?.name || match.awayTeam || 'קבוצה אורחת'}`}
                     className="tap-44 w-9 h-9 text-sm bg-bg-soft rounded-full border-none cursor-pointer text-ink-muted hover:bg-border font-bold leading-none flex items-center justify-center" disabled={!editable}>+</button>
                   <input
                     ref={awayInputRef}
                     type="number"
                     min="0"
-                    max="20"
+                    max={MAX_SCORE}
                     inputMode="numeric"
                     enterKeyHint="done"
-                    aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-20)`}
+                    aria-label={`ניחוש גולים ${awayTeam?.name || match.awayTeam || 'חוץ'} (0-${MAX_SCORE})`}
                     value={predAway}
                     onChange={handleAwayChange}
                     className={`min-w-[48px] min-h-[48px] md:min-w-[56px] md:min-h-[56px] text-center border-2 rounded-2xl text-xl font-extrabold tabular-nums transition-colors bg-white focus:border-primary focus:bg-primary-soft ${
