@@ -11,17 +11,28 @@ const FIFA_RANK = {
   CPV: 41, KSA: 42, COD: 43, CZE: 44, TUN: 45, PAR: 46, HAI: 47, CUR: 48,
 };
 
-// Outcome probabilities based on ranking difference
+// Skewed toward favorites vs. naive coin-flips: real WC data shows large
+// rank gaps rarely produce upsets, even at the group stage.
+const OUTCOME_TIERS = [
+  { maxDiff: 3,        pFavor: 0.45, pDraw: 0.32, pUnderdog: 0.23 },
+  { maxDiff: 10,       pFavor: 0.55, pDraw: 0.27, pUnderdog: 0.18 },
+  { maxDiff: 20,       pFavor: 0.65, pDraw: 0.23, pUnderdog: 0.12 },
+  { maxDiff: 30,       pFavor: 0.75, pDraw: 0.17, pUnderdog: 0.08 },
+  { maxDiff: Infinity, pFavor: 0.85, pDraw: 0.12, pUnderdog: 0.03 },
+];
+
+// Mid-table fallback for teams missing from FIFA_RANK (≈ middle of 48 finalists).
+const DEFAULT_RANK = 25;
+
+// Probability the lower-ranked team advances when a knockout match is drawn.
+// Models penalty-shootout variance without making it a coin flip.
+const KNOCKOUT_DRAW_UPSET_CHANCE = 0.20;
+
 function getOutcomeProbabilities(rankHome, rankAway) {
   const diff = Math.abs(rankHome - rankAway);
   const favorIsHome = rankHome <= rankAway;
-
-  let pFavor, pDraw, pUnderdog;
-  if (diff <= 3)       { pFavor = 0.38; pDraw = 0.32; pUnderdog = 0.30; }
-  else if (diff <= 10) { pFavor = 0.45; pDraw = 0.28; pUnderdog = 0.27; }
-  else if (diff <= 20) { pFavor = 0.55; pDraw = 0.25; pUnderdog = 0.20; }
-  else if (diff <= 30) { pFavor = 0.63; pDraw = 0.20; pUnderdog = 0.17; }
-  else                 { pFavor = 0.72; pDraw = 0.16; pUnderdog = 0.12; }
+  const tier = OUTCOME_TIERS.find((t) => diff <= t.maxDiff);
+  const { pFavor, pDraw, pUnderdog } = tier;
 
   return favorIsHome
     ? { homeWin: pFavor, draw: pDraw, awayWin: pUnderdog }
@@ -51,8 +62,8 @@ function pickWeighted(options) {
 
 // Predict a single match
 export function predictMatch(homeTeam, awayTeam) {
-  const rankH = FIFA_RANK[homeTeam] || 25;
-  const rankA = FIFA_RANK[awayTeam] || 25;
+  const rankH = FIFA_RANK[homeTeam] || DEFAULT_RANK;
+  const rankA = FIFA_RANK[awayTeam] || DEFAULT_RANK;
   const probs = getOutcomeProbabilities(rankH, rankA);
 
   const roll = Math.random();
@@ -119,9 +130,13 @@ export function predictAllMatches(
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
       const pred = predictMatch(teams.home, teams.away);
-      // Knockout draws need advancing team
       if (pred.homeScore === pred.awayScore) {
-        pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
+        const rankH = FIFA_RANK[teams.home] || DEFAULT_RANK;
+        const rankA = FIFA_RANK[teams.away] || DEFAULT_RANK;
+        const favored = rankH <= rankA ? teams.home : teams.away;
+        const underdog = favored === teams.home ? teams.away : teams.home;
+        pred.advancingTeam =
+          Math.random() < KNOCKOUT_DRAW_UPSET_CHANCE ? underdog : favored;
       }
       allPreds[m.id] = pred;
     }
