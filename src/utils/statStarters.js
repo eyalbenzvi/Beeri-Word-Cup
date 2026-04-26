@@ -58,7 +58,7 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
     out.push({
       id: "lone-1",
       label: `🎯 רק ${f.formName} קלע בדיוק`,
-      text: `רק ${f.formName} ראה את זה — ${result.homeScore}:${result.awayScore} בול.`,
+      text: `רק ${f.formName} ראה את זה — ${result.awayScore}:${result.homeScore} בול.`,
       kind: "lonePicks",
     });
   } else if (stats.lonePicks.length >= 2 && stats.lonePicks.length <= 3) {
@@ -66,7 +66,7 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
     out.push({
       id: "lone-few",
       label: `🎯 ${stats.lonePicks.length} קלעו בדיוק: ${stats.lonePicks.map((f) => f.formName).join(", ")}`,
-      text: `${stats.lonePicks.length} בלבד קלעו את ${result.homeScore}:${result.awayScore} בול: ${names}.`,
+      text: `${stats.lonePicks.length} בלבד קלעו את ${result.awayScore}:${result.homeScore} בול: ${names}.`,
       kind: "lonePicks",
     });
   }

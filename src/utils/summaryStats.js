@@ -50,7 +50,7 @@ function getFormPrediction(form, matchId) {
  *   totalForms,                         // # of submitted forms
  *   outcomeCounts: { home, draw, away },
  *   outcomePct: { home, draw, away },   // rounded % of totalForms
- *   topScores: [{ score: "2-1", count, pct }],  // top-3 predicted scorelines
+ *   topScores: [{ score: "1-2", count, pct }],  // top-3 predicted scorelines, key is "${away}-${home}" for RTL display
  *   exactHitCount,                      // forms matching real result exactly
  *   exactHitForms,                      // array of {formId, formName, userId, userName}
  *   outcomeHitCount,                    // forms matching real outcome (any score)
