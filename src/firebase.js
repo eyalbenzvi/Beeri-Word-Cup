@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -22,7 +22,16 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// Auto-detect long-polling fallback. The default WebChannel transport gets
+// blocked silently by some browser extensions, ad-blockers, corporate
+// proxies, and restrictive incognito profiles — listeners then hang
+// forever without firing either success or error, so the user sees an
+// indefinite "טוען..." with nothing in the console. Auto-detect tries
+// WebChannel first and falls back to XHR long-polling on the same
+// connection if the streaming attempt doesn't complete.
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
