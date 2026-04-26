@@ -55,6 +55,46 @@ assert(/publicSettingsUnsub\s*=\s*onSnapshot\(\s*gameDocRef\("settings"\)/.test(
 assert(/teardownPublicReadonlyMode[\s\S]*?publicSettingsUnsub\s*\(\s*\)/.test(storeSrc),
   "public-mode teardown unsubscribes the direct settings listener");
 
+// Hard watchdog: even if BOTH the Firestore listener and the Netlify
+// function go silent (no success, no error), the readiness flags must
+// flip after a fixed timeout so the visitor never sits on "טוען..."
+// indefinitely. Several past fixes have closed individual failure paths
+// only for new ones to emerge; the watchdog is the catch-all.
+assert(/PUBLIC_READINESS_WATCHDOG_MS\s*=\s*\d+/.test(storeSrc),
+  "public-mode watchdog timeout constant defined");
+assert(/markPublicReadinessForced/.test(storeSrc),
+  "public-mode watchdog has a forced-readiness routine");
+assert(/publicReadinessWatchdog\s*=\s*setTimeout\(\s*markPublicReadinessForced/.test(storeSrc),
+  "initPublicReadonlyMode arms the watchdog");
+assert(/teardownPublicReadonlyMode[\s\S]*?clearTimeout\(\s*publicReadinessWatchdog\s*\)/.test(storeSrc),
+  "teardown clears the watchdog timer");
+// Forced path must mark BOTH summaries and settings ready — either alone
+// would still trap the gate `blogDataReady = settingsReady && summariesReady`.
+{
+  const forcedFn = storeSrc.match(/function markPublicReadinessForced\(\)[\s\S]*?\n\}/)?.[0] || "";
+  assert(/cache\._ready\.summaries\s*=\s*true/.test(forcedFn),
+    "watchdog forces _ready.summaries true");
+  assert(/cache\._ready\.settings\s*=\s*true/.test(forcedFn),
+    "watchdog forces _ready.settings true");
+  assert(/notifyAndEmit\("summaries"\)/.test(forcedFn),
+    "watchdog notifies summaries subscribers");
+  assert(/notifyAndEmit\("settings"\)/.test(forcedFn),
+    "watchdog notifies settings subscribers");
+}
+
+// Defense against a synchronous throw inside the success handler — onSnapshot
+// does NOT route success-callback exceptions through the error handler, so
+// without try/catch the readiness flag could permanently stay false.
+{
+  const initFn = storeSrc.match(/export function initPublicReadonlyMode\(\)[\s\S]*?\n\}/)?.[0] || "";
+  // Each listener must mark ready after the try, not inside it — that way a
+  // parse error doesn't prevent readiness from flipping.
+  assert(/snapshot\.forEach[\s\S]*?\}\s*catch[\s\S]*?\}\s*cache\._ready\.summaries\s*=\s*true/.test(initFn),
+    "summaries listener: ready flag flipped after try/catch");
+  assert(/cache\.settings\s*=\s*\{[\s\S]*?\}\s*;\s*\}\s*catch[\s\S]*?\}\s*cache\._ready\.settings\s*=\s*true/.test(initFn),
+    "settings listener: ready flag flipped after try/catch");
+}
+
 // ============ 2. App.jsx gating ============
 console.log("--- 2. App.jsx blog bypass ---");
 const appSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/App.jsx", "utf8");
