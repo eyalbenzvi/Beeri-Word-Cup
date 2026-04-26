@@ -700,7 +700,7 @@ let summariesShowAll = false;
 // existing public-settings function (which uses the Admin SDK server-side).
 // No users, no predictions. Safe to re-enter after login cleanup.
 let publicModeInitialized = false;
-let publicSummariesUnsub = null;
+let publicSummariesTimer = null;
 let publicSettingsUnsub = null;
 let publicSettingsTimer = null;
 let publicReadinessWatchdog = null;
@@ -805,59 +805,61 @@ async function fetchPublicSettingsOnce() {
   }
 }
 
+// Mirrors fetchPublicSettingsOnce. We use a Netlify function (Admin SDK
+// server-side) instead of a browser-side Firestore collection-query
+// listener because the unauth onSnapshot path was observed to hang
+// indefinitely in incognito (no success, no error fired), trapping guest
+// viewers on the empty state. A plain HTTPS GET has no such failure mode.
+async function fetchPublicSummariesOnce() {
+  if (!publicModeInitialized) return;
+  let succeeded = false;
+  try {
+    const res = await fetch(`/.netlify/functions/get-public-summaries?t=${Date.now()}`, {
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!publicModeInitialized) return;
+      const map = {};
+      if (Array.isArray(data?.summaries)) {
+        for (const s of data.summaries) {
+          if (s && s.id) map[s.id] = s;
+        }
+      }
+      cache.summaries = map;
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+      succeeded = true;
+    } else {
+      captureClientMessage(`public-summaries-fetch-${res.status}`, {
+        status: res.status,
+        statusText: res.statusText,
+      }, "warning");
+    }
+  } catch (err) {
+    captureClientMessage("public-summaries-fetch-threw", {
+      message: err?.message || "unknown",
+    }, "warning");
+  }
+  if (!succeeded && publicModeInitialized) {
+    cache._ready.summaries = true;
+    notifyAndEmit("summaries");
+  }
+}
+
 export function initPublicReadonlyMode() {
   if (publicModeInitialized) return;
   publicModeInitialized = true;
 
-  // Subscribe to published summaries (Firestore rule permits unauth reads).
-  // Wrapped in try/catch because a throw inside the success handler (e.g.
-  // unexpected snapshot shape) would otherwise leave _ready.summaries
-  // permanently false — and `onSnapshot` would not fire the error
-  // callback for an exception in the success callback.
-  publicSummariesUnsub = onSnapshot(
-    query(summariesCollectionRef, where("status", "==", "published")),
-    (snapshot) => {
-      // Diagnostic — emit one Sentry event the first time the listener
-      // fires success, recording the snapshot size. Combined with the
-      // public-readiness-watchdog event we can tell:
-      //   - this event with size > 0 + watchdog also fired = listener
-      //     was just slow (>6s); cache populated eventually.
-      //   - this event with size === 0 = query returned no docs
-      //     (deployed status field mismatch, or rules pre-filter to nothing).
-      //   - watchdog fired but no fire event = success callback never
-      //     ran despite network channel completing.
-      captureClientMessage("public-summaries-success", {
-        size: snapshot.size,
-        empty: snapshot.empty,
-        fromCache: snapshot.metadata?.fromCache,
-        hasPendingWrites: snapshot.metadata?.hasPendingWrites,
-      }, "info");
-      try {
-        const map = {};
-        snapshot.forEach((docSnap) => {
-          map[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-        });
-        cache.summaries = map;
-      } catch (err) {
-        console.error("Public summaries snapshot parse error:", err);
-        captureClientError(err, { source: "publicSummariesParse" });
-      }
-      cache._ready.summaries = true;
-      notifyAndEmit("summaries");
-    },
-    (err) => {
-      console.error("Public summaries listener error:", err);
-      // Route to Sentry so a deployed-rules drift (e.g. unauth read denied
-      // on /summaries) surfaces. Without this hook the listener fails
-      // silently — the user passes the loading gate with cache.summaries
-      // empty and sees the "no summaries" empty card, indistinguishable
-      // from the legitimate empty case. reportListenerError downgrades
-      // permission-denied to a deduped warning message.
-      reportListenerError(err, "publicSummariesListener", { code: err?.code });
-      cache._ready.summaries = true;
-      notifyAndEmit("summaries");
-    },
-  );
+  // Published summaries via the Netlify function (Admin SDK server-side).
+  // We deliberately do NOT use a browser-side Firestore listener here —
+  // the unauth onSnapshot collection-query path was observed to hang
+  // indefinitely in incognito (no success, no error fired). A plain HTTPS
+  // GET is reliable. Refreshed every 30s so newly published posts appear
+  // for guests without a manual reload.
+  fetchPublicSummariesOnce();
+  publicSummariesTimer = setInterval(fetchPublicSummariesOnce, 30_000);
 
   // `gameData/settings` is the source of truth for `predictionsLocked`, and
   // the Firestore rule explicitly allows unauthenticated reads of that doc
@@ -920,9 +922,9 @@ export function initPublicReadonlyMode() {
 function teardownPublicReadonlyMode() {
   if (!publicModeInitialized) return;
   publicModeInitialized = false;
-  if (publicSummariesUnsub) {
-    publicSummariesUnsub();
-    publicSummariesUnsub = null;
+  if (publicSummariesTimer) {
+    clearInterval(publicSummariesTimer);
+    publicSummariesTimer = null;
   }
   if (publicSettingsUnsub) {
     publicSettingsUnsub();
