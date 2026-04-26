@@ -239,23 +239,6 @@ export default function DailySummary() {
         </div>
       )}
 
-      {!user && (
-        <div className="alert-primary-soft mb-3 text-center">
-          <p className="text-sm font-extrabold text-primary-dark mb-1">
-            {BLOG.public.guestTitle}
-          </p>
-          <p className="text-xs text-ink-muted font-medium">
-            {BLOG.public.guestBody}
-          </p>
-          <button
-            onClick={() => navigate("home")}
-            className="btn-duo btn-duo-primary btn-duo-sm mt-2"
-          >
-            {BLOG.public.guestCta}
-          </button>
-        </div>
-      )}
-
       {/* Compact post nav — flat (no 3-D shadow) so the headline still leads. */}
       <div className="flex items-center justify-between gap-2 mb-6 text-sm">
         <button
