@@ -82,7 +82,7 @@ export function computeMatchStats({
     if (!pred) continue;
     const predOutcome = outcomeOf(pred.homeScore, pred.awayScore);
     if (predOutcome) outcomeCounts[predOutcome] = (outcomeCounts[predOutcome] || 0) + 1;
-    const key = `${pred.homeScore}-${pred.awayScore}`;
+    const key = `${pred.awayScore}-${pred.homeScore}`;
     scoreCounts.set(key, (scoreCounts.get(key) || 0) + 1);
     if (
       result &&
@@ -108,7 +108,7 @@ export function computeMatchStats({
     .slice(0, 3)
     .map(([score, count]) => ({ score, count, pct: pct(count) }));
 
-  const actualKey = result ? `${Number(result.homeScore)}-${Number(result.awayScore)}` : null;
+  const actualKey = result ? `${Number(result.awayScore)}-${Number(result.homeScore)}` : null;
   const actualScoreCount = actualKey ? (scoreCounts.get(actualKey) || 0) : 0;
 
   // ---- Editorial / "piquancy" hooks ----

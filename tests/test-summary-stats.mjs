@@ -71,7 +71,9 @@ console.log("--- 2. mixed predictions, full result ---");
   assert(s.exactHitForms.some((f) => f.userId === "u2"), "u2 is in exact hits");
   assert(s.outcomeHitCount === 2, `expected 2 outcome hits, got ${s.outcomeHitCount}`);
   assert(s.actual.outcome === "home", `actual outcome should be home, got ${s.actual.outcome}`);
-  assert(s.topScores[0].score === "2-1", `most common score is 2-1, got ${s.topScores[0].score}`);
+  // Key format is `${away}-${home}` so the home digit lands on the right
+  // (visually adjacent to the home team) when rendered in the RTL document.
+  assert(s.topScores[0].score === "1-2", `most common score is 1-2 (away-home), got ${s.topScores[0].score}`);
   assert(s.topScores[0].count === 2, "top score count 2");
   assert(s.actualScoreCount === 2, "actualScoreCount is 2 (same as exact hits)");
   // Percentages
@@ -176,7 +178,8 @@ console.log("--- 7. top 3 scores, sorted descending ---");
     users: USERS,
   });
   assert(s.topScores.length === 3, "top scores capped at 3");
-  assert(s.topScores[0].score === "1-0" && s.topScores[0].count === 3, "1-0 most common");
+  // Key format is `${away}-${home}` (RTL-correct visual order).
+  assert(s.topScores[0].score === "0-1" && s.topScores[0].count === 3, "0-1 (home wins 1-0) most common");
   assert(s.topScores[1].score === "2-2" && s.topScores[1].count === 2, "2-2 second");
 }
 

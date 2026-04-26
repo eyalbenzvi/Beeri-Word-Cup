@@ -109,7 +109,7 @@ export default function MatchAnalysis({
               תוצאה מומלצת:
             </span>
             <span className="text-lg font-extrabold text-secondary" dir="ltr">
-              {result.homeScore} - {result.awayScore}
+              {result.awayScore} - {result.homeScore}
             </span>
           </div>
 

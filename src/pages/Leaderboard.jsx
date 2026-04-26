@@ -238,7 +238,7 @@ export default function Leaderboard({
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
                       {prediction
-                        ? <>{" "}<bdi>({prediction.homeScore}-{prediction.awayScore})</bdi></>
+                        ? <>{" "}<bdi>({prediction.awayScore}-{prediction.homeScore})</bdi></>
                         : ""}
                     </div>
                   )}
@@ -269,13 +269,7 @@ export default function Leaderboard({
 
   return (
     <div>
-      {!embedded && (
-        <PageHeader
-          eyebrow="המקום שלך"
-          title="טבלת דירוג"
-          subtitle={leaderboard.length > 0 ? `${leaderboard.length} טפסים מדורגים` : undefined}
-        />
-      )}
+      {!embedded && <PageHeader title="טבלת דירוג" />}
       {embedded && (
         <p className="text-sm font-extrabold text-ink mb-3">
           תצוגה מקדימה (מנהל)
@@ -286,33 +280,6 @@ export default function Leaderboard({
         renderFormDetail()
       ) : (
         <>
-          {rankedLeaderboard.length >= 3 && !embedded && (
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {[
-                { e: rankedLeaderboard[0], medal: "🥇", cls: "podium-gold", rank: 1 },
-                { e: rankedLeaderboard[1], medal: "🥈", cls: "podium-silver", rank: 2 },
-                { e: rankedLeaderboard[2], medal: "🥉", cls: "podium-bronze", rank: 3 },
-              ].map(({ e, medal, cls, rank }) => (
-                <div key={e.formId} className="flex items-center gap-2 min-w-0 rounded-xl p-2 border border-border bg-white">
-                  <div className={`w-11 h-11 rounded-full ${cls} text-white flex items-center justify-center text-lg font-extrabold flex-shrink-0 ${rank === 1 ? "animate-pop-in" : ""}`}>
-                    {medal}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-extrabold text-ink truncate">{e.formName}</div>
-                    <div className="text-xs text-ink-muted tabular-nums font-bold">
-                      <bdi>{e.totalPoints}</bdi> נק׳
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="text-xs text-ink-muted text-center font-bold mb-3">
-            {Object.keys(results).length} משחקים שוחקו • {leaderboard.length}{" "}
-            טפסים
-          </div>
-
           <div className="space-y-2">
             {rankedLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;

@@ -47,7 +47,7 @@ function MatchRow({ match, prediction }) {
           <bdi>{homeName}</bdi>
         </div>
         <div className="w-14 text-center font-extrabold text-ink tabular-nums">
-          {hasScore ? <bdi>{prediction.homeScore}–{prediction.awayScore}</bdi> : "–"}
+          {hasScore ? <bdi>{prediction.awayScore}–{prediction.homeScore}</bdi> : "–"}
         </div>
         <div className="flex-1 text-center truncate text-ink font-medium">
           <bdi>{awayName}</bdi>

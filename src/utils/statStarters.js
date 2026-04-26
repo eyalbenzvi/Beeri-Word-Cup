@@ -95,7 +95,7 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
   // 4. Most-predicted scoreline (when it's NOT the actual)
   if (stats.topScores.length > 0 && result) {
     const top = stats.topScores[0];
-    const actualKey = `${Number(result.homeScore)}-${Number(result.awayScore)}`;
+    const actualKey = `${Number(result.awayScore)}-${Number(result.homeScore)}`;
     if (top.score !== actualKey && top.pct >= 25) {
       out.push({
         id: "consensus-score",
@@ -110,8 +110,8 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
   if (stats.actualScorePct >= 40) {
     out.push({
       id: "consensus-right",
-      label: `✅ ${stats.actualScorePct}% קלעו ${result.homeScore}:${result.awayScore} בול`,
-      text: `${stats.actualScorePct}% קלעו את ${result.homeScore}:${result.awayScore} בול — היום לא הופתענו.`,
+      label: `✅ ${stats.actualScorePct}% קלעו ${result.awayScore}:${result.homeScore} בול`,
+      text: `${stats.actualScorePct}% קלעו את ${result.awayScore}:${result.homeScore} בול — היום לא הופתענו.`,
       kind: "actualConsensus",
     });
   }

@@ -18,11 +18,11 @@ export default function Home() {
 
   return (
     <div className="text-center max-w-xl mx-auto">
-      <div className="pt-2 pb-3 md:pt-6 md:pb-6">
-        <h1 className="font-heading text-3xl md:text-4xl font-extrabold text-ink mb-1 tracking-tight leading-tight text-balance">
+      <div className="pt-1 pb-2 md:pt-6 md:pb-6">
+        <h1 className="font-heading text-2xl md:text-4xl font-extrabold text-ink mb-1 tracking-tight leading-tight text-balance">
           <span aria-hidden="true">⚽</span> {BRAND.tournamentTitle}
         </h1>
-        <p className="text-sm md:text-base font-bold text-ink-muted">
+        <p className="text-xs md:text-base font-bold text-ink-muted">
           {BRAND.subtitle}
         </p>
       </div>
@@ -37,7 +37,7 @@ export default function Home() {
             }
             navigate("predict");
           }}
-          className="btn-duo btn-duo-primary btn-duo-cta mb-7"
+          className="btn-duo btn-duo-primary btn-duo-cta mb-3 md:mb-7"
         >
           קדימה, מלאו טופס
         </button>
