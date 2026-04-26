@@ -52,7 +52,7 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
       <span className="flex-1 min-w-0 truncate font-medium">{formLabel}</span>
       {showPrediction ? (
         <bdi className="tabular-nums font-bold">
-          {aligned.homeScore}–{aligned.awayScore}
+          {aligned.awayScore}–{aligned.homeScore}
         </bdi>
       ) : bracketMismatch ? (
         <span className="text-xs">קבוצות שונות בטופס</span>

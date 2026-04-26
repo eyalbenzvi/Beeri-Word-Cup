@@ -1,5 +1,6 @@
 // Validates WCAG 2.2 AA tap-target sizing (min 44×44 on pointer:coarse)
-// for MatchCard +/− buttons and Leaderboard podium medals.
+// for MatchCard +/− buttons. (The Leaderboard top-3 podium block was
+// removed by user request — see PR fix-scores-mobile-layout.)
 import fs from "node:fs";
 
 let passed = 0, failed = 0;
@@ -13,7 +14,6 @@ console.log("=== TAP TARGETS TESTS ===\n");
 
 const css = fs.readFileSync("src/index.css", "utf8");
 const matchCard = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
-const leaderboard = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
 
 // --- CSS utility exists and is gated on pointer:coarse ---
 assert(
@@ -35,19 +35,13 @@ assert(
   "MatchCard − button has aria-label (הורד גול)",
 );
 
-// --- Podium medals upgraded to w-11 h-11 (44px) ---
-const podiumBlock = leaderboard.match(/podium-gold[\s\S]{0,2000}podium-bronze[\s\S]{0,300}/);
-assert(podiumBlock, "Leaderboard podium block is detectable");
-if (podiumBlock) {
-  assert(
-    /w-11 h-11/.test(podiumBlock[0]),
-    "Leaderboard podium medals use w-11 h-11 (44px)",
-  );
-  assert(
-    !/w-9 h-9/.test(podiumBlock[0]),
-    "Leaderboard podium medals no longer use w-9 h-9",
-  );
-}
+// --- Leaderboard top-3 podium was removed by user request; assert it stays
+//     gone so a future re-add doesn't slip in without a tap-target review.
+const leaderboard = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+assert(
+  !/grid-cols-3[\s\S]{0,200}podium-gold[\s\S]{0,500}podium-silver[\s\S]{0,500}podium-bronze/.test(leaderboard),
+  "Leaderboard top-3 podium block stays removed",
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

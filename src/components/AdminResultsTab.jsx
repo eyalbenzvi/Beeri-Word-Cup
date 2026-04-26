@@ -367,7 +367,7 @@ export default function AdminResultsTab() {
                   <div className="flex items-center gap-2">
                     {result ? (
                       <span className="font-bold text-primary text-lg">
-                        {result.homeScore} - {result.awayScore}
+                        {result.awayScore} - {result.homeScore}
                       </span>
                     ) : (
                       <span className="text-ink-muted text-sm">לא שוחק</span>

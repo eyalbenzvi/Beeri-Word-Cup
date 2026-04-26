@@ -71,7 +71,8 @@ function MatchPredictions({ forms }) {
     // Most common scores
     const scoreCounts = {};
     preds.forEach((p) => {
-      const key = `${p.homeScore}-${p.awayScore}`;
+      // RTL display: away first so the home digit is read first by Hebrew readers (right side).
+      const key = `${p.awayScore}-${p.homeScore}`;
       scoreCounts[key] = (scoreCounts[key] || 0) + 1;
     });
     const topScores = Object.entries(scoreCounts)

@@ -202,7 +202,8 @@ function MatchCard({
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
             <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              <bdi>{actualResult.homeScore}–{actualResult.awayScore}</bdi>
+              {/* RTL: away first so the home digit lands next to the home team name (right). */}
+              <bdi>{actualResult.awayScore}–{actualResult.homeScore}</bdi>
             </div>
           )}
 
@@ -281,14 +282,14 @@ function MatchCard({
               <div
                 className={`text-sm tracking-wider tabular-nums ${hasPrediction ? "font-bold text-ink" : "text-ink-muted"}`}
               >
-                {hasPrediction ? <bdi>{predHome}–{predAway}</bdi> : "– : –"}
+                {hasPrediction ? <bdi>{predAway}–{predHome}</bdi> : "– : –"}
               </div>
             )
           )}
 
           {hasResult && !editable && predHome !== "" && (
             <div className="text-xs text-ink-muted font-medium tabular-nums">
-              ניחוש: <bdi>{predHome}–{predAway}</bdi>
+              ניחוש: <bdi>{predAway}–{predHome}</bdi>
             </div>
           )}
         </div>

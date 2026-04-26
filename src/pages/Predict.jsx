@@ -520,7 +520,7 @@ export default function Predict() {
       )}
 
       <div id="form-details-section" className="card-duo-tight mb-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div id="field-formName">
             <label className="text-xs font-extrabold text-ink-muted">שם הטופס (חובה)</label>
             <input
