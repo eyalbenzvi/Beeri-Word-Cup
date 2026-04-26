@@ -23,6 +23,22 @@ const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
 );
 
+// Pagination chunk for the ranked list — load this many initially and add
+// the same again each time the user clicks "show more".
+const PAGE_SIZE = 20;
+
+// Compact stage labels for the "נקודות עליה" badges. Intentionally shorter
+// than STAGES (e.g. "שמינית" not "שמינית גמר") so the chips fit on a phone
+// row. Keep the order = KNOCKOUT_STAGE_ORDER minus 3RD (3RD has no
+// advancing-points chip — third place is a terminal stage).
+const ADVANCING_POINTS_LABELS = [
+  ["R32", "שלב ה-32"],
+  ["R16", "שמינית"],
+  ["QF", "רבע"],
+  ["SF", "חצי"],
+  ["F", "גמר"],
+];
+
 export default function Leaderboard({
   embedded = false,
   forceUnlockView = false,
@@ -39,7 +55,7 @@ export default function Leaderboard({
     [settings.topScorerPlayers],
   );
   const [selectedForm, setSelectedForm] = useState(null);
-  const [showCount, setShowCount] = useState(20);
+  const [showCount, setShowCount] = useState(PAGE_SIZE);
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
@@ -142,13 +158,7 @@ export default function Leaderboard({
               נקודות עליה:
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              {[
-                ["R32", "שלב ה-32"],
-                ["R16", "שמינית"],
-                ["QF", "רבע"],
-                ["SF", "חצי"],
-                ["F", "גמר"],
-              ].map(([round, label]) => {
+              {ADVANCING_POINTS_LABELS.map(([round, label]) => {
                 const pts = score.advancingPoints[round] || 0;
                 if (!pts) return null;
                 return (
@@ -395,8 +405,8 @@ export default function Leaderboard({
             })}
 
             {showCount < leaderboard.length && (
-              <button onClick={() => setShowCount(s => s + 20)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
-                הצג {Math.min(20, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
+              <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
+                הצג {Math.min(PAGE_SIZE, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
               </button>
             )}
 

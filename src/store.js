@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "./sentry";
 import { generateDefaultFormName } from "./utils/formNameGenerator";
+import { MAX_AUDIT_LOG_SIZE } from "./storeAudit";
 
 // ============ AUDIT LOG ============
 const AUDIT_LOG_KEY = "wc2026_audit_log";
@@ -36,7 +37,7 @@ export function logAdminAction(action, details = {}) {
     timestamp: new Date().toISOString(),
   };
   auditLog.unshift(entry);
-  if (auditLog.length > 200) auditLog.length = 200;
+  if (auditLog.length > MAX_AUDIT_LOG_SIZE) auditLog.length = MAX_AUDIT_LOG_SIZE;
   localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
 }
 
@@ -423,8 +424,10 @@ function getRetryState(key) {
 }
 
 // Compute backoff delay: 2s, 4s, 8s, 16s, 30s, 30s, 30s, ...
+const RETRY_BASE_MS = 2000;
+const RETRY_MAX_MS = 30000;
 function retryDelay(attempt) {
-  return Math.min(2000 * Math.pow(2, attempt), 30000);
+  return Math.min(RETRY_BASE_MS * Math.pow(2, attempt), RETRY_MAX_MS);
 }
 
 // Transient permission-denied on listeners/reads is expected on iOS Safari

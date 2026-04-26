@@ -1,4 +1,4 @@
-import { SCORING_DATA } from "../constants/scoring";
+import { SCORING_DATA, BONUSES } from "../constants/scoring";
 import { LABELS } from "../constants/messages";
 
 export default function ScoringTable() {
@@ -29,11 +29,11 @@ export default function ScoringTable() {
       <div className="mt-3 space-y-1.5 text-sm">
         <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "var(--color-accent-soft)" }}>
           <span className="text-ink font-medium">🏆 {LABELS.guessChampion}</span>
-          <span className="font-extrabold text-accent-text">9 {LABELS.pointsShort}</span>
+          <span className="font-extrabold text-accent-text">{BONUSES.champion} {LABELS.pointsShort}</span>
         </div>
         <div className="flex justify-between items-center rounded-xl px-3 py-2 border-2 border-accent/40" style={{ background: "var(--color-accent-soft)" }}>
           <span className="text-ink font-medium">⚽ {LABELS.topScorer}</span>
-          <span className="font-extrabold text-accent-text">8 {LABELS.pointsShort}</span>
+          <span className="font-extrabold text-accent-text">{BONUSES.topScorer} {LABELS.pointsShort}</span>
         </div>
       </div>
     </>

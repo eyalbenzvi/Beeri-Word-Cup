@@ -8,6 +8,12 @@ import {
   FINAL_MATCHES,
 } from "../data/matches";
 import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
+
+// FIFA 2026 expanded format: 12 group winners + 12 runners-up + the top 8 of
+// 12 third-placed finishers advance to R32 (32 teams total). 8 here is the
+// number of qualifying third-place spots — defined by the FIFA regulations,
+// not arbitrary. Update only if the tournament format changes.
+const THIRD_PLACE_QUALIFIERS = 8;
 import { isScoreValid } from "./helpers";
 
 const ALL_TEAMS_MAP = {};
@@ -226,7 +232,7 @@ function getBestThirdPlaceTeams(standings) {
     const rankB = FIFA_RANKING[b.code] || 999;
     return rankA - rankB;
   });
-  return thirdPlace.slice(0, 8);
+  return thirdPlace.slice(0, THIRD_PLACE_QUALIFIERS);
 }
 
 function assignThirdPlaceTeams(qualifyingThird) {

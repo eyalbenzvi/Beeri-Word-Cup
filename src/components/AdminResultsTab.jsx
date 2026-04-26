@@ -5,6 +5,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import { randomScore } from "../utils/helpers";
+import { KNOCKOUT_STAGE_ORDER } from "../utils/constants";
 import GroupTable from "./GroupTable";
 import GroupSelector from "./GroupSelector";
 import { useConfirm } from "./ConfirmModal";
@@ -172,8 +173,7 @@ export default function AdminResultsTab() {
       saveMatchResult(match.id, r);
     });
 
-    const knockoutStageOrder = ["R32", "R16", "QF", "SF", "3RD", "F"];
-    for (const stage of knockoutStageOrder) {
+    for (const stage of KNOCKOUT_STAGE_ORDER) {
       const bracket = calcBracketTeams(allResults);
       for (const match of knockoutMatches.filter((m) => m.stage === stage)) {
         const r = allResults[match.id];

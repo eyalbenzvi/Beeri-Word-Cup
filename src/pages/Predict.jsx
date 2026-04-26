@@ -51,7 +51,7 @@ import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
 import { AUTH_COPY, LABELS } from "../constants/messages";
 
-import { KNOCKOUT_STAGE_ORDER as knockoutStageOrder, getStageLabel, STAGE_LABELS } from "../utils/constants";
+import { getStageLabel } from "../utils/constants";
 const EMPTY_MATCHES = {};
 const SCROLL_DELAY = 100; // ms to wait for DOM before scrollIntoView
 
