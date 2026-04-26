@@ -22,9 +22,16 @@ assert(/initRealtimeListeners[\s\S]*?teardownPublicReadonlyMode/.test(storeSrc),
   "teardown runs before auth listeners start");
 assert(storeSrc.includes("get-public-settings"),
   "public mode pulls settings + results via the public endpoint");
+// Public summaries used to use a browser-side onSnapshot listener; that
+// path was observed to hang silently in incognito (no success, no error
+// fired). It's now a Netlify-function fetch using the Admin SDK
+// server-side, mirroring get-public-settings. The auth listener still
+// filters to published for non-admins.
+assert(storeSrc.includes("get-public-summaries"),
+  "public mode pulls summaries via the public endpoint");
 assert(
-  /where\("status",\s*"==",\s*"published"\)/.test(storeSrc),
-  "public summaries listener filters to published only",
+  /query\(summariesCollectionRef,\s*where\("status",\s*"==",\s*"published"\)\)/.test(storeSrc),
+  "auth summaries listener filters to published for non-admins",
 );
 // Mark other _ready keys so the UI doesn't wait for user/predictions streams
 assert(/cache\._ready\[key\]\s*=\s*true/.test(storeSrc),
@@ -82,15 +89,26 @@ assert(/teardownPublicReadonlyMode[\s\S]*?clearTimeout\(\s*publicReadinessWatchd
     "watchdog notifies settings subscribers");
 }
 
-// Defense against a synchronous throw inside the success handler — onSnapshot
-// does NOT route success-callback exceptions through the error handler, so
-// without try/catch the readiness flag could permanently stay false.
+// Same regression as fetchPublicSettingsOnce: a non-ok response or thrown
+// fetch must still hit the failsafe that flips _ready.summaries, otherwise
+// an outage of the public summaries endpoint would trap guests on the
+// "טוען..." spinner.
+{
+  const fnMatch = storeSrc.match(/async function fetchPublicSummariesOnce\(\)[\s\S]*?\n\}/);
+  assert(fnMatch, "fetchPublicSummariesOnce found");
+  const body = fnMatch ? fnMatch[0] : "";
+  assert(!/if\s*\(\s*!res\.ok\s*\)\s*return\s*;/.test(body),
+    "fetchPublicSummariesOnce does not early-return on non-ok response (would skip failsafe)");
+  assert(/if\s*\(\s*!succeeded\s*&&\s*publicModeInitialized\s*\)\s*\{[\s\S]*?cache\._ready\.summaries\s*=\s*true/.test(body),
+    "fetchPublicSummariesOnce failsafe marks summaries ready on failure");
+}
+
+// Defense against a synchronous throw inside the settings success handler —
+// onSnapshot does NOT route success-callback exceptions through the error
+// handler, so without try/catch the readiness flag could permanently stay
+// false. (Summaries no longer uses onSnapshot in public mode.)
 {
   const initFn = storeSrc.match(/export function initPublicReadonlyMode\(\)[\s\S]*?\n\}/)?.[0] || "";
-  // Each listener must mark ready after the try, not inside it — that way a
-  // parse error doesn't prevent readiness from flipping.
-  assert(/snapshot\.forEach[\s\S]*?\}\s*catch[\s\S]*?\}\s*cache\._ready\.summaries\s*=\s*true/.test(initFn),
-    "summaries listener: ready flag flipped after try/catch");
   assert(/cache\.settings\s*=\s*\{[\s\S]*?\}\s*;\s*\}\s*catch[\s\S]*?\}\s*cache\._ready\.settings\s*=\s*true/.test(initFn),
     "settings listener: ready flag flipped after try/catch");
 }
