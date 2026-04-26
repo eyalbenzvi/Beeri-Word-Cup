@@ -817,6 +817,21 @@ export function initPublicReadonlyMode() {
   publicSummariesUnsub = onSnapshot(
     query(summariesCollectionRef, where("status", "==", "published")),
     (snapshot) => {
+      // Diagnostic — emit one Sentry event the first time the listener
+      // fires success, recording the snapshot size. Combined with the
+      // public-readiness-watchdog event we can tell:
+      //   - this event with size > 0 + watchdog also fired = listener
+      //     was just slow (>6s); cache populated eventually.
+      //   - this event with size === 0 = query returned no docs
+      //     (deployed status field mismatch, or rules pre-filter to nothing).
+      //   - watchdog fired but no fire event = success callback never
+      //     ran despite network channel completing.
+      captureClientMessage("public-summaries-success", {
+        size: snapshot.size,
+        empty: snapshot.empty,
+        fromCache: snapshot.metadata?.fromCache,
+        hasPendingWrites: snapshot.metadata?.hasPendingWrites,
+      }, "info");
       try {
         const map = {};
         snapshot.forEach((docSnap) => {
@@ -854,6 +869,12 @@ export function initPublicReadonlyMode() {
     gameDocRef("settings"),
     (snap) => {
       if (!publicModeInitialized) return;
+      // Diagnostic — same pattern as summaries above.
+      captureClientMessage("public-settings-success", {
+        exists: snap.exists(),
+        fromCache: snap.metadata?.fromCache,
+        hasPendingWrites: snap.metadata?.hasPendingWrites,
+      }, "info");
       try {
         const data = snap.exists() ? snap.data()?.data : null;
         cache.settings = {
