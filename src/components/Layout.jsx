@@ -20,14 +20,15 @@ export default function Layout({ children, rightRail = null }) {
   }, []);
 
   // Blog tab visibility:
-  //  - admins see it always (to manage drafts before the tournament starts).
-  //  - everyone else (signed-in or guest) sees it only after the admin locks
-  //    predictions (= tournament started) AND at least one summary is published.
+  //  - any signed-in user sees it always (admins to manage drafts; everyone
+  //    else lands on the published list or an empty state).
+  //  - guests see it only after the admin locks predictions (= tournament
+  //    started) AND at least one summary is published.
   const predictionsLocked = !!settings?.predictionsLocked;
   const hasPublishedSummary = Object.values(summaries || {}).some(
     (s) => s.status === "published",
   );
-  const showBlogTab = user?.isAdmin || (predictionsLocked && hasPublishedSummary);
+  const showBlogTab = !!user || (predictionsLocked && hasPublishedSummary);
 
   const allNavItems = user
     ? [

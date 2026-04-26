@@ -168,16 +168,16 @@ export default function DailySummary() {
     );
   }
 
-  // Pre-tournament: hide the blog from non-admins entirely. Admins keep
-  // editing drafts.
-  if (!user?.isAdmin && !predictionsLocked) {
+  // Pre-tournament: hide the blog from logged-out guests. Logged-in users
+  // (including admins) keep access — they see published summaries or an
+  // empty state.
+  if (!user && !predictionsLocked) {
     return (
       <div>
         <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
         <EmptyState
           icon="📰"
           title={BLOG.public.emptyTitle}
-          description={BLOG.public.emptyBody}
         />
       </div>
     );
@@ -192,7 +192,6 @@ export default function DailySummary() {
         <EmptyState
           icon="📰"
           title={BLOG.public.emptyTitle}
-          description={BLOG.public.emptyBody}
         />
       </div>
     );
