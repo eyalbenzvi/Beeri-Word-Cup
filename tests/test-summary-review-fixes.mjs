@@ -199,8 +199,10 @@ assert(/blogDataReady\s*=\s*settingsReady\s*&&\s*summariesReady/.test(dailyPage)
 assert(/if\s*\(!user\?\.isAdmin\s*&&\s*!blogDataReady\)/.test(dailyPage),
   "DailySummary holds loading state for non-admins until both flags are ready");
 // Empty-state gates still exist (for after data has loaded).
-assert(/if\s*\(!user\?\.isAdmin\s*&&\s*!predictionsLocked\)/.test(dailyPage),
-  "Pre-tournament gate still fires once settings ready and lock is off");
+// Pre-tournament gate now only applies to logged-out guests — any signed-in
+// user (admin or not) sees the blog regardless of tournament-locked state.
+assert(/if\s*\(!user\s*&&\s*!predictionsLocked\)/.test(dailyPage),
+  "Pre-tournament gate fires for guests only");
 assert(/if\s*\(visibleSummaries\.length\s*===\s*0\)/.test(dailyPage),
   "no-summaries gate still exists for the actually-empty case");
 
@@ -230,6 +232,24 @@ assert(!/useSummaries/.test(homePage),
   "Home.jsx must not subscribe to summaries (no blog surface there)");
 assert(!/Newspaper/.test(homePage),
   "Home.jsx must not import the Newspaper icon (it was only used for the blog callout)");
+
+// ---- Blog tab visibility: every logged-in user sees it ----
+// Product change: the blog tab must appear for any signed-in user, not only
+// admins or only after the tournament starts. Guests retain the legacy gate
+// (predictionsLocked + a published post).
+console.log("--- REGRESSION: blog tab visible to every logged-in user ---");
+assert(/showBlogTab\s*=\s*!!user\s*\|\|\s*\(predictionsLocked\s*&&\s*hasPublishedSummary\)/.test(layout),
+  "Layout.showBlogTab is truthy for any signed-in user");
+
+// ---- Empty-state body line removed ----
+// Product change: when there are no summaries yet, only the title is shown —
+// no "ברגע שהאדמין יפרסם..." follow-up sentence.
+assert(!/emptyBody/.test(messages),
+  "BLOG.public.emptyBody removed from messages");
+assert(!/emptyBody/.test(dailyPage),
+  "DailySummary no longer references BLOG.public.emptyBody");
+assert(!/ברגע שהאדמין יפרסם/.test(messages),
+  "old empty-state sentence is gone from messages");
 
 // (c) store + hooks expose the readiness checkers.
 assert(/export function isSettingsReady\s*\(\)/.test(store),
