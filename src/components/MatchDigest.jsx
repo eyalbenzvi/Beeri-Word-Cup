@@ -80,7 +80,7 @@ export default function MatchDigest({
   return (
     <section className="mt-10 pt-8 border-t border-border first:border-t-0 first:pt-0 first:mt-6">
       {/* Stage kicker */}
-      <div className="text-[11px] font-extrabold text-secondary uppercase tracking-wider mb-1">
+      <div className="text-xs font-extrabold text-secondary uppercase tracking-wider mb-1">
         {stageLabel}
         {match.group ? ` · בית ${match.group}` : ""}
       </div>
@@ -110,15 +110,11 @@ export default function MatchDigest({
         )}
       </div>
 
-      {/* Admin commentary as a pull-quote (RTL: border on the right) */}
+      {/* Admin commentary — soft tinted callout. Text stays in default ink;
+          the background colour alone carries the "writer's voice" signal,
+          so we avoid both the colored prose and the side-rule decoration. */}
       {note && note.trim() && (
-        <blockquote
-          className="mt-5 border-r-4 pr-4 font-heading text-lg md:text-xl leading-snug whitespace-pre-wrap"
-          style={{
-            borderColor: "var(--color-primary)",
-            color: "var(--color-primary-dark)",
-          }}
-        >
+        <blockquote className="mt-5 rounded-2xl bg-primary-soft px-4 py-3 md:px-5 md:py-4 text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap">
           {note}
         </blockquote>
       )}

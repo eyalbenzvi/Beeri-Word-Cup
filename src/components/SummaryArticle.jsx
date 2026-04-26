@@ -45,20 +45,20 @@ export default function SummaryArticle({
     <div>
       {/* Masthead */}
       <header className="mb-6 md:mb-10">
-        <div className="text-xs font-extrabold text-secondary tracking-[0.18em] uppercase mb-2">
+        <div className="text-xs font-extrabold text-secondary uppercase tracking-wider mb-2">
           {BLOG.pageTitle}
           {summary.number ? ` · סיכום #${summary.number}` : ""}
         </div>
-        <h1 className="font-heading text-3xl md:text-4xl xl:text-5xl font-extrabold text-ink leading-[1.1] tracking-tight">
+        <h1 className="font-heading text-3xl md:text-4xl font-extrabold text-ink leading-tight tracking-tight">
           {summary.title || (summary.number ? `סיכום #${summary.number}` : "סיכום חדש")}
         </h1>
         {summary.subtitle && (
-          <p className="font-heading text-lg md:text-xl text-ink-muted font-bold leading-snug mt-2 max-w-[68ch]">
+          <p className="text-base md:text-lg text-ink-muted font-bold leading-snug mt-2 max-w-[68ch]">
             {summary.subtitle}
           </p>
         )}
         {(dateLabel || coveredIds.length > 0) && (
-          <div className="mt-3 text-xs font-bold text-ink-light tracking-wider flex items-center gap-2 flex-wrap">
+          <div className="mt-3 text-xs font-bold text-ink-light flex items-center gap-2 flex-wrap">
             {dateLabel && <time>{dateLabel}</time>}
             {dateLabel && coveredIds.length > 0 && <span aria-hidden="true">·</span>}
             {coveredIds.length > 0 && <span>{coveredIds.length} משחקים</span>}
@@ -70,7 +70,7 @@ export default function SummaryArticle({
       {/* The post body — capped reading column. */}
       <article className="prose-column">
         {summary.intro && summary.intro.trim() && (
-          <p className="lede text-lg md:text-xl leading-[1.85] text-ink font-medium whitespace-pre-wrap mt-6 mb-2">
+          <p className="text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap mt-6 mb-2">
             {summary.intro}
           </p>
         )}
@@ -91,10 +91,7 @@ export default function SummaryArticle({
         })}
 
         {summary.conclusion && summary.conclusion.trim() && (
-          <aside
-            className="mt-10 border-r-4 pr-4 text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap"
-            style={{ borderColor: "var(--color-accent)" }}
-          >
+          <aside className="mt-10 text-base md:text-lg leading-relaxed text-ink whitespace-pre-wrap">
             {summary.conclusion}
           </aside>
         )}
