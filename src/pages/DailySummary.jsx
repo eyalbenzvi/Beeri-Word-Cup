@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { ChevronRight, ChevronLeft, Trophy } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
 import SummaryArticle from "../components/SummaryArticle";
@@ -14,44 +14,7 @@ import {
   useSettingsReady,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
-import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
-import { useActualBonuses } from "../hooks/useStore";
-import { useRightRail } from "../hooks/useRail";
 import { BLOG } from "../constants/messages";
-
-function LeaderboardRail({ rankedLeaderboard, users }) {
-  if (!rankedLeaderboard || rankedLeaderboard.length === 0) return null;
-  const top = rankedLeaderboard.slice(0, 10);
-  return (
-    <div className="card-duo">
-      <div className="flex items-center gap-2 mb-3">
-        <Trophy size={18} className="text-accent" />
-        <h3 className="font-extrabold text-sm text-ink">צמרת הטבלה</h3>
-      </div>
-      <ol className="space-y-1">
-        {top.map((entry) => {
-          const displayName = users?.[entry.userId]?.displayName || entry.userName || "משתתף";
-          return (
-            <li
-              key={entry.formId}
-              className="flex items-center justify-between gap-2 text-sm"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-bg-soft text-[11px] font-extrabold text-ink-muted tabular-nums">
-                  {entry.rank}
-                </span>
-                <span className="font-bold text-ink truncate">{displayName}</span>
-              </div>
-              <span className="text-sm font-extrabold text-primary tabular-nums">
-                {entry.totalPoints}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
 
 function LatestCountdown({ sortedSummaries, currentNumber }) {
   const latestNumber = sortedSummaries.length > 0
@@ -72,19 +35,11 @@ export default function DailySummary() {
   const matchResults = useMatchResults();
   const allPredictions = useAllPredictions();
   const users = useUsers();
-  const actualBonuses = useActualBonuses();
   const { user } = useCurrentUser();
   const settings = useSettings();
   const settingsReady = useSettingsReady();
   const summariesReady = useSummariesReady();
   const { params, navigate } = useNavigation();
-
-  const { rankedLeaderboard } = useLeaderboardComputed(
-    matchResults,
-    allPredictions,
-    users,
-    actualBonuses,
-  );
 
   // Non-admin users see only published summaries. Admins can preview drafts
   // as well, which is useful for checking how a post will render.
@@ -134,18 +89,6 @@ export default function DailySummary() {
     // navigate intentionally omitted — it's stable from the provider
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, params?.n]);
-
-  // Desktop side rail: leaderboard snapshot (skip for logged-out viewers —
-  // we can't compute scores without the full predictions stream, and showing
-  // an empty table would be confusing).
-  const rail = useMemo(
-    () =>
-      user && rankedLeaderboard && rankedLeaderboard.length > 0
-        ? <LeaderboardRail rankedLeaderboard={rankedLeaderboard} users={users} />
-        : null,
-    [rankedLeaderboard, users, user],
-  );
-  useRightRail(rail);
 
   // For a guest hitting /blog directly, the store starts with default
   // values (predictionsLocked: false, summaries: {}) until the public
@@ -236,23 +179,6 @@ export default function DailySummary() {
           <p className="text-sm font-extrabold text-accent-text">
             {BLOG.public.draftBanner}
           </p>
-        </div>
-      )}
-
-      {!user && (
-        <div className="alert-primary-soft mb-3 text-center">
-          <p className="text-sm font-extrabold text-primary-dark mb-1">
-            {BLOG.public.guestTitle}
-          </p>
-          <p className="text-xs text-ink-muted font-medium">
-            {BLOG.public.guestBody}
-          </p>
-          <button
-            onClick={() => navigate("home")}
-            className="btn-duo btn-duo-primary btn-duo-sm mt-2"
-          >
-            {BLOG.public.guestCta}
-          </button>
         </div>
       )}
 

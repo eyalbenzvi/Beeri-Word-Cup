@@ -111,9 +111,6 @@ export const BLOG = {
     notFoundCta: "לסיכום האחרון",
     emptyTitle: "אין עדיין סיכומים",
     draftBanner: "זו עוד טיוטה — רק אתה רואה אותה.",
-    guestTitle: "הבלוג של מונדיאל בארי",
-    guestBody: "תיכנס כדי לראות מי מוביל ומי קלע בול.",
-    guestCta: "כניסה למונדיאל",
     // Per-match exact-hit surfacing (now above the fold)
     exactHitsLabel: (count) => `קלעו בדיוק (${count}):`,
     exactHitsNone: "אף אחד לא קלע בדיוק.",
