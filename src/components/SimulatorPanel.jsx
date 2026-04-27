@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import {
   useMatchResults,
   useAllPredictions,
-  useUsers,
+  useUserDirectory,
   useActualBonuses,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
@@ -21,7 +21,7 @@ export default function SimulatorPanel({
 }) {
   const realResults = useMatchResults();
   const allPredictions = useAllPredictions();
-  const users = useUsers();
+  const users = useUserDirectory();
   const actualBonuses = useActualBonuses();
 
   const [override, setOverride] = useState({});

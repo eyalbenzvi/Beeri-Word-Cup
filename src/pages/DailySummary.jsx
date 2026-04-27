@@ -8,7 +8,7 @@ import {
   useSummariesReady,
   useMatchResults,
   useAllPredictions,
-  useUsers,
+  useUserDirectory,
   useCurrentUser,
   useSettings,
   useSettingsReady,
@@ -34,7 +34,7 @@ export default function DailySummary() {
   const summaries = useSummaries();
   const matchResults = useMatchResults();
   const allPredictions = useAllPredictions();
-  const users = useUsers();
+  const users = useUserDirectory();
   const { user } = useCurrentUser();
   const settings = useSettings();
   const settingsReady = useSettingsReady();
