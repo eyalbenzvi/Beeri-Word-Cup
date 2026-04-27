@@ -11,9 +11,14 @@ import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 import { setSentryUser, captureClientMessage } from "../sentry";
 
 // Watchdog thresholds — tuned so slow-3G users don't trip them prematurely.
+// auth-watchdog covers Firebase Auth init (Safari ITP class of bugs).
+// READY_WATCHDOG_MS covers post-auth Firestore listeners — both the "store
+// never becomes ready" and the "user-record never lands in cache" paths
+// share the same timing envelope, so we keep one constant for both.
 const AUTH_WATCHDOG_MS = 8000;
-const STORE_WATCHDOG_MS = 15000;
-const USER_WATCHDOG_MS = 15000;
+const READY_WATCHDOG_MS = 15000;
+const STORE_WATCHDOG_MS = READY_WATCHDOG_MS;
+const USER_WATCHDOG_MS = READY_WATCHDOG_MS;
 
 function connectionInfo() {
   try {

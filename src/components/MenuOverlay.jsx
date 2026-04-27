@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import ScoringTable from "./ScoringTable";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 function MenuSection({ icon, title, active, onToggle, children }) {
   return (
@@ -21,15 +22,30 @@ function MenuSection({ icon, title, active, onToggle, children }) {
 
 export default function MenuOverlay({ open, onClose }) {
   const [activeSection, setActiveSection] = useState(null);
+  const panelRef = useRef(null);
+  useFocusTrap(panelRef, open);
 
+  // Lock body-scroll while open. Cleanup runs on every effect re-run AND on
+  // unmount, so even if the parent unmounts while open=true the overflow
+  // style is restored — earlier the cleanup gated body.style on `open` and
+  // could leave the page locked if the component unmounted at the wrong time.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
+
+  // Escape closes the dialog — required by ARIA dialog pattern.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
   const toggle = (id) => setActiveSection(activeSection === id ? null : id);
@@ -40,7 +56,7 @@ export default function MenuOverlay({ open, onClose }) {
         className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
       />
-      <div id="menu-overlay" role="dialog" aria-modal="true" aria-label="תפריט מידע" className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
+      <div ref={panelRef} id="menu-overlay" role="dialog" aria-modal="true" aria-label="תפריט מידע" className="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-bg z-[70] shadow-2xl overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
         <div className="bg-primary text-white p-5 flex items-center justify-between border-b-4 border-primary-dark">
           <button
             onClick={onClose}

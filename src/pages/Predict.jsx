@@ -145,12 +145,37 @@ export default function Predict() {
     () => getFilteredMatches(selectedStage, selectedGroup),
     [selectedStage, selectedGroup]);
 
-  // Live validation: errors visible while the user is filling, so they know
-  // what's missing before they try to submit.
+  // Live validation: errors visible while the user is filling.
+  // We project allPredictions to a stable "candidates for duplicate-name
+  // check" map (submitted/approved/pending forms with name+status only),
+  // memoized on the JSON shape so unrelated other-user edits — score
+  // changes, drafts being saved — don't churn it. Without this, every
+  // keystroke anywhere in the tournament re-ran validation for every
+  // open Predict tab. The projection is also a sound input for
+  // validateForm because that function only reads f.formName + f.status.
+  const submittedNamesKey = useMemo(() => {
+    const parts = [];
+    for (const [fid, f] of Object.entries(allPredictions || {})) {
+      if (f.status === "submitted" || f.status === "approved" || f.status === "pending") {
+        parts.push(`${fid}:${f.status}:${(f.formName || "").trim().toLowerCase()}`);
+      }
+    }
+    return parts.sort().join("|");
+  }, [allPredictions]);
+  const submittedNamesView = useMemo(() => {
+    const view = {};
+    for (const [fid, f] of Object.entries(allPredictions || {})) {
+      if (f.status === "submitted" || f.status === "approved" || f.status === "pending") {
+        view[fid] = { formName: f.formName, status: f.status };
+      }
+    }
+    return view;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submittedNamesKey]);
   const liveErrors = useMemo(() => {
     if (!activeForm) return [];
-    return validateForm(activeForm, activeFormId, allPredictions, settings);
-  }, [activeForm, activeFormId, allPredictions, settings]);
+    return validateForm(activeForm, activeFormId, submittedNamesView, settings);
+  }, [activeForm, activeFormId, submittedNamesView, settings]);
   const isFormValid = liveErrors.length === 0;
 
   // Focus the first unfilled match when the user switches tabs (stage or group).

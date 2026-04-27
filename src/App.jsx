@@ -162,9 +162,14 @@ function AppShell({ page, Page }) {
   return (
     <Layout rightRail={rail}>
       <Suspense fallback={<Loading reason="lazy-page" compact />}>
-        <div key={page} className="animate-fade-in">
-          <Page />
-        </div>
+        {/* Per-page error boundary: a thrown error in one page no longer
+            kills the entire shell. resetKey={page} lets the user leave a
+            broken page by navigating, without a hard reload. */}
+        <ErrorBoundary variant="page" resetKey={page}>
+          <div key={page} className="animate-fade-in">
+            <Page />
+          </div>
+        </ErrorBoundary>
       </Suspense>
     </Layout>
   );

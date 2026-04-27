@@ -63,15 +63,21 @@ function writeAuditLog(action, details = {}) {
 }
 
 // ============ TOKEN REFRESH HELPER (A2) ============
-// Force a single ID-token refresh per uid per session when Firestore returns
-// permission-denied. Safeguards against rate-limit abuse if the denial is
-// genuinely a rule violation (in which case the refresh won't help anyway).
-const tokenRefreshedFor = new Set();
+// Force at most one ID-token refresh per uid per TOKEN_REFRESH_TTL_MS window
+// when Firestore returns permission-denied. The TTL avoids rate-limit abuse
+// (refreshing on every retry would hammer Firebase) while still allowing a
+// later, genuinely-different denial hours into the session to trigger one
+// fresh attempt. Without the TTL, a single early refresh disabled the
+// recovery path forever.
+const TOKEN_REFRESH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const tokenRefreshedAt = new Map(); // uid -> last-refresh timestamp
 async function maybeRefreshToken(err) {
   if (err?.code !== "permission-denied") return false;
   const u = auth.currentUser;
-  if (!u || tokenRefreshedFor.has(u.uid)) return false;
-  tokenRefreshedFor.add(u.uid);
+  if (!u) return false;
+  const last = tokenRefreshedAt.get(u.uid);
+  if (last && Date.now() - last < TOKEN_REFRESH_TTL_MS) return false;
+  tokenRefreshedAt.set(u.uid, Date.now());
   try {
     await u.getIdToken(true);
     captureClientMessage("token-refreshed-after-denied", { uid: u.uid });
