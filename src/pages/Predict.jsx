@@ -37,6 +37,11 @@ import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import ProgressHub from "../components/ProgressHub";
 import { useRightRail } from "../hooks/useRail";
+import {
+  usePredictPosition,
+  usePredictTabFocus,
+  usePredictDuplicateNameView,
+} from "../hooks/usePredict";
 import { lazyWithRetry } from "../utils/lazyWithRetry";
 const AllFormsView = lazyWithRetry(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
@@ -74,8 +79,12 @@ export default function Predict() {
     if (!stillExists) setActiveFormId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [selectedStage, setSelectedStage] = useState("group");
-  const [selectedGroup, setSelectedGroup] = useState("A");
+
+  // Stage/group selection persisted in sessionStorage per active form so
+  // a reload restores the user's last-viewed tab. Extracted to keep the
+  // load/save effects out of this component body — see usePredict.js.
+  const [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup] =
+    usePredictPosition(activeFormId);
   const [activeTab, setActiveTab] = useState("matches");
   const [showConfirm, setShowConfirm] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -83,26 +92,6 @@ export default function Predict() {
   const [submitting, setSubmitting] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
-
-  useEffect(() => {
-    if (!activeFormId) return;
-    const saved = sessionStorage.getItem(`predict-pos-${activeFormId}`);
-    if (saved) {
-      try {
-        const { stage, group } = JSON.parse(saved);
-        if (stage) setSelectedStage(stage);
-        if (group) setSelectedGroup(group);
-      } catch {}
-    }
-  }, [activeFormId]);
-
-  useEffect(() => {
-    if (!activeFormId) return;
-    sessionStorage.setItem(
-      `predict-pos-${activeFormId}`,
-      JSON.stringify({ stage: selectedStage, group: selectedGroup }),
-    );
-  }, [activeFormId, selectedStage, selectedGroup]);
 
   const activeForm =
     activeFormId && formData?.userId === user?.id ? formData : null;
@@ -135,83 +124,27 @@ export default function Predict() {
     () => getFilteredMatches(selectedStage, selectedGroup),
     [selectedStage, selectedGroup]);
 
-  // Live validation: errors visible while the user is filling.
-  // We project allPredictions to a stable "candidates for duplicate-name
-  // check" map (submitted/approved/pending forms with name+status only),
-  // memoized on the JSON shape so unrelated other-user edits — score
-  // changes, drafts being saved — don't churn it. Without this, every
-  // keystroke anywhere in the tournament re-ran validation for every
-  // open Predict tab. The projection is also a sound input for
-  // validateForm because that function only reads f.formName + f.status.
-  const submittedNamesKey = useMemo(() => {
-    const parts = [];
-    for (const [fid, f] of Object.entries(allPredictions || {})) {
-      if (f.status === "submitted" || f.status === "approved" || f.status === "pending") {
-        parts.push(`${fid}:${f.status}:${(f.formName || "").trim().toLowerCase()}`);
-      }
-    }
-    return parts.sort().join("|");
-  }, [allPredictions]);
-  const submittedNamesView = useMemo(() => {
-    const view = {};
-    for (const [fid, f] of Object.entries(allPredictions || {})) {
-      if (f.status === "submitted" || f.status === "approved" || f.status === "pending") {
-        view[fid] = { formName: f.formName, status: f.status };
-      }
-    }
-    return view;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submittedNamesKey]);
+  // Live validation: errors visible while the user is filling. The
+  // duplicate-name candidates view is referentially stable across
+  // unrelated other-user edits — see usePredictDuplicateNameView.
+  const submittedNamesView = usePredictDuplicateNameView(allPredictions);
   const liveErrors = useMemo(() => {
     if (!activeForm) return [];
     return validateForm(activeForm, activeFormId, submittedNamesView, settings);
   }, [activeForm, activeFormId, submittedNamesView, settings]);
   const isFormValid = liveErrors.length === 0;
 
-  // Focus the first unfilled match when the user switches tabs (stage or group).
-  // If everything in the tab is filled: scroll to the group table for the group
-  // stage, or to the first match for knockout stages. Skip on initial mount so
-  // we don't open the mobile keyboard unprompted.
-  const predictionsRef = useRef(matchPredictions);
-  predictionsRef.current = matchPredictions;
-  const canEditRef = useRef(canEdit);
-  canEditRef.current = canEdit;
-  const skipFocusOnMount = useRef(true);
-  useEffect(() => {
-    if (skipFocusOnMount.current) {
-      skipFocusOnMount.current = false;
-      return;
-    }
-    if (!canEditRef.current) return;
-    if (filteredMatches.length === 0) return;
-    const preds = predictionsRef.current;
-    const firstUnfilled = filteredMatches.find((m) => {
-      const p = preds[m.id];
-      return !p || p.homeScore == null || p.awayScore == null;
-    });
-    const timer = setTimeout(() => {
-      if (firstUnfilled) {
-        const container = document.getElementById(`match-${firstUnfilled.id}`);
-        if (!container) return;
-        const p = predictionsRef.current[firstUnfilled.id];
-        const inputs = container.querySelectorAll('input[type="number"]');
-        const target = p?.homeScore == null ? inputs[0] : inputs[1];
-        container.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
-        if (target) {
-          target.focus();
-          target.select?.();
-        }
-      } else if (selectedStage === "group") {
-        const table = document.querySelector("[data-group-table]");
-        table?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
-      } else {
-        const first = filteredMatches[0];
-        const container = document.getElementById(`match-${first.id}`);
-        container?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
-      }
-    }, SCROLL_DELAY);
-    return () => clearTimeout(timer);
-  }, [selectedStage, selectedGroup, filteredMatches]);
+  // On stage/group change, focus the first unfilled match and scroll it
+  // into view. Implementation lives in usePredictTabFocus so the long
+  // chain of refs / DOM queries / selection logic doesn't clutter this
+  // component body.
+  usePredictTabFocus({
+    matchPredictions,
+    canEdit,
+    filteredMatches,
+    selectedStage,
+    selectedGroup,
+  });
 
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {

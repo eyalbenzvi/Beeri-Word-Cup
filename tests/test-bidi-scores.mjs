@@ -164,22 +164,28 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
 }
 
 // === 6. SummaryEditor template strings (admin blog match panel) ===
+//
+// The per-match-row score lives in SummaryMatchNoteRow.jsx as of PR3
+// (extracted from the 800-line SummaryEditor body); the MatchRow chip
+// in the picker still lives in SummaryEditor.jsx. Both must stay in
+// {away}–{home} order.
 {
-  const src = fs.readFileSync("src/components/SummaryEditor.jsx", "utf8");
+  const editor = fs.readFileSync("src/components/SummaryEditor.jsx", "utf8");
+  const noteRow = fs.readFileSync("src/components/SummaryMatchNoteRow.jsx", "utf8");
   assert(
-    /\$\{r\.awayScore\}[–-]\$\{r\.homeScore\}/.test(src),
-    "SummaryEditor inline score: ${away}–${home}",
+    /\$\{r\.awayScore\}[–-]\$\{r\.homeScore\}/.test(noteRow),
+    "SummaryMatchNoteRow inline score: ${away}–${home}",
   );
   assert(
-    /\$\{result\.awayScore\}[–-]\$\{result\.homeScore\}/.test(src),
-    "SummaryEditor scoreText: ${away}–${home}",
+    /\$\{result\.awayScore\}[–-]\$\{result\.homeScore\}/.test(editor),
+    "SummaryEditor MatchRow scoreText: ${away}–${home}",
   );
   assert(
-    !/\$\{r\.homeScore\}[–-]\$\{r\.awayScore\}/.test(src),
-    "SummaryEditor: no legacy ${home}–${away} for r",
+    !/\$\{r\.homeScore\}[–-]\$\{r\.awayScore\}/.test(noteRow),
+    "SummaryMatchNoteRow: no legacy ${home}–${away} for r",
   );
   assert(
-    !/\$\{result\.homeScore\}[–-]\$\{result\.awayScore\}/.test(src),
+    !/\$\{result\.homeScore\}[–-]\$\{result\.awayScore\}/.test(editor),
     "SummaryEditor: no legacy ${home}–${away} for result",
   );
 }
