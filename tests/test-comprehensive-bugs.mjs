@@ -456,3 +456,7 @@ function checkSetStateDuringRender(src, filename) {
   assert(!/^\s{2}setSelectedStage\(/m.test(src), "3.10 AdminResultsTab.jsx no setState in render body");
 }
 
+console.log(`\n=== COMPREHENSIVE BUGS: ${passed} passed, ${failed} failed ===`);
+if (failures.length) { console.log("FAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
+process.exit(failed > 0 ? 1 : 0);
+
