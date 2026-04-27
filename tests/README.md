@@ -27,18 +27,44 @@ The third column in `run-all.sh` opts each test into the right loader:
 Tests that don't need to import the React tree (pure utility tests,
 static-audit greps) prefer `"no"` — fewer moving parts and faster start.
 
-## Categories (loose taxonomy)
+## Layout
 
-| Pattern | What it covers |
-|---------|---------------|
-| `test-bracket*`, `test-thirdplace`, `test-edge-cases`, `test-excel-*` | Group standings + knockout bracket math |
-| `test-scoring*`, `test-scoring-differential` | Scoring + tiebreakers |
-| `test-store-logic`, `test-load-and-users`, `test-comprehensive-bugs`, `test-store-*` | Ambient store state, listeners, watchdogs |
-| `test-performance-fixes*` | Perf regressions (cache speed, hash, listener retries) |
-| `test-bidi-scores`, `test-tap-targets`, `test-shared-components` | UI invariants, RTL ordering, WCAG tap targets |
-| `test-phone-auth` | OTP HMAC, token replay, normalization |
-| `test-summary-*` | Blog/summary editor + Firestore-rules contract |
-| `test-audit-fixes` | PR-driven regression coverage |
+Tests are grouped into topic subfolders. Loaders, fixtures, and the
+runner stay at the root.
+
+```
+tests/
+  loader.mjs, loader-jsx.mjs, run-all.sh, vitest.setup.js   harness
+  excel-comparison-data.json, excel-rounds/, python_reference.py,
+  scoring-verification.html, google-apps-script-compare.js   fixtures
+
+  bracket/   group standings + knockout bracket math, schedule, sims,
+             cross-validation against Excel/Python references, prediction
+             alignment, simulator parity, scenario predictor, expert-
+             analysis fix, rank consistency
+  scoring/   scoring + tiebreakers + differential + Hebrew topScorer +
+             scoring-verification HTML generator
+  store/     store state, listeners, watchdogs, audit log, sentry wrapper,
+             functions-contract, comprehensive bug detection, form-name
+             default, reopen-form, constants dedup, user-data protection,
+             stuck-loading protection
+  perf/      perf regressions (leaderboard cache, listener retry & hash,
+             bracket cache, batch limit)
+  ui/        UI invariants — RTL/BiDi, tap targets, shared components,
+             aria, focus traps, layout shells, empty states, profile/
+             leaderboard consistency, navigation URL params, micro-copy,
+             upcoming-matches integration, AI fill display, score auto-
+             init, selection-and-champion, profile features
+  auth/      phone OTP HMAC + token replay + auth-copy consistency
+  summary/   blog/summary editor + public mode + AI hardening + review
+             regressions + Firestore-rules contract
+  data/      pure data — match-time parsing, upcoming-matches selector,
+             player search/display (Hebrew), top-scorer selection
+```
+
+Tests reference source files via paths relative to the repo root
+(`readFileSync("src/...")` from cwd, or `resolve(__dirname, "..", "..")`
+for `__dirname`-based paths). Run from the repo root: `./tests/run-all.sh`.
 
 ## Migration plan: Vitest + React Testing Library
 
@@ -69,14 +95,19 @@ on its last line so the run-all.sh harness can surface real failures.
 
 ## Adding a new test
 
-1. Create `tests/test-<topic>.mjs`.
+1. Pick the right topic folder (see Layout above) and create
+   `tests/<topic>/test-<name>.mjs`.
 2. Top of file: a small `assert` helper + `passed/failed` counters.
 3. Bottom of file:
    ```js
    console.log(`\n=== <TOPIC>: ${passed} passed, ${failed} failed ===`);
    process.exit(failed > 0 ? 1 : 0);
    ```
-4. Add a `run_test "<N>. <Title>" "test-<topic>.mjs" "<loader>"` line
-   in `run-all.sh`.
+4. Add a `run_test "<N>. <Title>" "<topic>/test-<name>.mjs" "<loader>"`
+   line in `run-all.sh`.
 5. Run `./tests/run-all.sh`; the new test should report and the total
    should increase by your test count.
+
+When importing from `src/`, use `../../src/...` (two levels up from the
+topic folder). Same for `../../netlify/...`. For `__dirname`-based path
+roots, use `resolve(__dirname, "..", "..")`.
