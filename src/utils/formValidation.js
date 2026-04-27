@@ -2,6 +2,23 @@ import { groupMatches, knockoutMatches } from "../data/matches";
 import { getCachedBracket } from "./bracketCache";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 
+export const BUDGET_MIN = 100;
+export const BUDGET_MAX = 9999;
+export const BUDGET_RANGE_MESSAGE = `מספר תקציב חייב להיות מספר שלם בין ${BUDGET_MIN} ל-${BUDGET_MAX}`;
+
+// Pure budget shape check used by both inline UI hints and submit-time validation.
+// Returns true iff the value is a non-empty string of digits within range.
+// Empty/missing values are intentionally not classified as "invalid shape" —
+// the inline UI suppresses the error while the field is still empty, while
+// validateForm() reports the missing-budget error via the same helper.
+export function isBudgetValid(budgetNumber) {
+  if (budgetNumber == null) return false;
+  const s = String(budgetNumber);
+  if (!/^\d+$/.test(s)) return false;
+  const n = parseInt(s, 10);
+  return n >= BUDGET_MIN && n <= BUDGET_MAX;
+}
+
 /**
  * Validates a prediction form and returns an array of error objects.
  * Each error: { key: string, label: string, target?: { stage, group, matchId, field } }
@@ -103,11 +120,10 @@ export function validateForm(activeForm, activeFormId, allPredictions, settings)
   }
 
   // 6. Budget number
-  const budget = activeForm?.budgetNumber;
-  if (!budget || !/^\d+$/.test(budget) || parseInt(budget) < 100 || parseInt(budget) > 9999) {
+  if (!isBudgetValid(activeForm?.budgetNumber)) {
     errors.push({
       key: "invalidBudget",
-      label: "מספר תקציב חייב להיות מספר שלם בין 100 ל-9999",
+      label: BUDGET_RANGE_MESSAGE,
       target: { field: "budget" },
     });
   }

@@ -308,7 +308,24 @@ async function removeUserField(uid) {
   }
 }
 
+// Reverts cache.predictions[formId] back to a pre-write snapshot. Only used
+// for terminal errors (`permission-denied`) where the listener will never
+// auto-correct, since the server rejected the change and nothing changed
+// upstream to broadcast back. Transient errors (network/timeout) are left
+// alone so the listener's eventual snapshot can resolve them.
+function revertOptimisticForm(formId, snapshot) {
+  const next = { ...cache.predictions };
+  if (snapshot === undefined) {
+    delete next[formId];
+  } else {
+    next[formId] = snapshot;
+  }
+  cache.predictions = next;
+  notifyAndEmit("predictions");
+}
+
 async function writeFormDoc(formId, formData) {
+  const prevSnapshot = cache.predictions?.[formId];
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
@@ -321,6 +338,9 @@ async function writeFormDoc(formId, formData) {
     return true;
   } catch (err) {
     console.error(`Failed to write form ${formId}:`, err);
+    if (err?.code === "permission-denied") {
+      revertOptimisticForm(formId, prevSnapshot);
+    }
     emitWriteError("predictions", err);
     captureClientError(err, { source: "writeFormDoc", formId, code: err?.code });
     await maybeRefreshToken(err);
@@ -333,6 +353,7 @@ const pendingWrites = {};
 function debouncedWriteForm(formId, formData, delay = 500) {
   // Block writes immediately if predictions are locked
   if (cache.settings?.predictionsLocked) return;
+  const prevSnapshot = cache.predictions?.[formId];
   cache.predictions = { ...cache.predictions, [formId]: formData };
   notifyAndEmit("predictions");
   emitSaving("predictions");
@@ -345,6 +366,15 @@ function debouncedWriteForm(formId, formData, delay = 500) {
       .then(() => emitSaved("predictions"))
       .catch((err) => {
         console.error(`Failed to write form ${formId}:`, err);
+        if (err?.code === "permission-denied") {
+          // Only revert if the cache still matches what we tried to write —
+          // otherwise the user has typed since, and we'd discard their
+          // latest edits. The listener will eventually reconcile any
+          // transient errors that fall through this guard.
+          if (cache.predictions?.[formId] === formData) {
+            revertOptimisticForm(formId, prevSnapshot);
+          }
+        }
         emitWriteError("predictions", err);
         captureClientError(err, {
           source: "debouncedWriteForm",
@@ -1570,19 +1600,29 @@ export function adminReopenForm(formId) {
 }
 
 export async function adminDeleteForm(formId) {
-  if (!requireAdmin()) return;
+  if (!requireAdmin()) return false;
   writeAuditLog("delete-form", { formId });
   flushPendingWrites();
-  await deleteDoc(formDocRef(formId));
+  emitSaving("predictions");
+  try {
+    await deleteDoc(formDocRef(formId));
+  } catch (err) {
+    console.error(`adminDeleteForm failed for ${formId}:`, err);
+    emitWriteError("predictions", err);
+    captureClientError(err, { source: "adminDeleteForm", formId, code: err?.code });
+    return false;
+  }
   // Only update cache after successful delete
   const newPreds = { ...cache.predictions };
   delete newPreds[formId];
   cache.predictions = newPreds;
+  emitSaved("predictions");
   notifyAndEmit("predictions");
   if (getActiveFormId() === formId) {
     localStorage.removeItem(ACTIVE_FORM_KEY);
     notifyAndEmit("activeForm");
   }
+  return true;
 }
 
 export function adminUpdateForm(formId, fields) {
