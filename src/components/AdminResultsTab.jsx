@@ -321,6 +321,8 @@ export default function AdminResultsTab() {
                       <input
                         type="number"
                         min="0"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={editScores.homeScore}
                         onChange={(e) =>
                           setEditScores((s) => ({
@@ -334,6 +336,8 @@ export default function AdminResultsTab() {
                       <input
                         type="number"
                         min="0"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={editScores.awayScore}
                         onChange={(e) =>
                           setEditScores((s) => ({

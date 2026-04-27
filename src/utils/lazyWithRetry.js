@@ -5,7 +5,11 @@ import { lazy } from "react";
 // CDN. One forced reload fetches a fresh index.html with the new chunk names.
 // The sessionStorage flag prevents an infinite reload loop if the failure is
 // real (network down, chunk genuinely broken), letting ErrorBoundary handle it.
-const RELOAD_FLAG = "wc_chunkReloaded";
+// Namespace prefix matches every other client-side persisted key (`wc2026_*`).
+const RELOAD_FLAG = "wc2026_chunkReloaded";
+// One-time migration: tidy up the old prefix on read so users who sat
+// across the deploy don't get their reload-guard ignored.
+try { const old = sessionStorage.getItem("wc_chunkReloaded"); if (old != null) { sessionStorage.setItem(RELOAD_FLAG, old); sessionStorage.removeItem("wc_chunkReloaded"); } } catch { /* ignore */ }
 const CHUNK_ERROR_RE =
   /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk \d+ failed/i;
 

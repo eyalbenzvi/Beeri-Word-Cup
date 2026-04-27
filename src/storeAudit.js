@@ -1,5 +1,6 @@
-// Audit log module — extracted from store.js for better separation of concerns
-// Used by store.js internally and exported for admin pages
+// Audit log module — single source of truth for the local audit ring buffer.
+// store.js previously kept a parallel copy of this state which races on the
+// same localStorage key (last writer wins). Always import from here.
 
 const AUDIT_LOG_KEY = "wc2026_audit_log";
 
@@ -14,16 +15,25 @@ try {
   auditLog = [];
 }
 
-export function logAdminAction(action, details = {}, getCurrentUser) {
+// Caller passes the live Firebase auth uid. We don't read it from
+// localStorage here: the cache string can be stale or attacker-set in a
+// shared device, while auth.currentUser.uid is whatever Firebase has
+// actually signed in right now.
+export function logAdminAction(action, details = {}, userId) {
   const entry = {
     action,
     ...details,
-    userId: getCurrentUser?.()?.id || "unknown",
+    userId: userId || "unknown",
     timestamp: new Date().toISOString(),
   };
   auditLog.unshift(entry);
   if (auditLog.length > MAX_AUDIT_LOG_SIZE) auditLog.length = MAX_AUDIT_LOG_SIZE;
-  localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
+  try {
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
+  } catch {
+    /* noop — quota exceeded / private mode */
+  }
+  return entry;
 }
 
 export function getAuditLog() {

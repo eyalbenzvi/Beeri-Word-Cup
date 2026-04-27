@@ -1,0 +1,20 @@
+{
+  "_comment": "JSDoc-aware project config. Editors (VS Code, Cursor, JetBrains) use this to give type-aware completions in our plain JS source. JSDoc types in src/types.d.ts are picked up automatically. This file does NOT enable strict checking — that needs a TypeScript install + tsc. See JSDoc migration plan in docs/ARCHITECTURE.md.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "baseUrl": "."
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", ".netlify"]
+}

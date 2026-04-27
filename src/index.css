@@ -1,11 +1,22 @@
 @import "tailwindcss";
-@import "@fontsource/rubik/400.css";
-@import "@fontsource/rubik/500.css";
-@import "@fontsource/rubik/700.css";
-@import "@fontsource/rubik/800.css";
-@import "@fontsource/rubik/900.css";
-@import "@fontsource/heebo/700.css";
-@import "@fontsource/heebo/800.css";
+/* Hebrew-only subsets cut Latin glyph payload roughly in half on this app
+   (the UI is Hebrew-first; English shows up only in player names + brand
+   words). Each Fontsource hebrew-XXX.css file ships its own
+   `font-display: swap` declaration, so first-paint never blocks on font
+   download. The `font-rendering` rule below pins the same fallback so a
+   future bundler quirk can't silently flip to font-display:block. */
+@import "@fontsource/rubik/hebrew-400.css";
+@import "@fontsource/rubik/hebrew-500.css";
+@import "@fontsource/rubik/hebrew-700.css";
+@import "@fontsource/rubik/hebrew-800.css";
+@import "@fontsource/rubik/hebrew-900.css";
+@import "@fontsource/heebo/hebrew-700.css";
+@import "@fontsource/heebo/hebrew-800.css";
+
+/* Defense-in-depth: ensure swap behavior even if Fontsource regresses or a
+   future bundler re-orders @font-face. */
+@font-face { font-family: "Rubik"; font-display: swap; src: local("Rubik"); }
+@font-face { font-family: "Heebo"; font-display: swap; src: local("Heebo"); }
 
 @theme {
   /* Font pairing: Heebo for Hebrew display headings, Rubik for body */
@@ -436,6 +447,17 @@ button:focus-visible { border-radius: 14px; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Tailwind's `animate-pulse` / `animate-bounce` use infinite keyframes. The
+     star-selector clamp above leaves those utilities mid-keyframe (low-opacity
+     or shifted Y), which is jarring and worse than no motion. Disable them
+     explicitly so the static rest-state is what users see. */
+  .animate-pulse,
+  .animate-bounce,
+  .animate-spin,
+  .animate-fade-in,
+  .animate-pop-in {
+    animation: none !important;
   }
 }
 

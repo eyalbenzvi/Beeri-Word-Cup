@@ -16,6 +16,10 @@ const ALLOWED_INPUT_CHARS = /[^0-9+\-()\s.]/g;
 // directional isolates/embedding, word joiner, BOM, non-breaking space.
 const INVISIBLE_CHARS = /[​-‏‪-‮⁠﻿ ]/g;
 
+// Self-contained: phone.js is shared with Netlify Functions and Node-strict
+// test runners that can't load src/utils/constants.js (which transitively
+// imports data/matches → teams without explicit .js extensions). Keeping
+// the constant here avoids pulling that whole graph into a 17-line module.
 const MAX_INPUT_LEN = 20; // longest sane format "+972-50-123-4567" = 17
 
 // Live input filter. Keep only allowed characters, drop invisibles, cap length.

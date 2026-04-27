@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -29,8 +33,17 @@ const app = initializeApp(firebaseConfig);
 // indefinite "טוען..." with nothing in the console. Auto-detect tries
 // WebChannel first and falls back to XHR long-polling on the same
 // connection if the streaming attempt doesn't complete.
+//
+// Persistent IndexedDB cache (security audit #57/#71): pending writes that
+// haven't reached Firestore when the tab is killed (mobile Safari pagehide,
+// app backgrounding) survive to the next session and replay automatically.
+// Without this, debouncedWriteForm's last 500ms of edits could vanish when
+// the user closes the tab.
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
 });
 export const auth = getAuth(app);
 

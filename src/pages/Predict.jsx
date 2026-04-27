@@ -26,7 +26,7 @@ import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcBracketTeams } from "../utils/bracket";
 import { predictAllMatches, getPredictedChampion } from "../utils/fifaPredictor";
 import { predictScenario, pickTopScorerForTeam } from "../utils/scenarioPredictor";
-import { normalizeStatus } from "../utils/helpers";
+import { normalizeStatus, preferredScrollBehavior } from "../utils/helpers";
 import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
@@ -37,6 +37,11 @@ import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import ProgressHub from "../components/ProgressHub";
 import { useRightRail } from "../hooks/useRail";
+import {
+  usePredictPosition,
+  usePredictTabFocus,
+  usePredictDuplicateNameView,
+} from "../hooks/usePredict";
 import { lazyWithRetry } from "../utils/lazyWithRetry";
 const AllFormsView = lazyWithRetry(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
@@ -65,11 +70,21 @@ export default function Predict() {
   const formData = useFormData(activeFormId);
   const settings = useSettings();
 
+  // Clear stale active-form pointer on mount only when it no longer maps to
+  // a form the user owns (e.g. the form was deleted). Keeping a valid pointer
+  // preserves the user's editing context when navigating back to /predict.
   useEffect(() => {
-    setActiveFormId(null);
+    if (!activeFormId) return;
+    const stillExists = forms.some((f) => f.formId === activeFormId);
+    if (!stillExists) setActiveFormId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [selectedStage, setSelectedStage] = useState("group");
-  const [selectedGroup, setSelectedGroup] = useState("A");
+
+  // Stage/group selection persisted in sessionStorage per active form so
+  // a reload restores the user's last-viewed tab. Extracted to keep the
+  // load/save effects out of this component body — see usePredict.js.
+  const [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup] =
+    usePredictPosition(activeFormId);
   const [activeTab, setActiveTab] = useState("matches");
   const [showConfirm, setShowConfirm] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -77,36 +92,6 @@ export default function Predict() {
   const [submitting, setSubmitting] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    const handler = () => {
-      setKeyboardOpen(window.visualViewport.height < window.innerHeight * 0.75);
-    };
-    window.visualViewport.addEventListener('resize', handler);
-    return () => window.visualViewport.removeEventListener('resize', handler);
-  }, []);
-
-  useEffect(() => {
-    if (!activeFormId) return;
-    const saved = sessionStorage.getItem(`predict-pos-${activeFormId}`);
-    if (saved) {
-      try {
-        const { stage, group } = JSON.parse(saved);
-        if (stage) setSelectedStage(stage);
-        if (group) setSelectedGroup(group);
-      } catch {}
-    }
-  }, [activeFormId]);
-
-  useEffect(() => {
-    if (!activeFormId) return;
-    sessionStorage.setItem(
-      `predict-pos-${activeFormId}`,
-      JSON.stringify({ stage: selectedStage, group: selectedGroup }),
-    );
-  }, [activeFormId, selectedStage, selectedGroup]);
 
   const activeForm =
     activeFormId && formData?.userId === user?.id ? formData : null;
@@ -139,58 +124,27 @@ export default function Predict() {
     () => getFilteredMatches(selectedStage, selectedGroup),
     [selectedStage, selectedGroup]);
 
-  // Live validation: errors visible while the user is filling, so they know
-  // what's missing before they try to submit.
+  // Live validation: errors visible while the user is filling. The
+  // duplicate-name candidates view is referentially stable across
+  // unrelated other-user edits — see usePredictDuplicateNameView.
+  const submittedNamesView = usePredictDuplicateNameView(allPredictions);
   const liveErrors = useMemo(() => {
     if (!activeForm) return [];
-    return validateForm(activeForm, activeFormId, allPredictions, settings);
-  }, [activeForm, activeFormId, allPredictions, settings]);
+    return validateForm(activeForm, activeFormId, submittedNamesView, settings);
+  }, [activeForm, activeFormId, submittedNamesView, settings]);
   const isFormValid = liveErrors.length === 0;
 
-  // Focus the first unfilled match when the user switches tabs (stage or group).
-  // If everything in the tab is filled: scroll to the group table for the group
-  // stage, or to the first match for knockout stages. Skip on initial mount so
-  // we don't open the mobile keyboard unprompted.
-  const predictionsRef = useRef(matchPredictions);
-  predictionsRef.current = matchPredictions;
-  const canEditRef = useRef(canEdit);
-  canEditRef.current = canEdit;
-  const skipFocusOnMount = useRef(true);
-  useEffect(() => {
-    if (skipFocusOnMount.current) {
-      skipFocusOnMount.current = false;
-      return;
-    }
-    if (!canEditRef.current) return;
-    if (filteredMatches.length === 0) return;
-    const preds = predictionsRef.current;
-    const firstUnfilled = filteredMatches.find((m) => {
-      const p = preds[m.id];
-      return !p || p.homeScore == null || p.awayScore == null;
-    });
-    const timer = setTimeout(() => {
-      if (firstUnfilled) {
-        const container = document.getElementById(`match-${firstUnfilled.id}`);
-        if (!container) return;
-        const p = predictionsRef.current[firstUnfilled.id];
-        const inputs = container.querySelectorAll('input[type="number"]');
-        const target = p?.homeScore == null ? inputs[0] : inputs[1];
-        container.scrollIntoView({ behavior: "smooth", block: "start" });
-        if (target) {
-          target.focus();
-          target.select?.();
-        }
-      } else if (selectedStage === "group") {
-        const table = document.querySelector("[data-group-table]");
-        table?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        const first = filteredMatches[0];
-        const container = document.getElementById(`match-${first.id}`);
-        container?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }, SCROLL_DELAY);
-    return () => clearTimeout(timer);
-  }, [selectedStage, selectedGroup, filteredMatches]);
+  // On stage/group change, focus the first unfilled match and scroll it
+  // into view. Implementation lives in usePredictTabFocus so the long
+  // chain of refs / DOM queries / selection logic doesn't clutter this
+  // component body.
+  usePredictTabFocus({
+    matchPredictions,
+    canEdit,
+    filteredMatches,
+    selectedStage,
+    selectedGroup,
+  });
 
   const handlePredictionChange = useCallback(
     (matchId, prediction) => {
@@ -255,7 +209,7 @@ export default function Predict() {
     if (!target) return undefined;
     return () => {
       if (target.field) {
-        setTimeout(() => document.getElementById(`field-${target.field}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), SCROLL_DELAY);
+        setTimeout(() => document.getElementById(`field-${target.field}`)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' }), SCROLL_DELAY);
       } else if (target.matchId) {
         if (target.stage === "group" && target.group) {
           setSelectedStage("group");
@@ -264,7 +218,7 @@ export default function Predict() {
           setSelectedStage(target.stage);
         }
         setActiveTab("matches");
-        setTimeout(() => document.getElementById(`match-${target.matchId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), SCROLL_DELAY);
+        setTimeout(() => document.getElementById(`match-${target.matchId}`)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" }), SCROLL_DELAY);
       }
     };
   }, []);
@@ -391,7 +345,7 @@ export default function Predict() {
     setTimeout(() => {
       document
         .getElementById(`match-${match.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
     }, SCROLL_DELAY);
   }, []);
 
@@ -420,7 +374,7 @@ export default function Predict() {
         <p className="text-ink-muted text-sm mb-6 font-medium">
           {AUTH_COPY.loginRequiredSubtitle}
         </p>
-        <button onClick={() => navigate("login")} className="btn-duo btn-duo-primary w-full">
+        <button onClick={() => navigate("home")} className="btn-duo btn-duo-primary w-full">
           {AUTH_COPY.loginCta}
         </button>
       </div>

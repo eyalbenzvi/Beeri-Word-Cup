@@ -52,8 +52,22 @@ export function useFocusTrap(ref, active) {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
-        previouslyFocused.focus();
+      // iOS Safari moves focus to the body when a dialog closes via tap-
+      // outside; calling .focus() on a stale element re-opens the keyboard
+      // and can cause an unwanted scroll-jump. Only restore when the
+      // document still has focus (i.e. the user is interacting), and the
+      // element is actually focusable + still in the DOM.
+      try {
+        if (
+          document.hasFocus() &&
+          previouslyFocused &&
+          typeof previouslyFocused.focus === "function" &&
+          previouslyFocused.isConnected
+        ) {
+          previouslyFocused.focus({ preventScroll: true });
+        }
+      } catch {
+        /* noop — best effort */
       }
     };
   }, [ref, active]);

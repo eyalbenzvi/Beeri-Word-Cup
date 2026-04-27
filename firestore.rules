@@ -43,8 +43,36 @@ service cloud.firestore {
              (oldStatus == 'pending' && newStatus == 'draft') ||
              (oldStatus == 'submitted' && newStatus == 'draft');
     }
+    // Loose-but-bounded ISO 8601 timestamp string: YYYY-MM-DDTHH:MM:SS(.ms)?Z?
+    // Prevents clients from writing arbitrary strings (or far-future / past
+    // dates) that would corrupt sort order on submittedAt / updatedAt /
+    // reopenedAt. Length cap defends against a 1MB-string DoS.
+    function validIsoTimestamp(s) {
+      return s is string && s.size() <= 30 &&
+        s.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z?$');
+    }
+    // Verify each user-settable timestamp field, when present, is a valid
+    // ISO string. Missing fields pass (omission is fine).
+    function validUserTimestamps(d) {
+      return (!('updatedAt' in d) || validIsoTimestamp(d.updatedAt))
+        && (!('submittedAt' in d) || validIsoTimestamp(d.submittedAt))
+        && (!('reopenedAt' in d) || validIsoTimestamp(d.reopenedAt))
+        && (!('createdAt' in d) || validIsoTimestamp(d.createdAt));
+    }
 
-    // gameData collection — single documents
+    // gameData collection — single documents.
+    //
+    // KNOWN ISSUE — gameData/users PII exposure (security audit #4/#5/#39):
+    // Today every authenticated user can read the FULL users doc, which
+    // contains email, isAdmin, lastLoginAt for every member, AND the UIDs
+    // are phone-derived (`phone_05XXXXXXXX`) so the doc effectively leaks
+    // every member's mobile number. Tightening to admin-only here would
+    // break the leaderboard (which currently maps uid -> displayName from
+    // this same doc). The right fix is to introduce a separate
+    // `gameData/userDirectory` doc that holds ONLY {uid: {displayName}}
+    // and migrate all client read paths to it; that's a coordinated
+    // schema migration and is intentionally out of scope for this pass.
+    // Documenting here so any future tightener has the context.
     match /gameData/{docId} {
       // Most docs require auth; the `settings` doc is public so the
       // welcome screen can show lock state before the user logs in.
@@ -84,25 +112,30 @@ service cloud.firestore {
       // Users can create their own forms only when predictions not locked.
       // H29: new forms must have correct userId and start as draft.
       // H14: only the whitelisted fields may be present on create.
+      // H30: formId must follow `<uid>__<digits>` so a malicious user can't
+      //      embed slashes / dotdot tokens that confuse downstream listings.
       // Admins may create any form (needed for full-database restore from backup).
       allow create: if isAuth() && (
         isAdmin() || (
-          formId.matches(request.auth.uid + '__.*') && !isLocked()
+          formId.matches('^' + request.auth.uid + '__\\d{10,16}$') && !isLocked()
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.status == 'draft'
           && request.resource.data.keys().hasOnly(userCreateFields())
+          && validUserTimestamps(request.resource.data)
         )
       );
 
       // Updates:
       //   - Admin: may change anything except userId (immutable).
-      //   - Owner (not locked): status must follow the allowed FSM, and the
-      //     set of changed keys must be a subset of userUpdateFields.
+      //   - Owner (not locked): status must follow the allowed FSM, the
+      //     set of changed keys must be a subset of userUpdateFields, and
+      //     any timestamp string must be ISO 8601.
       allow update: if isAuth() && request.resource.data.userId == resource.data.userId && (
         isAdmin() || (
           resource.data.userId == request.auth.uid && !isLocked()
           && validUserStatusTransition(resource.data.status, request.resource.data.status)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(userUpdateFields())
+          && validUserTimestamps(request.resource.data)
         )
       );
 
@@ -169,14 +202,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Audit log — append-only for authenticated users, read for admins
-    // Validates: userId must match auth, action and timestamp required
+    // Audit log — append-only for authenticated users, read for admins.
+    // Hardened (security audit #19): cap field sizes so a hostile client
+    // can't flood the collection with megabyte-sized "actions". Total per-
+    // doc is ≈64 (action) + 30 (ts) + ~120 (uid) + small details = under
+    // 4KB, which prevents both storage cost-blowup and forensic poisoning.
     match /auditLog/{logId} {
       allow read: if isAdmin();
       allow create: if isAuth()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.action is string
-        && request.resource.data.timestamp is string;
+        && request.resource.data.action.size() <= 64
+        && request.resource.data.timestamp is string
+        && request.resource.data.timestamp.size() <= 30;
     }
 
     // Server-side counters written by Netlify Functions via Admin SDK.

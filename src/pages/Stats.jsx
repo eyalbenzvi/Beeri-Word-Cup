@@ -510,16 +510,9 @@ export default function Stats() {
   const { user: currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState("matches");
 
-  if (!settings.predictionsLocked) {
-    return (
-      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
-        <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted font-medium">הנתונים יתגלו כשהמשחקים יתחילו.</p>
-      </div>
-    );
-  }
-
+  // All hooks must run on every render before any early return — React's
+  // hook-call-order invariant. Otherwise toggling `predictionsLocked` swaps
+  // the hook count between renders and React throws.
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
       .filter(([, f]) => normalizeStatus(f.status) === "submitted")
@@ -530,6 +523,16 @@ export default function Stats() {
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
+
+  if (!settings.predictionsLocked) {
+    return (
+      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
+        <div className="text-6xl mb-4">🔒</div>
+        <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
+        <p className="text-sm text-ink-muted font-medium">הנתונים יתגלו כשהמשחקים יתחילו.</p>
+      </div>
+    );
+  }
 
   return (
     <div>

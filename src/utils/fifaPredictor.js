@@ -1,15 +1,8 @@
 // FIFA-ranking-based match predictor — zero API calls
 import { GROUPS } from "../data/teams";
-
-// FIFA Rankings (approximate, as of early 2026)
-const FIFA_RANK = {
-  ARG: 1, FRA: 2, BRA: 3, ENG: 4, ESP: 5, POR: 6, NED: 7, BEL: 8,
-  GER: 9, COL: 10, URU: 11, CRO: 12, MAR: 13, JPN: 14, USA: 15, MEX: 16,
-  SEN: 17, AUT: 18, TUR: 19, SUI: 20, KOR: 21, AUS: 22, EGY: 23, SWE: 24,
-  ECU: 25, ALG: 26, CIV: 27, NOR: 28, PAN: 29, CAN: 30, IRN: 31, GHA: 32,
-  BIH: 33, QAT: 34, IRQ: 35, SCO: 36, RSA: 37, JOR: 38, UZB: 39, NZL: 40,
-  CPV: 41, KSA: 42, COD: 43, CZE: 44, TUN: 45, PAR: 46, HAI: 47, CUR: 48,
-};
+// Dense 1..48 ranking among the WC finalists. Derived from the OFFICIAL
+// ranking so the two views are guaranteed consistent.
+import { FIFA_RANK_DENSE as FIFA_RANK } from "../data/fifaRanking";
 
 // Skewed toward favorites vs. naive coin-flips: real WC data shows large
 // rank gaps rarely produce upsets, even at the group stage.

@@ -43,7 +43,12 @@ export default function SimulatorPanel({
     return merged;
   }, [realResults, override]);
 
-  const { leaderboard: simLeaderboard } = useLeaderboardComputed(
+  // Use the dense-rank list so simulator ranks match Leaderboard / Profile.
+  // Earlier this used `leaderboard` and rendered `i + 1` inline, which made
+  // ties (e.g. tied 1st) read as 1, 2, 3 in the simulator while the real page
+  // showed 1, 1, 3 — confusing users about whether their what-if scenario
+  // moved them up.
+  const { rankedLeaderboard: simLeaderboard } = useLeaderboardComputed(
     effectiveResults,
     allPredictions,
     users,
@@ -155,7 +160,7 @@ export default function SimulatorPanel({
     if (!highlightUserId) return null;
     const idx = simLeaderboard.findIndex((e) => e.userId === highlightUserId);
     if (idx < 0) return null;
-    return { rank: idx + 1, entry: simLeaderboard[idx] };
+    return { rank: simLeaderboard[idx].rank, entry: simLeaderboard[idx] };
   }, [simLeaderboard, highlightUserId]);
 
   return (
@@ -279,6 +284,8 @@ export default function SimulatorPanel({
                       <input
                         type="number"
                         min="0"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={editScores.homeScore}
                         onChange={(e) =>
                           setEditScores((s) => ({
@@ -306,6 +313,8 @@ export default function SimulatorPanel({
                       <input
                         type="number"
                         min="0"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={editScores.awayScore}
                         onChange={(e) =>
                           setEditScores((s) => ({
@@ -430,7 +439,7 @@ export default function SimulatorPanel({
           </div>
         )}
         <ol className="text-xs space-y-1">
-          {shownLeaderboard.map((e, i) => {
+          {shownLeaderboard.map((e) => {
             const isMine = highlightUserId && e.userId === highlightUserId;
             return (
               <li
@@ -440,7 +449,7 @@ export default function SimulatorPanel({
                 }`}
               >
                 <span className="truncate">
-                  {i + 1}. {e.formName}
+                  {e.rank}. {e.formName}
                 </span>
                 <span className="font-mono font-extrabold">{e.totalPoints}</span>
               </li>

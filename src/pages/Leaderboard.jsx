@@ -13,6 +13,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
+import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
@@ -248,7 +249,7 @@ export default function Leaderboard({
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
                       {prediction
-                        ? <>{" "}<bdi>({prediction.awayScore}-{prediction.homeScore})</bdi></>
+                        ? <>{" "}<Score home={prediction.homeScore} away={prediction.awayScore} separator="-" wrap="parens" /></>
                         : ""}
                     </div>
                   )}
@@ -321,6 +322,13 @@ export default function Leaderboard({
                   aria-disabled={!canView}
                   tabIndex={canView ? 0 : -1}
                   title={canView ? undefined : "הניחושים יוצגו לאחר נעילת הטורניר"}
+                  // `content-visibility: auto` lets the browser skip layout
+                  // + paint for off-screen entries, providing free
+                  // virtualization without a JS library. `contain-intrinsic-
+                  // size` reserves a placeholder height so scroll position
+                  // stays stable as cards enter the viewport. With 200+ forms
+                  // this avoids layout-thrash on initial render.
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "0 88px" }}
                   className={`w-full bg-white rounded-2xl p-4 border-2 flex items-center gap-3 text-right ${borderColor} ${
                     entry.userId === user?.id ? "ring-2 ring-primary" : ""
                   } ${

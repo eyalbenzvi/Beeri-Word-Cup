@@ -13,24 +13,52 @@ echo "  BEERI WORLD CUP — FULL TEST SUITE"
 echo "==========================================="
 echo ""
 
+# Each test file must terminate with a line matching `<N> passed, <M> failed`
+# (or the legacy "=== ... <N> passed, <M> failed ===" wrapper).
+# Exit code is also captured: a non-zero exit from node (uncaught
+# exception, syntax error, missing import) is reported as a HARD-FAIL even
+# if the file printed an earlier "passed" line — previously `tail -1` of
+# grep'd output silently swallowed a hard crash that happened after a
+# passing block, because that earlier line was the only matching hit.
 run_test() {
   local name="$1"
   local file="$2"
   local needs_loader="$3"
 
   echo -n "$name: "
+  local out exitcode
   if [ "$needs_loader" = "jsx" ]; then
-    result=$(node --loader "$JSX_LOADER" "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+    out=$(node --loader "$JSX_LOADER" "$DIR/$file" 2>&1)
+    exitcode=$?
   elif [ "$needs_loader" = "yes" ]; then
-    result=$(node --loader "$LOADER" "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+    out=$(node --loader "$LOADER" "$DIR/$file" 2>&1)
+    exitcode=$?
   else
-    result=$(node "$DIR/$file" 2>&1 | grep -E "passed|failed" | tail -1)
+    out=$(node "$DIR/$file" 2>&1)
+    exitcode=$?
+  fi
+
+  local result
+  result=$(echo "$out" | grep -E "passed|failed" | tail -1)
+
+  if [ -z "$result" ]; then
+    echo "NO-SUMMARY (silent test, exit=$exitcode)"
+    TOTAL_FAIL=$((TOTAL_FAIL + 1))
+    return
+  fi
+
+  local p f
+  p=$(echo "$result" | grep -oP '\d+ passed' | grep -oP '\d+')
+  f=$(echo "$result" | grep -oP '\d+ failed' | grep -oP '\d+')
+
+  if [ "$exitcode" -ne 0 ]; then
+    echo "$result  [HARD-FAIL exit=$exitcode]"
+    TOTAL_PASS=$((TOTAL_PASS + ${p:-0}))
+    TOTAL_FAIL=$((TOTAL_FAIL + ${f:-0} + 1))
+    return
   fi
 
   echo "$result"
-
-  p=$(echo "$result" | grep -oP '\d+ passed' | grep -oP '\d+')
-  f=$(echo "$result" | grep -oP '\d+ failed' | grep -oP '\d+')
   TOTAL_PASS=$((TOTAL_PASS + ${p:-0}))
   TOTAL_FAIL=$((TOTAL_FAIL + ${f:-0}))
 }
@@ -112,4 +140,8 @@ echo "==========================================="
 echo "  TOTAL: $TOTAL_PASS passed, $TOTAL_FAIL failed"
 echo "==========================================="
 
-exit $TOTAL_FAIL
+# Bash exits clamp to 0..255 — a sufficiently large $TOTAL_FAIL would wrap
+# back to 0 and the suite would report green to CI. Always exit 1 on any
+# failure, 0 on full pass.
+if [ "$TOTAL_FAIL" -gt 0 ]; then exit 1; fi
+exit 0

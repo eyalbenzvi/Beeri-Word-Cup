@@ -189,6 +189,8 @@ function AdminFormEditModal({ formId, form, onClose }) {
                         <input
                           type="number"
                           min="0"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           defaultValue={pred?.homeScore ?? ""}
                           id={`${match.id}-h`}
                           className="w-10 border-2 border-border rounded-xl text-center"
@@ -197,6 +199,8 @@ function AdminFormEditModal({ formId, form, onClose }) {
                         <input
                           type="number"
                           min="0"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           defaultValue={pred?.awayScore ?? ""}
                           id={`${match.id}-a`}
                           className="w-10 border-2 border-border rounded-xl text-center"

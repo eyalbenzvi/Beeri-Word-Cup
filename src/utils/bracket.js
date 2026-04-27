@@ -14,6 +14,13 @@ import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
 // number of qualifying third-place spots — defined by the FIFA regulations,
 // not arbitrary. Update only if the tournament format changes.
 const THIRD_PLACE_QUALIFIERS = 8;
+
+// Single source of truth for "the round that feeds into round X". Used by
+// deriveActualAdvancing to decide which actual results gate a team's
+// advancement claim. Replaces a hand-rolled ternary chain that was easy to
+// get wrong on every edit.
+const ROUND_PARENT = { R16: "R32", QF: "R16", SF: "QF", F: "SF" };
+
 import { isScoreValid } from "./helpers";
 
 const ALL_TEAMS_MAP = {};
@@ -23,16 +30,10 @@ for (const [groupName, teams] of Object.entries(GROUPS)) {
   }
 }
 
-// FIFA/Coca-Cola World Ranking (used as last-resort tiebreaker per 2026 regulations)
-const FIFA_RANKING = {
-  FRA: 1, ESP: 2, ARG: 3, ENG: 4, POR: 5, BRA: 6, NED: 7, MAR: 8,
-  BEL: 9, GER: 10, CRO: 11, COL: 13, SEN: 14, MEX: 15, USA: 16,
-  URU: 17, JPN: 18, SUI: 19, IRN: 21, TUR: 22, ECU: 23, AUT: 24,
-  KOR: 25, AUS: 27, ALG: 28, EGY: 29, CAN: 30, NOR: 31, PAN: 33,
-  CIV: 34, SWE: 38, PAR: 40, CZE: 41, SCO: 43, TUN: 44, COD: 46,
-  UZB: 50, QAT: 55, IRQ: 57, RSA: 60, KSA: 61, JOR: 63, BIH: 65,
-  CPV: 69, GHA: 74, CUR: 82, HAI: 83, NZL: 85,
-};
+// FIFA/Coca-Cola World Ranking (used as last-resort tiebreaker per 2026
+// regulations). Source-of-truth lives in src/data/fifaRanking.js so
+// bracket.js and fifaPredictor.js cannot drift apart.
+import { FIFA_RANK_OFFICIAL as FIFA_RANKING } from "../data/fifaRanking";
 
 export function calcGroupStandings(matchPredictions) {
   const standings = {};
@@ -279,7 +280,11 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
     if (pred.advancingTeam === teams.home || pred.advancingTeam === teams.away) {
       return pred.advancingTeam;
     }
-    return teams.home; // default fallback
+    // Tied score with no `advancingTeam` set is genuinely "unresolved" — we
+    // must return null so callers (and downstream rounds) don't silently
+    // anoint the home side as winner. formValidation.js already flags this
+    // condition as `unresolvedTie`, so the fallback only masked a real bug.
+    return null;
   }
   return hs > as ? teams.home : teams.away;
 }
@@ -445,23 +450,10 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     const feedingMatchesPlayed = (teamCode) => {
       if (!teamCode) return false;
 
-      const priorRound =
-        round === "R16"
-          ? "R32"
-          : round === "QF"
-            ? "R16"
-            : round === "SF"
-              ? "QF"
-              : round === "F"
-                ? "SF"
-                : null;
+      const priorRound = ROUND_PARENT[round];
       if (!priorRound) return false;
       for (const [mId, result] of Object.entries(actualResults)) {
-        if (
-          !mId.startsWith(priorRound + "-") &&
-          !(priorRound === "R32" && mId.startsWith("R32-"))
-        )
-          continue;
+        if (!mId.startsWith(priorRound + "-")) continue;
         if (result.homeScore === null || result.homeScore === undefined)
           continue;
 

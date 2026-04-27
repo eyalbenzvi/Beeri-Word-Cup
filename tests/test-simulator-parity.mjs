@@ -492,8 +492,10 @@ console.log('\n--- Category 2: Simulation calculation errors ---');
   );
 }
 
-// 2c. Knockout tie without advancingTeam => getMatchWinner falls back to home
-//     (already-tested in bracket.js but we verify the sim path is the same).
+// 2c. Knockout tie WITHOUT advancingTeam is unresolved (not a silent home win).
+//     getMatchWinner returns null so downstream rounds also leave the slot
+//     empty until the user picks a winner. This guards against a long-standing
+//     bug where a tie + missing advancingTeam was scored as "home advances".
 {
   const preds = buildSeededResults();
   const realBracket = calcBracketTeams(preds);
@@ -504,13 +506,11 @@ console.log('\n--- Category 2: Simulation calculation errors ---');
       advancingTeam: null,
     };
     const bracketAfter = calcBracketTeams(preds);
-    // R16 match fed by R32-1 must have its slot set to R32-1.home (fallback).
-    // Look up which R16 match depends on R32-1.
     for (const m of knockoutMatches) {
       if (m.id.startsWith('R16-') && m.homeFrom === 'R32-1') {
         assert(
-          bracketAfter[m.id]?.home === realBracket['R32-1'].home,
-          `2c: null advancingTeam falls back to home (R16 ${m.id} fed by R32-1)`,
+          bracketAfter[m.id]?.home === null,
+          `2c: null advancingTeam leaves R16 slot null (R16 ${m.id} fed by R32-1)`,
         );
       }
     }
