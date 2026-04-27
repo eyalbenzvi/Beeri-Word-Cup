@@ -1,6 +1,7 @@
 import { saveBonusPrediction, updateFormDetails } from "../store";
 import PlayerAutocomplete from "./PlayerAutocomplete";
 import { LABELS } from "../constants/messages";
+import { isBudgetValid, BUDGET_RANGE_MESSAGE } from "../utils/formValidation";
 
 export default function FormDetailsTab({ activeForm, activeFormId, canEdit, championName }) {
   return (
@@ -22,7 +23,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
         />
         {(() => {
           const budgetValue = activeForm.budgetNumber || "";
-          const budgetError = budgetValue && (!/^\d+$/.test(budgetValue) || parseInt(budgetValue) < 100 || parseInt(budgetValue) > 9999);
+          const budgetError = budgetValue && !isBudgetValid(budgetValue);
           return (
             <>
               <input
@@ -38,7 +39,7 @@ export default function FormDetailsTab({ activeForm, activeFormId, canEdit, cham
                 placeholder="מספר תקציב (100-9999)"
                 className={`input-duo ${!canEdit ? "opacity-60" : ""}`}
               />
-              {budgetError && <p className="text-xs text-danger font-bold mt-1">מספר תקציב חייב להיות מספר שלם בין 100 ל-9999</p>}
+              {budgetError && <p className="text-xs text-danger font-bold mt-1">{BUDGET_RANGE_MESSAGE}</p>}
             </>
           );
         })()}

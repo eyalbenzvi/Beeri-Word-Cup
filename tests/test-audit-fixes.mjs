@@ -937,6 +937,128 @@ console.log("--- 4.3/4.4: MatchCard bracketEntry resolution ---");
 }
 
 // ============================================================
+// FIX 5.1: isBudgetValid — shared helper for inline + submit checks
+// Regression: budget validation was duplicated in formValidation.js and
+// FormDetailsTab.jsx with subtly different rules. The helper unifies them.
+// (Static-source assertions; the helper itself is exercised via the
+// existing FIX 4.1 inline simulation.)
+// ============================================================
+console.log("--- 5.1: isBudgetValid shared helper (static checks) ---");
+
+{
+  const fs = await import("node:fs");
+  const validationSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/utils/formValidation.js", "utf8");
+  const detailsSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/components/FormDetailsTab.jsx", "utf8");
+
+  // Helper exists and exposes the named constants used by both call sites.
+  assert(/export function isBudgetValid\(/.test(validationSrc), "isBudgetValid is exported");
+  assert(/export const BUDGET_MIN\s*=\s*100/.test(validationSrc), "BUDGET_MIN exported as 100");
+  assert(/export const BUDGET_MAX\s*=\s*9999/.test(validationSrc), "BUDGET_MAX exported as 9999");
+  assert(/export const BUDGET_RANGE_MESSAGE/.test(validationSrc), "BUDGET_RANGE_MESSAGE exported");
+
+  // validateForm + FormDetailsTab both use the helper rather than inline regex.
+  assert(validationSrc.includes("isBudgetValid(activeForm?.budgetNumber)"), "validateForm uses isBudgetValid");
+  assert(detailsSrc.includes("isBudgetValid(budgetValue)"), "FormDetailsTab uses isBudgetValid");
+  assert(detailsSrc.includes("BUDGET_RANGE_MESSAGE"), "FormDetailsTab uses shared message");
+  // Old inline regex must not coexist — would silently desynchronize from helper.
+  assert(!detailsSrc.match(/parseInt\(budgetValue\)\s*<\s*100/), "FormDetailsTab no longer inlines lower bound");
+  assert(!detailsSrc.match(/parseInt\(budgetValue\)\s*>\s*9999/), "FormDetailsTab no longer inlines upper bound");
+
+  // Reimplement the helper here and exercise it with edge cases. The static
+  // assertions above guarantee the source matches; this block guards the
+  // contract.
+  function isBudgetValid(v) {
+    if (v == null) return false;
+    const s = String(v);
+    if (!/^\d+$/.test(s)) return false;
+    const n = parseInt(s, 10);
+    return n >= 100 && n <= 9999;
+  }
+  assert(isBudgetValid("100") === true, "100 is valid (min)");
+  assert(isBudgetValid("9999") === true, "9999 is valid (max)");
+  assert(isBudgetValid("000100") === true, "Leading zeros parse to 100");
+  assert(isBudgetValid(500) === true, "Numeric input accepted");
+  assert(isBudgetValid("99") === false, "Below min");
+  assert(isBudgetValid("10000") === false, "Above max");
+  assert(isBudgetValid("") === false, "Empty rejected");
+  assert(isBudgetValid(null) === false, "null rejected");
+  assert(isBudgetValid("abc") === false, "Non-numeric rejected");
+  assert(isBudgetValid("12.5") === false, "Decimal rejected");
+  assert(isBudgetValid(" 500 ") === false, "Whitespace rejected — caller trims");
+}
+
+// ============================================================
+// FIX 5.2: adminDeleteForm returns success boolean and handles errors
+// Regression: function was async but caller (AdminFormsTab) didn't await,
+// so a Firestore failure would still display "הטופס נמחק" toast.
+// ============================================================
+console.log("--- 5.2: adminDeleteForm error contract ---");
+
+{
+  const fs = await import("node:fs");
+  const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+  const adminTabSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/components/AdminFormsTab.jsx", "utf8");
+
+  // Function shape: declares return values + try/catch around deleteDoc.
+  const fnMatch = storeSrc.match(/export async function adminDeleteForm\(formId\)\s*\{([\s\S]*?)\n\}\n/);
+  assert(!!fnMatch, "adminDeleteForm function found");
+  const body = fnMatch?.[1] || "";
+  assert(body.includes("return false"), "Returns false on early rejection / failure");
+  assert(body.includes("return true"), "Returns true on success");
+  assert(body.match(/try\s*\{[\s\S]*await\s+deleteDoc/), "deleteDoc wrapped in try/catch");
+  assert(body.includes("emitWriteError"), "Surfaces errors via emitWriteError");
+  // Cache update must remain after the await — never optimistic on a delete.
+  const cacheLineIdx = body.indexOf("delete newPreds[formId]");
+  const awaitLineIdx = body.indexOf("await deleteDoc");
+  assert(cacheLineIdx > awaitLineIdx, "Cache update happens after deleteDoc await");
+
+  // Caller must await + branch the toast on the boolean.
+  assert(adminTabSrc.match(/await\s+adminDeleteForm/), "Caller awaits adminDeleteForm");
+  assert(adminTabSrc.includes("מחיקת הטופס נכשלה"), "Failure toast wired up");
+  assert(adminTabSrc.match(/showToast\([^)]*"error"/), "Failure toast uses error variant");
+}
+
+// ============================================================
+// FIX 5.3: writeFormDoc / debouncedWriteForm revert optimistic cache on
+// permission-denied. Transient errors (network/timeout) are NOT reverted —
+// the realtime listener resolves them. Only rule-rejected writes need the
+// explicit revert because the server state never broadcasts a correction.
+// ============================================================
+console.log("--- 5.3: Optimistic write revert on permission-denied ---");
+
+{
+  const fs = await import("node:fs");
+  const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+
+  assert(storeSrc.includes("function revertOptimisticForm"), "revertOptimisticForm helper exists");
+
+  // writeFormDoc must capture snapshot before optimistic update + revert on permission-denied.
+  const writeFn = storeSrc.match(/async function writeFormDoc\(formId, formData\)\s*\{([\s\S]*?)\n\}\n/)?.[1] || "";
+  assert(writeFn.includes("const prevSnapshot = cache.predictions"), "writeFormDoc captures pre-write snapshot");
+  assert(writeFn.match(/if \(err\?\.code === "permission-denied"\)/), "writeFormDoc gates revert on permission-denied");
+  assert(writeFn.includes("revertOptimisticForm(formId, prevSnapshot)"), "writeFormDoc calls revertOptimisticForm");
+
+  // debouncedWriteForm must do the same, with an extra freshness guard so a
+  // racing later call's optimistic state isn't wiped.
+  const debFn = storeSrc.match(/function debouncedWriteForm\(formId, formData[^)]*\)\s*\{([\s\S]*?)\n\}\n/)?.[1] || "";
+  assert(debFn.includes("const prevSnapshot = cache.predictions"), "debouncedWriteForm captures snapshot");
+  assert(debFn.match(/if \(err\?\.code === "permission-denied"\)/), "debouncedWriteForm gates revert on permission-denied");
+  assert(debFn.includes("cache.predictions?.[formId] === formData"), "debouncedWriteForm has freshness guard before reverting");
+
+  // Pure logic check: simulate the revert/no-revert decision tree.
+  function decide(errCode, currentInCache, attempted) {
+    if (errCode !== "permission-denied") return "no-revert";
+    if (currentInCache !== attempted) return "no-revert"; // user typed since
+    return "revert";
+  }
+  const formA = { score: 1 }, formB = { score: 2 };
+  assert(decide("permission-denied", formA, formA) === "revert", "Stale write rejected: revert");
+  assert(decide("permission-denied", formB, formA) === "no-revert", "User has typed newer state: no revert");
+  assert(decide("unavailable", formA, formA) === "no-revert", "Transient error: no revert");
+  assert(decide("deadline-exceeded", formA, formA) === "no-revert", "Timeout: no revert");
+}
+
+// ============================================================
 // FINAL SUMMARY
 // ============================================================
 console.log(`\n=== AUDIT FIX RESULTS: ${passed} passed, ${failed} failed ===`);

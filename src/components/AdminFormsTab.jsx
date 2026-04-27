@@ -431,8 +431,9 @@ export default function AdminFormsTab({ users, allPredictions }) {
                 type="button"
                 onClick={async () => {
                   if (await confirm("למחוק טופס זה לצמיתות")) {
-                    adminDeleteForm(r.formId);
-                    showToast("הטופס נמחק");
+                    const ok = await adminDeleteForm(r.formId);
+                    if (ok) showToast("הטופס נמחק");
+                    else showToast("מחיקת הטופס נכשלה", "error");
                   }
                 }}
                 className="btn-duo-flat"
