@@ -3,11 +3,11 @@
 // test loader without needing a JSX transform.
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import Spinner from "../src/components/Spinner.jsx";
-import InlineError from "../src/components/InlineError.jsx";
-import ErrorBanner from "../src/components/ErrorBanner.jsx";
-import EmptyState from "../src/components/EmptyState.jsx";
-import Badge from "../src/components/Badge.jsx";
+import Spinner from "../../src/components/Spinner.jsx";
+import InlineError from "../../src/components/InlineError.jsx";
+import ErrorBanner from "../../src/components/ErrorBanner.jsx";
+import EmptyState from "../../src/components/EmptyState.jsx";
+import Badge from "../../src/components/Badge.jsx";
 
 let passed = 0, failed = 0;
 const failures = [];

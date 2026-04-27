@@ -23,8 +23,8 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 1. STAGES === STAGE_LABELS at runtime
 {
-  const matches = await import("../src/data/matches.js");
-  const constants = await import("../src/utils/constants.js");
+  const matches = await import("../../src/data/matches.js");
+  const constants = await import("../../src/utils/constants.js");
   assert(constants.STAGE_LABELS === matches.STAGES,
     "STAGE_LABELS is the same object reference as STAGES (re-export, not a copy)");
   assert(constants.getStageLabel("R32") === matches.STAGES.R32,
@@ -37,8 +37,8 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 2. SCORING_DATA derived from POINTS
 {
-  const scoring = await import("../src/utils/scoring.js");
-  const constants = await import("../src/constants/scoring.js");
+  const scoring = await import("../../src/utils/scoring.js");
+  const constants = await import("../../src/constants/scoring.js");
   for (const [, outcome, exact, advancing] of constants.SCORING_DATA) {
     assert(typeof outcome === "number", "SCORING_DATA outcome is a number");
     assert(typeof exact === "number", "SCORING_DATA exact is a number");
@@ -73,7 +73,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 // check. The cap check now lives entirely inside storeAudit.js (single
 // source of truth); store.js delegates via the imported logAdminAction.
 {
-  const storeAudit = await import("../src/storeAudit.js");
+  const storeAudit = await import("../../src/storeAudit.js");
   assert(typeof storeAudit.MAX_AUDIT_LOG_SIZE === "number",
     "storeAudit exports MAX_AUDIT_LOG_SIZE");
   const storeAuditSrc = fs.readFileSync("src/storeAudit.js", "utf8");

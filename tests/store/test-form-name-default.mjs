@@ -4,13 +4,13 @@
 import {
   generateDefaultFormName,
   DEFAULT_FORM_NAME_FALLBACK,
-} from "../src/utils/formNameGenerator.js";
+} from "../../src/utils/formNameGenerator.js";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "..");
+const ROOT = resolve(__dirname, "..", "..");
 
 let passed = 0,
   failed = 0;

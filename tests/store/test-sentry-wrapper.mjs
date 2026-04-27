@@ -5,7 +5,7 @@
 // הטסטים מבודדים את createWithSentry (factory) עם Sentry מוקי,
 // כדי לא להעמיס את @sentry/node האמיתי ולא לגעת ברשת.
 
-import { createWithSentry } from "../netlify/functions/_sentry.js";
+import { createWithSentry } from "../../netlify/functions/_sentry.js";
 
 let passed = 0,
   failed = 0;

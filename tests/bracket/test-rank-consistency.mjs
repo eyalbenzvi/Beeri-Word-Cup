@@ -3,7 +3,7 @@
 // consume that same array so a form's position never differs between the
 // two pages.
 import fs from "node:fs";
-import { compareTiebreaker } from "../src/utils/scoring.js";
+import { compareTiebreaker } from "../../src/utils/scoring.js";
 
 let passed = 0, failed = 0;
 const failures = [];

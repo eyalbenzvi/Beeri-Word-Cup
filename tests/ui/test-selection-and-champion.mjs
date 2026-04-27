@@ -13,17 +13,17 @@
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { groupMatches, knockoutMatches } from "../src/data/matches.js";
-import { getTeamByCode } from "../src/data/teams.js";
+import { groupMatches, knockoutMatches } from "../../src/data/matches.js";
+import { getTeamByCode } from "../../src/data/teams.js";
 import {
   calcBracketTeams,
   deriveChampion,
-} from "../src/utils/bracket.js";
-import { predictAllMatches } from "../src/utils/fifaPredictor.js";
-import { getCachedChampion, getCachedBracket } from "../src/utils/bracketCache.js";
+} from "../../src/utils/bracket.js";
+import { predictAllMatches } from "../../src/utils/fifaPredictor.js";
+import { getCachedChampion, getCachedBracket } from "../../src/utils/bracketCache.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "..");
+const ROOT = resolve(__dirname, "..", "..");
 
 let passed = 0,
   failed = 0;

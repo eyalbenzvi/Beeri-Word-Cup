@@ -10,7 +10,7 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 console.log("=== ConfirmModal TESTS ===\n");
 
 const src = await fs.readFile(
-  new URL("../src/components/ConfirmModal.jsx", import.meta.url),
+  new URL("../../src/components/ConfirmModal.jsx", import.meta.url),
   "utf8",
 );
 
