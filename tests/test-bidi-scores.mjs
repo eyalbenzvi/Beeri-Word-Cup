@@ -1,17 +1,24 @@
-// Static source audit: verifies match-score rendering uses AWAY-before-HOME
-// source order so that, in the RTL Hebrew document, the home digit visually
-// lands next to the home team name on the right and is read first by Hebrew
-// readers.
+// Static source audit — RTL-correct score rendering.
 //
-// Background: digit sub-runs always render LTR. With source "{home}-{away}"
-// the home digit ends up on the LEFT, but the home team name (first flex
-// child) is rendered on the RIGHT. Hebrew readers reading RTL therefore
-// interpret the right number ("away") as the home team's score — scores look
-// reversed. Putting away first in source flips the visual layout so the right
-// edge of the score block carries the home digit.
+// Background: digit sub-runs always render LTR within their bidi context.
+// With JSX written as `{home}-{away}` the home digit ends up visually on
+// the LEFT, while the home team name (the first flex child) renders on the
+// RIGHT in an RTL document. Hebrew readers reading right-to-left then
+// interpret the right number ("away") as the home team's score — scores
+// look reversed. The fix is to put `away` FIRST in source so the right-
+// hand digit is the home score.
 //
-// Coverage: every file in the project that renders a two-number score string
-// is asserted here so a future "fix" doesn't silently re-introduce the bug.
+// As of PR2 (#97), the inline `<bdi>{X.away}–{X.home}</bdi>` pattern lives
+// behind a single `<Score home={...} away={...} />` component. This audit
+// now locks down:
+//   1. Score is imported wherever a two-number scoreline is rendered.
+//   2. The `home={...}` / `away={...}` props are explicit (no positional
+//      mistakes) and the home prop comes from a `*.homeScore` field.
+//   3. Score itself (in Score.jsx) puts `away` BEFORE `home` in source.
+//   4. String-template scorelines in admin / stats utils still use
+//      `${away}-${home}` order.
+//   5. Per-row score components (split into 2 spans) keep their existing
+//      RTL-flex-reverse-friendly home-first source order.
 import fs from "node:fs";
 
 let passed = 0, failed = 0;
@@ -19,6 +26,22 @@ const failures = [];
 function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); console.error("  FAIL: " + m); } }
 
 console.log("=== BIDI SCORES STATIC AUDIT ===\n");
+
+// === 0. Score component is the single source of truth for inline pairs ===
+{
+  const score = fs.readFileSync("src/components/Score.jsx", "utf8");
+  // Inside the bdi, `away` must appear BEFORE `home` in source order.
+  // The regex tolerates the separator + whitespace + JSX expression braces.
+  assert(
+    /<bdi[^>]*>\s*\{away\}[\s\S]{0,100}\{home\}\s*<\/bdi>/.test(score),
+    "Score.jsx: bdi puts {away} before {home} in source",
+  );
+  // Reverse pattern must NOT appear — that would be the legacy bug.
+  assert(
+    !/<bdi[^>]*>\s*\{home\}[\s\S]{0,100}\{away\}\s*<\/bdi>/.test(score),
+    "Score.jsx: no reversed {home} before {away}",
+  );
+}
 
 // === 1. No legacy `dir="ltr"` score wrappers anywhere ===
 const SCORE_FILES = [
@@ -37,54 +60,67 @@ for (const f of SCORE_FILES) {
   assert(!legacyPair, `${f}: no legacy dir=ltr wrapping {X.Score} – {Y.Score}`);
 }
 
-// === 2. MatchCard: actual result, prediction-display, and "your guess" ===
-{
-  const src = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
-  assert(
-    /<bdi>\{actualResult\.awayScore\}[–-]\{actualResult\.homeScore\}<\/bdi>/.test(src),
-    "MatchCard actualResult: <bdi>{away}–{home}</bdi>",
-  );
-  assert(
-    (src.match(/<bdi>\{predAway\}[–-]\{predHome\}<\/bdi>/g) || []).length >= 2,
-    "MatchCard prediction display + 'ניחוש' line: both use <bdi>{predAway}–{predHome}</bdi>",
-  );
-  assert(
-    !/<bdi>\{actualResult\.homeScore\}\s*[–-]\s*\{actualResult\.awayScore\}<\/bdi>/.test(src),
-    "MatchCard: no legacy {home}–{away} for actualResult",
-  );
-  assert(
-    !/<bdi>\{predHome\}\s*[–-]\s*\{predAway\}<\/bdi>/.test(src),
-    "MatchCard: no legacy {predHome}–{predAway}",
-  );
+// === 2. Inline pair callers all import + use <Score /> ===
+//
+// Each consumer must:
+//   (a) import Score from the right relative path.
+//   (b) pass home={...homeScore} + away={...awayScore} to Score.
+//   (c) NOT contain a leftover inline `<bdi>{...away...}–{...home...}</bdi>`
+//       pattern — the static guard against re-introducing the duplication.
+const SCORE_CONSUMERS = [
+  {
+    file: "src/components/MatchCard.jsx",
+    importRe: /import\s+Score\s+from\s+["']\.\/Score["']/,
+    requiredProps: [
+      // actual result + two prediction renders
+      /home=\{actualResult\.homeScore\}\s+away=\{actualResult\.awayScore\}/,
+      /home=\{predHome\}\s+away=\{predAway\}/,
+    ],
+    // `predHome`/`predAway` are normal local vars — match either both
+    // explicit or shorthand if a future refactor switches.
+  },
+  {
+    file: "src/pages/AllForms.jsx",
+    importRe: /import\s+Score\s+from\s+["']\.\.\/components\/Score["']/,
+    requiredProps: [
+      /home=\{prediction\.homeScore\}\s+away=\{prediction\.awayScore\}/,
+    ],
+  },
+  {
+    file: "src/components/UpcomingMatches.jsx",
+    importRe: /import\s+Score\s+from\s+["']\.\/Score["']/,
+    requiredProps: [
+      /home=\{aligned\.homeScore\}/,
+      /away=\{aligned\.awayScore\}/,
+    ],
+  },
+  {
+    file: "src/pages/Leaderboard.jsx",
+    importRe: /import\s+Score\s+from\s+["']\.\.\/components\/Score["']/,
+    requiredProps: [
+      // Leaderboard's predicted-matchup tail uses separator="-" + parens
+      /home=\{prediction\.homeScore\}\s+away=\{prediction\.awayScore\}\s+separator="-"\s+wrap="parens"/,
+    ],
+  },
+];
+for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
+  const src = fs.readFileSync(file, "utf8");
+  assert(importRe.test(src), `${file}: imports Score from the right path`);
+  for (const rp of requiredProps) {
+    assert(rp.test(src), `${file}: passes ${rp} to Score`);
+  }
+  // No leftover legacy inline pattern.
+  const legacyAwayBdi = /<bdi[^>]*>\s*\{[^}]*\.awayScore\}[\s\S]{0,40}\{[^}]*\.homeScore\}\s*<\/bdi>/.test(src);
+  assert(!legacyAwayBdi, `${file}: no leftover inline <bdi>{X.away}–{X.home}</bdi>`);
+  // No legacy reversed pattern either (would be a regression to the
+  // pre-fix bug — we want the Score component, not raw flipped JSX).
+  const legacyHomeBdi = /<bdi[^>]*>\s*\{[^}]*\.homeScore\}[\s\S]{0,40}\{[^}]*\.awayScore\}\s*<\/bdi>/.test(src);
+  assert(!legacyHomeBdi, `${file}: no reversed <bdi>{X.home}–{X.away}</bdi>`);
 }
 
-// === 3. AllForms (per-row score) ===
-{
-  const src = fs.readFileSync("src/pages/AllForms.jsx", "utf8");
-  assert(
-    /<bdi>\{prediction\.awayScore\}[–-]\{prediction\.homeScore\}<\/bdi>/.test(src),
-    "AllForms: <bdi>{away}–{home}</bdi>",
-  );
-  assert(
-    !/<bdi>\{prediction\.homeScore\}\s*[–-]\s*\{prediction\.awayScore\}<\/bdi>/.test(src),
-    "AllForms: no legacy home-away",
-  );
-}
-
-// === 4. UpcomingMatches (per-form prediction line) ===
-{
-  const src = fs.readFileSync("src/components/UpcomingMatches.jsx", "utf8");
-  assert(
-    /<bdi[^>]*>[\s\S]{0,80}aligned\.awayScore[\s\S]{0,40}aligned\.homeScore[\s\S]{0,40}<\/bdi>/.test(src),
-    "UpcomingMatches: <bdi>{aligned.away}–{aligned.home}</bdi>",
-  );
-  assert(
-    !/<bdi[^>]*>[\s\S]{0,80}aligned\.homeScore[\s\S]{0,40}aligned\.awayScore[\s\S]{0,40}<\/bdi>/.test(src),
-    "UpcomingMatches: no legacy home-away",
-  );
-}
-
-// === 5. Leaderboard (predicted matchup tail + per-row stats use single-number bdi) ===
+// === 3. Leaderboard: single-number bdi wrappers (totalPoints, exactScoreCount)
+//        still use `<bdi>` (these aren't pairs — they only need bidi
+//        isolation, not source-order flipping). ===
 {
   const src = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
   assert(
@@ -99,17 +135,9 @@ for (const f of SCORE_FILES) {
     /<bdi>\{score\.exactScoreCount\}<\/bdi>/.test(src),
     "Leaderboard: exactScoreCount uses <bdi>",
   );
-  assert(
-    /<bdi>\(\{prediction\.awayScore\}-\{prediction\.homeScore\}\)<\/bdi>/.test(src),
-    "Leaderboard predicted matchup: <bdi>({away}-{home})</bdi>",
-  );
-  assert(
-    !/<bdi>\(\{prediction\.homeScore\}-\{prediction\.awayScore\}\)<\/bdi>/.test(src),
-    "Leaderboard predicted matchup: no legacy home-away in parens",
-  );
 }
 
-// === 6. MatchAnalysis (AI suggested score chip) ===
+// === 4. MatchAnalysis: AI suggestion keeps explicit dir="ltr" + away first ===
 {
   const src = fs.readFileSync("src/components/MatchAnalysis.jsx", "utf8");
   assert(
@@ -122,7 +150,7 @@ for (const f of SCORE_FILES) {
   );
 }
 
-// === 7. AdminResultsTab (admin-entered result display, not the inputs) ===
+// === 5. AdminResultsTab (admin-entered result display) ===
 {
   const src = fs.readFileSync("src/components/AdminResultsTab.jsx", "utf8");
   assert(
@@ -135,7 +163,7 @@ for (const f of SCORE_FILES) {
   );
 }
 
-// === 8. SummaryEditor (admin blog match panel + match-row chip) ===
+// === 6. SummaryEditor template strings (admin blog match panel) ===
 {
   const src = fs.readFileSync("src/components/SummaryEditor.jsx", "utf8");
   assert(
@@ -156,7 +184,7 @@ for (const f of SCORE_FILES) {
   );
 }
 
-// === 9. Stats page: most-common score key uses {away}-{home} ===
+// === 7. Stats page: most-common score key uses {away}-{home} ===
 {
   const src = fs.readFileSync("src/pages/Stats.jsx", "utf8");
   assert(
@@ -169,7 +197,7 @@ for (const f of SCORE_FILES) {
   );
 }
 
-// === 10. summaryStats util (key + actualKey both flipped) ===
+// === 8. summaryStats util (key + actualKey both flipped) ===
 {
   const src = fs.readFileSync("src/utils/summaryStats.js", "utf8");
   assert(
@@ -182,10 +210,9 @@ for (const f of SCORE_FILES) {
   );
 }
 
-// === 11. statStarters (every "X:Y בול" template) ===
+// === 9. statStarters (every "X:Y בול" template) ===
 {
   const src = fs.readFileSync("src/utils/statStarters.js", "utf8");
-  // Every templated score must use away:home order, never home:away.
   const homeFirst = src.match(/\$\{result\.homeScore\}:\$\{result\.awayScore\}/g);
   assert(
     !homeFirst,
@@ -196,21 +223,19 @@ for (const f of SCORE_FILES) {
     awayFirst && awayFirst.length >= 4,
     `statStarters: at least 4 \${away}:\${home} templates (found ${awayFirst?.length || 0})`,
   );
-  // actualKey for stat comparison
   assert(
     /const actualKey = `\$\{Number\(result\.awayScore\)\}-\$\{Number\(result\.homeScore\)\}`/.test(src),
     "statStarters actualKey: ${away}-${home}",
   );
 }
 
-// === 12. Per-row score components (Results.jsx, SimulatorPanel, AdminFormsTab,
-//        MatchDigest) display each team's score on its own row/element. They
-//        don't hit the LTR-digit-sub-run trap, but assert they still split the
-//        scores into separate spans rather than one inline text. ===
+// === 10. Per-row score components (Results.jsx, SimulatorPanel, AdminFormsTab,
+//         MatchDigest) display each team's score in a separate flex child.
+//         They don't hit the LTR-digit-sub-run trap, but verify they
+//         still split the scores into separate spans rather than one
+//         inline text. ===
 {
   const results = fs.readFileSync("src/pages/Results.jsx", "utf8");
-  // Each team gets its own `flex items-center justify-between py-1.5` row
-  // containing the team name + that team's single score.
   const justifyBetweenRows = (results.match(/flex items-center justify-between py-1\.5/g) || []).length;
   assert(
     justifyBetweenRows >= 2,
@@ -220,8 +245,6 @@ for (const f of SCORE_FILES) {
     /\{result\.homeScore\}/.test(results) && /\{result\.awayScore\}/.test(results),
     "Results.jsx: home and away each rendered separately",
   );
-  // Crucially the two scores are NOT inline in one bdi/span pair (no reversal
-  // risk): no `homeScore}–{awayScore` (or " - ") pattern in source.
   assert(
     !/\{result\.homeScore\}\s*[–-]\s*\{result\.awayScore\}/.test(results),
     "Results.jsx: no inline {home}–{away} pair (each score is its own span)",
@@ -235,17 +258,12 @@ for (const f of SCORE_FILES) {
   );
 
   const adminForms = fs.readFileSync("src/components/AdminFormsTab.jsx", "utf8");
-  // Admin forms tab keeps its inline order [homeName][homeInput]-[awayInput][awayName].
-  // RTL flex reverses: home name + home input land on the right edge.
   assert(
     /defaultValue=\{pred\?\.homeScore[\s\S]{0,600}defaultValue=\{pred\?\.awayScore/.test(adminForms),
     "AdminFormsTab: home input precedes away input in source (RTL flex puts home input next to home name on the right)",
   );
 
   const digest = fs.readFileSync("src/components/MatchDigest.jsx", "utf8");
-  // MatchDigest scoreline uses three flex children — RTL flex reverses, so
-  // homeScore first in source ends up on the right. That's the correct visual
-  // order; this assertion locks it in.
   assert(
     /\{Number\.isFinite\(result\?\.homeScore\)[\s\S]{0,300}\{Number\.isFinite\(result\?\.awayScore\)/.test(digest),
     "MatchDigest scoreline: homeScore first in source (RTL flex puts it on the right)",

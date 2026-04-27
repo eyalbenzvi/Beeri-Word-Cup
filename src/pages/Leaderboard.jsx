@@ -13,6 +13,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
+import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
@@ -248,7 +249,7 @@ export default function Leaderboard({
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
                       {prediction
-                        ? <>{" "}<bdi>({prediction.awayScore}-{prediction.homeScore})</bdi></>
+                        ? <>{" "}<Score home={prediction.homeScore} away={prediction.awayScore} separator="-" wrap="parens" /></>
                         : ""}
                     </div>
                   )}

@@ -6,6 +6,7 @@ import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
 import { formatIsraelDateLabel } from "../utils/matchTime";
 import { isScoreValid } from "../utils/helpers";
+import Score from "./Score";
 import {
   alignPredictionToActual,
   resolveMatchTeams,
@@ -51,9 +52,11 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
     >
       <span className="flex-1 min-w-0 truncate font-medium">{formLabel}</span>
       {showPrediction ? (
-        <bdi className="tabular-nums font-bold">
-          {aligned.awayScore}–{aligned.homeScore}
-        </bdi>
+        <Score
+          home={aligned.homeScore}
+          away={aligned.awayScore}
+          className="tabular-nums font-bold"
+        />
       ) : bracketMismatch ? (
         <span className="text-xs">קבוצות שונות בטופס</span>
       ) : (

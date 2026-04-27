@@ -4,6 +4,7 @@ import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
+import Score from "../components/Score";
 import {
   useAllPredictions,
   useUsers,
@@ -47,7 +48,7 @@ function MatchRow({ match, prediction }) {
           <bdi>{homeName}</bdi>
         </div>
         <div className="w-14 text-center font-extrabold text-ink tabular-nums">
-          {hasScore ? <bdi>{prediction.awayScore}–{prediction.homeScore}</bdi> : "–"}
+          {hasScore ? <Score home={prediction.homeScore} away={prediction.awayScore} /> : "–"}
         </div>
         <div className="flex-1 text-center truncate text-ink font-medium">
           <bdi>{awayName}</bdi>
