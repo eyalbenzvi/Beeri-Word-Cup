@@ -120,7 +120,7 @@ const cache = {
 
 // ============ FIRESTORE HELPERS ============
 
-import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "./utils/constants.js";
+import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "./utils/constants";
 
 // Splits operations across multiple batches when exceeding Firestore's 500 op limit
 export async function commitInBatches(operations) {

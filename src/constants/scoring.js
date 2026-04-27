@@ -4,7 +4,7 @@
 // shorter than STAGES (e.g. "בתים" not "שלב הבתים") so the 4-column table
 // fits on phone widths.
 
-import { POINTS, BONUSES } from "../utils/scoring.js";
+import { POINTS, BONUSES } from "../utils/scoring";
 
 // [stage code, display label] in the order they should appear on the rules page.
 const SCORING_TABLE_ROWS = [

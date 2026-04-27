@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { KICKOFF_UTC } from "../utils/constants.js";
+import { KICKOFF_UTC } from "../utils/constants";
 
 export function useCountdown() {
   const [now, setNow] = useState(Date.now());

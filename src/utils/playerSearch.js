@@ -1,5 +1,5 @@
-import { getTeamByCode } from "../data/teams.js";
-import { TOP_SCORER_PLAYERS } from "../data/players.js";
+import { getTeamByCode } from "../data/teams";
+import { TOP_SCORER_PLAYERS } from "../data/players";
 
 const HEBREW_RE = /[֐-׿]/;
 const NIQQUD_RE = /[֑-ׇ]/g;

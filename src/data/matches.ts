@@ -446,7 +446,23 @@ export const FINAL_MATCHES = [
 
 // Generate all knockout match objects
 export function generateKnockoutMatches() {
-  const allTemplates = [
+  // Each round's templates have slightly different shapes (R32 has explicit
+  // home/away placeholders; R16+ derive their slots from `homeFrom`/`awayFrom`
+  // / `thirdFrom`). Widen the union to the single permissive shape that the
+  // generator below indexes into, so TypeScript stops narrowing per-variant.
+  type KnockoutTemplate = {
+    id: string;
+    fifaMatch: number;
+    label: string;
+    date: string;
+    stage: string;
+    home?: string;
+    away?: string;
+    homeFrom?: string;
+    awayFrom?: string;
+    thirdFrom?: string;
+  };
+  const allTemplates: KnockoutTemplate[] = [
     ...R32_MATCHES.map((m) => ({ ...m, stage: "R32" })),
     ...R16_MATCHES.map((m) => ({ ...m, stage: "R16" })),
     ...QF_MATCHES.map((m) => ({ ...m, stage: "QF" })),

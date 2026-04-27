@@ -3,7 +3,7 @@
 // two cannot drift. Order of the knockout rounds is the project-wide source
 // of truth and is consumed both for iteration and for ranking comparisons.
 
-import { STAGES } from "../data/matches.js";
+import { STAGES } from "../data/matches";
 
 export const KNOCKOUT_STAGE_ORDER = ["R32", "R16", "QF", "SF", "3RD", "F"];
 

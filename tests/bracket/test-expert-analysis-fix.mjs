@@ -264,7 +264,13 @@ const matchAnalysisSrc = readFileSync(resolve(ROOT, "src/components/MatchAnalysi
 // ============================================================
 
 {
-  const matchesSrc = readFileSync(resolve(ROOT, "src/data/matches.js"), "utf8");
+  // matches has migrated from .js to .ts; try both for a clean failure mode.
+  let matchesSrc;
+  try {
+    matchesSrc = readFileSync(resolve(ROOT, "src/data/matches.js"), "utf8");
+  } catch {
+    matchesSrc = readFileSync(resolve(ROOT, "src/data/matches.ts"), "utf8");
+  }
 
   // 8.1 Knockout matches explicitly set homeTeam: null
   const hasNullHome = /homeTeam:\s*null/.test(matchesSrc);
