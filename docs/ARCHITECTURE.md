@@ -178,13 +178,98 @@ Test taxonomy (loose):
 
 There is no Vitest / RTL setup yet — see migration backlog.
 
-## Known issues + migration backlog
+## PII migration (audit #4/#5/#39)
 
-- **PII exposure (security audit #4/#5/#39)**: `gameData/users` is
-  readable by any authenticated user; UIDs are phone-derived. The fix
-  needs a `gameData/userDirectory` doc with only `{uid: {displayName}}`
-  for public reads + admin-only on the full users doc + client read
-  paths to use the directory. Rules currently document the gap.
+User data is being split across three Firestore locations to fix the
+historical leak where every authenticated member could read every other
+member's email + isAdmin flag + last-login from a single shared doc.
+
+### Shapes
+
+- **`gameData/users`** — legacy full record `{ data: { uid: {...} } }`.
+  Kept dual-written during the compat window. Read = any auth user
+  today; tightened to admin-only after the cut-over PR.
+- **`gameData/userDirectory`** — `{ data: { uid: { displayName,
+  firstName?, lastName? } } }`. Auth-readable. The directory is the
+  source of truth for non-admin display data on the leaderboard,
+  AllForms, daily summary, simulator, summary editor.
+- **`userPrivate/{uid}`** — per-user private record: `{ id, email,
+  isAdmin, profileCompleted, lastLoginAt, createdAt, photoURL? }`.
+  Read = owner OR admin. Owner-create requires `isAdmin == false`;
+  owner-update can only touch `email / profileCompleted /
+  lastLoginAt / photoURL`.
+
+### Phase A — additive (this PR)
+
+- New rules deployed for `userDirectory` + `userPrivate` (additive — no
+  legacy access tightened yet).
+- `src/store.js` dual-writes every user mutation across all three
+  locations atomically via `writeBatch`. Field classification lives in
+  two arrays: `DIRECTORY_FIELDS` and `USER_PRIVATE_FIELDS`.
+- New listeners populate `cache.userDirectory` (single doc) and
+  `cache.userPrivate[currentUid]` (per-uid).
+- New hook `useUserDirectory()` returns the directory map. Non-admin
+  consumers were migrated off `useUsers()` to it (Leaderboard,
+  AllForms, DailySummary, SimulatorPanel, SummaryEditor).
+- `set-admin-claim` Netlify function dual-writes `isAdmin` to both
+  legacy users and `userPrivate/{uid}`.
+- `importAllData` re-derives directory + userPrivate from the imported
+  legacy users blob; backups round-trip correctly.
+- `clearAllData` wipes the userPrivate collection too.
+- Static rules-grep regression test
+  (`tests/store/test-firestore-rules-pii.mjs`) catches drift in field
+  classification / rule structure / consumer migration.
+- Migration script `scripts/migrate-userDirectory.mjs` backfills the
+  new locations from the legacy doc, idempotent + safe to re-run.
+
+### Migration runbook (run after Phase A merges, before Phase B)
+
+1. **Backup.** Use the admin tab "Export all data" to save a JSON
+   snapshot. Verify the file opens and counts look right.
+2. **Lock the tournament** (admin tab → settings → predictionsLocked = true).
+3. **Dry-run the script.** From a machine with the Firebase service
+   account JSON:
+
+   ```sh
+   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/svc.json \
+     node scripts/migrate-userDirectory.mjs --dry-run --verbose
+   ```
+
+   Eyeball the planned writes. Counts should match the legacy users doc.
+4. **Real run.** Same command with `--confirm-prod` instead of
+   `--dry-run`. Re-running is safe — only differing entries are
+   re-written.
+5. **Spot-check** in the Firebase Console:
+   - `gameData/userDirectory.data` has one entry per user.
+   - `userPrivate/{adminUid}` exists with `isAdmin: true`.
+   - `userPrivate/{regularUid}` exists with `isAdmin: false`.
+6. **Unlock** the tournament.
+7. **Watch Sentry** for `userPrivateListener-permission-denied` events
+   over the next 24 h. None expected; if any appear, investigate before
+   proceeding to Phase B.
+
+### Phase B — cut-over (separate PR, lands later)
+
+After the migration is verified in production:
+
+1. Tighten `gameData/users` read rule to admin-only.
+2. Switch the `isAdmin()` rule helper's Firestore fallback from
+   `gameData/users.data[uid].isAdmin` to `userPrivate/{uid}.isAdmin`.
+3. Drop the dual-write to legacy users from `set-admin-claim` (the
+   userPrivate write becomes the only Firestore source of truth).
+
+The legacy `gameData/users` doc may be left in place after Phase B as a
+forensic artifact; nothing reads from it.
+
+### Residual issue
+
+UIDs are still phone-derived (`phone_05XXXXXXXX`) so any signed-in
+member can derive any other member's mobile number from form IDs
+(`<uid>__<ts>`). That's addressed in a separate follow-up (Task 2 —
+random hashed UIDs).
+
+## Other migration backlog
+
 - **Per-user form cap in rules** (#26): client-side only; needs a
   counter doc for rule-level enforcement.
 - **Vitest + RTL migration**: bash + grep is brittle; no JSX rendering

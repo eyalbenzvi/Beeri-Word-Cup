@@ -7,7 +7,7 @@ import FormSummaryLines from "../components/FormSummaryLines";
 import Score from "../components/Score";
 import {
   useAllPredictions,
-  useUsers,
+  useUserDirectory,
   useSettings,
   useCurrentUser,
 } from "../hooks/useStore";
@@ -171,7 +171,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
 
 export default function AllFormsView({ onBack }) {
   const allPredictions = useAllPredictions();
-  const users = useUsers();
+  const users = useUserDirectory();
   const settings = useSettings();
   const { user } = useCurrentUser();
   const locked = settings.predictionsLocked;

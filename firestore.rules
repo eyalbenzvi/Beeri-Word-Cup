@@ -53,6 +53,17 @@ service cloud.firestore {
     }
     // Verify each user-settable timestamp field, when present, is a valid
     // ISO string. Missing fields pass (omission is fine).
+    // Shape + size caps for a userDirectory entry. The directory is
+    // auth-readable, so an unbounded entry could let a hostile member
+    // bloat the doc and inflate everyone else's read cost. 100/50/50
+    // are generous compared to the legacy users-doc fields.
+    function userDirectoryEntryOk(e) {
+      return e.keys().hasOnly(['displayName', 'firstName', 'lastName'])
+        && e.displayName is string && e.displayName.size() <= 100
+        && (!('firstName' in e) || (e.firstName is string && e.firstName.size() <= 50))
+        && (!('lastName' in e) || (e.lastName is string && e.lastName.size() <= 50));
+    }
+
     function validUserTimestamps(d) {
       return (!('updatedAt' in d) || validIsoTimestamp(d.updatedAt))
         && (!('submittedAt' in d) || validIsoTimestamp(d.submittedAt))
@@ -62,17 +73,20 @@ service cloud.firestore {
 
     // gameData collection — single documents.
     //
-    // KNOWN ISSUE — gameData/users PII exposure (security audit #4/#5/#39):
-    // Today every authenticated user can read the FULL users doc, which
-    // contains email, isAdmin, lastLoginAt for every member, AND the UIDs
-    // are phone-derived (`phone_05XXXXXXXX`) so the doc effectively leaks
-    // every member's mobile number. Tightening to admin-only here would
-    // break the leaderboard (which currently maps uid -> displayName from
-    // this same doc). The right fix is to introduce a separate
-    // `gameData/userDirectory` doc that holds ONLY {uid: {displayName}}
-    // and migrate all client read paths to it; that's a coordinated
-    // schema migration and is intentionally out of scope for this pass.
-    // Documenting here so any future tightener has the context.
+    // PII MIGRATION (audit #4/#5/#39) — Phase A (additive):
+    //   - `gameData/userDirectory` holds the public-bounded directory
+    //     {uid: {displayName, firstName?, lastName?}}. Auth-readable.
+    //     The leaderboard / AllForms / SimulatorPanel / etc. read from
+    //     here instead of the legacy users doc.
+    //   - `userPrivate/{uid}` (per-uid collection) holds private fields:
+    //     email, isAdmin, profileCompleted, lastLoginAt, createdAt,
+    //     photoURL. Read = owner OR admin.
+    //   - Legacy `gameData/users` is kept dual-written during the compat
+    //     window so admin tabs and `set-admin-claim` Netlify function
+    //     keep working without changes. After all consumers migrate, a
+    //     follow-up tightens its read rule to admin-only.
+    // Phone-derived UID leak via formIds is addressed in a separate
+    // follow-up (random hashed UIDs).
     match /gameData/{docId} {
       // Most docs require auth; the `settings` doc is public so the
       // welcome screen can show lock state before the user logs in.
@@ -95,8 +109,56 @@ service cloud.firestore {
         )
       );
 
+      // userDirectory — public-bounded {uid: {displayName, firstName?, lastName?}}
+      // Read: any authenticated user.
+      // Write: a non-admin user may only mutate their own key, with the
+      //        same diff-affectedKeys discipline used for the legacy
+      //        users doc above. Each entry's shape + sizes are bounded
+      //        so a hostile client can't bloat the auth-readable doc.
+      //        Admin may mutate anything.
+      allow create: if isAuth() && docId == 'userDirectory';
+      allow update: if isAuth() && docId == 'userDirectory' && (
+        isAdmin() || (
+          request.resource.data.data.diff(resource.data.data).affectedKeys().hasOnly([request.auth.uid])
+          && userDirectoryEntryOk(request.resource.data.data[request.auth.uid])
+        )
+      );
+
       // Admin-only documents
       allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing'];
+    }
+
+    // userPrivate/{uid} — per-user private record (email, isAdmin,
+    // profileCompleted, lastLoginAt, createdAt, photoURL).
+    //   Read:   the owner OR an admin.
+    //   Create: the owner with isAdmin == false (defense-in-depth: a
+    //           regular user must not seed themselves as admin), or any
+    //           admin.
+    //   Update: the owner, but `isAdmin` must stay the same; an admin
+    //           may change anything (including isAdmin).
+    //   Delete: admin only — kept here so admins can hard-delete a user.
+    function userPrivateOwnerCreateOk(d) {
+      return d.keys().hasOnly([
+        'id', 'email', 'isAdmin', 'profileCompleted',
+        'lastLoginAt', 'createdAt', 'photoURL'
+      ]) && (!('isAdmin' in d) || d.isAdmin == false);
+    }
+    function userPrivateOwnerUpdateOk(req, res) {
+      return req.diff(res).affectedKeys().hasOnly([
+        'email', 'profileCompleted', 'lastLoginAt', 'photoURL'
+      ]);
+    }
+    match /userPrivate/{uid} {
+      allow read: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAuth() && (
+        isAdmin() || (request.auth.uid == uid &&
+                      userPrivateOwnerCreateOk(request.resource.data))
+      );
+      allow update: if isAuth() && (
+        isAdmin() || (request.auth.uid == uid &&
+                      userPrivateOwnerUpdateOk(request.resource.data, resource.data))
+      );
+      allow delete: if isAdmin();
     }
 
     // predictions collection — one document per form

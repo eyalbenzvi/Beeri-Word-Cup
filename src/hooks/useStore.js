@@ -146,6 +146,14 @@ export function useUsers() {
   return useStoreValue(store.getUsers);
 }
 
+// PII migration Phase A: prefer this for any consumer that only needs
+// {displayName, firstName?, lastName?} — non-admin code paths must
+// migrate off useUsers() so the legacy gameData/users read rule can be
+// tightened to admin-only.
+export function useUserDirectory() {
+  return useStoreValue(store.getUserDirectory);
+}
+
 const EMPTY_FORMS = [];
 
 // `getFormsForUser` always builds a new array, so without a cache layer

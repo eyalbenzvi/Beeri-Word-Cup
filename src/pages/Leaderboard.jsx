@@ -5,7 +5,7 @@ import {
   useCurrentUser,
   useMatchResults,
   useAllPredictions,
-  useUsers,
+  useUserDirectory,
   useActualBonuses,
   useSettings,
 } from "../hooks/useStore";
@@ -47,7 +47,7 @@ export default function Leaderboard({
   const { user } = useCurrentUser();
   const results = useMatchResults();
   const allPredictions = useAllPredictions();
-  const users = useUsers();
+  const users = useUserDirectory();
   const actualBonuses = useActualBonuses();
   const settings = useSettings();
   const locked = settings.predictionsLocked;

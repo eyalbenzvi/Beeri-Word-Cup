@@ -86,6 +86,10 @@ async function maybeRefreshToken(err) {
 
 const DOCS = {
   users: "users",
+  // PII migration Phase A: directory holds {uid: {displayName, firstName?, lastName?}}
+  // and is auth-readable. The leaderboard / AllForms / etc. read from here
+  // instead of the legacy users doc once migrated.
+  userDirectory: "userDirectory",
   matchResults: "matchResults",
   actualAdvancing: "actualAdvancing",
   actualBonuses: "actualBonuses",
@@ -97,6 +101,14 @@ const ACTIVE_FORM_KEY = "wc2026_activeForm";
 
 const cache = {
   users: {},
+  // {uid: {displayName, firstName?, lastName?}} — auth-readable directory.
+  userDirectory: {},
+  // {uid: {email, isAdmin, profileCompleted, lastLoginAt, createdAt, ...}}
+  // For non-admin users: own record only (rules permit owner-read only).
+  // For admin users: still own record only on the listener side; admin tabs
+  // continue to read legacy `users` for the full membership during the
+  // compat window.
+  userPrivate: {},
   predictions: {}, // formId -> formData (assembled from individual docs)
   matchResults: {},
   actualAdvancing: {},
@@ -158,6 +170,15 @@ function summaryDocRef(summaryId) {
 
 const summariesCollectionRef = collection(db, "summaries");
 
+// PII migration Phase A: per-user private record lives at userPrivate/{uid}.
+function userPrivateDocRef(uid) {
+  return doc(db, "userPrivate", uid);
+}
+
+const userPrivateCollectionRef = collection(db, "userPrivate");
+
+const userDirectoryDocRef = () => gameDocRef("userDirectory");
+
 async function writeGameDoc(docName, data, { force = false } = {}) {
   // Safety guard: block writes that would dramatically shrink shared data.
   // Pass { force: true } for explicit admin-initiated clears.
@@ -200,20 +221,83 @@ async function writeGameDoc(docName, data, { force = false } = {}) {
   }
 }
 
-// Safe single-user field update via dot-notation (no full-doc overwrite)
-async function updateUserField(uid, fields) {
-  const updatePayload = {};
-  for (const [key, value] of Object.entries(fields)) {
-    updatePayload[`data.${uid}.${key}`] = value;
+// PII migration Phase A: each user record is split across THREE Firestore
+// locations and dual-written atomically:
+//   1. gameData/users      — legacy doc (full record). Kept during the
+//                            compat window so admin tabs and the
+//                            set-admin-claim Netlify function keep
+//                            working unchanged.
+//   2. gameData/userDirectory — public-bounded {uid: {displayName, firstName?, lastName?}}.
+//   3. userPrivate/{uid}   — per-user private doc (email, isAdmin,
+//                            profileCompleted, lastLoginAt, createdAt,
+//                            photoURL).
+// These two arrays are the single source of truth for which destination
+// each field belongs to. They MUST stay in sync with firestore.rules
+// (userDirectoryEntryOk + userPrivateOwnerCreateOk).
+const DIRECTORY_FIELDS = ["displayName", "firstName", "lastName"];
+const USER_PRIVATE_FIELDS = [
+  "id", "email", "isAdmin", "profileCompleted",
+  "lastLoginAt", "createdAt", "photoURL",
+];
+
+// Pick the keys from `obj` that belong to `allowed`, dropping undefined.
+function pickKnown(obj, allowed) {
+  const out = {};
+  for (const k of allowed) {
+    if (obj && obj[k] !== undefined) out[k] = obj[k];
   }
+  return out;
+}
+
+// Update a user's record. Writes to legacy users + directory + userPrivate
+// atomically via writeBatch. Caller passes whatever fields they want to
+// change; this fans them out to the right destinations.
+async function updateUserField(uid, fields) {
+  const dirFields = pickKnown(fields, DIRECTORY_FIELDS);
+  const privFields = pickKnown(fields, USER_PRIVATE_FIELDS);
+
+  // Optimistic cache updates.
   cache.users = {
     ...cache.users,
     [uid]: { ...cache.users[uid], ...fields },
   };
+  if (Object.keys(dirFields).length > 0) {
+    cache.userDirectory = {
+      ...cache.userDirectory,
+      [uid]: { ...cache.userDirectory[uid], ...dirFields },
+    };
+  }
+  if (Object.keys(privFields).length > 0) {
+    cache.userPrivate = {
+      ...cache.userPrivate,
+      [uid]: { ...cache.userPrivate[uid], ...privFields },
+    };
+  }
   notifyAndEmit("users");
   emitSaving("users");
+
+  const batch = writeBatch(db);
+  // Legacy users — dot-notation update.
+  const legacyPayload = {};
+  for (const [key, value] of Object.entries(fields)) {
+    legacyPayload[`data.${uid}.${key}`] = value;
+  }
+  batch.update(gameDocRef("users"), legacyPayload);
+  // Directory — setDoc(merge:true) so first-ever write creates the doc.
+  if (Object.keys(dirFields).length > 0) {
+    batch.set(
+      userDirectoryDocRef(),
+      { data: { [uid]: dirFields } },
+      { merge: true },
+    );
+  }
+  // userPrivate/{uid} — setDoc(merge:true) for create-or-update.
+  if (Object.keys(privFields).length > 0) {
+    batch.set(userPrivateDocRef(uid), privFields, { merge: true });
+  }
+
   try {
-    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    await withTimeout(batch.commit(), 10000);
     emitSaved("users");
     return true;
   } catch (err) {
@@ -234,7 +318,8 @@ async function updateUserField(uid, fields) {
 const MAX_USERS_WARNING = 1500;
 const MAX_USERS_HARD_LIMIT = USER_LIMIT;
 
-// Safe new-user creation via dot-notation (no full-doc overwrite)
+// Create a new user record across all three locations atomically. Caller
+// passes the full record; this splits the fields and dual-writes.
 async function createUserField(uid, userData) {
   const currentCount = Object.keys(cache.users).length;
   if (currentCount >= MAX_USERS_HARD_LIMIT) {
@@ -245,28 +330,43 @@ async function createUserField(uid, userData) {
   if (currentCount >= MAX_USERS_WARNING) {
     console.warn(`[WARNING] User count (${currentCount}) approaching Firestore 1MB document limit.`);
   }
-  const updatePayload = { [`data.${uid}`]: userData };
+
+  const dirFields = pickKnown(userData, DIRECTORY_FIELDS);
+  const privFields = pickKnown(userData, USER_PRIVATE_FIELDS);
+
+  // Optimistic cache updates.
   cache.users = { ...cache.users, [uid]: userData };
+  cache.userDirectory = { ...cache.userDirectory, [uid]: dirFields };
+  cache.userPrivate = { ...cache.userPrivate, [uid]: privFields };
   notifyAndEmit("users");
   emitSaving("users");
   writeAuditLog("user-create", {
     targetUser: uid,
     userCountAfter: Object.keys(cache.users).length,
   });
+
+  // Use setDoc(merge:true) for the legacy users doc too — handles both the
+  // first-user-ever case (doc not yet created) and subsequent additions
+  // without a try/catch/fallback dance, and keeps the whole operation
+  // atomic under writeBatch.
+  const batch = writeBatch(db);
+  batch.set(
+    gameDocRef("users"),
+    { data: { [uid]: userData } },
+    { merge: true },
+  );
+  batch.set(
+    userDirectoryDocRef(),
+    { data: { [uid]: dirFields } },
+    { merge: true },
+  );
+  batch.set(userPrivateDocRef(uid), privFields, { merge: true });
+
   try {
-    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    await withTimeout(batch.commit(), 10000);
     emitSaved("users");
     return true;
   } catch (err) {
-    if (err.code === "not-found") {
-      // Document doesn't exist yet (first user ever) — create it
-      await withTimeout(
-        setDoc(gameDocRef("users"), { data: { [uid]: userData } }),
-        10000,
-      );
-      emitSaved("users");
-      return true;
-    }
     console.error(`Failed to create user ${uid}:`, err);
     emitWriteError("users", err);
     captureClientError(err, {
@@ -279,16 +379,29 @@ async function createUserField(uid, userData) {
   }
 }
 
-// Safe user removal via deleteField (no full-doc overwrite)
+// Remove a user from all three locations atomically. Admin-only path
+// (deleteUser is gated by requireAdmin); rules permit admin deletes on
+// userPrivate.
 async function removeUserField(uid) {
-  const updatePayload = { [`data.${uid}`]: deleteField() };
   const newUsers = { ...cache.users };
   delete newUsers[uid];
   cache.users = newUsers;
+  const newDir = { ...cache.userDirectory };
+  delete newDir[uid];
+  cache.userDirectory = newDir;
+  const newPriv = { ...cache.userPrivate };
+  delete newPriv[uid];
+  cache.userPrivate = newPriv;
   notifyAndEmit("users");
   emitSaving("users");
+
+  const batch = writeBatch(db);
+  batch.update(gameDocRef("users"), { [`data.${uid}`]: deleteField() });
+  batch.update(userDirectoryDocRef(), { [`data.${uid}`]: deleteField() });
+  batch.delete(userPrivateDocRef(uid));
+
   try {
-    await withTimeout(updateDoc(gameDocRef("users"), updatePayload), 10000);
+    await withTimeout(batch.commit(), 10000);
     emitSaved("users");
     return true;
   } catch (err) {
@@ -437,6 +550,7 @@ let predictionsShowAll = false;
 let gameDocUnsubs = [];
 let predictionsListenerGeneration = 0;
 let summariesUnsub = null;
+let userPrivateUnsub = null;
 const retryState = {}; // key -> { count, inProgress }
 
 function getRetryState(key) {
@@ -708,6 +822,9 @@ export function initRealtimeListeners(userId) {
   // Summaries listener — all summaries (reads filtered server-side by rules:
   // published for everyone, drafts only for admins)
   setupSummariesListener();
+
+  // PII migration Phase A: own private record listener.
+  setupUserPrivateListener(userId);
 }
 
 // The Firestore rule allows non-admins to read only `status == 'published'`
@@ -936,7 +1053,14 @@ export function initPublicReadonlyMode() {
   );
 
   // Mark other keys ready so the UI doesn't block on unused streams.
-  for (const key of ["users", "actualAdvancing", "actualBonuses", "predictions"]) {
+  for (const key of [
+    "users",
+    "userDirectory",
+    "userPrivate",
+    "actualAdvancing",
+    "actualBonuses",
+    "predictions",
+  ]) {
     cache._ready[key] = true;
   }
   notifyAndEmit("users");
@@ -1004,6 +1128,49 @@ function maybeUpgradeSummariesListener() {
   if (isUserAdmin !== summariesShowAll) {
     setupSummariesListener();
   }
+}
+
+// PII migration Phase A: per-uid listener for the user's own private record.
+// Read access is owner-or-admin per firestore.rules, so non-admins see
+// exactly one doc here. The doc may not exist for users who haven't been
+// migrated or backfilled yet — that's fine; cache stays empty and ready
+// flips to true so isStoreReady() doesn't block the UI.
+function setupUserPrivateListener(userId) {
+  if (userPrivateUnsub) {
+    userPrivateUnsub();
+    userPrivateUnsub = null;
+  }
+  if (!userId) {
+    cache._ready.userPrivate = true;
+    notifyAndEmit("userPrivate");
+    return;
+  }
+  const ref = userPrivateDocRef(userId);
+  userPrivateUnsub = onSnapshot(
+    ref,
+    (snap) => {
+      getRetryState("userPrivate").count = 0;
+      if (snap.exists()) {
+        cache.userPrivate = { ...cache.userPrivate, [userId]: snap.data() };
+      } else {
+        // Doc doesn't exist yet — leave any existing cache entry alone
+        // (a previous session may have written it; or migration hasn't run).
+        // Just flip ready so the UI proceeds.
+      }
+      cache._ready.userPrivate = true;
+      notifyAndEmit("userPrivate");
+    },
+    (err) => {
+      console.error("Listener error for userPrivate:", err);
+      reportListenerError(err, "userPrivateListener", {
+        retryCount: getRetryState("userPrivate").count,
+      });
+      maybeRefreshToken(err);
+      // Non-fatal during compat: legacy users doc still has the same data.
+      cache._ready.userPrivate = true;
+      notifyAndEmit("userPrivate");
+    },
+  );
 }
 
 export function isStoreReady() {
@@ -1084,6 +1251,29 @@ const DEFAULT_SETTINGS = { predictionsLocked: false };
 
 export function getUsers() {
   return cache.users || EMPTY_OBJ;
+}
+
+// PII migration Phase A: public-bounded directory of {uid: {displayName,
+// firstName?, lastName?}}. Non-admin reads should prefer this over
+// `getUsers()` so the legacy users doc can be tightened to admin-only.
+export function getUserDirectory() {
+  return cache.userDirectory || EMPTY_OBJ;
+}
+
+// Returns the current authenticated user's private record or null. Admins
+// only have their own record materialised via this listener too — admin
+// tabs continue to read the legacy users doc for the full membership
+// during the compat window.
+export function getUserPrivate(uid) {
+  if (!uid) return null;
+  return (cache.userPrivate || EMPTY_OBJ)[uid] || null;
+}
+
+// Whether the userPrivate listener has fired at least once. Distinct
+// from `_ready.users` (legacy doc) so consumers that depend specifically
+// on the new path can wait correctly.
+export function isUserPrivateReady() {
+  return !!cache._ready.userPrivate;
 }
 
 let lastEnsuredUid = null;
@@ -1258,10 +1448,16 @@ export async function deleteUser(userId) {
     (fid) => cache.predictions[fid]?.userId === userId,
   );
 
-  // Update local cache
+  // Update local cache (legacy + directory + private + predictions)
   const newUsers = { ...cache.users };
   delete newUsers[userId];
   cache.users = newUsers;
+  const newDir = { ...cache.userDirectory };
+  delete newDir[userId];
+  cache.userDirectory = newDir;
+  const newPriv = { ...cache.userPrivate };
+  delete newPriv[userId];
+  cache.userPrivate = newPriv;
   for (const fid of formsToDelete) {
     delete cache.predictions[fid];
   }
@@ -1275,9 +1471,13 @@ export async function deleteUser(userId) {
     formsDeleted: formsToDelete.length,
   });
 
-  // Use batch: remove user field + delete form docs
+  // Single batch: remove user from all three locations + delete form docs.
+  // PII migration Phase A: dual-delete keeps the directory + userPrivate
+  // in sync with the legacy users doc.
   const batch = writeBatch(db);
   batch.update(gameDocRef("users"), { [`data.${userId}`]: deleteField() });
+  batch.update(userDirectoryDocRef(), { [`data.${userId}`]: deleteField() });
+  batch.delete(userPrivateDocRef(userId));
   for (const fid of formsToDelete) {
     batch.delete(formDocRef(fid));
   }
@@ -1333,11 +1533,17 @@ export function logoutUser() {
     summariesUnsub();
     summariesUnsub = null;
   }
+  if (userPrivateUnsub) {
+    userPrivateUnsub();
+    userPrivateUnsub = null;
+  }
   gameDocUnsubs.forEach((u) => u());
   gameDocUnsubs = [];
   currentListenerUserId = null;
   // Reset cache to prevent stale data after re-login
   cache.users = {};
+  cache.userDirectory = {};
+  cache.userPrivate = {};
   cache.predictions = {};
   cache.matchResults = {};
   cache.actualAdvancing = {};
@@ -1785,11 +1991,18 @@ export async function clearAllData() {
   if (!requireAdmin()) return;
   writeAuditLog("clear-all-data");
 
-  // Delete all form documents using batched operations
-  const snapshot = await getDocs(predictionsCollectionRef);
+  // Delete all form documents and all userPrivate docs using batched operations.
+  // PII migration Phase A: also clears userDirectory + userPrivate so a
+  // subsequent restore (or a fresh tournament) starts from a clean slate.
+  const [predsSnap, privateSnap] = await Promise.all([
+    getDocs(predictionsCollectionRef),
+    getDocs(userPrivateCollectionRef),
+  ]);
   const ops = [];
-  snapshot.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  predsSnap.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  privateSnap.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
   ops.push({ type: "set", ref: gameDocRef("users"), data: { data: {} } });
+  ops.push({ type: "set", ref: gameDocRef("userDirectory"), data: { data: {} } });
   ops.push({ type: "set", ref: gameDocRef("matchResults"), data: { data: {} } });
   ops.push({ type: "set", ref: gameDocRef("actualAdvancing"), data: { data: {} } });
   ops.push({ type: "set", ref: gameDocRef("actualBonuses"), data: { data: { champion: null, topScorers: [] } } });
@@ -1797,6 +2010,8 @@ export async function clearAllData() {
   await commitInBatches(ops);
 
   cache.users = {};
+  cache.userDirectory = {};
+  cache.userPrivate = {};
   cache.predictions = {};
   cache.matchResults = {};
   cache.actualAdvancing = {};
@@ -1852,11 +2067,25 @@ export async function importAllData(data) {
     };
   }
 
+  // PII migration Phase A: derive userDirectory + userPrivate from the
+  // imported (admin-preserved) users blob. Backups predate the split so
+  // they only carry the legacy users doc; we re-derive the new shapes on
+  // every import. This means a v1 backup round-trips correctly and admins
+  // never have to think about the split structure when restoring.
+  const importedDirectory = {};
+  const importedUserPrivate = {}; // uid -> private record
+  for (const [uid, u] of Object.entries(importedUsers)) {
+    if (!u || typeof u !== "object") continue;
+    importedDirectory[uid] = pickKnown(u, DIRECTORY_FIELDS);
+    importedUserPrivate[uid] = pickKnown(u, USER_PRIVATE_FIELDS);
+  }
+
   const ops = [];
 
-  // gameData single-doc writes
+  // gameData single-doc writes (legacy + directory)
   const gameDocMap = {
     users: importedUsers,
+    userDirectory: importedDirectory,
     matchResults: data.matchResults,
     actualAdvancing: data.actualAdvancing,
     actualBonuses: data.actualBonuses,
@@ -1886,6 +2115,17 @@ export async function importAllData(data) {
     }
   }
 
+  // userPrivate: delete existing collection, then write derived per-uid docs
+  const existingPrivate = await getDocs(userPrivateCollectionRef);
+  existingPrivate.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  for (const [uid, record] of Object.entries(importedUserPrivate)) {
+    ops.push({
+      type: "set",
+      ref: userPrivateDocRef(uid),
+      data: structuredClone(record),
+    });
+  }
+
   try {
     await commitInBatches(ops);
   } catch (err) {
@@ -1906,6 +2146,8 @@ export async function importAllData(data) {
   // will also refresh the cache from the server snapshots — this just makes
   // the UI reflect the new state immediately.
   cache.users = importedUsers;
+  cache.userDirectory = importedDirectory;
+  cache.userPrivate = importedUserPrivate;
   if (data.matchResults) cache.matchResults = data.matchResults;
   if (data.actualAdvancing) cache.actualAdvancing = data.actualAdvancing;
   if (data.actualBonuses) cache.actualBonuses = data.actualBonuses;
@@ -1913,6 +2155,8 @@ export async function importAllData(data) {
   if (data.predictions) cache.predictions = data.predictions;
   rebuildUserFormIndex();
   notifyAndEmit("users");
+  notifyAndEmit("userDirectory");
+  notifyAndEmit("userPrivate");
   notifyAndEmit("predictions");
   notifyAndEmit("matchResults");
   notifyAndEmit("settings");

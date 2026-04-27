@@ -8,7 +8,7 @@ import {
   publishSummary,
   unpublishSummary,
 } from "../store";
-import { useMatchResults, useUsers, useAllPredictions, useSummaries } from "../hooks/useStore";
+import { useMatchResults, useUserDirectory, useAllPredictions, useSummaries } from "../hooks/useStore";
 import { ALL_MATCHES, getMatchById, STAGES } from "../data/matches";
 import { getMatchKickoffUTC } from "../utils/matchTime";
 import { getGlobalSuggestions, pairCoveredMatches } from "../utils/statStarters";
@@ -100,7 +100,7 @@ function MatchRow({ match, result, selected, isAlreadyCovered, onToggle }) {
 export default function SummaryEditor({ summaryId, onClose }) {
   const matchResults = useMatchResults();
   const allPredictions = useAllPredictions();
-  const users = useUsers();
+  const users = useUserDirectory();
   const summaries = useSummaries();
   const showToast = useToast();
   const confirm = useConfirm();

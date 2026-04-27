@@ -116,11 +116,20 @@ for (const filePath of jsxFiles) {
   }
 }
 
-// ---- 12. Store: no unsupported Firestore params ----
+// ---- 12. Store: shared-doc safety guards ----
 console.log("--- 12. Firestore API contract ---");
 const storeFile = readFileSync('/home/user/Beeri-World-Cup/src/store.js', 'utf8');
-// Check that setDoc calls don't include unsupported params
-assert(!storeFile.includes('merge: true'), "store.js: no merge:true in setDoc (use updateDoc for merges)");
+// `merge: true` is permitted for the userDirectory + userPrivate dual-write
+// (PII migration Phase A) — those writes target per-uid subpaths where merge
+// is the correct tool. The historical concern was accidentally merging into
+// shared docs like matchResults/settings/actualBonuses/actualAdvancing,
+// which would silently overwrite the doc structure. Assert that no setDoc
+// targeting those collections uses merge:true.
+const dangerousMergePattern = /setDoc\([^)]*gameDocRef\(["'](?:matchResults|settings|actualBonuses|actualAdvancing)["']\)[^)]*merge:\s*true/;
+assert(
+  !dangerousMergePattern.test(storeFile),
+  "store.js: no setDoc(merge:true) on matchResults/settings/actualBonuses/actualAdvancing",
+);
 
 // ---- 13. Security: no hardcoded API keys in source ----
 console.log("--- 13. No hardcoded API keys ---");
