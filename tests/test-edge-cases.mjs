@@ -131,16 +131,26 @@ assert(st5.A[3].code === "CZE", `GD test: 4th CZE, got ${st5.A[3].code}`);
 
 // ---- 6. Bracket with all knockout draws (penalties) ----
 console.log("--- 6. All knockout draws (penalty shootouts) ---");
+// getMatchWinner now returns null for tied scores without an `advancingTeam`
+// (previously it silently defaulted to home). To exercise the all-penalty
+// path we fill round-by-round so each round's bracket is fully resolved
+// before the next round picks its `teams.home` for advancingTeam.
 const penPreds = {};
 for (const m of groupMatches) penPreds[m.id] = { homeScore: 1, awayScore: 0 };
 
-const bracket1 = calcBracketTeams(penPreds);
-// Now fill all knockout matches as draws, with home team advancing
-for (const [matchId, teams] of Object.entries(bracket1)) {
-  if (!matchId.startsWith("group-")) {
-    penPreds[matchId] = { homeScore: 1, awayScore: 1, advancingTeam: teams.home };
+const fillRound = (predicate) => {
+  const br = calcBracketTeams(penPreds);
+  for (const [matchId, teams] of Object.entries(br)) {
+    if (predicate(matchId) && teams.home && teams.away) {
+      penPreds[matchId] = { homeScore: 1, awayScore: 1, advancingTeam: teams.home };
+    }
   }
-}
+};
+fillRound((id) => id.startsWith("R32-"));
+fillRound((id) => id.startsWith("R16-"));
+fillRound((id) => id.startsWith("QF-"));
+fillRound((id) => id.startsWith("SF-"));
+fillRound((id) => id.startsWith("F-") || id.startsWith("3RD-"));
 
 const bracket2 = calcBracketTeams(penPreds);
 const adv = deriveAdvancingTeams(bracket2);
@@ -157,12 +167,19 @@ assert(champPen !== null, `Penalty champion derived: ${champPen}`);
 console.log("--- 7. Away team wins all penalties ---");
 const awayPreds = {};
 for (const m of groupMatches) awayPreds[m.id] = { homeScore: 1, awayScore: 0 };
-const awayBracket1 = calcBracketTeams(awayPreds);
-for (const [matchId, teams] of Object.entries(awayBracket1)) {
-  if (!matchId.startsWith("group-")) {
-    awayPreds[matchId] = { homeScore: 0, awayScore: 0, advancingTeam: teams.away };
+const fillAwayRound = (predicate) => {
+  const br = calcBracketTeams(awayPreds);
+  for (const [matchId, teams] of Object.entries(br)) {
+    if (predicate(matchId) && teams.home && teams.away) {
+      awayPreds[matchId] = { homeScore: 0, awayScore: 0, advancingTeam: teams.away };
+    }
   }
-}
+};
+fillAwayRound((id) => id.startsWith("R32-"));
+fillAwayRound((id) => id.startsWith("R16-"));
+fillAwayRound((id) => id.startsWith("QF-"));
+fillAwayRound((id) => id.startsWith("SF-"));
+fillAwayRound((id) => id.startsWith("F-") || id.startsWith("3RD-"));
 const awayBracket2 = calcBracketTeams(awayPreds);
 const champAway = deriveChampion(awayPreds, awayBracket2);
 assert(champAway !== null, `Away penalty champion: ${champAway}`);

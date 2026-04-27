@@ -67,6 +67,10 @@ export default function Layout({ children, rightRail = null }) {
               <img
                 src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png"
                 alt="בארי"
+                width="36"
+                height="36"
+                loading="eager"
+                decoding="async"
                 className="h-9 w-auto object-contain"
               />
               <span className="hidden sm:inline">בארי מונדיאל</span>
@@ -108,7 +112,7 @@ export default function Layout({ children, rightRail = null }) {
             </div>
           ) : (
             <button
-              onClick={() => navigate("login")}
+              onClick={() => navigate("home")}
               className="btn-duo btn-duo-primary btn-duo-sm xl:hidden"
             >
               התחבר

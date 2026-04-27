@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
+import { preferredScrollBehavior } from "../utils/helpers";
 import MatchAnalysis from "./MatchAnalysis";
 
 // Upper bound on a score input. 20 is well above any realistic football
@@ -19,20 +20,21 @@ function focusNextInput(currentInput) {
     return;
   }
 
-  // Use nextElementSibling traversal instead of querying all cards in DOM
-  let nextCard = card.parentElement?.nextElementSibling;
-  while (nextCard) {
-    const cardEl = nextCard.querySelector("[data-match-card]") || (nextCard.hasAttribute("data-match-card") ? nextCard : null);
-    if (cardEl) {
-      const nextInput = cardEl.querySelector('input[type="number"]');
-      if (nextInput) {
-        nextInput.focus();
-        nextInput.select();
-        nextInput.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
+  // Walk siblings via [data-match-card] markers rather than nextElementSibling
+  // — the latter breaks if a divider/group-header element ever lands between
+  // cards, silently halting auto-advance at the boundary.
+  const scope =
+    card.closest("[data-match-card-scope]") || card.parentElement?.parentElement || document;
+  const allCards = Array.from(scope.querySelectorAll("[data-match-card]"));
+  const cardIdx = allCards.indexOf(card);
+  for (let i = cardIdx + 1; i < allCards.length; i++) {
+    const nextInput = allCards[i].querySelector('input[type="number"]');
+    if (nextInput) {
+      nextInput.focus();
+      nextInput.select();
+      nextInput.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
+      return;
     }
-    nextCard = nextCard.nextElementSibling;
   }
 }
 

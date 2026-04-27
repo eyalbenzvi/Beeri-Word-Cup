@@ -143,23 +143,41 @@ export function useUsers() {
 
 const EMPTY_FORMS = [];
 
+// `getFormsForUser` always builds a new array, so without a cache layer
+// useSyncExternalStore would re-render every consumer on every store notify,
+// even if nothing the user owns changed. Cache compares the inner per-form
+// data references — these come straight from `cache.predictions[formId]`,
+// which writers replace whenever they mutate (immutable updates). That gives
+// us correct invalidation on every actual change (including a single-match
+// edit) without false re-renders. The previous "match-count + status" check
+// was buggy: editing a single match (same id count) silently kept the cache.
 export function useUserForms(userId) {
   const cacheRef = useRef(EMPTY_FORMS);
   const getSnapshot = useCallback(() => {
     if (!userId) return EMPTY_FORMS;
     const next = store.getFormsForUser(userId);
+    const prev = cacheRef.current;
     if (
-      cacheRef.current.length === next.length &&
-      cacheRef.current.every(
-        (f, i) =>
-          f.formId === next[i].formId &&
-          f.status === next[i].status &&
-          f.formName === next[i].formName &&
-          Object.keys(f.matches || {}).length ===
-            Object.keys(next[i].matches || {}).length,
-      )
+      prev.length === next.length &&
+      prev.every((p, i) => p.formId === next[i].formId)
     ) {
-      return cacheRef.current;
+      // Same set of formIds — verify each underlying data reference is also
+      // identical. Predictions are stored immutably in `cache.predictions`,
+      // so reference equality on the per-form fields is a sound proxy for
+      // "nothing in this user's forms changed".
+      const allSame = prev.every((p, i) => {
+        const n = next[i];
+        return (
+          p.matches === n.matches &&
+          p.status === n.status &&
+          p.formName === n.formName &&
+          p.topScorer === n.topScorer &&
+          p.budgetNumber === n.budgetNumber &&
+          p.advancing === n.advancing &&
+          p.champion === n.champion
+        );
+      });
+      if (allSame) return prev;
     }
     cacheRef.current = next;
     return next;

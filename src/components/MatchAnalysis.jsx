@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import InlineError from "./InlineError";
 
 const analysisCache = {};
@@ -20,7 +20,7 @@ export default function MatchAnalysis({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const fetchedRef = useRef(false);
+  const abortRef = useRef(null);
 
   const fetchAnalysis = useCallback(async () => {
     const key = cacheKey(homeTeam, awayTeam, stage);
@@ -28,6 +28,10 @@ export default function MatchAnalysis({
       setResult(analysisCache[key]);
       return;
     }
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setLoading(true);
     setError(null);
@@ -49,24 +53,30 @@ export default function MatchAnalysis({
           stage,
           group,
         }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) throw new Error(data?.error || `שגיאה ${res.status}`);
       if (data.error) throw new Error(data.error);
       analysisCache[key] = data;
-      setResult(data);
+      if (!controller.signal.aborted) setResult(data);
     } catch (err) {
+      if (err?.name === "AbortError") return;
       setError(err.message || "ניתוח לא זמין כרגע");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [homeTeam, awayTeam, homeTeamName, awayTeamName, stage, group]);
 
-  // Auto-fetch on mount
-  if (!fetchedRef.current) {
-    fetchedRef.current = true;
+  // Auto-fetch on mount; runs once per cache-key change. Side-effects belong
+  // in useEffect — calling fetch from render body is undefined behaviour and
+  // double-fires under StrictMode in dev.
+  useEffect(() => {
     fetchAnalysis();
-  }
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, [fetchAnalysis]);
 
   return (
     <div className="border-2 border-secondary/30 rounded-2xl p-4 mt-2 animate-fade-in" style={{ background: "#F0F9FF" }}>

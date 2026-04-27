@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import { useCurrentUser, useUserForms, useAllPredictions, useMatchResults, useActualBonuses, useUsers, useSettings } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
@@ -23,7 +23,10 @@ export default function Profile() {
   const users = useUsers();
   const actualBonuses = useActualBonuses();
   const settings = useSettings();
-  const playerList = resolvePlayerList(settings.topScorerPlayers);
+  const playerList = useMemo(
+    () => resolvePlayerList(settings.topScorerPlayers),
+    [settings.topScorerPlayers],
+  );
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");

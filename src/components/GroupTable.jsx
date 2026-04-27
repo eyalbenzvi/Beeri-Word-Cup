@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { calcGroupStandings } from "../utils/bracket";
+import { preferredScrollBehavior } from "../utils/helpers";
 
 export default function GroupTable({ matchData, group }) {
   const standings = useMemo(() => calcGroupStandings(matchData), [matchData]);
@@ -16,7 +17,7 @@ export default function GroupTable({ matchData, group }) {
         const activeEl = document.activeElement;
         const card = activeEl?.closest?.("[data-match-card]");
         if (card) {
-          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          card.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
         }
       });
     }

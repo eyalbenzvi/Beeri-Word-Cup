@@ -187,25 +187,28 @@ const matchAnalysisSrc = readFileSync(resolve(ROOT, "src/components/MatchAnalysi
 }
 
 // ============================================================
-// 5. MatchAnalysis fetchedRef prevents double-fetch on same mount
+// 5. MatchAnalysis fires fetch via useEffect (not during render)
+// React 19: side-effects belong in effects, not the render body. The previous
+// `fetchedRef` guard pattern fired fetch during render which double-invokes
+// under StrictMode and is "undefined behaviour" in React's docs.
 // ============================================================
 
-// 5.1 fetchedRef is initialized as false
+// 5.1 fetch is wired through useEffect (not a render-time guard)
 {
-  const hasFetchedRef = /useRef\(false\)/.test(matchAnalysisSrc);
-  assert(hasFetchedRef, "5.1 fetchedRef initialized as false");
+  const fetchInsideEffect = /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?fetchAnalysis\(\)/.test(matchAnalysisSrc);
+  assert(fetchInsideEffect, "5.1 fetchAnalysis called from inside useEffect");
 }
 
-// 5.2 fetchedRef is set to true before calling fetchAnalysis
+// 5.2 AbortController is used so a parent unmount cancels the in-flight fetch
 {
-  const setsRefBeforeFetch = /fetchedRef\.current\s*=\s*true[\s\S]*?fetchAnalysis\(\)/.test(matchAnalysisSrc);
-  assert(setsRefBeforeFetch, "5.2 fetchedRef set to true before fetchAnalysis call");
+  const usesAbort = /AbortController/.test(matchAnalysisSrc) && /controller\.signal/.test(matchAnalysisSrc);
+  assert(usesAbort, "5.2 AbortController + signal threaded into fetch");
 }
 
-// 5.3 fetchedRef guard prevents re-fetch
+// 5.3 cleanup aborts the controller on unmount / fetch-key change
 {
-  const hasGuard = /if\s*\(!fetchedRef\.current\)/.test(matchAnalysisSrc);
-  assert(hasGuard, "5.3 fetchedRef guard prevents re-fetch on re-render");
+  const cleanupAborts = /return\s*\(\)\s*=>\s*\{[\s\S]*?abortRef\.current\.abort\(\)/.test(matchAnalysisSrc);
+  assert(cleanupAborts, "5.3 useEffect cleanup aborts the controller");
 }
 
 // ============================================================

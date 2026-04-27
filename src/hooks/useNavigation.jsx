@@ -72,11 +72,13 @@ export function NavigationProvider({ children }) {
 
   // Handle back/forward browser navigation — read straight from the URL so
   // we don't get out of sync if another script mutated history.
+  // Also reset scroll on Back/Forward so the user doesn't land mid-page.
   useEffect(() => {
     const onPop = () => {
       const next = readInitialFromURL();
       setPage(next.page);
       setParams(next.params);
+      try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* noop */ }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -84,11 +86,13 @@ export function NavigationProvider({ children }) {
 
   // `options.replace`: true for URL-sync (e.g. auto-jump to latest summary);
   // default (false) pushes a new history entry so Back/Forward works.
+  // `behavior: "auto"` is the spec value for an instant scroll; older code
+  // used the non-standard "instant" alias which most browsers tolerate.
   const navigate = useCallback((p, nextParams = {}, options = {}) => {
     setPage(p);
     setParams(nextParams || {});
     writeURL(p, nextParams || {}, { replace: !!options.replace });
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
 
   const value = useMemo(() => ({ page, params, navigate }), [page, params, navigate]);

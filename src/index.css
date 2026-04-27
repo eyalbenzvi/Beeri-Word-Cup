@@ -437,6 +437,17 @@ button:focus-visible { border-radius: 14px; }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* Tailwind's `animate-pulse` / `animate-bounce` use infinite keyframes. The
+     star-selector clamp above leaves those utilities mid-keyframe (low-opacity
+     or shifted Y), which is jarring and worse than no motion. Disable them
+     explicitly so the static rest-state is what users see. */
+  .animate-pulse,
+  .animate-bounce,
+  .animate-spin,
+  .animate-fade-in,
+  .animate-pop-in {
+    animation: none !important;
+  }
 }
 
 /* --------- Shared alert / info boxes --------- */

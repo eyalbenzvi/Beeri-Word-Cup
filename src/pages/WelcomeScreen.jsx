@@ -84,7 +84,7 @@ export default function WelcomeScreen() {
               <Menu size={24} />
             </button>
             <span className="text-lg font-extrabold text-ink flex items-center gap-2 tracking-tight">
-              <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" className="h-9 w-auto object-contain" />
+              <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" width="36" height="36" loading="eager" decoding="async" className="h-9 w-auto object-contain" />
               <span className="hidden sm:inline">בארי מונדיאל</span>
             </span>
           </div>

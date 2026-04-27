@@ -14,3 +14,9 @@ export const STAGE_LABELS = STAGES;
 export function getStageLabel(stage) {
   return STAGES[stage] || stage;
 }
+
+// World Cup 2026 kickoff: Mexico City local 13:00 (UTC-6) = 19:00 UTC =
+// 22:00 Israel time (IDT, UTC+3). Source for both the live countdown and any
+// "tournament has started" gate. Single source so `useCountdown` and any
+// future caller cannot drift.
+export const KICKOFF_UTC = new Date("2026-06-11T19:00:00Z").getTime();

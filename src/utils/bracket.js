@@ -14,6 +14,13 @@ import { lookupThirdPlaceAssignment } from "../data/thirdPlaceTable";
 // number of qualifying third-place spots — defined by the FIFA regulations,
 // not arbitrary. Update only if the tournament format changes.
 const THIRD_PLACE_QUALIFIERS = 8;
+
+// Single source of truth for "the round that feeds into round X". Used by
+// deriveActualAdvancing to decide which actual results gate a team's
+// advancement claim. Replaces a hand-rolled ternary chain that was easy to
+// get wrong on every edit.
+const ROUND_PARENT = { R16: "R32", QF: "R16", SF: "QF", F: "SF" };
+
 import { isScoreValid } from "./helpers";
 
 const ALL_TEAMS_MAP = {};
@@ -279,7 +286,11 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
     if (pred.advancingTeam === teams.home || pred.advancingTeam === teams.away) {
       return pred.advancingTeam;
     }
-    return teams.home; // default fallback
+    // Tied score with no `advancingTeam` set is genuinely "unresolved" — we
+    // must return null so callers (and downstream rounds) don't silently
+    // anoint the home side as winner. formValidation.js already flags this
+    // condition as `unresolvedTie`, so the fallback only masked a real bug.
+    return null;
   }
   return hs > as ? teams.home : teams.away;
 }
@@ -445,23 +456,10 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     const feedingMatchesPlayed = (teamCode) => {
       if (!teamCode) return false;
 
-      const priorRound =
-        round === "R16"
-          ? "R32"
-          : round === "QF"
-            ? "R16"
-            : round === "SF"
-              ? "QF"
-              : round === "F"
-                ? "SF"
-                : null;
+      const priorRound = ROUND_PARENT[round];
       if (!priorRound) return false;
       for (const [mId, result] of Object.entries(actualResults)) {
-        if (
-          !mId.startsWith(priorRound + "-") &&
-          !(priorRound === "R32" && mId.startsWith("R32-"))
-        )
-          continue;
+        if (!mId.startsWith(priorRound + "-")) continue;
         if (result.homeScore === null || result.homeScore === undefined)
           continue;
 

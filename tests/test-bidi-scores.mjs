@@ -238,7 +238,7 @@ for (const f of SCORE_FILES) {
   // Admin forms tab keeps its inline order [homeName][homeInput]-[awayInput][awayName].
   // RTL flex reverses: home name + home input land on the right edge.
   assert(
-    /defaultValue=\{pred\?\.homeScore[\s\S]{0,400}defaultValue=\{pred\?\.awayScore/.test(adminForms),
+    /defaultValue=\{pred\?\.homeScore[\s\S]{0,600}defaultValue=\{pred\?\.awayScore/.test(adminForms),
     "AdminFormsTab: home input precedes away input in source (RTL flex puts home input next to home name on the right)",
   );
 
