@@ -87,10 +87,20 @@ async function setAdminClaimHandler(event) {
     const isAdmin = action === "promote";
     await admin.auth().setCustomUserClaims(targetUid, { admin: isAdmin });
 
-    // Also update Firestore users doc for consistency (client reads from here)
-    await admin.firestore().doc("gameData/users").update({
-      [`data.${targetUid}.isAdmin`]: isAdmin,
-    });
+    // PII migration Phase A: dual-write isAdmin to legacy users + new
+    // userPrivate doc. firestore.rules `isAdmin()` helper still falls
+    // back to legacy users during the compat window; the cut-over PR
+    // switches it to read userPrivate/{uid}.isAdmin instead. Until then
+    // both paths must stay in sync. Admin SDK bypasses security rules so
+    // we can write either path freely.
+    const fs = admin.firestore();
+    const userPrivateRef = fs.doc(`userPrivate/${targetUid}`);
+    await Promise.all([
+      fs.doc("gameData/users").update({
+        [`data.${targetUid}.isAdmin`]: isAdmin,
+      }),
+      userPrivateRef.set({ isAdmin }, { merge: true }),
+    ]);
 
     return {
       statusCode: 200,

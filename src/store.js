@@ -2067,11 +2067,25 @@ export async function importAllData(data) {
     };
   }
 
+  // PII migration Phase A: derive userDirectory + userPrivate from the
+  // imported (admin-preserved) users blob. Backups predate the split so
+  // they only carry the legacy users doc; we re-derive the new shapes on
+  // every import. This means a v1 backup round-trips correctly and admins
+  // never have to think about the split structure when restoring.
+  const importedDirectory = {};
+  const importedUserPrivate = {}; // uid -> private record
+  for (const [uid, u] of Object.entries(importedUsers)) {
+    if (!u || typeof u !== "object") continue;
+    importedDirectory[uid] = pickKnown(u, DIRECTORY_FIELDS);
+    importedUserPrivate[uid] = pickKnown(u, USER_PRIVATE_FIELDS);
+  }
+
   const ops = [];
 
-  // gameData single-doc writes
+  // gameData single-doc writes (legacy + directory)
   const gameDocMap = {
     users: importedUsers,
+    userDirectory: importedDirectory,
     matchResults: data.matchResults,
     actualAdvancing: data.actualAdvancing,
     actualBonuses: data.actualBonuses,
@@ -2101,6 +2115,17 @@ export async function importAllData(data) {
     }
   }
 
+  // userPrivate: delete existing collection, then write derived per-uid docs
+  const existingPrivate = await getDocs(userPrivateCollectionRef);
+  existingPrivate.forEach((docSnap) => ops.push({ type: "delete", ref: docSnap.ref }));
+  for (const [uid, record] of Object.entries(importedUserPrivate)) {
+    ops.push({
+      type: "set",
+      ref: userPrivateDocRef(uid),
+      data: structuredClone(record),
+    });
+  }
+
   try {
     await commitInBatches(ops);
   } catch (err) {
@@ -2121,6 +2146,8 @@ export async function importAllData(data) {
   // will also refresh the cache from the server snapshots — this just makes
   // the UI reflect the new state immediately.
   cache.users = importedUsers;
+  cache.userDirectory = importedDirectory;
+  cache.userPrivate = importedUserPrivate;
   if (data.matchResults) cache.matchResults = data.matchResults;
   if (data.actualAdvancing) cache.actualAdvancing = data.actualAdvancing;
   if (data.actualBonuses) cache.actualBonuses = data.actualBonuses;
@@ -2128,6 +2155,8 @@ export async function importAllData(data) {
   if (data.predictions) cache.predictions = data.predictions;
   rebuildUserFormIndex();
   notifyAndEmit("users");
+  notifyAndEmit("userDirectory");
+  notifyAndEmit("userPrivate");
   notifyAndEmit("predictions");
   notifyAndEmit("matchResults");
   notifyAndEmit("settings");
