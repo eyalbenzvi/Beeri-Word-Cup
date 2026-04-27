@@ -23,7 +23,34 @@ function resolveRelative(specifier, parentURL) {
   return null;
 }
 
+// See loader.mjs for the rationale — same trick, also covers .jsx -> .tsx.
+function redirectExtensionIfMissing(specifier, context) {
+  if (!specifier.startsWith(".") && !specifier.startsWith("/")) return null;
+  const swap = { ".js": ".ts", ".jsx": ".tsx" };
+  for (const [from, to] of Object.entries(swap)) {
+    if (!specifier.endsWith(from)) continue;
+    let absPath;
+    if (specifier.startsWith("/")) {
+      absPath = specifier;
+    } else if (context.parentURL) {
+      const parentPath = fileURLToPath(context.parentURL);
+      absPath = pathResolve(dirname(parentPath), specifier);
+    } else {
+      return null;
+    }
+    if (!fs.existsSync(absPath)) {
+      const swapped = absPath.slice(0, -from.length) + to;
+      if (fs.existsSync(swapped)) {
+        return specifier.slice(0, -from.length) + to;
+      }
+    }
+  }
+  return null;
+}
+
 export function resolve(specifier, context, next) {
+  const swapped = redirectExtensionIfMissing(specifier, context);
+  if (swapped) return next(swapped, context);
   if (
     specifier.startsWith(".") &&
     !specifier.endsWith(".js") &&
