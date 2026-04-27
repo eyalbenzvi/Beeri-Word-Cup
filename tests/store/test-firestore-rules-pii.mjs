@@ -234,6 +234,74 @@ for (const helper of ["createUserField", "updateUserField", "removeUserField"]) 
   );
 }
 
+// ---------- Phase B: cut-over assertions ----------
+console.log("--- Phase B cut-over ---");
+
+// isAdmin() reads from userPrivate, NOT gameData/users.
+const isAdminBlock =
+  rules.match(/function isAdmin\(\)\s*\{[\s\S]+?\n\s*\}/)?.[0] || "";
+assert(
+  /userPrivate\/\$\(request\.auth\.uid\)/.test(isAdminBlock),
+  "rules: isAdmin() Firestore fallback reads userPrivate/{uid}",
+);
+assert(
+  !/get\([^)]*gameData\/users[^)]*\)\.data\.data\[/.test(isAdminBlock),
+  "rules: isAdmin() no longer reads gameData/users",
+);
+assert(
+  /exists\([^;]*userPrivate/.test(isAdminBlock),
+  "rules: isAdmin() guards Firestore fallback with exists() (no error on missing doc)",
+);
+
+// gameData/users read is admin-only. Settings is still public, other docs auth.
+const gameDataReadBlock =
+  rules.match(
+    /match\s+\/gameData\/\{docId\}[\s\S]+?allow\s+read:[\s\S]+?;/,
+  )?.[0] || "";
+assert(
+  /docId\s*==\s*['"]users['"][^?]*\?[\s\S]*?isAdmin\(\)/.test(gameDataReadBlock) ||
+    /docId\s*==\s*['"]users['"][\s\S]+?isAdmin\(\)/.test(gameDataReadBlock),
+  "rules: gameData/users read is gated on isAdmin()",
+);
+assert(
+  /docId\s*==\s*['"]settings['"]/.test(gameDataReadBlock),
+  "rules: settings doc remains publicly readable",
+);
+
+// store.js handles permission-denied on the legacy users listener as
+// expected (Phase B non-admin path). Look for a guarded early-return
+// inside the gameDoc listener error handler.
+const usersPermDeniedPattern =
+  /if\s*\(\s*key\s*===\s*["']users["'][\s\S]{0,200}?permission-denied[\s\S]{0,200}?cache\._ready\[key\]\s*=\s*true/;
+assert(
+  usersPermDeniedPattern.test(store),
+  "store: gameDoc listener treats permission-denied on `users` as expected",
+);
+
+// isCurrentUserAdmin helper consults userPrivate (Phase B source of truth)
+assert(
+  /function\s+isCurrentUserAdmin\s*\(/.test(store),
+  "store: isCurrentUserAdmin helper exists",
+);
+// The helper binds currentListenerUserId to a local and reads through
+// cache.userPrivate first (Phase B source of truth).
+const isCurrentUserAdminBlock =
+  store.match(/function\s+isCurrentUserAdmin\s*\([^)]*\)\s*\{[\s\S]+?\n\}/)?.[0] || "";
+assert(
+  /cache\.userPrivate\?\.\[/.test(isCurrentUserAdminBlock) &&
+    /\.isAdmin/.test(isCurrentUserAdminBlock),
+  "store: isCurrentUserAdmin reads from cache.userPrivate (new source of truth)",
+);
+
+// getUser merges from userDirectory + userPrivate when cache.users is empty
+const getUserBlock =
+  store.match(/export function getUser\([\s\S]+?\n\}/)?.[0] || "";
+assert(
+  /cache\.userDirectory/.test(getUserBlock) &&
+    /cache\.userPrivate/.test(getUserBlock),
+  "store: getUser() falls back to userDirectory + userPrivate merge",
+);
+
 // useUsers consumers we explicitly migrated should now use useUserDirectory.
 console.log("--- non-admin consumers migrated ---");
 const migrated = [

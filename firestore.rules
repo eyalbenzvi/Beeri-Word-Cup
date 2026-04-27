@@ -5,10 +5,21 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isAdmin() {
-      // Prefer Custom Claims (set server-side, tamper-proof); fall back to Firestore users doc
+      // Prefer Custom Claims (set server-side, tamper-proof). Firestore
+      // fallback now reads userPrivate/{uid}.isAdmin (PII migration
+      // Phase B cut-over). Legacy gameData/users.data[uid].isAdmin is no
+      // longer consulted by the rules; the doc is kept dual-written so
+      // admin tabs (which still read it) stay accurate, but it is no
+      // longer the source of truth for authorization.
+      // The exists() guard prevents a permission-denied / read error if
+      // a user somehow lacks a userPrivate doc — they correctly fall
+      // through to "not admin".
       return isAuth() && (
         request.auth.token.admin == true ||
-        get(/databases/$(database)/documents/gameData/users).data.data[request.auth.uid].isAdmin == true
+        (
+          exists(/databases/$(database)/documents/userPrivate/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/userPrivate/$(request.auth.uid)).data.isAdmin == true
+        )
       );
     }
     function isLocked() {
@@ -73,24 +84,24 @@ service cloud.firestore {
 
     // gameData collection — single documents.
     //
-    // PII MIGRATION (audit #4/#5/#39) — Phase A (additive):
-    //   - `gameData/userDirectory` holds the public-bounded directory
-    //     {uid: {displayName, firstName?, lastName?}}. Auth-readable.
-    //     The leaderboard / AllForms / SimulatorPanel / etc. read from
-    //     here instead of the legacy users doc.
-    //   - `userPrivate/{uid}` (per-uid collection) holds private fields:
-    //     email, isAdmin, profileCompleted, lastLoginAt, createdAt,
-    //     photoURL. Read = owner OR admin.
-    //   - Legacy `gameData/users` is kept dual-written during the compat
-    //     window so admin tabs and `set-admin-claim` Netlify function
-    //     keep working without changes. After all consumers migrate, a
-    //     follow-up tightens its read rule to admin-only.
+    // PII MIGRATION (audit #4/#5/#39) — Phase B (cut-over, this PR):
+    //   - `gameData/users` read is now admin-only. Non-admin clients
+    //     receive permission-denied on the legacy users listener; the
+    //     client treats that as expected and falls back to the
+    //     userDirectory + userPrivate listeners.
+    //   - `userPrivate/{uid}.isAdmin` is the new authorization source
+    //     of truth for the rules' isAdmin() helper.
+    //   - Legacy doc is still dual-written by store.js + set-admin-claim
+    //     so admin tabs (which still consume it) stay accurate.
     // Phone-derived UID leak via formIds is addressed in a separate
     // follow-up (random hashed UIDs).
     match /gameData/{docId} {
-      // Most docs require auth; the `settings` doc is public so the
-      // welcome screen can show lock state before the user logs in.
-      allow read: if isAuth() || docId == 'settings';
+      // settings is public; users is admin-only; everything else is
+      // any-auth.
+      allow read: if (
+        docId == 'settings' ||
+        (docId == 'users' ? isAdmin() : isAuth())
+      );
 
       // Users document: first creation allowed; updates restricted
       allow create: if isAuth() && docId == 'users';

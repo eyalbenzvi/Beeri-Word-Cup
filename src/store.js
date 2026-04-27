@@ -702,16 +702,28 @@ function setupPredictionsListener(userId, showAll) {
   );
 }
 
+// PII migration Phase B: prefer userPrivate.isAdmin (new source of truth);
+// fall back to legacy users for clients that haven't received userPrivate
+// yet. Both should agree post-migration; the OR is belt-and-braces during
+// the rollout window where one listener may have landed before the other.
+function isCurrentUserAdmin() {
+  const uid = currentListenerUserId;
+  if (!uid) return false;
+  return (
+    cache.userPrivate?.[uid]?.isAdmin === true ||
+    cache.users?.[uid]?.isAdmin === true
+  );
+}
+
 let upgradeTimer = null;
 function maybeUpgradePredictionsListener() {
   if (predictionsShowAll || !currentListenerUserId) return;
-  // Debounce: settings and users may fire in quick succession
+  // Debounce: settings, users, and userPrivate may fire in quick succession
   clearTimeout(upgradeTimer);
   upgradeTimer = setTimeout(() => {
     if (predictionsShowAll || !currentListenerUserId) return;
-    const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
     const isLocked = cache.settings?.predictionsLocked === true;
-    if (isUserAdmin || isLocked) {
+    if (isCurrentUserAdmin() || isLocked) {
       setupPredictionsListener(currentListenerUserId, true);
     }
   }, 100);
@@ -790,6 +802,23 @@ export function initRealtimeListeners(userId) {
           }
         },
         (err) => {
+          // PII migration Phase B: gameData/users is admin-only. Non-admin
+          // clients receive permission-denied here on every login. Treat
+          // this as expected — flip ready so isStoreReady() doesn't block,
+          // and DON'T retry. cache.users stays empty {}; admin tabs are
+          // gated by requireAdmin() and never render for non-admins
+          // anyway. Other docs in the loop still treat permission-denied
+          // as a real error.
+          if (key === "users" && err?.code === "permission-denied") {
+            cache._ready[key] = true;
+            notifyAndEmit(key);
+            // Still call maybeUpgrade* so the predictions/summaries
+            // listeners can decide based on userPrivate.isAdmin once
+            // that listener fires.
+            maybeUpgradePredictionsListener();
+            maybeUpgradeSummariesListener();
+            return;
+          }
           console.error(`Listener error for ${docName}:`, err);
           reportListenerError(err, "gameDocListener", {
             docName,
@@ -1090,9 +1119,7 @@ function teardownPublicReadonlyMode() {
 
 function setupSummariesListener() {
   if (summariesUnsub) summariesUnsub();
-  const isUserAdmin =
-    !!currentListenerUserId &&
-    cache.users?.[currentListenerUserId]?.isAdmin === true;
+  const isUserAdmin = isCurrentUserAdmin();
   summariesShowAll = isUserAdmin;
   const q = isUserAdmin
     ? summariesCollectionRef
@@ -1124,8 +1151,7 @@ function setupSummariesListener() {
 
 function maybeUpgradeSummariesListener() {
   if (!currentListenerUserId) return;
-  const isUserAdmin = cache.users?.[currentListenerUserId]?.isAdmin === true;
-  if (isUserAdmin !== summariesShowAll) {
+  if (isCurrentUserAdmin() !== summariesShowAll) {
     setupSummariesListener();
   }
 }
@@ -1159,6 +1185,10 @@ function setupUserPrivateListener(userId) {
       }
       cache._ready.userPrivate = true;
       notifyAndEmit("userPrivate");
+      // Phase B: userPrivate.isAdmin is the new source of truth for the
+      // upgrade decisions. Re-evaluate now that admin status is known.
+      maybeUpgradePredictionsListener();
+      maybeUpgradeSummariesListener();
     },
     (err) => {
       console.error("Listener error for userPrivate:", err);
@@ -1267,6 +1297,13 @@ export function getUserDirectory() {
 export function getUserPrivate(uid) {
   if (!uid) return null;
   return (cache.userPrivate || EMPTY_OBJ)[uid] || null;
+}
+
+// Whole map of {uid -> private record}. Useful as the snapshot input for
+// useSyncExternalStore so consumers re-render when the user's own private
+// record changes (e.g. lastLoginAt updated, profileCompleted flipped).
+export function getUserPrivateMap() {
+  return cache.userPrivate || EMPTY_OBJ;
 }
 
 // Whether the userPrivate listener has fired at least once. Distinct
@@ -1484,9 +1521,20 @@ export async function deleteUser(userId) {
   await batch.commit();
 }
 
+// PII migration Phase B: cache.users is empty for non-admins (they get
+// permission-denied on the legacy doc). Merge from userDirectory +
+// userPrivate so own-user reads (Profile.jsx, getCurrentUser()) keep
+// working. For other-user reads, only directory data is returned —
+// non-admins never see another member's email / isAdmin / lastLoginAt
+// because rules deny their userPrivate read.
 export function getUser(userId) {
-  const users = getUsers();
-  return users[userId] || null;
+  if (!userId) return null;
+  const fromUsers = (cache.users || EMPTY_OBJ)[userId];
+  if (fromUsers) return fromUsers;
+  const fromDirectory = (cache.userDirectory || EMPTY_OBJ)[userId] || null;
+  const fromPrivate = (cache.userPrivate || EMPTY_OBJ)[userId] || null;
+  if (!fromDirectory && !fromPrivate) return null;
+  return { ...(fromDirectory || {}), ...(fromPrivate || {}) };
 }
 
 export function getCurrentUser() {

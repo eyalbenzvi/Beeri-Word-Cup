@@ -248,18 +248,38 @@ member's email + isAdmin flag + last-login from a single shared doc.
    over the next 24 h. None expected; if any appear, investigate before
    proceeding to Phase B.
 
-### Phase B — cut-over (separate PR, lands later)
+### Phase B — cut-over (this PR)
 
-After the migration is verified in production:
+After Phase A's migration script runs in production, Phase B:
 
-1. Tighten `gameData/users` read rule to admin-only.
-2. Switch the `isAdmin()` rule helper's Firestore fallback from
-   `gameData/users.data[uid].isAdmin` to `userPrivate/{uid}.isAdmin`.
-3. Drop the dual-write to legacy users from `set-admin-claim` (the
-   userPrivate write becomes the only Firestore source of truth).
+1. Tightens the `gameData/users` **read rule** to admin-only. Settings is
+   still public; everything else under `gameData/{docId}` is auth-readable.
+2. Switches the `isAdmin()` rule helper's Firestore fallback from
+   `gameData/users.data[uid].isAdmin` to `userPrivate/{uid}.isAdmin`,
+   guarded by an `exists()` check so a missing private doc resolves
+   cleanly to "not admin" rather than a rule evaluation error.
+3. Teaches `src/store.js`'s gameDoc listener that `permission-denied`
+   on the legacy users doc is the **expected** state for non-admins —
+   it flips `_ready.users = true` (cache stays empty `{}`) and skips
+   the retry loop. No Sentry noise.
+4. Updates the upgrade-decision helpers (`maybeUpgradePredictionsListener`
+   / `setupSummariesListener` / `maybeUpgradeSummariesListener`) to
+   consult `cache.userPrivate[uid].isAdmin` as the new source of truth,
+   with the legacy `cache.users[uid].isAdmin` kept as a fallback.
+5. Updates `store.getUser()` to merge from `userDirectory + userPrivate`
+   when `cache.users` is empty, so own-user reads (Profile.jsx,
+   `getCurrentUser()`, `requireAdmin()`) keep working for non-admins.
+6. `useCurrentUser` subscribes to `getUserPrivateMap` so updates to the
+   user's own private record (e.g. `lastLoginAt`, `profileCompleted`)
+   trigger re-renders.
 
-The legacy `gameData/users` doc may be left in place after Phase B as a
-forensic artifact; nothing reads from it.
+The legacy `gameData/users` doc is still **dual-written** by store.js
+and `set-admin-claim`. It's no longer read by Firestore rules, and no
+longer read by non-admin clients, but admin tabs (`AdminUsersTab`,
+`AdminToolsTab`, `Admin.jsx`) continue to consume it as the full
+membership listing. Dropping the dual-write is a separate cleanup PR
+once the admin tabs migrate to a collection-query of `userPrivate/*`
+or a derived view.
 
 ### Residual issue
 
