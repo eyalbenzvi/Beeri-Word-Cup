@@ -40,7 +40,14 @@ export function useStoreReady() {
 
 export function useCurrentUser() {
   useStoreValue(store.isStoreReady);
-  useStoreValue(store.getUsers); // subscribe to user changes so we re-render when a new user is created
+  // Subscribe to whichever cache slice carries the user record. After the
+  // PII migration Phase B cut-over, non-admins have an empty cache.users
+  // and read their own record via the userDirectory + userPrivate merge
+  // that store.getUser() performs internally — so we must re-render when
+  // any of the three change.
+  useStoreValue(store.getUsers);
+  useStoreValue(store.getUserDirectory);
+  useStoreValue(store.getUserPrivateMap);
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
   const storeReady = store.isStoreReady();
