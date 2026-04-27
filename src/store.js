@@ -18,39 +18,28 @@ import {
 } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "./sentry";
 import { generateDefaultFormName } from "./utils/formNameGenerator";
-import { MAX_AUDIT_LOG_SIZE } from "./storeAudit";
+import {
+  logAdminAction as logAdminActionToBuffer,
+  getAuditLog as getAuditLogFromBuffer,
+} from "./storeAudit";
 
 // ============ AUDIT LOG ============
-const AUDIT_LOG_KEY = "wc2026_audit_log";
-let auditLog;
-try {
-  auditLog = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || "[]");
-} catch {
-  auditLog = [];
+// Single source of truth in storeAudit.js — these are thin re-exports that
+// bind the userId from Firebase auth (not the localStorage cache, which can
+// be spoofed on a shared device). Callers below use writeAuditLog to also
+// persist to Firestore for forensic recovery.
+export function logAdminAction(action, details = {}) {
+  return logAdminActionToBuffer(action, details, auth.currentUser?.uid || null);
 }
 
-export function logAdminAction(action, details = {}) {
-  const entry = {
-    action,
-    ...details,
-    userId: getCurrentUser()?.id || "unknown",
-    timestamp: new Date().toISOString(),
-  };
-  auditLog.unshift(entry);
-  if (auditLog.length > MAX_AUDIT_LOG_SIZE) auditLog.length = MAX_AUDIT_LOG_SIZE;
-  localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLog));
+export function getAuditLog() {
+  return getAuditLogFromBuffer();
 }
 
 function writeAuditLog(action, details = {}) {
-  const entry = {
-    action,
-    ...details,
-    userId: getCurrentUser()?.id || "unknown",
-    timestamp: new Date().toISOString(),
-  };
-  // Keep local log
-  logAdminAction(action, details);
-  // Also write to Firestore
+  const entry = logAdminAction(action, details);
+  if (!entry) return;
+  // Also persist to Firestore for forensic recovery beyond a single device.
   const auditRef = doc(
     db,
     "auditLog",
@@ -91,10 +80,6 @@ async function maybeRefreshToken(err) {
   }
 }
 
-export function getAuditLog() {
-  return auditLog;
-}
-
 // ============ DOCUMENT STRUCTURE ============
 // gameData/{users, matchResults, actualAdvancing, actualBonuses, settings} — single docs
 // predictions/{formId} — one document per form (NEW)
@@ -123,7 +108,7 @@ const cache = {
 
 // ============ FIRESTORE HELPERS ============
 
-const BATCH_LIMIT = 400; // Firestore limit is 500, use 400 for safety margin
+import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "./utils/constants.js";
 
 // Splits operations across multiple batches when exceeding Firestore's 500 op limit
 export async function commitInBatches(operations) {
@@ -247,7 +232,7 @@ async function updateUserField(uid, fields) {
 
 // Firestore document size limit is 1MB. Warn when approaching.
 const MAX_USERS_WARNING = 1500;
-const MAX_USERS_HARD_LIMIT = 2000;
+const MAX_USERS_HARD_LIMIT = USER_LIMIT;
 
 // Safe new-user creation via dot-notation (no full-doc overwrite)
 async function createUserField(uid, userData) {
@@ -1440,7 +1425,7 @@ export function getForm(formId) {
   return all[formId] || null;
 }
 
-const MAX_FORMS_PER_USER = 10;
+const MAX_FORMS_PER_USER = FORMS_LIMIT;
 
 export function createForm(userId, formName) {
   if (getSettings().predictionsLocked) {

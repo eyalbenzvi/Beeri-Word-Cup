@@ -69,18 +69,25 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 }
 
 // 3. MAX_AUDIT_LOG_SIZE deduped
+// Originally store.js owned its own copy of `auditLog` + a duplicate cap
+// check. The cap check now lives entirely inside storeAudit.js (single
+// source of truth); store.js delegates via the imported logAdminAction.
 {
   const storeAudit = await import("../src/storeAudit.js");
   assert(typeof storeAudit.MAX_AUDIT_LOG_SIZE === "number",
     "storeAudit exports MAX_AUDIT_LOG_SIZE");
+  const storeAuditSrc = fs.readFileSync("src/storeAudit.js", "utf8");
+  assert(/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeAuditSrc),
+    "storeAudit.js owns the cap check");
   const storeSrc = fs.readFileSync("src/store.js", "utf8");
-  // No surviving `auditLog.length > 200` or `= 200` patterns.
   assert(!/auditLog\.length\s*>\s*200/.test(storeSrc),
     "store.js no longer hardcodes `auditLog.length > 200`");
-  assert(/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeSrc),
-    "store.js uses MAX_AUDIT_LOG_SIZE for the cap");
+  assert(!/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeSrc),
+    "store.js no longer duplicates the cap check (delegates to storeAudit)");
   assert(/from\s+["']\.\/storeAudit["']/.test(storeSrc),
     "store.js imports from storeAudit");
+  assert(/logAdminAction\s+as\s+logAdminActionToBuffer/.test(storeSrc),
+    "store.js imports logAdminAction (renamed to avoid shadowing)");
 }
 
 // 4. KNOCKOUT_STAGE_ORDER not re-declared as a private array

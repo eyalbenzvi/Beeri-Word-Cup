@@ -83,16 +83,6 @@ export default function Predict() {
   const [submitting, setSubmitting] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const allPredictions = useAllPredictions();
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    const handler = () => {
-      setKeyboardOpen(window.visualViewport.height < window.innerHeight * 0.75);
-    };
-    window.visualViewport.addEventListener('resize', handler);
-    return () => window.visualViewport.removeEventListener('resize', handler);
-  }, []);
 
   useEffect(() => {
     if (!activeFormId) return;

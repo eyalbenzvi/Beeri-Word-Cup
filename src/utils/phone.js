@@ -16,7 +16,8 @@ const ALLOWED_INPUT_CHARS = /[^0-9+\-()\s.]/g;
 // directional isolates/embedding, word joiner, BOM, non-breaking space.
 const INVISIBLE_CHARS = /[​-‏‪-‮⁠﻿ ]/g;
 
-const MAX_INPUT_LEN = 20; // longest sane format "+972-50-123-4567" = 17
+// Single source: src/utils/constants.js
+import { PHONE_MAX_INPUT_LEN as MAX_INPUT_LEN } from "./constants.js";
 
 // Live input filter. Keep only allowed characters, drop invisibles, cap length.
 export function sanitizePhoneInput(raw) {
