@@ -5,7 +5,7 @@ import {
   isValidIsraeliMobile,
   sanitizePhoneInput,
   ISRAELI_MOBILE_PREFIXES,
-} from "../src/utils/phone.js";
+} from "../../src/utils/phone.js";
 
 let passed = 0, failed = 0;
 const failures = [];

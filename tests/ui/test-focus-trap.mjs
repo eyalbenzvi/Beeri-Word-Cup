@@ -1,7 +1,7 @@
 // Behavioural tests for useFocusTrap. Uses a minimal DOM shim so we can verify
 // Tab/Shift+Tab cycle without needing React renderer or jsdom. Focuses on the
 // focusable-selector contract + the cycling logic.
-import { useFocusTrap } from "../src/hooks/useFocusTrap.js";
+import { useFocusTrap } from "../../src/hooks/useFocusTrap.js";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -34,7 +34,7 @@ console.log("--- focusable selector ---");
 console.log("--- focus escape detection ---");
 {
   const fs = await import("node:fs/promises");
-  const src = await fs.readFile(new URL("../src/hooks/useFocusTrap.js", import.meta.url), "utf8");
+  const src = await fs.readFile(new URL("../../src/hooks/useFocusTrap.js", import.meta.url), "utf8");
   assert(src.includes("node.contains(current)"), "guards against focus leaving the container");
   assert(src.includes('e.key !== "Tab"'), "only intercepts Tab (not other keys)");
   assert(src.includes("previouslyFocused"), "restores previously-focused element on unmount");
