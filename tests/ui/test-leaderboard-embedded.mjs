@@ -1,5 +1,6 @@
 // Validates that Leaderboard's embedded mode stays clean (no rail, no rank delta).
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -7,7 +8,7 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 
 console.log("=== LEADERBOARD EMBEDDED MODE TESTS ===\n");
 
-const src = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+const src = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 
 // --- embedded prop exists and is respected ---
 assert(/embedded\s*=\s*false/.test(src), "Leaderboard accepts embedded prop with default=false");

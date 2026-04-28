@@ -6,20 +6,22 @@ import {
   useContext,
 } from "react";
 
-const ToastContext = createContext();
+type ToastType = "success" | "error" | "info";
+type ShowToast = (message: string, type?: ToastType) => void;
+const ToastContext = createContext<ShowToast>(() => {});
 
-export function ToastProvider({ children }) {
-  const [toast, setToast] = useState(null);
+export function ToastProvider({ children }: { children: any }) {
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [exiting, setExiting] = useState(false);
 
-  const showToast = useCallback((message, type = "success") => {
+  const showToast: ShowToast = useCallback((message, type = "success") => {
     setExiting(false);
     setToast({ message, type });
   }, []);
 
   useEffect(() => {
     if (!toast) return;
-    let innerTimer;
+    let innerTimer: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
       setExiting(true);
       innerTimer = setTimeout(() => {

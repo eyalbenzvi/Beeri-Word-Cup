@@ -12,7 +12,7 @@ import {
 // Stored value is the Hebrew name (`nameHe`) of the chosen player.
 // Free-typed text that doesn't resolve to a list item is rejected on blur
 // (the input reverts to the last-stored value).
-export default function PlayerAutocomplete({ value, onChange, disabled, compact = false }) {
+export default function PlayerAutocomplete({ value, onChange, disabled = false, compact = false }: { value: string; onChange: (val: string) => void; disabled?: boolean; compact?: boolean }) {
   const settings = useSettings();
   const players = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),

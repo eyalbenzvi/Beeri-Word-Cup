@@ -27,3 +27,18 @@ export function readMigratedSrc(relOrAbsPath, encoding = "utf8") {
     throw err;
   }
 }
+
+// Migration-aware existsSync. True if either the recorded path or its
+// .ts/.tsx counterpart is present.
+export function existsMigratedSrc(relOrAbsPath) {
+  const absPath = relOrAbsPath.startsWith("/") ? relOrAbsPath : resolve(REPO_ROOT, relOrAbsPath);
+  if (fs.existsSync(absPath)) return true;
+  const swap = { ".js": ".ts", ".jsx": ".tsx" };
+  for (const [from, to] of Object.entries(swap)) {
+    if (absPath.endsWith(from)) {
+      const swapped = absPath.slice(0, -from.length) + to;
+      if (fs.existsSync(swapped)) return true;
+    }
+  }
+  return false;
+}

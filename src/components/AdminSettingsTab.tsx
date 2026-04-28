@@ -118,7 +118,7 @@ export default function AdminSettingsTab({
               const reader = new FileReader();
               reader.onload = (ev) => {
                 try {
-                  const data = JSON.parse(ev.target.result);
+                  const data = JSON.parse(ev.target!.result as string);
                   if (!Array.isArray(data) || !data[0]?.team || !data[0]?.name) {
                     showToast("פורמט לא תקין — נדרש מערך של { team, name, nameHe? }", "error");
                     return;

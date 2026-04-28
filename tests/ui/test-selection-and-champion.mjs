@@ -11,6 +11,7 @@
  */
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { groupMatches, knockoutMatches } from "../../src/data/matches.js";
@@ -37,11 +38,11 @@ function assert(c, m) {
   }
 }
 
-const matchCardSrc = readFileSync(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
-const formListSrc = readFileSync(resolve(ROOT, "src/components/FormList.jsx"), "utf8");
-const reviewScreenSrc = readFileSync(resolve(ROOT, "src/components/ReviewScreen.jsx"), "utf8");
-const formDetailsTabSrc = readFileSync(resolve(ROOT, "src/components/FormDetailsTab.jsx"), "utf8");
-const predictSrc = readFileSync(resolve(ROOT, "src/pages/Predict.jsx"), "utf8");
+const matchCardSrc = readMigratedSrc(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
+const formListSrc = readMigratedSrc(resolve(ROOT, "src/components/FormList.jsx"), "utf8");
+const reviewScreenSrc = readMigratedSrc(resolve(ROOT, "src/components/ReviewScreen.jsx"), "utf8");
+const formDetailsTabSrc = readMigratedSrc(resolve(ROOT, "src/components/FormDetailsTab.jsx"), "utf8");
+const predictSrc = readMigratedSrc(resolve(ROOT, "src/pages/Predict.jsx"), "utf8");
 
 // ============================================================
 // 1. MatchCard tie-breaker buttons use homeCode/awayCode

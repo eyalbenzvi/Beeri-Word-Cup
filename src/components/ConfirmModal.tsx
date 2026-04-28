@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef, createContext, useContext, useEffect } from "react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
-const ConfirmContext = createContext(null);
+type ConfirmFn = (messageOrOpts: string | { message: string; title?: string; confirmLabel?: string; cancelLabel?: string; variant?: "primary" | "danger" }) => Promise<boolean>;
+const ConfirmContext = createContext<ConfirmFn | null>(null);
 
-export function ConfirmProvider({ children }) {
-  const [state, setState] = useState(null);
-  const resolveRef = useRef(null);
-  const dialogRef = useRef(null);
+export function ConfirmProvider({ children }: { children: any }) {
+  const [state, setState] = useState<any>(null);
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(dialogRef, !!state);
 
   /**
@@ -14,7 +15,7 @@ export function ConfirmProvider({ children }) {
    * confirm({ message, title, confirmLabel, cancelLabel, variant })
    *   variant: "primary" (default) | "danger"
    */
-  const confirm = useCallback((messageOrOpts) => {
+  const confirm: ConfirmFn = useCallback((messageOrOpts) => {
     const opts =
       typeof messageOrOpts === "string" ? { message: messageOrOpts } : messageOrOpts;
     return new Promise((resolve) => {
@@ -42,7 +43,7 @@ export function ConfirmProvider({ children }) {
   // Esc to cancel
   useEffect(() => {
     if (!state) return;
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleCancel();
     };
     window.addEventListener("keydown", onKey);

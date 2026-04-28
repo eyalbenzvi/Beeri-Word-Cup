@@ -8,17 +8,24 @@ import { captureClientError } from "../sentry";
 //
 // When `resetKey` changes we clear hasError so a navigation away from a
 // broken page lets the user actually leave (without a hard reload).
-export default class ErrorBoundary extends Component {
-  constructor(props) {
+type ErrorBoundaryProps = {
+  variant?: "page" | "root";
+  resetKey?: any;
+  children?: any;
+};
+type ErrorBoundaryState = { hasError: boolean; error: Error | null };
+
+export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
     if (
       this.state.hasError &&
       prevProps.resetKey !== this.props.resetKey &&
@@ -28,7 +35,7 @@ export default class ErrorBoundary extends Component {
     }
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: { componentStack?: string }) {
     console.error("ErrorBoundary caught:", error, info.componentStack);
     try {
       captureClientError(error, {

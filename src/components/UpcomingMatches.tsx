@@ -166,7 +166,7 @@ function MatchRow({ match, actualTeams }) {
 // sprawling vertically.
 // `matchResultsOverride` is used by the logged-out WelcomeScreen path, which
 // has no Firestore listeners and must get results from the public endpoint.
-export default function UpcomingMatches({ matchResultsOverride } = {}) {
+export default function UpcomingMatches({ matchResultsOverride }: { matchResultsOverride?: Record<string, any> } = {}) {
   const { user } = useCurrentUser();
   const userForms = useUserForms(user?.id || null);
   const matches = useUpcomingMatches(matchResultsOverride);

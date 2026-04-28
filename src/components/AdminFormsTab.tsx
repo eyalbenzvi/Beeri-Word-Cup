@@ -53,7 +53,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
     if (!Number.isFinite(hs) || !Number.isFinite(as) || hs < 0 || as < 0)
       return;
     const isKo = match.stage && match.stage !== "group";
-    const pred = { homeScore: hs, awayScore: as };
+    const pred: any = { homeScore: hs, awayScore: as };
     if (isKo && hs === as) {
       const teams = predBracket[match.id];
       if (advancingTeam) pred.advancingTeam = advancingTeam;
@@ -213,8 +213,8 @@ function AdminFormEditModal({ formId, form, onClose }) {
                           className="btn-duo-flat"
                           style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                           onClick={() => {
-                            const hi = document.getElementById(`${match.id}-h`);
-                            const ai = document.getElementById(`${match.id}-a`);
+                            const hi = document.getElementById(`${match.id}-h`) as HTMLInputElement | null;
+                            const ai = document.getElementById(`${match.id}-a`) as HTMLInputElement | null;
                             saveMatchPred(
                               match,
                               hi?.value,
@@ -234,10 +234,10 @@ function AdminFormEditModal({ formId, form, onClose }) {
                             onClick={() => {
                               const hi = document.getElementById(
                                 `${match.id}-h`,
-                              );
+                              ) as HTMLInputElement | null;
                               const ai = document.getElementById(
                                 `${match.id}-a`,
-                              );
+                              ) as HTMLInputElement | null;
                               saveMatchPred(
                                 match,
                                 hi?.value,
@@ -254,10 +254,10 @@ function AdminFormEditModal({ formId, form, onClose }) {
                             onClick={() => {
                               const hi = document.getElementById(
                                 `${match.id}-h`,
-                              );
+                              ) as HTMLInputElement | null;
                               const ai = document.getElementById(
                                 `${match.id}-a`,
-                              );
+                              ) as HTMLInputElement | null;
                               saveMatchPred(
                                 match,
                                 hi?.value,
@@ -300,11 +300,14 @@ export default function AdminFormsTab({ users, allPredictions }) {
 
   const rows = useMemo(() => {
     return Object.entries(allPredictions)
-      .map(([formId, p]) => ({
-        formId,
-        ...p,
-        userName: users[p.userId]?.displayName || p.userId,
-      }))
+      .map(([formId, pAny]) => {
+        const p = pAny as any;
+        return {
+          formId,
+          ...p,
+          userName: users[p.userId]?.displayName || p.userId,
+        };
+      })
       .filter((r) => {
         if (statusFilter === "draft" && r.status !== "draft") return false;
         if (

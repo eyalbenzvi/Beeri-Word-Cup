@@ -5,6 +5,13 @@ export default function ErrorBanner({
   onDismiss,
   icon = "⚠️",
   className = "",
+}: {
+  children?: any;
+  onRetry?: any;
+  retryLabel?: string;
+  onDismiss?: any;
+  icon?: string;
+  className?: string;
 }) {
   if (!children) return null;
   return (

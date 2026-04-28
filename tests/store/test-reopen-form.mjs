@@ -16,6 +16,7 @@
 //  5. Static source audits — firestore.rules, store.js, FormList.jsx, Predict.jsx
 
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -160,7 +161,7 @@ console.log("--- 5. Static source audits ---");
 
 {
   // 5a. firestore.rules must contain the three user-allowed transitions
-  const rules = fs.readFileSync("firestore.rules", "utf8");
+  const rules = readMigratedSrc("firestore.rules", "utf8");
   assert(
     /oldStatus\s*==\s*'draft'\s*&&\s*\(\s*newStatus\s*==\s*'draft'\s*\|\|\s*newStatus\s*==\s*'pending'\s*\)/.test(rules),
     "firestore.rules: allows draft → draft|pending",
@@ -185,7 +186,7 @@ console.log("--- 5. Static source audits ---");
 {
   // 5b. src/store.js reopenForm must accept pending OR submitted, and must
   //     short-circuit when locked.
-  const store = fs.readFileSync("src/store.js", "utf8");
+  const store = readMigratedSrc("src/store.js", "utf8");
   const reopenMatch = store.match(/export function reopenForm\(formId\)\s*\{[\s\S]*?\n\}/);
   assert(reopenMatch, "store.js: reopenForm export found");
   const body = reopenMatch ? reopenMatch[0] : "";
@@ -201,7 +202,7 @@ console.log("--- 5. Static source audits ---");
 
 {
   // 5c. FormList: button renders for pending or normalized submitted, not draft
-  const src = fs.readFileSync("src/components/FormList.jsx", "utf8");
+  const src = readMigratedSrc("src/components/FormList.jsx", "utf8");
   assert(/פתח לעריכה/.test(src), "FormList: button label 'פתח לעריכה' present");
   assert(
     /form\.status\s*===\s*"pending"\s*\|\|\s*formStatus\s*===\s*"submitted"/.test(src),
@@ -220,7 +221,7 @@ console.log("--- 5. Static source audits ---");
 {
   // 5d. Predict.jsx: submitted block must render a reopen button gated by
   //     !settings.predictionsLocked and wrapped in a confirm() dialog.
-  const src = fs.readFileSync("src/pages/Predict.jsx", "utf8");
+  const src = readMigratedSrc("src/pages/Predict.jsx", "utf8");
   // Find the block where status === "submitted" && activeForm?.status !== "pending"
   const blockMatch = src.match(
     /\{status === "submitted" && activeForm\?\.status !== "pending" && \(([\s\S]*?)\n\s{6}\)\}/,

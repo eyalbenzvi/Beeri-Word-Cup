@@ -121,7 +121,35 @@ const GROUP_MATCH_SCHEDULE = [
   { fifaMatch: 72, group: "K", home: 2, away: 3, matchday: 3, date: "Jun 28", time: "02:30" },
 ];
 
-export function generateGroupMatches() {
+// A single Match type used across the app. Group matches don't have
+// `label/home/away/homeFrom/awayFrom/thirdFrom`; knockout matches do.
+// Modelling them as one optional-fields shape lets consumers iterate
+// over `[...groupMatches, ...knockoutMatches]` without union-narrowing
+// pain, and keeps the JSDoc annotations aligned with what the runtime
+// already produces.
+export type Match = {
+  id: string;
+  stage: string;
+  group?: string;
+  matchday?: number;
+  fifaMatch: number;
+  date: string;
+  time: string | null;
+  venue: any;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  played: boolean;
+  label?: string;
+  home?: string;
+  away?: string;
+  homeFrom?: string;
+  awayFrom?: string;
+  thirdFrom?: string;
+};
+
+export function generateGroupMatches(): Match[] {
   return GROUP_MATCH_SCHEDULE.map((m) => {
     const teams = GROUPS[m.group];
     // Build a stable match ID per group (1-6 within each group)
@@ -445,7 +473,7 @@ export const FINAL_MATCHES = [
 ];
 
 // Generate all knockout match objects
-export function generateKnockoutMatches() {
+export function generateKnockoutMatches(): Match[] {
   // Each round's templates have slightly different shapes (R32 has explicit
   // home/away placeholders; R16+ derive their slots from `homeFrom`/`awayFrom`
   // / `thirdFrom`). Widen the union to the single permissive shape that the

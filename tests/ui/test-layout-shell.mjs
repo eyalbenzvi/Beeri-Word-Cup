@@ -1,6 +1,7 @@
 // Validates the App Shell structure: desktop sidebar on xl:, right-rail prop
 // support, and mobile bottom-nav preservation.
 import fs from "node:fs";
+import { readMigratedSrc, existsMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -8,7 +9,7 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 
 console.log("=== LAYOUT SHELL TESTS ===\n");
 
-const layoutSrc = fs.readFileSync("src/components/Layout.jsx", "utf8");
+const layoutSrc = readMigratedSrc("src/components/Layout.jsx", "utf8");
 
 // --- Layout accepts rightRail prop ---
 assert(/rightRail/.test(layoutSrc), "Layout accepts rightRail prop");
@@ -33,10 +34,10 @@ assert(
 
 // --- DesktopSideNav component exists ---
 const sideNavPath = "src/components/DesktopSideNav.jsx";
-assert(fs.existsSync(sideNavPath), "DesktopSideNav.jsx file exists");
+assert(existsMigratedSrc(sideNavPath), "DesktopSideNav.jsx file exists");
 
-if (fs.existsSync(sideNavPath)) {
-  const sideNavSrc = fs.readFileSync(sideNavPath, "utf8");
+if (existsMigratedSrc(sideNavPath)) {
+  const sideNavSrc = readMigratedSrc(sideNavPath, "utf8");
   // Uses lucide icons, not emoji
   assert(/from ["']lucide-react["']/.test(sideNavSrc), "DesktopSideNav imports from lucide-react");
   // Has aria-label on nav items

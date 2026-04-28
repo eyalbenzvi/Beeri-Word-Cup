@@ -32,9 +32,10 @@ export default function AdminUsersTab({ users, allPredictions }) {
   }
 
   // Precompute userId → forms[] map once (O(N) instead of O(N×M))
-  const userFormsMap = useMemo(() => {
-    const map = {};
-    for (const [formId, p] of Object.entries(allPredictions)) {
+  const userFormsMap = useMemo<Record<string, any[]>>(() => {
+    const map: Record<string, any[]> = {};
+    for (const [formId, pAny] of Object.entries(allPredictions)) {
+      const p = pAny as any;
       const uid = p.userId;
       if (!uid) continue;
       if (!map[uid]) map[uid] = [];
@@ -45,7 +46,8 @@ export default function AdminUsersTab({ users, allPredictions }) {
 
   return (
     <div className="space-y-2">
-      {Object.entries(users).map(([uid, u]) => {
+      {Object.entries(users).map(([uid, uAny]) => {
+        const u = uAny as any;
         const userForms = userFormsMap[uid] || [];
         const submittedCount = userForms.filter(([, p]) =>
           ["submitted", "approved", "pending"].includes(p.status),

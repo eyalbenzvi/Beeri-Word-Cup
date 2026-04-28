@@ -4,8 +4,8 @@ const SIZES = {
   lg: "w-8 h-8 border-[3px]",
 };
 
-export default function Spinner({ size = "md", label, className = "" }) {
-  const sizeCls = SIZES[size] || SIZES.md;
+export default function Spinner({ size = "md", label, className = "" }: { size?: string; label?: string; className?: string }) {
+  const sizeCls = SIZES[size as keyof typeof SIZES] || SIZES.md;
   return (
     <span
       className={`inline-flex items-center gap-2 ${className}`}

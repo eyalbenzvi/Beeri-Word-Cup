@@ -7,6 +7,7 @@
 // as filled.
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -136,7 +137,7 @@ function buildPredictionUpdate(prediction, side, value, isKnockout = false) {
 // ============================================================
 console.log("--- 2. MatchCard.jsx callsites wired to helper ---");
 
-const matchCardSrc = readFileSync(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
+const matchCardSrc = readMigratedSrc(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
 
 assert(/buildPredictionUpdate\s*=/.test(matchCardSrc), "buildPredictionUpdate is defined in MatchCard.jsx");
 
@@ -164,7 +165,7 @@ assert(/const\s+clampScore\s*=/.test(matchCardSrc), "clampScore helper still pre
 // ============================================================
 console.log("--- 3. ProgressHub.jsx filled counter ---");
 
-const progressSrc = readFileSync(resolve(ROOT, "src/components/ProgressHub.jsx"), "utf8");
+const progressSrc = readMigratedSrc(resolve(ROOT, "src/components/ProgressHub.jsx"), "utf8");
 
 assert(
   /p\.homeScore\s*!=\s*null\s*&&\s*p\.awayScore\s*!=\s*null/.test(progressSrc) ||
@@ -189,7 +190,7 @@ assert(progressHubIsFilled({}) === false, "NOT filled: empty object");
 // ============================================================
 console.log("--- 4. AllForms.jsx hasScore check ---");
 
-const allFormsSrc = readFileSync(resolve(ROOT, "src/pages/AllForms.jsx"), "utf8");
+const allFormsSrc = readMigratedSrc(resolve(ROOT, "src/pages/AllForms.jsx"), "utf8");
 
 // Extract the hasScore assignment (the first one)
 const hasScoreMatch = allFormsSrc.match(/const\s+hasScore\s*=\s*([\s\S]+?);/);

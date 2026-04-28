@@ -48,7 +48,7 @@ export default function AdminBackupRestore() {
     reader.onload = async (ev) => {
       let data;
       try {
-        data = JSON.parse(ev.target.result);
+        data = JSON.parse(ev.target!.result as string);
       } catch {
         showToast("קובץ לא תקין — שגיאה בפרסור JSON", "error");
         return;

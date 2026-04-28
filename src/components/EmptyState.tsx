@@ -4,6 +4,12 @@ export default function EmptyState({
   description,
   cta,
   className = "",
+}: {
+  icon?: any;
+  title?: any;
+  description?: any;
+  cta?: any;
+  className?: string;
 }) {
   return (
     <div className={`text-center py-12 max-w-md mx-auto ${className}`}>

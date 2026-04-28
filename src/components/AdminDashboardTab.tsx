@@ -18,7 +18,8 @@ export default function AdminDashboardTab({
     const formEntries = Object.entries(allPredictions);
     let submitted = 0;
     let draft = 0;
-    for (const [, p] of formEntries) {
+    for (const [, pAny] of formEntries) {
+      const p = pAny as any;
       if (p.status === "submitted" || p.status === "approved") submitted++;
       else draft++;
     }

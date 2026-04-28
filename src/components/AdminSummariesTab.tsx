@@ -30,13 +30,14 @@ export default function AdminSummariesTab() {
   const [editingId, setEditingId] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const sortedSummaries = useMemo(() => {
-    return Object.values(summaries).sort((a, b) => (b.number || 0) - (a.number || 0));
+  const sortedSummaries = useMemo<any[]>(() => {
+    return (Object.values(summaries) as any[]).sort((a, b) => (b.number || 0) - (a.number || 0));
   }, [summaries]);
 
   const coveredByOthers = useMemo(() => {
-    const set = new Set();
-    for (const s of Object.values(summaries)) {
+    const set = new Set<string>();
+    for (const sAny of Object.values(summaries)) {
+      const s = sAny as any;
       for (const mid of s.coveredMatchIds || []) set.add(mid);
     }
     return set;

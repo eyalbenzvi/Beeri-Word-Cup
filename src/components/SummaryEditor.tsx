@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useDeferredValue } from "react";
 import { Sparkles, Eye, Pencil } from "lucide-react";
 import * as summaryAI from "../utils/summaryAI";
+import { computeMatchStats } from "../utils/summaryStats";
 import { BLOG } from "../constants/messages";
 import {
   createSummary,
@@ -173,9 +174,10 @@ export default function SummaryEditor({ summaryId, onClose }) {
   // anyway via a separate "הוסף משחק שכבר הוצג" button.
   const { uncovered, otherSummariesCovered } = useMemo(() => {
     // All summaries EXCEPT this one's covered ids
-    const otherCovered = new Set();
-    for (const [id, s] of Object.entries(summaries || {})) {
+    const otherCovered = new Set<string>();
+    for (const [id, sAny] of Object.entries(summaries || {})) {
       if (id === summaryId) continue;
+      const s = sAny as any;
       for (const mid of s.coveredMatchIds || []) otherCovered.add(mid);
     }
     const withResults = ALL_MATCHES.filter((m) => !!matchResults[m.id]);

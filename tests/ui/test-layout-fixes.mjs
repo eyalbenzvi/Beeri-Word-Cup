@@ -14,6 +14,7 @@
 //    match.
 
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -24,10 +25,10 @@ function assert(c, m) {
 
 console.log("=== LAYOUT FIXES REGRESSION TESTS ===\n");
 
-const home = fs.readFileSync("src/pages/Home.jsx", "utf8");
-const welcome = fs.readFileSync("src/pages/WelcomeScreen.jsx", "utf8");
-const upcoming = fs.readFileSync("src/components/UpcomingMatches.jsx", "utf8");
-const matchdayHero = fs.readFileSync("src/components/MatchdayHero.jsx", "utf8");
+const home = readMigratedSrc("src/pages/Home.jsx", "utf8");
+const welcome = readMigratedSrc("src/pages/WelcomeScreen.jsx", "utf8");
+const upcoming = readMigratedSrc("src/components/UpcomingMatches.jsx", "utf8");
+const matchdayHero = readMigratedSrc("src/components/MatchdayHero.jsx", "utf8");
 
 // ============================================================
 // ISSUE #2: UpcomingMatches lives in the main column on Home,

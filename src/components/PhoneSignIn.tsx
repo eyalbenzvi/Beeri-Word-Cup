@@ -28,9 +28,11 @@ export default function PhoneSignIn() {
     if (step !== "code") return;
     if (typeof window === "undefined" || !("OTPCredential" in window)) return;
     const ac = new AbortController();
-    navigator.credentials
+    // WebOTP API — `otp` is a non-standard credential descriptor not in
+    // the lib.dom.d.ts CredentialRequestOptions type yet. Cast to any.
+    (navigator.credentials as any)
       .get({ otp: { transport: ["sms"] }, signal: ac.signal })
-      .then((cred) => {
+      .then((cred: any) => {
         const otp = cred?.code?.replace(/\D/g, "").slice(0, 6);
         if (otp && otp.length === 6) setCode(otp);
       })

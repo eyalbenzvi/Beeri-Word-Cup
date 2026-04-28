@@ -26,7 +26,7 @@ export default function Layout({ children, rightRail = null }) {
   //    started) AND at least one summary is published.
   const predictionsLocked = !!settings?.predictionsLocked;
   const hasPublishedSummary = Object.values(summaries || {}).some(
-    (s) => s.status === "published",
+    (s: any) => s.status === "published",
   );
   const showBlogTab = !!user || (predictionsLocked && hasPublishedSummary);
 

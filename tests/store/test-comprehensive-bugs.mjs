@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -25,13 +26,13 @@ function assert(c, m) {
 // don't need to know which extension is actually on disk.
 function readSrc(relPath) {
   try {
-    return readFileSync(resolve(ROOT, relPath), "utf8");
+    return readMigratedSrc(resolve(ROOT, relPath), "utf8");
   } catch (e) {
     const swap = { ".js": ".ts", ".jsx": ".tsx" };
     for (const [from, to] of Object.entries(swap)) {
       if (relPath.endsWith(from)) {
         const swapped = relPath.slice(0, -from.length) + to;
-        try { return readFileSync(resolve(ROOT, swapped), "utf8"); } catch { /* fall through */ }
+        try { return readMigratedSrc(resolve(ROOT, swapped), "utf8"); } catch { /* fall through */ }
       }
     }
     throw e;

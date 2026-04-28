@@ -27,7 +27,7 @@ export default function AdminResultsTab() {
   const bracketTeams = useMemo(() => calcBracketTeams(results), [results]);
 
   const completedGroupCount = useMemo(() => {
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const matchId of Object.keys(results)) {
       const m = matchId.match(/^group-([A-L])-/);
       if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
@@ -190,11 +190,13 @@ export default function AdminResultsTab() {
 
   const unresolvedKnockoutTies = useMemo(() => {
     return Object.entries(results).filter(
-      ([, r]) =>
-        r.stage &&
-        r.stage !== "group" &&
-        r.homeScore === r.awayScore &&
-        !r.advancingTeam,
+      ([, rAny]) => {
+        const r = rAny as any;
+        return r.stage &&
+          r.stage !== "group" &&
+          r.homeScore === r.awayScore &&
+          !r.advancingTeam;
+      },
     );
   }, [results]);
 

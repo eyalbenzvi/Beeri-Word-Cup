@@ -9,6 +9,11 @@ export default function TournamentCountdown({
   footerText,
   headerText,
   variant = "compact",
+}: {
+  countdown?: any;
+  footerText?: any;
+  headerText?: any;
+  variant?: "compact" | "large";
 }) {
   const gap = variant === "large" ? "gap-2.5 md:gap-4" : "gap-2 md:gap-3";
   return (

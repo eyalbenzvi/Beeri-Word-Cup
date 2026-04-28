@@ -3,6 +3,7 @@
 // consume that same array so a form's position never differs between the
 // two pages.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { compareTiebreaker } from "../../src/utils/scoring.js";
 
 let passed = 0, failed = 0;
@@ -67,8 +68,8 @@ assert(assignRanks([]).length === 0, "Empty leaderboard → empty ranks");
 
 // --- 4. Both Profile and Leaderboard read from the same rankedLeaderboard
 // destructured off useLeaderboardComputed, so positions cannot drift. ---
-const profile = fs.readFileSync("src/pages/Profile.jsx", "utf8");
-const leaderboard = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+const profile = readMigratedSrc("src/pages/Profile.jsx", "utf8");
+const leaderboard = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 assert(
   /useLeaderboardComputed[\s\S]*?rankedLeaderboard/.test(profile),
   "Profile destructures rankedLeaderboard from the shared hook",

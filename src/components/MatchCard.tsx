@@ -26,10 +26,10 @@ function focusNextInput(currentInput) {
   // cards, silently halting auto-advance at the boundary.
   const scope =
     card.closest("[data-match-card-scope]") || card.parentElement?.parentElement || document;
-  const allCards = Array.from(scope.querySelectorAll("[data-match-card]"));
+  const allCards = Array.from((scope as Element | Document).querySelectorAll("[data-match-card]"));
   const cardIdx = allCards.indexOf(card);
   for (let i = cardIdx + 1; i < allCards.length; i++) {
-    const nextInput = allCards[i].querySelector('input[type="number"]');
+    const nextInput = allCards[i].querySelector('input[type="number"]') as HTMLInputElement | null;
     if (nextInput) {
       nextInput.focus();
       nextInput.select();

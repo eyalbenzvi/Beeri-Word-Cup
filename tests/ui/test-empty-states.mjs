@@ -1,6 +1,7 @@
 // Ensures Profile, Stats, and AllForms all render a consistent EmptyState
 // when their primary data is missing (avoids blank panels).
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -11,9 +12,9 @@ function assert(c, m) {
 
 console.log("=== EMPTY STATES TESTS ===\n");
 
-const profile = fs.readFileSync("src/pages/Profile.jsx", "utf8");
-const stats = fs.readFileSync("src/pages/Stats.jsx", "utf8");
-const allForms = fs.readFileSync("src/pages/AllForms.jsx", "utf8");
+const profile = readMigratedSrc("src/pages/Profile.jsx", "utf8");
+const stats = readMigratedSrc("src/pages/Stats.jsx", "utf8");
+const allForms = readMigratedSrc("src/pages/AllForms.jsx", "utf8");
 
 // --- Profile imports and uses EmptyState for forms.length === 0 ---
 assert(/import EmptyState/.test(profile), "Profile imports EmptyState");

@@ -1,6 +1,7 @@
 // Scans icon-only / symbol buttons across key components and ensures they
 // have aria-label for screen-reader users.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -19,7 +20,7 @@ const files = [
 ];
 
 for (const f of files) {
-  const src = fs.readFileSync(f, "utf8");
+  const src = readMigratedSrc(f, "utf8");
 
   // Count <button> tags that contain only an icon (Menu, Info, X, lucide
   // imports, or a standalone +/− char). Each should either have aria-label
@@ -34,7 +35,7 @@ for (const f of files) {
 }
 
 // --- MatchCard +/− buttons are specifically checked ---
-const matchCard = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
+const matchCard = readMigratedSrc("src/components/MatchCard.jsx", "utf8");
 const plusBtnCount = (matchCard.match(/aria-label=\{`הוסף גול ל/g) || []).length;
 const minusBtnCount = (matchCard.match(/aria-label=\{`הורד גול מ/g) || []).length;
 assert(plusBtnCount === 2, `MatchCard has 2 aria-labeled + buttons (found ${plusBtnCount})`);

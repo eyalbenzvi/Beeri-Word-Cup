@@ -86,7 +86,7 @@ export default function SimulatorPanel({
   );
 
   const completedGroupCount = useMemo(() => {
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const matchId of Object.keys(effectiveResults)) {
       const m = matchId.match(/^group-([A-L])-/);
       if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;

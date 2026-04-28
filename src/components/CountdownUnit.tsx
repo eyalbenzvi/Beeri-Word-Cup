@@ -1,4 +1,4 @@
-export default function CountdownUnit({ value, label, accent }) {
+export default function CountdownUnit({ value, label, accent }: { value: any; label?: any; accent?: any }) {
   const bgClass = accent || "bg-primary";
   const shadowColor = accent === "bg-secondary"
     ? "var(--color-secondary-dark)"

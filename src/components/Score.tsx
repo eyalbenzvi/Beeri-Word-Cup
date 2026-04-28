@@ -33,6 +33,12 @@ export default function Score({
   separator = "–", // en-dash
   wrap,
   className,
+}: {
+  home: any;
+  away: any;
+  separator?: string;
+  wrap?: any;
+  className?: any;
 }) {
   const inner = (
     <bdi className={className}>

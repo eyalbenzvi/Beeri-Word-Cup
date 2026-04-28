@@ -19,7 +19,7 @@ export default function MatchdayHero({ results }) {
       .sort((a, b) => {
         const au = getMatchKickoffUTC(a);
         const bu = getMatchKickoffUTC(b);
-        return new Date(au) - new Date(bu);
+        return new Date(au).getTime() - new Date(bu).getTime();
       });
   }, []);
 
