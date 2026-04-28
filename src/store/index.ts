@@ -1,4 +1,4 @@
-import { db, auth } from "./firebase";
+import { db, auth } from "../firebase";
 import {
   doc,
   getDoc,
@@ -16,12 +16,12 @@ import {
   orderBy,
   limit,
 } from "firebase/firestore";
-import { captureClientError, captureClientMessage } from "./sentry";
-import { generateDefaultFormName } from "./utils/formNameGenerator";
+import { captureClientError, captureClientMessage } from "../sentry";
+import { generateDefaultFormName } from "../utils/formNameGenerator";
 import {
   logAdminAction as logAdminActionToBuffer,
   getAuditLog as getAuditLogFromBuffer,
-} from "./storeAudit";
+} from "../storeAudit";
 
 // ============ AUDIT LOG ============
 // Single source of truth in storeAudit.js — these are thin re-exports that
@@ -132,7 +132,7 @@ const cache: CacheShape = {
 
 // ============ FIRESTORE HELPERS ============
 
-import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "./utils/constants";
+import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 
 // Splits operations across multiple batches when exceeding Firestore's 500 op limit
 export async function commitInBatches(operations) {
@@ -1466,7 +1466,7 @@ export function demoteAdmin(userId: string) {
 export async function setAdminClaim(targetUid, action) {
   if (!requireAdmin()) return { error: "Not admin" };
   try {
-    const { auth: firebaseAuth } = await import("./firebase.js");
+    const { auth: firebaseAuth } = await import("../firebase");
     const idToken = await firebaseAuth.currentUser?.getIdToken();
     if (!idToken) return { error: "Not authenticated" };
 

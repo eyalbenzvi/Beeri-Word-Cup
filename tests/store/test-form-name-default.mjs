@@ -333,8 +333,8 @@ eq(
 console.log("--- 17. Static check: store.js wires the helper in ---");
 const storeSrc = readMigratedSrc(resolve(ROOT,"src/store.js"), "utf8");
 assert(
-  storeSrc.includes('from "./utils/formNameGenerator"'),
-  "store.js imports the helper",
+  /from\s+["']\.\.?\/utils\/formNameGenerator["']/.test(storeSrc),
+  "store imports the helper",
 );
 assert(
   /generateDefaultFormName\s*\(/.test(storeSrc),

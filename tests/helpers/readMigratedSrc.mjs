@@ -22,6 +22,12 @@ export function readMigratedSrc(relOrAbsPath, encoding = "utf8") {
       if (absPath.endsWith(from)) {
         const swapped = absPath.slice(0, -from.length) + to;
         try { return fs.readFileSync(swapped, encoding); } catch { /* fall through */ }
+        // Module-split: src/foo.js -> src/foo/index.{ts,tsx,js,jsx}
+        const baseDir = absPath.slice(0, -from.length);
+        for (const ext of [".ts", ".tsx", ".js", ".jsx"]) {
+          const indexPath = `${baseDir}/index${ext}`;
+          try { return fs.readFileSync(indexPath, encoding); } catch { /* fall through */ }
+        }
       }
     }
     throw err;
@@ -38,6 +44,11 @@ export function existsMigratedSrc(relOrAbsPath) {
     if (absPath.endsWith(from)) {
       const swapped = absPath.slice(0, -from.length) + to;
       if (fs.existsSync(swapped)) return true;
+      // Module-split fallback: src/foo.js -> src/foo/index.*
+      const baseDir = absPath.slice(0, -from.length);
+      for (const ext of [".ts", ".tsx", ".js", ".jsx"]) {
+        if (fs.existsSync(`${baseDir}/index${ext}`)) return true;
+      }
     }
   }
   return false;

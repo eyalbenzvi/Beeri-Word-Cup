@@ -85,8 +85,8 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
     "store.js no longer hardcodes `auditLog.length > 200`");
   assert(!/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeSrc),
     "store.js no longer duplicates the cap check (delegates to storeAudit)");
-  assert(/from\s+["']\.\/storeAudit["']/.test(storeSrc),
-    "store.js imports from storeAudit");
+  assert(/from\s+["']\.\.?\/storeAudit["']/.test(storeSrc),
+    "store imports from storeAudit");
   assert(/logAdminAction\s+as\s+logAdminActionToBuffer/.test(storeSrc),
     "store.js imports logAdminAction (renamed to avoid shadowing)");
 }
