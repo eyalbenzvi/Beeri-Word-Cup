@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { BestCaseResult } from "../utils/bestCase";
 import { useAllPredictions, useMatchResults } from "./useStore";
 
@@ -49,6 +49,13 @@ export function useBestCase(formId: string | null): {
     result: null,
     error: false,
   });
+
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
   const reset = useCallback(() => {
     workerRef.current?.terminate();

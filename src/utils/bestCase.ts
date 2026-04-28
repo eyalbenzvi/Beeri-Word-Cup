@@ -31,8 +31,8 @@ export type ProgressCallback = (phase: string, percent: number) => void;
 
 // ─── Score all submitted forms ────────────────────────────────────
 // Computes full scores for every form against a given results set.
-// Top scorer is excluded (topScorers: []). Champion is derived from
-// the simulated match results, so best-case choices propagate naturally.
+// Top scorer is excluded (topScorers: []). Champion and advancing are
+// derived from each form's predicted bracket — matching useLeaderboardComputed.
 
 function scoreAllForms(
   submittedForms: Record<string, any>,
@@ -47,7 +47,14 @@ function scoreAllForms(
   for (const [formId, formData] of Object.entries(submittedForms)) {
     const d = formData as any;
     const predBracket = calcBracketTeams(d.matches || {});
-    const enriched = { ...d, advancing: deriveAdvancingTeams(predBracket) };
+    // BUG #1 FIX: derive champion from form's predicted bracket, same as
+    // useLeaderboardComputed does — the stored `champion` field is null.
+    const formChampion = deriveChampion(d.matches || {}, predBracket);
+    const enriched = {
+      ...d,
+      advancing: deriveAdvancingTeams(predBracket),
+      champion: formChampion,
+    };
     scores[formId] = calculateFullScore(
       enriched,
       allResults,
@@ -61,6 +68,8 @@ function scoreAllForms(
 }
 
 // How many of the given formIds score strictly above targetId.
+// BUG #5 FIX: mirror the three-level tiebreaker used by rankedLeaderboard
+// (points → compareTiebreaker → formId.localeCompare).
 function countAbove(
   targetId: string,
   formIds: string[],
@@ -73,12 +82,13 @@ function countAbove(
     if (id === targetId) continue;
     const s = scores[id];
     if (!s) continue;
-    if (s.totalPoints > t.totalPoints) n++;
-    else if (
-      s.totalPoints === t.totalPoints &&
-      compareTiebreaker(s, t) < 0
-    )
+    if (s.totalPoints > t.totalPoints) {
       n++;
+    } else if (s.totalPoints === t.totalPoints) {
+      const tb = compareTiebreaker(s, t);
+      if (tb < 0) n++;
+      else if (tb === 0 && id.localeCompare(targetId) < 0) n++;
+    }
   }
   return n;
 }
@@ -108,7 +118,10 @@ function maxRemainingPts(
     const p = (POINTS as any)[km.stage] || POINTS.group;
     max += p.outcome + p.exactScore + p.advancing;
   }
-  max += 9; // champion bonus
+  // BUG #6 FIX: champion bonus only possible if the Final hasn't been played.
+  if (remKO.some((km: any) => km.stage === "F")) {
+    max += 9;
+  }
   return max;
 }
 
@@ -126,16 +139,14 @@ function identifyRelevant(
     if (id === targetId) return false;
     const cur = baseScores[id]?.totalPoints ?? 0;
     const maxG = maxRemainingPts(forms[id], remGroup, remKO);
-    // Reachable above: we might overtake them
-    if (cur > tBase) return tMax >= cur;
-    // Threat below: they might overtake us
-    return cur + maxG >= tBase;
+    if (cur > tBase) return tMax >= cur;   // reachable above
+    return cur + maxG >= tBase;            // threat below
   });
 }
 
 // ─── Candidate match results ──────────────────────────────────────
-// For a given match, collect all distinct (homeScore, awayScore) pairs
-// predicted by any submitted form, plus one fallback per outcome type.
+// Collects all distinct (homeScore, awayScore) pairs predicted by any form,
+// plus one fallback per outcome type to ensure coverage.
 
 const OUTCOME_DEFAULTS: [number, number][] = [
   [1, 0], // H-win
@@ -159,7 +170,6 @@ function getCandidates(
       list.push({ homeScore: +p.homeScore, awayScore: +p.awayScore });
     }
   }
-  // Ensure at least one candidate per outcome type
   for (const [dh, da] of OUTCOME_DEFAULTS) {
     const k = `${dh}:${da}`;
     if (!seen.has(k)) {
@@ -170,25 +180,28 @@ function getCandidates(
   return list;
 }
 
-// For a knockout tie, attach an advancingTeam so calcBracketTeams can
-// resolve the bracket. Prefer the target form's choice if valid.
-function withAdvancing(
-  cand: { homeScore: number; awayScore: number },
-  matchId: string,
-  forms: Record<string, any>,
-  targetId: string,
+// BUG #3 FIX: for knockout draw candidates, expand into two candidates —
+// one advancing home, one advancing away — so the optimizer can evaluate
+// which choice minimises forms above target, rather than falling back to
+// an arbitrary bias. Non-draw candidates are returned as-is.
+function expandKnockoutCandidates(
+  base: Array<{ homeScore: number; awayScore: number }>,
   actualTeams: { home: string; away: string },
-): any {
-  if (cand.homeScore !== cand.awayScore) return cand;
-  const pred = forms[targetId]?.matches?.[matchId];
-  const at = pred?.advancingTeam;
-  if (at && (at === actualTeams.home || at === actualTeams.away))
-    return { ...cand, advancingTeam: at };
-  return { ...cand, advancingTeam: actualTeams.home };
+): any[] {
+  const expanded: any[] = [];
+  for (const c of base) {
+    if (c.homeScore !== c.awayScore) {
+      expanded.push(c);
+    } else {
+      expanded.push({ ...c, advancingTeam: actualTeams.home });
+      expanded.push({ ...c, advancingTeam: actualTeams.away });
+    }
+  }
+  return expanded;
 }
 
 // ─── Single-match delta (lightweight, no full-score recompute) ────
-// Returns outcome + exact points for one form on one match.
+// Returns outcome + exact-score points for one form on one match.
 // Respects wrongMatchup logic for knockout stages.
 
 function singleMatchDelta(
@@ -214,12 +227,10 @@ function singleMatchDelta(
       return 0;
   }
 
-  const ph = +p.homeScore,
-    pa = +p.awayScore;
-  const rh = result.homeScore,
-    ra = result.awayScore;
+  const ph = +p.homeScore, pa = +p.awayScore;
+  const rh = result.homeScore, ra = result.awayScore;
   const predO = ph > pa ? "H" : ph < pa ? "A" : "D";
-  const actO = rh > ra ? "H" : rh < ra ? "A" : "D";
+  const actO  = rh > ra ? "H" : rh < ra ? "A" : "D";
   if (predO !== actO) return 0;
 
   const pts = (POINTS as any)[stage] || POINTS.group;
@@ -227,9 +238,44 @@ function singleMatchDelta(
 }
 
 // ─── Group stage optimizer ────────────────────────────────────────
-// Enumerates all 3^k outcome combinations for the remaining matches of
-// one group, picks the one that minimises "forms above target".
-// Uses calcGroupStandings (delegated) for standings + advancing points.
+// Enumerates all 3^k outcome combinations for a group's remaining matches
+// and picks the one minimising "forms above target".
+// Standings are delegated to calcGroupStandings; advancing predictions are
+// looked up from the precomputed formR32Preds map (Bug #2 fix).
+
+function buildGroupDelta(
+  combo: Record<string, { homeScore: number; awayScore: number }>,
+  top2: string[],
+  forms: Record<string, any>,
+  formR32Preds: Record<string, string[]>,
+) {
+  // Returns the lightweight score delta for formId from this group combo.
+  return (formId: string): number => {
+    const formData = forms[formId];
+    let pts = 0;
+    const mp = formData?.matches || {};
+    for (const [mid, res] of Object.entries(combo) as [
+      string,
+      { homeScore: number; awayScore: number },
+    ][]) {
+      const p = mp[mid];
+      if (!isScoreValid(p)) continue;
+      const ph = +p.homeScore, pa = +p.awayScore;
+      const rh = res.homeScore, ra = res.awayScore;
+      const predO = ph > pa ? "H" : ph < pa ? "A" : "D";
+      const actO  = rh > ra ? "H" : rh < ra ? "A" : "D";
+      if (predO !== actO) continue;
+      pts += POINTS.group.outcome + (ph === rh && pa === ra ? POINTS.group.exactScore : 0);
+    }
+    // BUG #2 FIX: use precomputed R32 predictions derived from the form's
+    // bracket, not the raw advancing field (which is always {} in Firestore).
+    const formR32 = formR32Preds[formId] || [];
+    for (const code of top2) {
+      if (formR32.includes(code)) pts += POINTS.group.advancing;
+    }
+    return pts;
+  };
+}
 
 function bestGroupCombo(
   group: string,
@@ -239,11 +285,11 @@ function bestGroupCombo(
   baseScores: Record<string, any>,
   forms: Record<string, any>,
   playedResults: Record<string, any>,
+  formR32Preds: Record<string, string[]>,
 ): Record<string, any> {
   const k = remainingMatches.length;
   const tBase = baseScores[targetId]?.totalPoints ?? 0;
 
-  // Build the already-played results for this group (needed for standings)
   const playedInGroup: Record<string, any> = {};
   for (const gm of groupMatches) {
     if (gm.group === group && playedResults[gm.id])
@@ -260,56 +306,25 @@ function bestGroupCombo(
     for (const m of remainingMatches) {
       const outcomeIdx = tmp % 3;
       tmp = Math.floor(tmp / 3);
-
-      // Prefer target's exact prediction if it matches the required outcome
       const pred = forms[targetId]?.matches?.[m.id];
       let ch: [number, number] = OUTCOME_DEFAULTS[outcomeIdx];
       if (isScoreValid(pred)) {
-        const ph = +pred.homeScore,
-          pa = +pred.awayScore;
-        const ok =
-          outcomeIdx === 0 ? ph > pa : outcomeIdx === 1 ? ph === pa : pa > ph;
+        const ph = +pred.homeScore, pa = +pred.awayScore;
+        const ok = outcomeIdx === 0 ? ph > pa : outcomeIdx === 1 ? ph === pa : pa > ph;
         if (ok) ch = [ph, pa];
       }
       combo[m.id] = { homeScore: ch[0], awayScore: ch[1] };
     }
 
-    // Compute standings for this group using delegated function
     const standings =
       calcGroupStandings({ ...playedInGroup, ...combo })[group] || [];
     const top2 = standings.slice(0, 2).map((t: any) => t.code);
+    const delta = buildGroupDelta(combo, top2, forms, formR32Preds);
 
-    // Lightweight objective: match pts + this group's advancing pts
-    const delta = (formData: any): number => {
-      let pts = 0;
-      const mp = formData?.matches || {};
-      for (const [mid, res] of Object.entries(combo) as [
-        string,
-        { homeScore: number; awayScore: number },
-      ][]) {
-        const p = mp[mid];
-        if (!isScoreValid(p)) continue;
-        const ph = +p.homeScore,
-          pa = +p.awayScore;
-        const rh = res.homeScore,
-          ra = res.awayScore;
-        const predO = ph > pa ? "H" : ph < pa ? "A" : "D";
-        const actO = rh > ra ? "H" : rh < ra ? "A" : "D";
-        if (predO !== actO) continue;
-        pts += POINTS.group.outcome + (ph === rh && pa === ra ? POINTS.group.exactScore : 0);
-      }
-      const formR32 = formData?.advancing?.R32 || [];
-      for (const code of top2) {
-        if (formR32.includes(code)) pts += POINTS.group.advancing;
-      }
-      return pts;
-    };
-
-    const tTotal = tBase + delta(forms[targetId]);
+    const tTotal = tBase + delta(targetId);
     let formsAbove = 0;
     for (const id of relevantIds) {
-      const base = baseScores[id]?.totalPoints ?? 0;
-      if (base + delta(forms[id]) > tTotal) formsAbove++;
+      if ((baseScores[id]?.totalPoints ?? 0) + delta(id) > tTotal) formsAbove++;
     }
 
     if (formsAbove < bestObj) {
@@ -322,8 +337,11 @@ function bestGroupCombo(
 }
 
 // ─── Knockout optimizer ───────────────────────────────────────────
-// Greedy round-by-round. For each match uses per-form predicted brackets
-// (precomputed once) to detect wrongMatchup without recomputing brackets.
+// Greedy round-by-round. Per-form predicted brackets are precomputed once.
+// BUG #3 FIX: draw candidates are expanded to both advancing options.
+// BUG #7 FIX: cumulative delta tracks points earned in earlier KO rounds
+//             so the comparison baseline is always current, not frozen at
+//             the post-group-stage snapshot.
 
 function optimizeKnockout(
   remKO: any[],
@@ -335,28 +353,35 @@ function optimizeKnockout(
 ): Record<string, any> {
   if (remKO.length === 0) return {};
 
-  // Precompute per-form predicted brackets once
+  // Precompute predicted brackets for target + relevant forms (once per call).
   const predBrackets: Record<string, Record<string, any>> = {};
   for (const id of [targetId, ...relevantIds]) {
     predBrackets[id] = calcBracketTeams(forms[id]?.matches || {});
   }
 
   const koRes: Record<string, any> = {};
-  const tBase = currentScores[targetId]?.totalPoints ?? 0;
+
+  // BUG #7 FIX: accumulate match-level deltas so comparisons in later rounds
+  // reflect points already earned in earlier KO rounds of this same call.
+  const cumulativeDelta: Record<string, number> = {};
+  for (const id of [targetId, ...relevantIds]) cumulativeDelta[id] = 0;
+
+  const effectiveBase = (id: string) =>
+    (currentScores[id]?.totalPoints ?? 0) + cumulativeDelta[id];
 
   for (const round of ["R32", "R16", "QF", "SF", "3RD", "F"]) {
     const roundMatches = remKO.filter((m) => m.stage === round);
     if (!roundMatches.length) continue;
 
-    // Compute actual bracket for this round using all decided results so far
     const actualBracket = calcBracketTeams({ ...workingResults, ...koRes });
 
     for (const match of roundMatches) {
       const actualTeams = actualBracket[match.id];
       if (!actualTeams?.home || !actualTeams?.away) continue;
 
-      const candidates = getCandidates(match.id, forms).map((c) =>
-        withAdvancing(c, match.id, forms, targetId, actualTeams),
+      const candidates = expandKnockoutCandidates(
+        getCandidates(match.id, forms),
+        actualTeams,
       );
 
       let bestObj = Infinity;
@@ -364,27 +389,18 @@ function optimizeKnockout(
 
       for (const cand of candidates) {
         const tDelta = singleMatchDelta(
-          forms[targetId],
-          match.id,
-          cand,
-          match.stage,
-          predBrackets[targetId]?.[match.id],
-          actualTeams,
+          forms[targetId], match.id, cand, match.stage,
+          predBrackets[targetId]?.[match.id], actualTeams,
         );
-        const tTotal = tBase + tDelta;
+        const tTotal = effectiveBase(targetId) + tDelta;
 
         let formsAbove = 0;
         for (const id of relevantIds) {
-          const fBase = currentScores[id]?.totalPoints ?? 0;
           const fDelta = singleMatchDelta(
-            forms[id],
-            match.id,
-            cand,
-            match.stage,
-            predBrackets[id]?.[match.id],
-            actualTeams,
+            forms[id], match.id, cand, match.stage,
+            predBrackets[id]?.[match.id], actualTeams,
           );
-          if (fBase + fDelta > tTotal) formsAbove++;
+          if (effectiveBase(id) + fDelta > tTotal) formsAbove++;
         }
 
         if (formsAbove < bestObj) {
@@ -394,6 +410,14 @@ function optimizeKnockout(
       }
 
       koRes[match.id] = bestCand;
+
+      // Update cumulative delta for all tracked forms after choosing this result.
+      for (const id of [targetId, ...relevantIds]) {
+        cumulativeDelta[id] += singleMatchDelta(
+          forms[id], match.id, bestCand, match.stage,
+          predBrackets[id]?.[match.id], actualTeams,
+        );
+      }
     }
   }
 
@@ -401,9 +425,8 @@ function optimizeKnockout(
 }
 
 // ─── Iterative refinement ─────────────────────────────────────────
-// For each group, tries the top-K bracket shapes (by direct-score objective)
-// and re-optimises knockout for each. Uses full scoreAllForms to compare
-// global rank — this is the expensive step, so K is kept small.
+// For each group, tries top-K distinct bracket shapes and re-optimises
+// knockout for each, using full scoreAllForms for the final comparison.
 
 function getTopKShapes(
   group: string,
@@ -414,6 +437,7 @@ function getTopKShapes(
   forms: Record<string, any>,
   playedResults: Record<string, any>,
   K: number,
+  formR32Preds: Record<string, string[]>,
 ): Array<Record<string, any>> {
   const k = remainingMatches.length;
   const tBase = baseScores[targetId]?.totalPoints ?? 0;
@@ -424,7 +448,6 @@ function getTopKShapes(
       playedInGroup[gm.id] = playedResults[gm.id];
   }
 
-  // Map: shapeKey → { combo, objective }
   const shapeMap = new Map<string, { combo: Record<string, any>; obj: number }>();
 
   for (let mask = 0; mask < 3 ** k; mask++) {
@@ -436,10 +459,8 @@ function getTopKShapes(
       const pred = forms[targetId]?.matches?.[m.id];
       let ch: [number, number] = OUTCOME_DEFAULTS[outcomeIdx];
       if (isScoreValid(pred)) {
-        const ph = +pred.homeScore,
-          pa = +pred.awayScore;
-        const ok =
-          outcomeIdx === 0 ? ph > pa : outcomeIdx === 1 ? ph === pa : pa > ph;
+        const ph = +pred.homeScore, pa = +pred.awayScore;
+        const ok = outcomeIdx === 0 ? ph > pa : outcomeIdx === 1 ? ph === pa : pa > ph;
         if (ok) ch = [ph, pa];
       }
       combo[m.id] = { homeScore: ch[0], awayScore: ch[1] };
@@ -449,37 +470,12 @@ function getTopKShapes(
       calcGroupStandings({ ...playedInGroup, ...combo })[group] || [];
     const top2 = standings.slice(0, 2).map((t: any) => t.code);
     const shapeKey = top2.join(":");
+    const delta = buildGroupDelta(combo, top2, forms, formR32Preds);
 
-    const delta = (formData: any): number => {
-      let pts = 0;
-      const mp = formData?.matches || {};
-      for (const [mid, res] of Object.entries(combo) as [
-        string,
-        { homeScore: number; awayScore: number },
-      ][]) {
-        const p = mp[mid];
-        if (!isScoreValid(p)) continue;
-        const ph = +p.homeScore,
-          pa = +p.awayScore;
-        const rh = res.homeScore,
-          ra = res.awayScore;
-        const predO = ph > pa ? "H" : ph < pa ? "A" : "D";
-        const actO = rh > ra ? "H" : rh < ra ? "A" : "D";
-        if (predO !== actO) continue;
-        pts += POINTS.group.outcome + (ph === rh && pa === ra ? POINTS.group.exactScore : 0);
-      }
-      const formR32 = formData?.advancing?.R32 || [];
-      for (const code of top2) {
-        if (formR32.includes(code)) pts += POINTS.group.advancing;
-      }
-      return pts;
-    };
-
-    const tTotal = tBase + delta(forms[targetId]);
+    const tTotal = tBase + delta(targetId);
     let formsAbove = 0;
     for (const id of relevantIds) {
-      const base = baseScores[id]?.totalPoints ?? 0;
-      if (base + delta(forms[id]) > tTotal) formsAbove++;
+      if ((baseScores[id]?.totalPoints ?? 0) + delta(id) > tTotal) formsAbove++;
     }
 
     const existing = shapeMap.get(shapeKey);
@@ -504,14 +500,12 @@ function refineGroups(
   baseScores: Record<string, any>,
   playedResults: Record<string, any>,
   allIds: string[],
+  formR32Preds: Record<string, string[]>,
 ): Record<string, any> {
   let best = { ...workingResults };
 
-  const initScores = scoreAllForms(
-    Object.fromEntries(allIds.map((id) => [id, forms[id]])),
-    best,
-  );
-  let bestRank = countAbove(targetId, allIds, initScores);
+  const allFormsSubset = Object.fromEntries(allIds.map((id) => [id, forms[id]]));
+  let bestRank = countAbove(targetId, allIds, scoreAllForms(allFormsSubset, best));
 
   for (let iter = 0; iter < 4; iter++) {
     let improved = false;
@@ -521,41 +515,24 @@ function refineGroups(
       if (!groupRem.length) continue;
 
       const shapes = getTopKShapes(
-        group,
-        groupRem,
-        targetId,
-        relevantIds,
-        baseScores,
-        forms,
-        playedResults,
-        5,
+        group, groupRem, targetId, relevantIds,
+        baseScores, forms, playedResults, 5, formR32Preds,
       );
 
       for (const shape of shapes) {
         const trial = { ...best };
         Object.assign(trial, shape);
-        // Remove stale knockout results so they are re-optimised
         for (const km of remKO) delete trial[km.id];
 
-        const afterGroup = scoreAllForms(
-          Object.fromEntries(allIds.map((id) => [id, forms[id]])),
-          trial,
-        );
+        const afterGroup = scoreAllForms(allFormsSubset, trial);
         const newKO = optimizeKnockout(
-          remKO,
-          trial,
-          targetId,
-          relevantIds,
-          afterGroup,
-          forms,
+          remKO, trial, targetId, relevantIds, afterGroup, forms,
         );
         Object.assign(trial, newKO);
 
-        const trialScores = scoreAllForms(
-          Object.fromEntries(allIds.map((id) => [id, forms[id]])),
-          trial,
+        const trialRank = countAbove(
+          targetId, allIds, scoreAllForms(allFormsSubset, trial),
         );
-        const trialRank = countAbove(targetId, allIds, trialScores);
 
         if (trialRank < bestRank) {
           bestRank = trialRank;
@@ -580,7 +557,6 @@ export function computeBestCase(
   playedResults: Record<string, any>,
   onProgress?: ProgressCallback,
 ): BestCaseResult | null {
-  // Only work with submitted / approved forms
   const submittedForms = Object.fromEntries(
     Object.entries(allForms).filter(([, f]) => {
       const s = (f as any).status;
@@ -592,17 +568,22 @@ export function computeBestCase(
   const remGroup = groupMatches.filter((m) => !playedResults[m.id]);
   const remKO = knockoutMatches.filter((m) => !playedResults[m.id]);
 
-  // ── Phase 0: base scores from already-played matches ──
+  // ── Phase 0: base scores + relevant competitors ──
   onProgress?.("prep", 5);
   const baseScores = scoreAllForms(submittedForms, playedResults);
   const relevantIds = identifyRelevant(
-    targetFormId,
-    submittedForms,
-    baseScores,
-    remGroup,
-    remKO,
+    targetFormId, submittedForms, baseScores, remGroup, remKO,
   );
   const allIds = Object.keys(submittedForms);
+
+  // BUG #2 FIX: precompute R32 advancing predictions for every form once,
+  // derived from each form's predicted bracket (the stored advancing field
+  // is always {} — only the bracket-derived value is meaningful).
+  const formR32Preds: Record<string, string[]> = {};
+  for (const id of allIds) {
+    const predBracket = calcBracketTeams(submittedForms[id]?.matches || {});
+    formR32Preds[id] = deriveAdvancingTeams(predBracket).R32 || [];
+  }
 
   // ── Phase 1: greedy group stage ──
   onProgress?.("group", 15);
@@ -610,43 +591,32 @@ export function computeBestCase(
   for (const group of Object.keys(GROUPS)) {
     const groupRem = remGroup.filter((m) => m.group === group);
     if (!groupRem.length) continue;
-    const combo = bestGroupCombo(
-      group,
-      groupRem,
-      targetFormId,
-      relevantIds,
-      baseScores,
-      submittedForms,
-      playedResults,
+    Object.assign(
+      workingResults,
+      bestGroupCombo(
+        group, groupRem, targetFormId, relevantIds,
+        baseScores, submittedForms, playedResults, formR32Preds,
+      ),
     );
-    Object.assign(workingResults, combo);
   }
 
   // ── Phase 2: greedy knockout ──
   onProgress?.("knockout", 50);
   const afterGroupScores = scoreAllForms(submittedForms, workingResults);
-  const koRes = optimizeKnockout(
-    remKO,
+  Object.assign(
     workingResults,
-    targetFormId,
-    relevantIds,
-    afterGroupScores,
-    submittedForms,
+    optimizeKnockout(
+      remKO, workingResults, targetFormId, relevantIds,
+      afterGroupScores, submittedForms,
+    ),
   );
-  Object.assign(workingResults, koRes);
 
   // ── Phase 3: iterative refinement ──
   onProgress?.("refine", 65);
   const refined = refineGroups(
-    remGroup,
-    remKO,
-    workingResults,
-    targetFormId,
-    relevantIds,
-    submittedForms,
-    baseScores,
-    playedResults,
-    allIds,
+    remGroup, remKO, workingResults,
+    targetFormId, relevantIds, submittedForms,
+    baseScores, playedResults, allIds, formR32Preds,
   );
 
   // ── Phase 4: final rank ──

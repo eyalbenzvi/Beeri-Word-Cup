@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 import { computeBestCase } from "../utils/bestCase";
 
 self.onmessage = (e: MessageEvent) => {

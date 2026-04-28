@@ -15,8 +15,7 @@ export default function BestCasePanel({ formId, onReset }: Props) {
   useEffect(() => {
     reset();
     onReset?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formId]);
+  }, [formId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Not yet triggered
   if (state.phase === "idle") {
