@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
-import { preferredScrollBehavior } from "../utils/helpers";
+import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers";
 import MatchAnalysis from "./MatchAnalysis";
 import Score from "./Score";
 
@@ -185,7 +185,7 @@ function MatchCard({
             <span
               className={`text-xs font-medium ${importance === "knockout" || importance === "showcase" ? "text-secondary/90" : "text-ink-muted"}`}
             >
-              {match.label}
+              {flipMatchLabelForRtl(match.label)}
             </span>
           ) : <span />}
           <span className="text-xs text-ink-muted">

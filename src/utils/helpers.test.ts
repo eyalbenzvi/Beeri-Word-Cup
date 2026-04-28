@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  flipMatchLabelForRtl,
   isScoreValid,
   normalizeStatus,
   preferredScrollBehavior,
@@ -71,6 +72,24 @@ describe("preferredScrollBehavior", () => {
       throw new Error("matchMedia broken");
     });
     expect(preferredScrollBehavior()).toBe("smooth");
+  });
+});
+
+describe("flipMatchLabelForRtl", () => {
+  it("swaps the two sides of an 'X vs Y' label", () => {
+    expect(flipMatchLabelForRtl("1A vs 3rd place")).toBe("3rd place vs 1A");
+    expect(flipMatchLabelForRtl("2A vs 2B")).toBe("2B vs 2A");
+    expect(flipMatchLabelForRtl("W74 vs W77")).toBe("W77 vs W74");
+  });
+
+  it("returns the label unchanged when it has no 'vs' separator", () => {
+    expect(flipMatchLabelForRtl("Final")).toBe("Final");
+    expect(flipMatchLabelForRtl("3rd Place Match")).toBe("3rd Place Match");
+  });
+
+  it("handles empty / nullish input safely", () => {
+    expect(flipMatchLabelForRtl("")).toBe("");
+    expect(flipMatchLabelForRtl(undefined as any)).toBe(undefined);
   });
 });
 
