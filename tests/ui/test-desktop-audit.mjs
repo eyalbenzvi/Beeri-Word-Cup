@@ -4,6 +4,7 @@
 // - Layout main has no max-w-4xl cap
 // - Heebo font paired with Rubik in index.css
 import fs from "node:fs";
+import { readMigratedSrc, existsMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import path from "node:path";
 
 let passed = 0, failed = 0;
@@ -19,14 +20,14 @@ const scorePairFiles = [
   "src/components/UpcomingMatches.jsx",
 ];
 for (const f of scorePairFiles) {
-  const src = fs.readFileSync(f, "utf8");
+  const src = readMigratedSrc(f, "utf8");
   // Look for pattern: dir="ltr">...\d\s*[-–]\s*\d
   const hasScorePair = /dir="ltr"[^>]*>\s*\{?[^}]*\d[^<]*[–-]\s*\{?[^}]*\d/.test(src);
   assert(!hasScorePair, `${f}: no dir=ltr on score pairs (uses <bdi>)`);
 }
 
 // --- --color-ink-light contrast on white ---
-const cssSrc = fs.readFileSync("src/index.css", "utf8");
+const cssSrc = readMigratedSrc("src/index.css", "utf8");
 const inkLightMatch = cssSrc.match(/--color-ink-light:\s*#([0-9A-Fa-f]{6})/);
 assert(inkLightMatch, "--color-ink-light is defined");
 if (inkLightMatch) {
@@ -46,7 +47,7 @@ if (inkLightMatch) {
 }
 
 // --- Layout main has no max-w-4xl cap ---
-const layoutSrc = fs.readFileSync("src/components/Layout.jsx", "utf8");
+const layoutSrc = readMigratedSrc("src/components/Layout.jsx", "utf8");
 assert(!/<main[^>]*max-w-4xl/.test(layoutSrc), "main element is NOT capped at max-w-4xl");
 
 // --- Heebo font paired in index.css ---
@@ -54,14 +55,14 @@ assert(/heebo/i.test(cssSrc), "Heebo font is loaded in index.css");
 assert(/--font-heading/.test(cssSrc), "--font-heading token defined");
 
 // --- PageHeader exists ---
-assert(fs.existsSync("src/components/PageHeader.jsx"), "PageHeader.jsx exists");
+assert(existsMigratedSrc("src/components/PageHeader.jsx"), "PageHeader.jsx exists");
 
 // --- MatchdayHero exists ---
-assert(fs.existsSync("src/components/MatchdayHero.jsx"), "MatchdayHero.jsx exists");
+assert(existsMigratedSrc("src/components/MatchdayHero.jsx"), "MatchdayHero.jsx exists");
 
 // --- DesktopSideNav exists and exposes info drawer ---
-assert(fs.existsSync("src/components/DesktopSideNav.jsx"), "DesktopSideNav.jsx exists");
-const sideNavSrc = fs.readFileSync("src/components/DesktopSideNav.jsx", "utf8");
+assert(existsMigratedSrc("src/components/DesktopSideNav.jsx"), "DesktopSideNav.jsx exists");
+const sideNavSrc = readMigratedSrc("src/components/DesktopSideNav.jsx", "utf8");
 assert(/open-info-drawer/.test(sideNavSrc), "DesktopSideNav dispatches open-info-drawer event");
 
 // --- Layout nav does NOT use emoji strings for primary nav items ---

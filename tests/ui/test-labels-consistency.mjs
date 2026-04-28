@@ -3,6 +3,7 @@
 // Once a noun is centralised in LABELS, touching it in a single place updates
 // every surface (cards, leaderboard rows, CSV export, admin screens).
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -13,7 +14,7 @@ function assert(c, m) {
 
 console.log("=== LABELS CONSISTENCY TESTS ===\n");
 
-const messages = fs.readFileSync("src/constants/messages.js", "utf8");
+const messages = readMigratedSrc("src/constants/messages.js", "utf8");
 
 // --- 1. LABELS shape and canonical values ---
 assert(/export const LABELS/.test(messages), "messages.js exports LABELS");
@@ -51,7 +52,7 @@ const consumers = [
   "src/pages/AllForms.jsx",
 ];
 for (const file of consumers) {
-  const src = fs.readFileSync(file, "utf8");
+  const src = readMigratedSrc(file, "utf8");
   assert(
     /from ["']\.\.\/constants\/messages["']/.test(src) ||
       /from ["']\.\.\/\.\.\/constants\/messages["']/.test(src),
@@ -66,7 +67,7 @@ const filesThatOnceHadWrongGender = [
   "src/pages/Profile.jsx",
 ];
 for (const file of filesThatOnceHadWrongGender) {
-  const src = fs.readFileSync(file, "utf8");
+  const src = readMigratedSrc(file, "utf8");
   assert(!/מדויקות/.test(src), `${file}: no stale 'מדויקות' string`);
 }
 
@@ -85,7 +86,7 @@ const definiteOnly = [
   "src/components/AdminToolsTab.jsx",
 ];
 for (const file of definiteOnly) {
-  const src = fs.readFileSync(file, "utf8");
+  const src = readMigratedSrc(file, "utf8");
   // Allow the definite form "מלך השערים" but catch the indefinite "מלך שערים"
   // (not followed by ה).
   assert(

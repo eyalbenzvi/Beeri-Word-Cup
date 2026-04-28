@@ -18,6 +18,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { predictAllMatches } from '/home/user/Beeri-World-Cup/src/utils/fifaPredictor.js';
 import { groupMatches, knockoutMatches } from '/home/user/Beeri-World-Cup/src/data/matches.js';
 import { calcBracketTeams } from '/home/user/Beeri-World-Cup/src/utils/bracket.js';
@@ -312,7 +313,7 @@ section('3. Leaderboard canView / row-level privacy');
 // visibility guard or layout changes get undone by a later edit.
 section('4. Source-level regression guards');
 {
-  const leaderboardSrc = fs.readFileSync(
+  const leaderboardSrc = readMigratedSrc(
     path.resolve('/home/user/Beeri-World-Cup/src/pages/Leaderboard.jsx'),
     'utf8',
   );
@@ -334,7 +335,7 @@ section('4. Source-level regression guards');
     'Leaderboard passes topScorerName to FormSummaryLines',
   );
   // Icons now live in the shared FormSummaryLines component.
-  const summarySrc = fs.readFileSync(
+  const summarySrc = readMigratedSrc(
     path.resolve('/home/user/Beeri-World-Cup/src/components/FormSummaryLines.jsx'),
     'utf8',
   );
@@ -356,7 +357,7 @@ section('4. Source-level regression guards');
 }
 
 {
-  const simSrc = fs.readFileSync(
+  const simSrc = readMigratedSrc(
     path.resolve('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx'),
     'utf8',
   );
@@ -392,7 +393,7 @@ section('4. Source-level regression guards');
 }
 
 {
-  const predictSrc = fs.readFileSync(
+  const predictSrc = readMigratedSrc(
     path.resolve('/home/user/Beeri-World-Cup/src/pages/Predict.jsx'),
     'utf8',
   );
@@ -427,7 +428,7 @@ section('4. Source-level regression guards');
 // confirming the call site remained home-first.
 section('5. Simulator handleSaveResult mapping remains home-first');
 {
-  const simSrc = fs.readFileSync(
+  const simSrc = readMigratedSrc(
     path.resolve('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx'),
     'utf8',
   );

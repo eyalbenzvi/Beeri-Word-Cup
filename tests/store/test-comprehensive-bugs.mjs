@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -19,8 +20,23 @@ function assert(c, m) {
   else { failed++; failures.push(m); console.error("  FAIL: " + m); }
 }
 
+// Migration-aware reader: a file recorded as .js / .jsx may have already
+// migrated to .ts / .tsx. Try the original path first, then the swapped
+// extension. Caller stores under the historical key so the assertions
+// don't need to know which extension is actually on disk.
 function readSrc(relPath) {
-  return readFileSync(resolve(ROOT, relPath), "utf8");
+  try {
+    return readMigratedSrc(resolve(ROOT, relPath), "utf8");
+  } catch (e) {
+    const swap = { ".js": ".ts", ".jsx": ".tsx" };
+    for (const [from, to] of Object.entries(swap)) {
+      if (relPath.endsWith(from)) {
+        const swapped = relPath.slice(0, -from.length) + to;
+        try { return readMigratedSrc(resolve(ROOT, swapped), "utf8"); } catch { /* fall through */ }
+      }
+    }
+    throw e;
+  }
 }
 
 // Gather all JSX/JS source files

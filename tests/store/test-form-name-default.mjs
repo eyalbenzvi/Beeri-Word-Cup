@@ -8,6 +8,7 @@ import {
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..");
@@ -330,7 +331,7 @@ eq(
 
 // ============ 17. Caller contract: store.js wires this in ============
 console.log("--- 17. Static check: store.js wires the helper in ---");
-const storeSrc = readFileSync(resolve(ROOT, "src/store.js"), "utf8");
+const storeSrc = readMigratedSrc(resolve(ROOT,"src/store.js"), "utf8");
 assert(
   storeSrc.includes('from "./utils/formNameGenerator"'),
   "store.js imports the helper",
@@ -346,10 +347,7 @@ assert(
 
 // ============ 18. FormList uses the helper for placeholder + submit ============
 console.log("--- 18. FormList uses the helper ---");
-const formListSrc = readFileSync(
-  resolve(ROOT, "src/components/FormList.jsx"),
-  "utf8",
-);
+const formListSrc = readMigratedSrc(resolve(ROOT, "src/components/FormList.jsx"));
 assert(
   formListSrc.includes('from "../utils/formNameGenerator"'),
   "FormList imports the helper",
@@ -369,10 +367,7 @@ assert(
 
 // ============ 19. Existing unique-name validation still agrees with helper ============
 console.log("--- 19. Validation rule still references the same status set ---");
-const validSrc = readFileSync(
-  resolve(ROOT, "src/utils/formValidation.js"),
-  "utf8",
-);
+const validSrc = readMigratedSrc(resolve(ROOT, "src/utils/formValidation.js"));
 assert(
   /"submitted"/.test(validSrc) &&
     /"approved"/.test(validSrc) &&

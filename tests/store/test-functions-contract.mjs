@@ -20,6 +20,7 @@ const GROQ_UNSUPPORTED_PARAMS = ['timeout', 'api_key', 'apiKey', 'headers', 'bas
 
 // Read the function files and check for unsupported params
 import { readFileSync } from 'fs';
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 const matchFile = readFileSync('/home/user/Beeri-World-Cup/netlify/functions/match-analysis.js', 'utf8');
 
@@ -96,7 +97,7 @@ const jsxFiles = [
 ];
 
 for (const filePath of jsxFiles) {
-  const content = readFileSync(filePath, 'utf8');
+  const content = readMigratedSrc(filePath);
   const fileName = filePath.split('/').pop();
 
   // Look for render functions that call setState
@@ -118,7 +119,7 @@ for (const filePath of jsxFiles) {
 
 // ---- 12. Store: shared-doc safety guards ----
 console.log("--- 12. Firestore API contract ---");
-const storeFile = readFileSync('/home/user/Beeri-World-Cup/src/store.js', 'utf8');
+const storeFile = readMigratedSrc('/home/user/Beeri-World-Cup/src/store.js');
 // `merge: true` is permitted for the userDirectory + userPrivate dual-write
 // (PII migration Phase A) — those writes target per-uid subpaths where merge
 // is the correct tool. The historical concern was accidentally merging into

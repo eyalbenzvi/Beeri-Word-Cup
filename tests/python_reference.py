@@ -50,9 +50,16 @@ GROUP_PAIRINGS = [
 # ============ THIRD-PLACE TABLE (FIFA Annex C, extracted from Excel) ============
 # Load from our JS file
 def load_third_place_table():
-    import re
-    with open("/home/user/Beeri-World-Cup/src/data/thirdPlaceTable.js") as f:
-        content = f.read()
+    import re, os
+    # Source has migrated to .ts; try both for a clean failure mode.
+    for ext in ("ts", "js"):
+        path = f"/home/user/Beeri-World-Cup/src/data/thirdPlaceTable.{ext}"
+        if os.path.exists(path):
+            with open(path) as f:
+                content = f.read()
+            break
+    else:
+        raise FileNotFoundError("thirdPlaceTable not found in src/data/")
     entries = re.findall(r'(\w{8}):\s*"(\w{8})"', content)
     return dict(entries)
 

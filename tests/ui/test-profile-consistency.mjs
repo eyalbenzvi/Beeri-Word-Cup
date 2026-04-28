@@ -3,6 +3,7 @@
 // `form.champion` field (always null) and computed a custom rank that
 // disagreed with Leaderboard when two forms were tied.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -13,9 +14,9 @@ function assert(c, m) {
 
 console.log("=== PROFILE CONSISTENCY TESTS ===\n");
 
-const profile = fs.readFileSync("src/pages/Profile.jsx", "utf8");
-const adminTools = fs.readFileSync("src/components/AdminToolsTab.jsx", "utf8");
-const hook = fs.readFileSync("src/hooks/useLeaderboardComputed.js", "utf8");
+const profile = readMigratedSrc("src/pages/Profile.jsx", "utf8");
+const adminTools = readMigratedSrc("src/components/AdminToolsTab.jsx", "utf8");
+const hook = readMigratedSrc("src/hooks/useLeaderboardComputed.js", "utf8");
 
 // --- 1. Profile uses computed champion (parity with FormList/AllForms/Leaderboard) ---
 assert(

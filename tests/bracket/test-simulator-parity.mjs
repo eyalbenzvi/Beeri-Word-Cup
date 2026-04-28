@@ -10,6 +10,7 @@
 //   5. Resource issues: cache pollution, reference stability, perf bounds
 // ============================================================
 
+import { readMigratedSrc, existsMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { GROUPS } from '/home/user/Beeri-World-Cup/src/data/teams.js';
 import { groupMatches, knockoutMatches } from '/home/user/Beeri-World-Cup/src/data/matches.js';
 import {
@@ -363,7 +364,7 @@ console.log('--- Category 1: Real-result calculations corrupted by simulator ---
   ];
   const fs = await import('node:fs');
   for (const path of source) {
-    const src = fs.readFileSync(path, 'utf8');
+    const src = readMigratedSrc(path, 'utf8');
     assert(
       !/savePrediction|saveMatchResult|debouncedWriteForm/.test(src),
       `1e: SimulatorPanel must not call store-writing functions (${path})`,
@@ -673,11 +674,11 @@ console.log('\n--- Category 3: Admin vs user simulator produce identical results
 // 3c. Structural: SimulatorPanel is imported (shared) by both consumers.
 {
   const fs = await import('node:fs');
-  const adminSrc = fs.readFileSync(
+  const adminSrc = readMigratedSrc(
     '/home/user/Beeri-World-Cup/src/components/AdminToolsTab.jsx',
     'utf8',
   );
-  const statsSrc = fs.readFileSync(
+  const statsSrc = readMigratedSrc(
     '/home/user/Beeri-World-Cup/src/pages/Stats.jsx',
     'utf8',
   );
@@ -721,10 +722,10 @@ console.log('\n--- Category 4: Code duplication ---');
 {
   const fs = await import('node:fs');
   const simPath = '/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx';
-  const exists = fs.existsSync(simPath);
-  assert(exists, '4a: SimulatorPanel.jsx exists as shared component');
+  const exists = existsMigratedSrc(simPath);
+  assert(exists, '4a: SimulatorPanel exists as shared component');
   if (exists) {
-    const src = fs.readFileSync(simPath, 'utf8');
+    const src = readMigratedSrc(simPath, 'utf8');
     assert(
       /export default function SimulatorPanel/.test(src),
       '4a: SimulatorPanel has a default export',
@@ -743,7 +744,7 @@ console.log('\n--- Category 4: Code duplication ---');
 // 4b. No reimplementation of bracket/scoring logic inside SimulatorPanel.
 {
   const fs = await import('node:fs');
-  const src = fs.readFileSync(
+  const src = readMigratedSrc(
     '/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx',
     'utf8',
   );
@@ -759,7 +760,7 @@ console.log('\n--- Category 4: Code duplication ---');
 // 4c. AdminToolsTab no longer duplicates the simulator body.
 {
   const fs = await import('node:fs');
-  const src = fs.readFileSync(
+  const src = readMigratedSrc(
     '/home/user/Beeri-World-Cup/src/components/AdminToolsTab.jsx',
     'utf8',
   );
@@ -869,12 +870,13 @@ console.log('\n--- Category 5: Resource issues ---');
 // 5e. SimulatorPanel source is a single file, bounded size (< 20KB).
 {
   const fs = await import('node:fs');
-  const stat = fs.statSync(
-    '/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx',
-  );
+  // .jsx -> .tsx during the TypeScript migration; try both.
+  let stat;
+  try { stat = fs.statSync('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx'); }
+  catch { stat = fs.statSync('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.tsx'); }
   assert(
     stat.size < 20000,
-    `5e: SimulatorPanel.jsx size bounded (${stat.size} bytes)`,
+    `5e: SimulatorPanel size bounded (${stat.size} bytes)`,
   );
 }
 

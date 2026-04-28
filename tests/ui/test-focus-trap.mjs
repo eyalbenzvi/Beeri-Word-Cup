@@ -34,7 +34,8 @@ console.log("--- focusable selector ---");
 console.log("--- focus escape detection ---");
 {
   const fs = await import("node:fs/promises");
-  const src = await fs.readFile(new URL("../../src/hooks/useFocusTrap.js", import.meta.url), "utf8");
+  const { readMigratedSrc } = await import("../helpers/readMigratedSrc.mjs");
+  const src = readMigratedSrc("src/hooks/useFocusTrap.js");
   assert(src.includes("node.contains(current)"), "guards against focus leaving the container");
   assert(src.includes('e.key !== "Tab"'), "only intercepts Tab (not other keys)");
   assert(src.includes("previouslyFocused"), "restores previously-focused element on unmount");

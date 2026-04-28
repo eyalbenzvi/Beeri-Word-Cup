@@ -6,6 +6,7 @@
 // suppress per-button outlines inside; cards that are themselves the click
 // target keep .card-duo-hover.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -16,11 +17,11 @@ function assert(c, m) {
 
 console.log("=== CARD FOCUS / HOVER CONTRACT TESTS ===\n");
 
-const css = fs.readFileSync("src/index.css", "utf8");
-const formList = fs.readFileSync("src/components/FormList.jsx", "utf8");
-const results = fs.readFileSync("src/pages/Results.jsx", "utf8");
-const matchCard = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
-const leaderboard = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+const css = readMigratedSrc("src/index.css", "utf8");
+const formList = readMigratedSrc("src/components/FormList.jsx", "utf8");
+const results = readMigratedSrc("src/pages/Results.jsx", "utf8");
+const matchCard = readMigratedSrc("src/components/MatchCard.jsx", "utf8");
+const leaderboard = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 
 // --- FormList: card-duo-hover replaced with focus-within ring ---
 assert(

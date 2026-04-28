@@ -19,8 +19,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/vitest.setup.js"],
     include: [
-      "src/**/*.test.{js,jsx}",
-      "tests/vitest/**/*.test.{js,jsx}",
+      "src/**/*.test.{js,jsx,ts,tsx}",
+      "tests/vitest/**/*.test.{js,jsx,ts,tsx}",
     ],
     exclude: ["node_modules", "dist", ".netlify"],
     coverage: {

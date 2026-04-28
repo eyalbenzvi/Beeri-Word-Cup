@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 // Project-wide JSDoc-friendly type definitions.
 // These describe the data shapes that flow through src/store.js and the
 // scoring / bracket utilities. They aren't enforced at runtime — but
@@ -8,6 +10,7 @@
 // To use: in any .js / .jsx file, annotate with `@type {Form}` etc.
 
 declare global {
+
   /** A two-letter team code like "ARG", "ENG", "ISR". */
   type TeamCode = string;
 

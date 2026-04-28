@@ -9,6 +9,7 @@
 // Run: node tests/store/test-firestore-rules-pii.mjs
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -27,8 +28,8 @@ function assert(cond, msg) {
   }
 }
 
-const rules = readFileSync(resolve(ROOT, "firestore.rules"), "utf8");
-const store = readFileSync(resolve(ROOT, "src/store.js"), "utf8");
+const rules = readMigratedSrc(resolve(ROOT, "firestore.rules"), "utf8");
+const store = readMigratedSrc(resolve(ROOT, "src/store.js"), "utf8");
 
 console.log("=== FIRESTORE RULES — PII MIGRATION (Phase A) ===\n");
 
@@ -312,7 +313,7 @@ const migrated = [
   "src/components/SummaryEditor.jsx",
 ];
 for (const f of migrated) {
-  const src = readFileSync(resolve(ROOT, f), "utf8");
+  const src = readMigratedSrc(resolve(ROOT, f), "utf8");
   assert(
     /useUserDirectory/.test(src) && !/\buseUsers\(/.test(src),
     `${f} uses useUserDirectory and not useUsers()`,

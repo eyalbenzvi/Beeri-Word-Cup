@@ -2,6 +2,7 @@
 // Each section tests potential bugs from the corresponding fix
 
 import crypto from "crypto";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -947,8 +948,8 @@ console.log("--- 5.1: isBudgetValid shared helper (static checks) ---");
 
 {
   const fs = await import("node:fs");
-  const validationSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/utils/formValidation.js", "utf8");
-  const detailsSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/components/FormDetailsTab.jsx", "utf8");
+  const validationSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/utils/formValidation.js", "utf8");
+  const detailsSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/components/FormDetailsTab.jsx", "utf8");
 
   // Helper exists and exposes the named constants used by both call sites.
   assert(/export function isBudgetValid\(/.test(validationSrc), "isBudgetValid is exported");
@@ -996,8 +997,8 @@ console.log("--- 5.2: adminDeleteForm error contract ---");
 
 {
   const fs = await import("node:fs");
-  const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
-  const adminTabSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/components/AdminFormsTab.jsx", "utf8");
+  const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+  const adminTabSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/components/AdminFormsTab.jsx", "utf8");
 
   // Function shape: declares return values + try/catch around deleteDoc.
   const fnMatch = storeSrc.match(/export async function adminDeleteForm\(formId\)\s*\{([\s\S]*?)\n\}\n/);
@@ -1028,7 +1029,7 @@ console.log("--- 5.3: Optimistic write revert on permission-denied ---");
 
 {
   const fs = await import("node:fs");
-  const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+  const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
 
   assert(storeSrc.includes("function revertOptimisticForm"), "revertOptimisticForm helper exists");
 

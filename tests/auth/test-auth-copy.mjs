@@ -2,6 +2,7 @@
 // The older copy "הצטרף למשחק קודם" is the user-facing "title" — it
 // contradicted the CTA "התחבר למשחק". Consolidated in constants/messages.js.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -12,8 +13,8 @@ function assert(c, m) {
 
 console.log("=== AUTH COPY TESTS ===\n");
 
-const messages = fs.readFileSync("src/constants/messages.js", "utf8");
-const predict = fs.readFileSync("src/pages/Predict.jsx", "utf8");
+const messages = readMigratedSrc("src/constants/messages.js", "utf8");
+const predict = readMigratedSrc("src/pages/Predict.jsx", "utf8");
 
 // --- Constants file exports AUTH_COPY with the consolidated title ---
 assert(/AUTH_COPY/.test(messages), "messages.js exports AUTH_COPY");

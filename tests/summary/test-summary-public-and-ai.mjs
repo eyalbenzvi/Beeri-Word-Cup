@@ -3,6 +3,7 @@
 // run them end-to-end from Node; we assert that the guardrails exist in
 // source form. Complements the dynamic summary-stats test suite.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -15,7 +16,7 @@ console.log("=== SUMMARY PUBLIC + AI AUDIT ===\n");
 
 // ============ 1. Public-readonly mode ============
 console.log("--- 1. public-readonly mode in store.js ---");
-const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
 assert(storeSrc.includes("initPublicReadonlyMode"), "public init exported");
 assert(storeSrc.includes("teardownPublicReadonlyMode"), "public teardown exists");
 assert(/initRealtimeListeners[\s\S]*?teardownPublicReadonlyMode/.test(storeSrc),
@@ -115,7 +116,7 @@ assert(/teardownPublicReadonlyMode[\s\S]*?clearTimeout\(\s*publicReadinessWatchd
 
 // ============ 2. App.jsx gating ============
 console.log("--- 2. App.jsx blog bypass ---");
-const appSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/App.jsx", "utf8");
+const appSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/App.jsx", "utf8");
 assert(appSrc.includes("initPublicReadonlyMode"), "App imports public init");
 assert(/page\s*===\s*"blog"/.test(appSrc), "blog page gets bypass branch");
 assert(/!isLoggedIn[\s\S]{0,200}page\s*===\s*"blog"/.test(appSrc),
@@ -123,7 +124,7 @@ assert(/!isLoggedIn[\s\S]{0,200}page\s*===\s*"blog"/.test(appSrc),
 
 // ============ 3. firestore.rules hardened shape ============
 console.log("--- 3. firestore.rules shape caps ---");
-const rulesSrc = fs.readFileSync("/home/user/Beeri-World-Cup/firestore.rules", "utf8");
+const rulesSrc = readMigratedSrc("/home/user/Beeri-World-Cup/firestore.rules", "utf8");
 assert(/d\.title\.size\(\)\s*<=\s*300/.test(rulesSrc), "title size cap");
 assert(/d\.intro\.size\(\)\s*<=\s*20000/.test(rulesSrc), "intro size cap");
 assert(/d\.conclusion\.size\(\)\s*<=\s*20000/.test(rulesSrc), "conclusion size cap");
@@ -136,7 +137,7 @@ assert(/request\.resource\.data\.createdAt\s*==\s*resource\.data\.createdAt/.tes
 
 // ============ 4. summary-ai.js hardening ============
 console.log("--- 4. summary-ai.js hardening ---");
-const aiSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/summary-ai.js", "utf8");
+const aiSrc = readMigratedSrc("/home/user/Beeri-World-Cup/netlify/functions/summary-ai.js", "utf8");
 assert(aiSrc.includes("verifyIdToken"), "verifies Firebase ID token");
 assert(/caller\.isAdmin/.test(aiSrc), "rejects non-admin callers");
 assert(aiSrc.includes("checkRateLimit"), "rate-limits per uid");
@@ -153,7 +154,7 @@ assert(/validSummaryShape|typeof\s+out\?\.title\s*!==\s*"string"/.test(aiSrc),
 
 // ============ 5. og-summary.js safety ============
 console.log("--- 5. og-summary.js safety ---");
-const ogSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/og-summary.js", "utf8");
+const ogSrc = readMigratedSrc("/home/user/Beeri-World-Cup/netlify/functions/og-summary.js", "utf8");
 assert(ogSrc.includes("escapeHtml"), "HTML-escapes dynamic meta values");
 assert(/where\("status",\s*"==",\s*"published"\)/.test(ogSrc),
   "og-summary only reads published summaries");
@@ -165,7 +166,7 @@ assert(/refresh[^"]*url=/.test(ogSrc) || /window\.location\.replace/.test(ogSrc)
 
 // ============ 6. netlify.toml rewrite ============
 console.log("--- 6. netlify.toml redirect ---");
-const tomlSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify.toml", "utf8");
+const tomlSrc = readMigratedSrc("/home/user/Beeri-World-Cup/netlify.toml", "utf8");
 assert(tomlSrc.includes("/blog/:n"), "pretty URL for blog");
 assert(tomlSrc.includes("og-summary"), "redirect target is the OG function");
 

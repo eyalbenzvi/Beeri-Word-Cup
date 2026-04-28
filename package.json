@@ -8,10 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:legacy": "./tests/run-all.sh",
-    "test:all": "vitest run && ./tests/run-all.sh"
+    "test:all": "tsc --noEmit && vitest run && ./tests/run-all.sh"
   },
   "dependencies": {
     "@fontsource/heebo": "^5.2.8",
@@ -34,6 +35,8 @@
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vitejs/plugin-react": "^6.0.1",
     "esbuild": "^0.28.0",
     "eslint": "^9.39.4",
@@ -41,6 +44,8 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "jsdom": "^29.1.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
     "vite": "^8.0.1",
     "vitest": "^4.1.5"
   }

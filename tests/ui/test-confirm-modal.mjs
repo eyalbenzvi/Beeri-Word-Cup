@@ -2,6 +2,7 @@
 // argument produce the same promise-based API. Focus is on the data shape
 // (since we can't drive Promise resolution without a React renderer).
 import fs from "node:fs/promises";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -9,10 +10,7 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 
 console.log("=== ConfirmModal TESTS ===\n");
 
-const src = await fs.readFile(
-  new URL("../../src/components/ConfirmModal.jsx", import.meta.url),
-  "utf8",
-);
+const src = readMigratedSrc("src/components/ConfirmModal.jsx");
 
 console.log("--- API contract ---");
 // 1. Accepts both string and object form

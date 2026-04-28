@@ -1,0 +1,25 @@
+{
+  "_comment": "TypeScript configuration. allowJs:true keeps the existing .js/.jsx tree compilable while files are migrated one directory at a time. strict flags are enabled INCREMENTALLY: noImplicitAny -> strictNullChecks -> full strict. Each tightening lands as its own commit on the migration branch. After all files convert, allowJs is dropped.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "checkJs": false,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "types": ["@testing-library/jest-dom"],
+    "verbatimModuleSyntax": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", ".netlify", "tests/**/*.mjs"]
+}

@@ -9,6 +9,7 @@
  */
 
 import { readFileSync } from "fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,8 +23,8 @@ function assert(c, m) {
   else { failed++; failures.push(m); console.error("  FAIL: " + m); }
 }
 
-const matchCardSrc = readFileSync(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
-const matchAnalysisSrc = readFileSync(resolve(ROOT, "src/components/MatchAnalysis.jsx"), "utf8");
+const matchCardSrc = readMigratedSrc(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
+const matchAnalysisSrc = readMigratedSrc(resolve(ROOT, "src/components/MatchAnalysis.jsx"), "utf8");
 
 // ============================================================
 // 1. MatchCard must pass bracket-derived codes, not match.homeTeam/awayTeam
@@ -264,7 +265,13 @@ const matchAnalysisSrc = readFileSync(resolve(ROOT, "src/components/MatchAnalysi
 // ============================================================
 
 {
-  const matchesSrc = readFileSync(resolve(ROOT, "src/data/matches.js"), "utf8");
+  // matches has migrated from .js to .ts; try both for a clean failure mode.
+  let matchesSrc;
+  try {
+    matchesSrc = readMigratedSrc(resolve(ROOT, "src/data/matches.js"), "utf8");
+  } catch {
+    matchesSrc = readMigratedSrc(resolve(ROOT, "src/data/matches.ts"), "utf8");
+  }
 
   // 8.1 Knockout matches explicitly set homeTeam: null
   const hasNullHome = /homeTeam:\s*null/.test(matchesSrc);

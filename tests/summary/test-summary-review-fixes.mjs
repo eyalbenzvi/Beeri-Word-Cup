@@ -3,6 +3,7 @@
 // Static audits — Firestore/Netlify are not available in Node, so we
 // assert the source has the correct guardrails in place.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -13,7 +14,7 @@ function assert(cond, msg) {
 
 console.log("=== SUMMARY REVIEW FIXES ===\n");
 
-const R = (p) => fs.readFileSync(p, "utf8");
+const R = (p) => readMigratedSrc(p);
 const nav = R("/home/user/Beeri-World-Cup/src/hooks/useNavigation.jsx");
 const store = R("/home/user/Beeri-World-Cup/src/store.js");
 const app = R("/home/user/Beeri-World-Cup/src/App.jsx");

@@ -1,15 +1,18 @@
 // Tests for Profile, ProfileSetup, FormIconPicker features
 import { readFileSync, existsSync } from 'fs';
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
 function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); console.error("  FAIL: " + m); } }
 
 const SRC = '/home/user/Beeri-World-Cup/src';
-const read = (f) => readFileSync(f, 'utf8');
+const read = (f) => readMigratedSrc(f);
 // Tolerate optional files (component may have been removed); test blocks
 // guarded by `tryRead` skip cleanly instead of crashing the whole suite.
-const tryRead = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : null);
+const tryRead = (f) => {
+  try { return readMigratedSrc(f); } catch { return null; }
+};
 
 console.log("=== PROFILE FEATURES TESTS ===\n");
 

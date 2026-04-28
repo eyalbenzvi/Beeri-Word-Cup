@@ -2,6 +2,7 @@
 // for MatchCard +/− buttons. (The Leaderboard top-3 podium block was
 // removed by user request — see PR fix-scores-mobile-layout.)
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -12,8 +13,8 @@ function assert(c, m) {
 
 console.log("=== TAP TARGETS TESTS ===\n");
 
-const css = fs.readFileSync("src/index.css", "utf8");
-const matchCard = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
+const css = readMigratedSrc("src/index.css", "utf8");
+const matchCard = readMigratedSrc("src/components/MatchCard.jsx", "utf8");
 
 // --- CSS utility exists and is gated on pointer:coarse ---
 assert(
@@ -37,7 +38,7 @@ assert(
 
 // --- Leaderboard top-3 podium was removed by user request; assert it stays
 //     gone so a future re-add doesn't slip in without a tap-target review.
-const leaderboard = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+const leaderboard = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 assert(
   !/grid-cols-3[\s\S]{0,200}podium-gold[\s\S]{0,500}podium-silver[\s\S]{0,500}podium-bronze/.test(leaderboard),
   "Leaderboard top-3 podium block stays removed",

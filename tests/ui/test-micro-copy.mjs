@@ -1,6 +1,7 @@
 // Regression lock: critical UI strings that MUST NOT change (contract with users
 // or with other tests), and assertions that new copy is in place.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -8,8 +9,8 @@ function assert(c, m) { if (c) passed++; else { failed++; failures.push(m); cons
 
 console.log("=== MICRO-COPY CONTRACT TESTS ===\n");
 
-const homeSrc = fs.readFileSync("src/pages/Home.jsx", "utf8");
-const lockMessagesSrc = fs.readFileSync("src/constants/messages.js", "utf8");
+const homeSrc = readMigratedSrc("src/pages/Home.jsx", "utf8");
+const lockMessagesSrc = readMigratedSrc("src/constants/messages.js", "utf8");
 
 // --- LOCKED STRINGS (per CLAUDE.md) ---
 // The canonical copy now lives in constants/messages.js; Home consumes it via
@@ -49,7 +50,7 @@ assert(
 );
 
 // Predict submit toast
-const predictSrc = fs.readFileSync("src/pages/Predict.jsx", "utf8");
+const predictSrc = readMigratedSrc("src/pages/Predict.jsx", "utf8");
 assert(
   predictSrc.includes("נקלט") || predictSrc.includes("בהצלחה"),
   "Predict submit toast has short Hebrew copy"
@@ -60,7 +61,7 @@ assert(
 );
 
 // Profile save toast
-const profileSrc = fs.readFileSync("src/pages/Profile.jsx", "utf8");
+const profileSrc = readMigratedSrc("src/pages/Profile.jsx", "utf8");
 assert(
   profileSrc.includes("עדכנתי") || profileSrc.includes("הפרופיל נשמר"),
   "Profile save toast present (either new or old acceptable)"

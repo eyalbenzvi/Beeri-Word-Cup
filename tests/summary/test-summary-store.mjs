@@ -3,6 +3,7 @@
 //   1) Re-implement the pure helpers and assert their behavior.
 //   2) Static-audit the real source files to verify the guardrails exist.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -118,7 +119,7 @@ assert(nextSummaryNumber({ a: { number: 2 } }) === 3,
 
 // ============ 2. store.js source audit ============
 console.log("--- 2. store.js source audit ---");
-const storeSrc = fs.readFileSync("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
 assert(storeSrc.includes("summariesCollectionRef"), "summariesCollectionRef declared");
 assert(storeSrc.includes("setupSummariesListener"), "listener function declared");
 assert(storeSrc.includes('where("status", "==", "published")'),
@@ -136,7 +137,7 @@ assert(/number:\s*_dropNumber/.test(storeSrc),
 
 // ============ 3. firestore.rules audit ============
 console.log("--- 3. firestore.rules audit ---");
-const rulesSrc = fs.readFileSync("/home/user/Beeri-World-Cup/firestore.rules", "utf8");
+const rulesSrc = readMigratedSrc("/home/user/Beeri-World-Cup/firestore.rules", "utf8");
 assert(rulesSrc.includes("match /summaries/"), "summaries rule block present");
 assert(/allow\s+read:\s*if\s+resource\.data\.status\s*==\s*'published'\s*\|\|\s*isAdmin\(\)/.test(rulesSrc),
   "summaries read rule: published OR admin");
