@@ -35,42 +35,34 @@ import {
   maybeRefreshToken,
 } from "./firestoreClient";
 import { logAdminAction, getAuditLog, writeAuditLog } from "./audit";
+import {
+  cache,
+  notifyAndEmit,
+  notifyAllListeners,
+  emitSaving,
+  emitSaved,
+  emitWriteError,
+  isStoreReady,
+  getMissingReadyKeys,
+  subscribe,
+  subscribeToKey,
+  openBroadcastChannel,
+  closeBroadcastChannel,
+  broadcastActiveFormChange,
+} from "./cache";
 
-export { commitInBatches, logAdminAction, getAuditLog };
+export {
+  commitInBatches,
+  logAdminAction,
+  getAuditLog,
+  isStoreReady,
+  getMissingReadyKeys,
+  subscribe,
+  subscribeToKey,
+};
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
-
-type CacheShape = {
-  users: Record<string, any>;
-  userDirectory: Record<string, any>;
-  userPrivate: Record<string, any>;
-  predictions: Record<string, any>;
-  matchResults: Record<string, any>;
-  actualAdvancing: Record<string, any>;
-  actualBonuses: any;
-  settings: Record<string, any>;
-  summaries: Record<string, any>;
-  _ready: Record<string, boolean>;
-};
-const cache: CacheShape = {
-  users: {},
-  // {uid: {displayName, firstName?, lastName?}} — auth-readable directory.
-  userDirectory: {},
-  // {uid: {email, isAdmin, profileCompleted, lastLoginAt, createdAt, ...}}
-  // For non-admin users: own record only (rules permit owner-read only).
-  // For admin users: still own record only on the listener side; admin tabs
-  // continue to read legacy `users` for the full membership during the
-  // compat window.
-  userPrivate: {},
-  predictions: {}, // formId -> formData (assembled from individual docs)
-  matchResults: {},
-  actualAdvancing: {},
-  actualBonuses: { champion: null, topScorers: [] },
-  settings: { predictionsLocked: false },
-  summaries: {}, // summaryId -> summaryData
-  _ready: {},
-};
 
 import { MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 
@@ -411,23 +403,6 @@ function flushPendingWrites() {
       console.error(`Failed to clone for flush ${key}:`, err);
     }
   }
-}
-
-function notifyAndEmit(key) {
-  window.dispatchEvent(new CustomEvent("store-updated", { detail: { key } }));
-}
-function emitSaving(key) {
-  window.dispatchEvent(new CustomEvent("store-saving", { detail: { key } }));
-}
-function emitSaved(key) {
-  window.dispatchEvent(new CustomEvent("store-saved", { detail: { key } }));
-}
-function emitWriteError(key, error) {
-  window.dispatchEvent(
-    new CustomEvent("store-write-error", {
-      detail: { key, error: error?.message || String(error) },
-    }),
-  );
 }
 
 export function hasPendingWrites() {
@@ -1098,77 +1073,6 @@ function setupUserPrivateListener(userId) {
   );
 }
 
-export function isStoreReady() {
-  return (
-    Object.keys(DOCS).every((k) => cache._ready[k]) && cache._ready.predictions
-  );
-}
-
-export function getMissingReadyKeys() {
-  const missing = [];
-  for (const k of Object.keys(DOCS)) if (!cache._ready[k]) missing.push(k);
-  if (!cache._ready.predictions) missing.push("predictions");
-  return missing;
-}
-
-// ============ SUBSCRIPTIONS ============
-
-type Listener = () => void;
-const listeners = new Set<Listener>();
-const keyedListeners = new Map<string, Set<Listener>>();
-
-export function subscribe(listener: Listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-// Subscribe only to changes for a specific key (e.g., "predictions", "users")
-export function subscribeToKey(key, listener) {
-  if (!keyedListeners.has(key)) keyedListeners.set(key, new Set());
-  keyedListeners.get(key).add(listener);
-  return () => {
-    const set = keyedListeners.get(key);
-    if (set) { set.delete(listener); if (set.size === 0) keyedListeners.delete(key); }
-  };
-}
-
-function notifyListeners(event?: any) {
-  for (const listener of listeners) listener();
-  // Also notify keyed listeners
-  const key = event?.detail?.key;
-  if (key && keyedListeners.has(key)) {
-    for (const listener of keyedListeners.get(key)!) listener();
-  }
-}
-
-// Registered once at module load — notifyListeners dispatched via notifyAndEmit
-if (!(window as any).__storeListenerRegistered) {
-  (window as any).__storeListenerRegistered = true;
-  window.addEventListener("store-updated", notifyListeners as EventListener);
-}
-
-// Cross-tab sync: notify other tabs when active form changes
-let broadcastChannel = null;
-function openBroadcastChannel() {
-  if (broadcastChannel) return; // already open
-  try {
-    broadcastChannel = new BroadcastChannel("beeri-wc-sync");
-    broadcastChannel.onmessage = (event) => {
-      if (event.data?.type === "activeForm-changed") {
-        // Another tab changed the active form — re-read from localStorage
-        notifyAndEmit("activeForm");
-      }
-    };
-  } catch {
-    // BroadcastChannel not supported — graceful fallback (no cross-tab sync)
-  }
-}
-function closeBroadcastChannel() {
-  try { broadcastChannel?.close(); } catch { /* already closed */ }
-  broadcastChannel = null;
-}
-openBroadcastChannel();
-
 // ============ USERS ============
 
 const EMPTY_OBJ = {};
@@ -1395,7 +1299,7 @@ export async function deleteUser(userId) {
     delete cache.predictions[fid];
   }
   cache.predictions = { ...cache.predictions };
-  notifyListeners();
+  notifyAllListeners();
 
   writeAuditLog("user-delete", {
     targetUser: userId,
@@ -1514,7 +1418,7 @@ export function getActiveFormId() {
 export function setActiveFormId(formId) {
   localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
   notifyAndEmit("activeForm");
-  try { broadcastChannel?.postMessage({ type: "activeForm-changed" }); } catch {}
+  broadcastActiveFormChange();
 }
 
 // ============ PREDICTIONS (PER-FORM DOCUMENTS) ============

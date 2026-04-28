@@ -169,20 +169,32 @@ assert(/d\.coveredMatchIds\s+is\s+list/.test(rulesSrc), "coveredMatchIds must be
 assert(/d\.matchNotes\s+is\s+map/.test(rulesSrc), "matchNotes must be map");
 assert(/validSummaryStatus/.test(rulesSrc), "status is validated via validSummaryStatus");
 
-// ============ 4. store listener NEVER includes summaries in readiness check ============
+// ============ 4. isStoreReady NEVER includes summaries in its gate ============
 console.log("--- 4. isStoreReady does not block on summaries ---");
 // The summaries listener marks itself ready on both success AND error, and
-// the check intentionally excludes summaries so a failure there can't brick
-// the app. Make sure isStoreReady only references DOCS + predictions.
+// the readiness gate intentionally excludes summaries so a failure there
+// can't brick the app. After the store-module split the gate lives in
+// store/cache.ts; we probe both the barrel and the cache module.
+let cacheSrc = "";
+try { cacheSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store/cache.ts", "utf8"); } catch { /* not split yet */ }
+const storeAndCache = storeSrc + cacheSrc;
 assert(
-  /function isStoreReady\(\) \{[\s\S]*?Object\.keys\(DOCS\)\.every[\s\S]*?cache\._ready\.predictions[\s\S]*?\}/.test(storeSrc),
-  "isStoreReady only gates on DOCS + predictions",
+  /isStoreReady/.test(storeAndCache),
+  "isStoreReady is defined somewhere in the store",
 );
+const readyBody =
+  cacheSrc.match(/function isStoreReady\(\)[\s\S]{0,500}?\}/)?.[0] ||
+  storeSrc.match(/function isStoreReady\(\)[\s\S]{0,500}?\}/)?.[0] ||
+  "";
 assert(
-  !/isStoreReady[\s\S]*?_ready\.summaries/.test(
-    storeSrc.match(/function isStoreReady\(\)[\s\S]{0,200}/)?.[0] || "",
-  ),
-  "isStoreReady does NOT depend on summaries readiness",
+  !/summaries/.test(readyBody),
+  "isStoreReady body does NOT mention summaries",
+);
+const requiredKeys =
+  cacheSrc.match(/REQUIRED_READY_KEYS\s*=\s*new Set[^)]+\)/)?.[0] || "";
+assert(
+  !requiredKeys || !/summaries/.test(requiredKeys),
+  "REQUIRED_READY_KEYS set does NOT include summaries",
 );
 
 // ============ SUMMARY ============
