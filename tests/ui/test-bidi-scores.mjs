@@ -48,7 +48,10 @@ console.log("=== BIDI SCORES STATIC AUDIT ===\n");
 // === 1. No legacy `dir="ltr"` score wrappers anywhere ===
 const SCORE_FILES = [
   "src/components/MatchCard.jsx",
-  "src/pages/AllForms.jsx",
+  // The match-row rendering originally lived inline in AllForms.jsx and
+  // was extracted to FormMatchesView so it could be reused by both the
+  // AllForms list and the BestCasePanel scenario view.
+  "src/components/FormMatchesView.jsx",
   "src/components/UpcomingMatches.jsx",
   "src/pages/Leaderboard.jsx",
   "src/components/SummaryEditor.jsx",
@@ -82,10 +85,13 @@ const SCORE_CONSUMERS = [
     // explicit or shorthand if a future refactor switches.
   },
   {
-    file: "src/pages/AllForms.jsx",
-    importRe: /import\s+Score\s+from\s+["']\.\.\/components\/Score["']/,
+    // Score row was extracted from AllForms into FormMatchesView so it
+    // could be reused by both the form-detail accordion and the
+    // BestCasePanel scenario overlay. Import path is sibling now.
+    file: "src/components/FormMatchesView.jsx",
+    importRe: /import\s+Score\s+from\s+["']\.\/Score["']/,
     requiredProps: [
-      /home=\{prediction\.homeScore\}\s+away=\{prediction\.awayScore\}/,
+      /home=\{prediction\!?\.homeScore\}\s+away=\{prediction\!?\.awayScore\}/,
     ],
   },
   {
