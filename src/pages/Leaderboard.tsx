@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
@@ -27,6 +27,12 @@ const allMatchesMap = Object.fromEntries(
 // Pagination chunk for the ranked list — load this many initially and add
 // the same again each time the user clicks "show more".
 const PAGE_SIZE = 20;
+
+// Auto-scroll grace period: enough for `content-visibility: auto` cards to
+// finalise their intrinsic-size paint so getBoundingClientRect lands on the
+// actual element. Below ~120ms the scroll lands a few hundred pixels off on
+// long lists.
+const AUTO_SCROLL_DELAY_MS = 150;
 
 // Compact stage labels for the "נקודות עליה" badges. Intentionally shorter
 // than STAGES (e.g. "שמינית" not "שמינית גמר") so the chips fit on a phone
@@ -57,9 +63,51 @@ export default function Leaderboard({
   );
   const [selectedForm, setSelectedForm] = useState(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
+  const autoScrolledRef = useRef(false);
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
+
+  // Find every form belonging to the current user, sorted by rank ascending
+  // (best first). On the locked tournament view this powers the "your forms:
+  // #5, #23, #87" jump list and the auto-scroll to the user's best entry.
+  const myForms = useMemo(() => {
+    if (!user?.id) return [];
+    return rankedLeaderboard.filter((e) => e.userId === user.id);
+  }, [rankedLeaderboard, user?.id]);
+
+  // Smooth jump to a leaderboard row, expanding the page-size if the row
+  // would otherwise be clipped behind "show more". Used by both the
+  // auto-scroll effect below and the user-controlled "קפוץ" buttons.
+  const jumpToForm = (formId: string) => {
+    const idx = rankedLeaderboard.findIndex((e) => e.formId === formId);
+    if (idx < 0) return;
+    if (idx + 1 > showCount) {
+      const grow = Math.ceil((idx + 1) / PAGE_SIZE) * PAGE_SIZE;
+      setShowCount(grow);
+    }
+    setTimeout(() => {
+      const el = document.getElementById(`lb-form-${formId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, AUTO_SCROLL_DELAY_MS);
+  };
+
+  // Auto-scroll once per page entry to the user's best-ranked form, but only
+  // if it's outside the initial visible page (otherwise scrolling past
+  // pos #1-3 just to show the user their #5 is more annoying than helpful).
+  // Skipped in embedded admin preview, when a form is being inspected, or
+  // when the user has 0/1 forms — the latter is auto-pinned anyway.
+  useEffect(() => {
+    if (embedded || selectedForm || autoScrolledRef.current) return;
+    if (myForms.length === 0) return;
+    const best = myForms[0];
+    const idx = rankedLeaderboard.findIndex((e) => e.formId === best.formId);
+    if (idx < 0) return;
+    autoScrolledRef.current = true;
+    if (idx < PAGE_SIZE) return; // already on the first screen, no scroll needed
+    jumpToForm(best.formId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myForms, rankedLeaderboard, embedded, selectedForm]);
 
   // Rank delta: compare current rank per formId with the rank we saw last
   // visit. Stored in localStorage under "beeri:prevRanks". Deltas show for 3s
@@ -291,6 +339,27 @@ export default function Leaderboard({
         renderFormDetail()
       ) : (
         <>
+          {!embedded && myForms.length > 1 && (
+            <div
+              className="card-duo mb-3"
+              style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
+            >
+              <div className="text-xs font-extrabold text-ink mb-2">
+                הטפסים שלך:
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {myForms.map((f) => (
+                  <button
+                    key={f.formId}
+                    onClick={() => jumpToForm(f.formId)}
+                    className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-white border-2 border-primary text-primary-dark cursor-pointer hover:bg-primary-soft"
+                  >
+                    #{f.rank} · {f.formName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             {rankedLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
@@ -316,6 +385,7 @@ export default function Leaderboard({
               return (
                 <button
                   key={entry.formId}
+                  id={`lb-form-${entry.formId}`}
                   onClick={() => {
                     if (canView) setSelectedForm(entry.formId);
                   }}

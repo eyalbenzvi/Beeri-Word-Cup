@@ -5,11 +5,21 @@ const NavigationContext = createContext<any>(null);
 // Pages supported via URL query parameters. Only these are rehydrated from
 // `?page=...` on load, so bogus or legacy values can't drop the user onto
 // an unrendered page.
-const URL_PAGES = new Set(["home", "predict", "leaderboard", "results", "stats", "admin", "profile", "blog"]);
+const URL_PAGES = new Set(["home", "predict", "leaderboard", "results", "stats", "admin", "profile", "blog", "simulator"]);
 
 // Query-string params we care about. Anything else is preserved on navigation
 // via URLSearchParams.
-const KNOWN_PARAM_KEYS = ["n"];
+//   n       — summary index (blog deep links)
+//   form    — active form id under /predict
+//   stage   — predict stage selector (group/R32/R16/QF/SF/3RD/F)
+//   group   — predict group selector (A..L)
+//   view    — predict sub-view (e.g. "all" → AllForms)
+//   tab     — page-internal tab (e.g. Stats: matches/teams/forms)
+//   modal   — top-level dialog (review/search/scenario/aiprogress)
+const KNOWN_PARAM_KEYS = ["n", "form", "stage", "group", "view", "tab", "modal"];
+
+// Modals that are valid to express via ?modal=… — bogus values are ignored.
+export const VALID_MODALS = new Set(["review", "search", "scenario", "aiprogress"]);
 
 function readInitialFromURL() {
   if (typeof window === "undefined") return { page: "home", params: {} as Record<string, string> };
@@ -88,14 +98,45 @@ export function NavigationProvider({ children }: { children: any }) {
   // default (false) pushes a new history entry so Back/Forward works.
   // `behavior: "auto"` is the spec value for an instant scroll; older code
   // used the non-standard "instant" alias which most browsers tolerate.
-  const navigate = useCallback((p: string, nextParams: Record<string, any> = {}, options: { replace?: boolean } = {}) => {
+  // `options.scroll`: false to keep current scroll (e.g. opening a modal —
+  // we don't want the page to jump while a dialog appears overlaid).
+  const navigate = useCallback((p: string, nextParams: Record<string, any> = {}, options: { replace?: boolean; scroll?: boolean } = {}) => {
     setPage(p);
     setParams(nextParams || {});
     writeURL(p, nextParams || {}, { replace: !!options.replace });
-    window.scrollTo({ top: 0, behavior: "auto" });
+    if (options.scroll !== false) window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
 
-  const value = useMemo(() => ({ page, params, navigate }), [page, params, navigate]);
+  // Merge a partial param patch into the current params, preserving the page.
+  // Use for in-page state (e.g. opening a modal or switching a tab) where
+  // we don't want to clobber sibling params. Pass null/undefined/"" to drop
+  // a key. Defaults to { replace: false, scroll: false } since most in-page
+  // updates are visual overlays where we want Back to undo, but no scroll.
+  const setParamsPatch = useCallback(
+    (patch: Record<string, any>, options: { replace?: boolean; scroll?: boolean } = {}) => {
+      setParams((prev) => {
+        const next: Record<string, any> = { ...prev };
+        for (const [k, v] of Object.entries(patch)) {
+          if (v == null || v === "") delete next[k];
+          else next[k] = String(v);
+        }
+        setPage((curPage) => {
+          writeURL(curPage, next, { replace: !!options.replace });
+          return curPage;
+        });
+        if (options.scroll === true) {
+          try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* noop */ }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const value = useMemo(
+    () => ({ page, params, navigate, setParamsPatch }),
+    [page, params, navigate, setParamsPatch],
+  );
 
   return (
     <NavigationContext.Provider value={value}>

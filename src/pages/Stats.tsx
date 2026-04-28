@@ -6,6 +6,7 @@ import {
   useSettings,
   useCurrentUser,
 } from "../hooks/useStore";
+import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
@@ -14,6 +15,8 @@ import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
+
+const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
 const allMatches = [...groupMatches, ...knockoutMatches];
 
@@ -369,8 +372,13 @@ function GeneralStats({ forms, results }) {
 }
 
 // ============ SEARCH ============
-function SearchStats({ forms, playerList }) {
-  const [query, setQuery] = useState("");
+function SearchStats({ forms, playerList, externalQuery }: { forms: any; playerList: any; externalQuery?: string }) {
+  // When `externalQuery` is provided (driven from the global Stats search
+  // field), this component skips its own input and reads the query from
+  // props. This lets the global field act as the canonical search UI while
+  // keeping result rendering co-located with the rest of the analysis.
+  const [internalQuery, setInternalQuery] = useState("");
+  const query = externalQuery !== undefined ? externalQuery : internalQuery;
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const debounceRef = useRef(null);
 
@@ -464,15 +472,19 @@ function SearchStats({ forms, playerList }) {
       : [{ title: "לא נמצאו תוצאות", items: [] }];
   }, [debouncedQuery, forms]);
 
+  const showInternalInput = externalQuery === undefined;
+
   return (
     <StatCard title="חיפוש חופשי" icon="💬">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder='חפש קבוצה, שחקן, שם טופס או תוצאה (לדוגמה: "ברזיל", "מבאפה", "2-1")'
-        className="input-duo mb-3"
-      />
+      {showInternalInput && (
+        <input
+          type="text"
+          value={internalQuery}
+          onChange={(e) => setInternalQuery(e.target.value)}
+          placeholder='חפש קבוצה, שחקן, שם טופס או תוצאה (לדוגמה: "ברזיל", "מבאפה", "2-1")'
+          className="input-duo mb-3"
+        />
+      )}
       {searchResults && (
         <div className="space-y-3">
           {searchResults.map((group, i) => (
@@ -510,7 +522,17 @@ export default function Stats() {
   const results = useMatchResults();
   const settings = useSettings();
   const { user: currentUser } = useCurrentUser();
-  const [activeTab, setActiveTab] = useState("matches");
+  const { params, setParamsPatch, navigate } = useNavigation();
+  // Tab is URL-driven; falls back to "matches" for fresh entries or invalid
+  // values. Legacy `?tab=search` users land on the matches tab — the global
+  // search field at the top still works.
+  const activeTab = VALID_TABS.has(params?.tab as string)
+    ? (params!.tab as string)
+    : "matches";
+  // Top-of-page search: when the user is typing, the query takes over the
+  // page and renders SearchStats below the input. Empty string returns to
+  // tab view.
+  const [searchQuery, setSearchQuery] = useState("");
 
   // All hooks must run on every render before any early return — React's
   // hook-call-order invariant. Otherwise toggling `predictionsLocked` swaps
@@ -536,6 +558,8 @@ export default function Stats() {
     );
   }
 
+  const isSearching = searchQuery.trim().length > 0;
+
   return (
     <div>
       <PageHeader
@@ -549,46 +573,69 @@ export default function Stats() {
         <EmptyState icon="📊" title="אין מספיק נתונים להצגת סטטיסטיקות" />
       ) : (
         <>
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            {[
-              { id: "matches", label: "📊 משחקים" },
-              { id: "teams", label: "🏆 קבוצות" },
-              { id: "forms", label: "📋 טפסים" },
-              { id: "search", label: "🔍 חיפוש" },
-              { id: "simulate", label: "🎮 סימולציה" },
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`chip-duo flex-shrink-0 ${activeTab === tab.id ? "active" : ""}`}>
-                {tab.label}
-              </button>
-            ))}
+          {/* Global search field — replaces the per-tab "search" tab */}
+          <div className="card-duo mb-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder='חפש קבוצה, שחקן, שם טופס או תוצאה (לדוגמה: "ברזיל", "מבאפה", "2-1")'
+              className="input-duo"
+              aria-label="חיפוש חופשי"
+            />
           </div>
 
+          {!isSearching && (
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 items-center">
+              {[
+                { id: "matches", label: "📊 משחקים" },
+                { id: "teams", label: "🏆 קבוצות" },
+                { id: "forms", label: "📋 טפסים" },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setParamsPatch({ tab: tab.id === "matches" ? null : tab.id })}
+                  aria-pressed={activeTab === tab.id}
+                  className={`chip-duo flex-shrink-0 ${activeTab === tab.id ? "active" : ""}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+              <button
+                onClick={() => navigate("simulator")}
+                className="chip-duo flex-shrink-0"
+                style={{ marginInlineStart: "auto" }}
+              >
+                🎮 סימולטור
+              </button>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {activeTab === "matches" && (
-              <>
-                <GeneralStats forms={submittedForms} results={results} />
-                <MatchPredictions forms={submittedForms} />
-              </>
-            )}
-            {activeTab === "teams" && (
-              <>
-                <ChampionStats forms={submittedForms} />
-                <TopScorerStats forms={submittedForms} playerList={playerList} />
-              </>
-            )}
-            {activeTab === "forms" && (
-              <GeneralStats forms={submittedForms} results={results} />
-            )}
-            {activeTab === "search" && (
-              <SearchStats forms={submittedForms} playerList={playerList} />
-            )}
-            {activeTab === "simulate" && (
-              <SimulatorPanel
-                userMode
-                highlightUserId={currentUser?.id || null}
-                leaderboardLimit={0}
+            {isSearching ? (
+              <SearchStats
+                forms={submittedForms}
+                playerList={playerList}
+                externalQuery={searchQuery}
               />
+            ) : (
+              <>
+                {activeTab === "matches" && (
+                  <>
+                    <GeneralStats forms={submittedForms} results={results} />
+                    <MatchPredictions forms={submittedForms} />
+                  </>
+                )}
+                {activeTab === "teams" && (
+                  <>
+                    <ChampionStats forms={submittedForms} />
+                    <TopScorerStats forms={submittedForms} playerList={playerList} />
+                  </>
+                )}
+                {activeTab === "forms" && (
+                  <GeneralStats forms={submittedForms} results={results} />
+                )}
+              </>
             )}
           </div>
         </>

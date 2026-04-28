@@ -77,23 +77,10 @@ export default function Layout({ children, rightRail = null }) {
             </button>
           </div>
 
-          {/* Tablet nav — text tabs; hidden on xl: (replaced by DesktopSideNav) */}
-          <div className="hidden md:flex xl:hidden items-center gap-1">
-            {allNavItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.id)}
-                className={`px-3 py-1.5 rounded-xl text-sm font-bold bg-transparent border-none cursor-pointer transition-colors whitespace-nowrap ${
-                  page === item.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-ink-muted hover:text-ink hover:bg-bg-soft"
-                }`}
-                aria-current={page === item.id ? "page" : undefined}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          {/* Tablet/mobile users navigate via the bottom-nav (xl:hidden); the
+              previous header-tabs row was a duplicate that doubled the
+              "active" indicator in landscape iPads. Desktop (xl+) uses
+              DesktopSideNav. */}
 
           {user ? (
             <div className="flex items-center gap-1.5 xl:hidden">

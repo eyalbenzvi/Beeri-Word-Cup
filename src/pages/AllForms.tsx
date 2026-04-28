@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
@@ -63,8 +63,7 @@ function MatchRow({ match, prediction }) {
   );
 }
 
-function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerList }) {
-  const [expanded, setExpanded] = useState(false);
+function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerList, expanded, onToggle }) {
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
   // Lazy: only compute bracket when the card is expanded (not for all 250 forms on load)
@@ -80,7 +79,8 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
   return (
     <div className="bg-white rounded-2xl border-2 border-border overflow-hidden">
       <button
-        onClick={() => canExpand && setExpanded(!expanded)}
+        onClick={() => canExpand && onToggle?.()}
+        aria-expanded={!!expanded}
         className={`w-full flex items-center gap-3 p-4 text-right bg-transparent border-none ${canExpand ? "cursor-pointer hover:bg-bg-soft" : "cursor-default"}`}
       >
         <FormAvatar form={form} size="md" />
@@ -181,6 +181,10 @@ export default function AllFormsView({ onBack }) {
   );
   const [filterText, setFilterText] = useState("");
   const [filterBy, setFilterBy] = useState("form");
+  // Single-open accordion: at most one form is expanded at a time. With
+  // 200+ forms a multi-open list quickly becomes unscrollable; one card open
+  // also keeps the bracket compute cost bounded.
+  const [expandedFormId, setExpandedFormId] = useState<string | null>(null);
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
@@ -213,20 +217,41 @@ export default function AllFormsView({ onBack }) {
     });
   }, [submittedForms, filterText, activeFilter, users]);
 
+  // If the user expanded a card and then filtered it out, drop the
+  // expansion — otherwise an invisible drawer keeps the bracket compute
+  // alive for a card the user can no longer see.
+  useEffect(() => {
+    if (!expandedFormId) return;
+    if (!filteredForms.some((f) => f.formId === expandedFormId)) {
+      setExpandedFormId(null);
+    }
+  }, [filteredForms, expandedFormId]);
+
   return (
     <div>
       <PageHeader
         title="כל הטפסים"
         subtitle={submittedForms.length > 0 ? `${submittedForms.length} טפסים הוגשו` : undefined}
         action={
-          <button
-            onClick={onBack}
-            className="btn-duo-flat"
-            style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
-          >
-            חזרה
-            <ArrowRight size={16} aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-2">
+            {expandedFormId && (
+              <button
+                onClick={() => setExpandedFormId(null)}
+                className="btn-duo-flat"
+                style={{ padding: "0.45rem 0.85rem", fontSize: "0.8rem" }}
+              >
+                סגור הכל
+              </button>
+            )}
+            <button
+              onClick={onBack}
+              className="btn-duo-flat"
+              style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
+            >
+              חזרה
+              <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          </div>
         }
       />
 
@@ -301,6 +326,8 @@ export default function AllFormsView({ onBack }) {
                   isOwnForm={form.userId === user?.id}
                   userName={userName}
                   playerList={playerList}
+                  expanded={expandedFormId === form.formId}
+                  onToggle={() => setExpandedFormId((cur) => cur === form.formId ? null : form.formId)}
                 />
               );
             })}

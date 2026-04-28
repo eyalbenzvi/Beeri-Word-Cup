@@ -52,6 +52,7 @@ import MatchSearch from "../components/MatchSearch";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import AIFillOverlay from "../components/AIFillOverlay";
 import FinalistsPickerModal from "../components/FinalistsPickerModal";
+import InlineError from "../components/InlineError";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
 import { AUTH_COPY, LABELS } from "../constants/messages";
@@ -62,13 +63,40 @@ const SCROLL_DELAY = 100; // ms to wait for DOM before scrollIntoView
 
 export default function Predict() {
   const { user } = useCurrentUser();
-  const { navigate } = useNavigation();
+  const { navigate, params, setParamsPatch } = useNavigation();
   const showToast = useToast();
   const confirm = useConfirm();
   const forms = useUserForms(user?.id);
-  const activeFormId = useActiveFormId();
+  const storeActiveFormId = useActiveFormId();
+  // The URL is now the source of truth for the active form. Store's
+  // activeFormId stays in sync via the effect below so cross-tab listeners
+  // and other consumers that read it directly continue to work.
+  const activeFormId = (params?.form as string) || null;
   const formData = useFormData(activeFormId);
   const settings = useSettings();
+
+  // Sync the URL → store. Fires whenever the URL form id changes (including
+  // initial load and Back/Forward navigation).
+  useEffect(() => {
+    if (storeActiveFormId !== activeFormId) {
+      setActiveFormId(activeFormId);
+    }
+  }, [activeFormId, storeActiveFormId]);
+
+  // When a fresh form is opened with no name yet, focus the name input so
+  // the user starts where they need to start. Only on desktop (pointer:fine)
+  // — on phones we don't want the keyboard popping up unannounced.
+  const focusedFormIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeFormId || focusedFormIdRef.current === activeFormId) return;
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    focusedFormIdRef.current = activeFormId;
+    setTimeout(() => {
+      const el = document.getElementById("input-formName") as HTMLInputElement | null;
+      if (el && !el.value) el.focus({ preventScroll: true });
+    }, 80);
+  }, [activeFormId]);
 
   // Clear stale active-form pointer on mount only when it no longer maps to
   // a form the user owns (e.g. the form was deleted). Keeping a valid pointer
@@ -76,21 +104,28 @@ export default function Predict() {
   useEffect(() => {
     if (!activeFormId) return;
     const stillExists = forms.some((f) => f.formId === activeFormId);
-    if (!stillExists) setActiveFormId(null);
+    if (!stillExists) setParamsPatch({ form: null, stage: null, group: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Stage/group selection persisted in sessionStorage per active form so
-  // a reload restores the user's last-viewed tab. Extracted to keep the
-  // load/save effects out of this component body — see usePredict.js.
+  // Stage/group selection driven by URL params. usePredictPosition keeps
+  // session-storage as a fallback bootstrap when the URL has no values.
   const [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup] =
     usePredictPosition(activeFormId);
-  const [activeTab, setActiveTab] = useState("matches");
-  const [showConfirm, setShowConfirm] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
-  const [showAllForms, setShowAllForms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
+  // Per-field errors are quiet until the user has attempted to submit at
+  // least once, OR the field has been blurred after a touch. Avoids
+  // shouting at the user when they just opened a fresh form.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  // Modal/view state lives in the URL so Back closes them and refresh
+  // preserves them. The locals below are derived per render; we don't keep
+  // duplicate React state for them.
+  const showConfirm = params?.modal === "review";
+  const showSearch = params?.modal === "search";
+  const showScenarioModal = params?.modal === "scenario";
+  const showAllForms = params?.view === "all";
   const allPredictions = useAllPredictions();
 
   const activeForm =
@@ -134,6 +169,26 @@ export default function Predict() {
   }, [activeForm, activeFormId, submittedNamesView, settings]);
   const isFormValid = liveErrors.length === 0;
 
+  // Map per-field errors so each input can show its own message inline.
+  // We only surface a field's error if the user attempted submit OR they
+  // touched and blurred that specific field — otherwise a fresh form lights
+  // up red on first render which is hostile.
+  const fieldErrors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const e of liveErrors) {
+      const f = (e as any).target?.field;
+      if (!f) continue;
+      if (!map[f]) map[f] = e.label;
+    }
+    return map;
+  }, [liveErrors]);
+
+  const showFieldError = (field: string) =>
+    (attemptedSubmit || touchedFields[field]) ? fieldErrors[field] : undefined;
+  const markTouched = useCallback((field: string) => {
+    setTouchedFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  }, []);
+
   // On stage/group change, focus the first unfilled match and scroll it
   // into view. Implementation lives in usePredictTabFocus so the long
   // chain of refs / DOM queries / selection logic doesn't clutter this
@@ -171,7 +226,7 @@ export default function Predict() {
     if (!activeFormId || submitting) return;
     setSubmitting(true);
     submitPredictions(activeFormId);
-    setShowConfirm(false);
+    setParamsPatch({ modal: null });
     setValidationErrors([]);
     showToast("נקלט. בהצלחה!");
     // Respect the user's motion preference: skip confetti if they asked for
@@ -201,15 +256,28 @@ export default function Predict() {
       }
     } catch { /* confetti is cosmetic — never block submit */ }
     setSubmitting(false);
-    setActiveFormId(null); // return to form list
-  }, [activeFormId, submitting, showToast]);
+    // Return to form list (drop form + sub-state from URL)
+    navigate("predict", {});
+  }, [activeFormId, submitting, showToast, navigate]);
 
-  // Map validation error targets to scroll/navigate actions
+  // Map validation error targets to scroll/navigate actions. After scroll,
+  // we also focus the input itself — without focus, the user lands beside
+  // the offending field but has to tap it manually before they can fix it.
+  // On mobile we deliberately don't auto-focus number inputs — that pops
+  // the keyboard mid-scroll which is jarring; we only focus text/select.
   const scrollToTarget = useCallback((target) => {
     if (!target) return undefined;
     return () => {
       if (target.field) {
-        setTimeout(() => document.getElementById(`field-${target.field}`)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' }), SCROLL_DELAY);
+        setTimeout(() => {
+          const wrap = document.getElementById(`field-${target.field}`);
+          if (!wrap) return;
+          wrap.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' });
+          const input = wrap.querySelector(
+            'input:not([type="number"]), select, textarea',
+          ) as HTMLElement | null;
+          input?.focus({ preventScroll: true });
+        }, SCROLL_DELAY);
       } else if (target.matchId) {
         if (target.stage === "group" && target.group) {
           setSelectedStage("group");
@@ -217,22 +285,37 @@ export default function Predict() {
         } else if (target.stage) {
           setSelectedStage(target.stage);
         }
-        setActiveTab("matches");
-        setTimeout(() => document.getElementById(`match-${target.matchId}`)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" }), SCROLL_DELAY);
+        setTimeout(() => {
+          const card = document.getElementById(`match-${target.matchId}`);
+          if (!card) return;
+          card.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
+        }, SCROLL_DELAY);
       }
     };
-  }, []);
+  }, [setSelectedStage, setSelectedGroup]);
 
   const handleTrySubmit = useCallback(() => {
     if (!activeFormId || !activeForm) return;
     const rawErrors = validateForm(activeForm, activeFormId, allPredictions, settings);
     const errors = rawErrors.map((e) => ({ label: e.label, action: scrollToTarget(e.target) }));
     setValidationErrors(errors);
-    setShowConfirm(true);
-  }, [activeFormId, activeForm, allPredictions, settings, scrollToTarget]);
+    // Reveal all per-field errors after first submit attempt, even on
+    // fields the user never blurred. They've now formally asked the form
+    // to be checked.
+    setAttemptedSubmit(true);
+    setParamsPatch({ modal: "review" });
+  }, [activeFormId, activeForm, allPredictions, settings, scrollToTarget, setParamsPatch]);
 
   const [aiProgress, setAiProgress] = useState(null);
-  const [showScenarioModal, setShowScenarioModal] = useState(false);
+  // Cancellation flag: writes happen synchronously after the fake-delay
+  // gates, so checking this before each save keeps the form clean if the
+  // user backed out mid-progress.
+  const aiCancelledRef = useRef(false);
+
+  const handleAICancel = useCallback(() => {
+    aiCancelledRef.current = true;
+    setAiProgress(null);
+  }, []);
 
   const handleAIFill = useCallback(async () => {
     if (!activeFormId || !canEdit) return;
@@ -244,11 +327,13 @@ export default function Predict() {
     if (!ok) return;
 
     const totalSteps = 3;
+    aiCancelledRef.current = false;
 
     try {
       // Step 1: "Analyzing" (fake delay for UX)
       setAiProgress({ current: 1, total: totalSteps });
       await new Promise((r) => setTimeout(r, 1200));
+      if (aiCancelledRef.current) return;
 
       // Fill only missing predictions; user's filled matches are preserved
       // verbatim, and the knockout cascade uses them for continuity.
@@ -263,6 +348,7 @@ export default function Predict() {
       // Step 2: "Computing bracket"
       setAiProgress({ current: 2, total: totalSteps });
       await new Promise((r) => setTimeout(r, 1000));
+      if (aiCancelledRef.current) return;
 
       // Save all predictions in one batch (preserved ones are unchanged)
       savePredictionsBatch(activeFormId, allPreds);
@@ -270,6 +356,7 @@ export default function Predict() {
       // Step 3: Top scorer — keep user's choice if already set
       setAiProgress({ current: 3, total: totalSteps });
       await new Promise((r) => setTimeout(r, 800));
+      if (aiCancelledRef.current) return;
 
       if (!activeForm?.topScorer) {
         const playerList = settings.topScorerPlayers?.length > 0 ? settings.topScorerPlayers : TOP_SCORER_PLAYERS;
@@ -284,18 +371,20 @@ export default function Predict() {
     } catch (err) {
       showToast(`שגיאה: ${err.message}`);
     } finally {
-      setAiProgress(null);
+      if (!aiCancelledRef.current) setAiProgress(null);
     }
   }, [activeFormId, canEdit, activeForm, settings, showToast, confirm]);
 
   const handleScenarioFill = useCallback(async (champion, runnerUp) => {
     if (!activeFormId || !canEdit) return;
-    setShowScenarioModal(false);
+    setParamsPatch({ modal: null });
 
     const totalSteps = 3;
+    aiCancelledRef.current = false;
     try {
       setAiProgress({ current: 1, total: totalSteps });
       await new Promise((r) => setTimeout(r, 1000));
+      if (aiCancelledRef.current) return;
 
       const existingMatches = activeForm?.matches || {};
       const allPreds = predictScenario(
@@ -309,6 +398,7 @@ export default function Predict() {
 
       setAiProgress({ current: 2, total: totalSteps });
       await new Promise((r) => setTimeout(r, 900));
+      if (aiCancelledRef.current) return;
 
       savePredictionsBatch(activeFormId, allPreds);
       saveBonusPrediction(activeFormId, "chosenChampion", champion);
@@ -316,6 +406,7 @@ export default function Predict() {
 
       setAiProgress({ current: 3, total: totalSteps });
       await new Promise((r) => setTimeout(r, 700));
+      if (aiCancelledRef.current) return;
 
       // Top scorer from the champion squad (don't override user's existing pick)
       if (!activeForm?.topScorer) {
@@ -330,9 +421,9 @@ export default function Predict() {
     } catch (err) {
       showToast(`שגיאה: ${err.message}`);
     } finally {
-      setAiProgress(null);
+      if (!aiCancelledRef.current) setAiProgress(null);
     }
-  }, [activeFormId, canEdit, activeForm, settings, showToast]);
+  }, [activeFormId, canEdit, activeForm, settings, showToast, setParamsPatch]);
 
   const handleMatchJump = useCallback((match) => {
     if (match.stage === "group") {
@@ -341,13 +432,12 @@ export default function Predict() {
     } else {
       setSelectedStage(match.stage);
     }
-    setActiveTab("matches");
     setTimeout(() => {
       document
         .getElementById(`match-${match.id}`)
         ?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
     }, SCROLL_DELAY);
-  }, []);
+  }, [setSelectedStage, setSelectedGroup]);
 
   // Desktop right-rail: show ProgressHub while actively editing a form.
   const railNode = useMemo(() => {
@@ -384,7 +474,7 @@ export default function Predict() {
   if (!activeForm && showAllForms) {
     return (
       <Suspense fallback={<div className="text-center py-8 text-ink-muted font-bold"><Spinner label="טוען..." /></div>}>
-        <AllFormsView onBack={() => setShowAllForms(false)} />
+        <AllFormsView onBack={() => setParamsPatch({ view: null })} />
       </Suspense>
     );
   }
@@ -395,7 +485,7 @@ export default function Predict() {
         forms={forms}
         user={user}
         settings={settings}
-        onShowAllForms={() => setShowAllForms(true)}
+        onShowAllForms={() => setParamsPatch({ view: "all" })}
       />
     );
   }
@@ -406,7 +496,7 @@ export default function Predict() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveFormId(null)}
+            onClick={() => navigate("predict", {})}
             className="text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer p-0 hover:text-secondary-dark inline-flex items-center gap-1"
           >
             הטפסים שלי
@@ -476,39 +566,64 @@ export default function Predict() {
       <div id="form-details-section" className="card-duo-tight mb-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div id="field-formName">
-            <label className="text-xs font-extrabold text-ink-muted">שם הטופס (חובה)</label>
+            <label htmlFor="input-formName" className="text-xs font-extrabold text-ink-muted">שם הטופס (חובה)</label>
             <input
+              id="input-formName"
               value={activeForm.formName || ""}
               onChange={(e) => updateFormDetails(activeFormId, { formName: e.target.value })}
+              onBlur={() => markTouched("formName")}
               placeholder="שם הטופס"
               name="formName"
               maxLength={50}
-              className="input-duo input-duo-sm"
+              className={`input-duo input-duo-sm ${showFieldError("formName") ? "border-danger" : ""}`}
               disabled={!canEdit}
               required
+              aria-invalid={!!showFieldError("formName")}
+              aria-describedby={showFieldError("formName") ? "err-formName" : undefined}
             />
+            {showFieldError("formName") && (
+              <InlineError className="mt-1 text-xs">
+                <span id="err-formName">{showFieldError("formName")}</span>
+              </InlineError>
+            )}
           </div>
           <div id="field-budget">
-            <label className="text-xs font-extrabold text-ink-muted">תקציב (חובה)</label>
+            <label htmlFor="input-budget" className="text-xs font-extrabold text-ink-muted">תקציב (חובה)</label>
             <input
+              id="input-budget"
               value={activeForm.budgetNumber || ""}
               onChange={(e) => updateFormDetails(activeFormId, { budgetNumber: e.target.value })}
+              onBlur={() => markTouched("budget")}
               inputMode="numeric"
               placeholder="100-9999"
               maxLength={4}
-              className="input-duo input-duo-sm"
+              className={`input-duo input-duo-sm ${showFieldError("budget") ? "border-danger" : ""}`}
               disabled={!canEdit}
               required
+              aria-invalid={!!showFieldError("budget")}
+              aria-describedby={showFieldError("budget") ? "err-budget" : undefined}
             />
+            {showFieldError("budget") && (
+              <InlineError className="mt-1 text-xs">
+                <span id="err-budget">{showFieldError("budget")}</span>
+              </InlineError>
+            )}
           </div>
           <div id="field-topScorer">
             <label className="text-xs font-extrabold text-ink-muted">{LABELS.topScorer} (חובה)</label>
-            <PlayerAutocomplete
-              value={activeForm.topScorer || ""}
-              onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
-              disabled={!canEdit}
-              compact
-            />
+            <div onBlur={() => markTouched("topScorer")}>
+              <PlayerAutocomplete
+                value={activeForm.topScorer || ""}
+                onChange={(val) => saveBonusPrediction(activeFormId, "topScorer", val)}
+                disabled={!canEdit}
+                compact
+              />
+            </div>
+            {showFieldError("topScorer") && (
+              <InlineError className="mt-1 text-xs">
+                <span id="err-topScorer">{showFieldError("topScorer")}</span>
+              </InlineError>
+            )}
           </div>
         </div>
         {championName && (
@@ -526,7 +641,7 @@ export default function Predict() {
             : getStageLabel(selectedStage)}
         </div>
         <button
-          onClick={() => setShowSearch(true)}
+          onClick={() => setParamsPatch({ modal: "search" })}
           className="btn-duo-flat"
           style={{ background: "var(--color-secondary)", color: "white", padding: "0.4rem 0.85rem" }}
         >
@@ -536,7 +651,7 @@ export default function Predict() {
 
       {(
         <>
-          <div className="sticky top-[56px] z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="sticky top-16 z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
             <StageSelector
               selectedStage={selectedStage}
               onSelect={setSelectedStage}
@@ -553,7 +668,7 @@ export default function Predict() {
           {status === "draft" && !settings.predictionsLocked && (
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
               <button
-                onClick={() => setShowScenarioModal(true)}
+                onClick={() => setParamsPatch({ modal: "scenario" })}
                 disabled={!!aiProgress}
                 title="בחר אלופה וסגנית — הטופס ימולא כך שהן ייפגשו בגמר"
                 className="btn-duo btn-duo-orange btn-duo-sm w-full md:w-auto"
@@ -633,17 +748,17 @@ export default function Predict() {
           matchPredictions={matchPredictions}
           bracketTeams={bracketTeams}
           onJump={handleMatchJump}
-          onClose={() => setShowSearch(false)}
+          onClose={() => setParamsPatch({ modal: null })}
         />
       )}
 
-      <AIFillOverlay aiProgress={aiProgress} />
+      <AIFillOverlay aiProgress={aiProgress} onCancel={handleAICancel} />
 
       {showScenarioModal && (
         <FinalistsPickerModal
           initialChampion={activeForm?.chosenChampion}
           initialRunnerUp={activeForm?.chosenRunnerUp}
-          onCancel={() => setShowScenarioModal(false)}
+          onCancel={() => setParamsPatch({ modal: null })}
           onConfirm={handleScenarioFill}
         />
       )}
@@ -658,7 +773,7 @@ export default function Predict() {
           predictedKnockoutCount={predictedKnockout}
           championName={championName}
           onClose={() => {
-            setShowConfirm(false);
+            setParamsPatch({ modal: null });
             setValidationErrors([]);
           }}
           onSubmit={handleSubmit}

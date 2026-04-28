@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useNavigation } from "./useNavigation";
 import { preferredScrollBehavior } from "../utils/helpers";
 
 // Wait for the DOM to settle (e.g. tab swap, layout change) before we
@@ -6,33 +7,44 @@ import { preferredScrollBehavior } from "../utils/helpers";
 // perception. Used by usePredictTabFocus.
 const SCROLL_DELAY = 100;
 
+const VALID_STAGES = new Set(["group", "R32", "R16", "QF", "SF", "3RD", "F"]);
+const VALID_GROUPS = new Set("ABCDEFGHIJKL".split(""));
+
 /**
- * Persist the active form's selected stage/group across reloads in
- * sessionStorage. Returns [stage, setStage, group, setGroup] for use in
- * the host component.
- *
- * sessionStorage is per-tab, which is what we want — switching forms in
- * a different tab shouldn't reset position here.
+ * URL-driven stage/group selection. Reads from `?stage=…&group=…` and writes
+ * back via setParamsPatch. sessionStorage is preserved as a one-time bootstrap
+ * so first navigations to a form (no URL hint) restore the user's last view.
  */
 export function usePredictPosition(activeFormId: string | null) {
-  const [selectedStage, setSelectedStage] = useState<string>("group");
-  const [selectedGroup, setSelectedGroup] = useState<string>("A");
+  const { params, setParamsPatch } = useNavigation();
 
-  // Restore on form change.
+  const urlStage = (params?.stage as string) || "";
+  const urlGroup = (params?.group as string) || "";
+  const selectedStage = VALID_STAGES.has(urlStage) ? urlStage : "group";
+  const selectedGroup = VALID_GROUPS.has(urlGroup) ? urlGroup : "A";
+
+  // Bootstrap from sessionStorage when the URL has no stage/group yet —
+  // happens once per form on first arrival (e.g. clicking a card).
+  const bootstrapped = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeFormId) return;
-    const saved = sessionStorage.getItem(`predict-pos-${activeFormId}`);
-    if (!saved) return;
+    if (!activeFormId || bootstrapped.current === activeFormId) return;
+    bootstrapped.current = activeFormId;
+    if (urlStage || urlGroup) return; // URL wins
     try {
+      const saved = sessionStorage.getItem(`predict-pos-${activeFormId}`);
+      if (!saved) return;
       const { stage, group } = JSON.parse(saved);
-      if (stage) setSelectedStage(stage);
-      if (group) setSelectedGroup(group);
+      const patch: Record<string, string | null> = {};
+      if (stage && VALID_STAGES.has(stage)) patch.stage = stage;
+      if (group && VALID_GROUPS.has(group)) patch.group = group;
+      if (Object.keys(patch).length) setParamsPatch(patch, { replace: true });
     } catch {
       /* malformed JSON — ignore */
     }
-  }, [activeFormId]);
+  }, [activeFormId, urlStage, urlGroup, setParamsPatch]);
 
-  // Persist on every change.
+  // Persist to sessionStorage on every URL change so future visits can
+  // bootstrap from the last viewed position.
   useEffect(() => {
     if (!activeFormId) return;
     try {
@@ -44,6 +56,14 @@ export function usePredictPosition(activeFormId: string | null) {
       /* quota exceeded / private mode — best effort */
     }
   }, [activeFormId, selectedStage, selectedGroup]);
+
+  const setSelectedStage = useCallback((s: string) => {
+    setParamsPatch({ stage: s === "group" ? null : s });
+  }, [setParamsPatch]);
+
+  const setSelectedGroup = useCallback((g: string) => {
+    setParamsPatch({ group: g === "A" ? null : g });
+  }, [setParamsPatch]);
 
   return [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup] as const;
 }

@@ -27,18 +27,30 @@ export default function Profile() {
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
-  const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [nickname, setNickname] = useState(user?.displayName || "");
 
+  // The form is always editable; "שמור"/"ביטול" appear only when the user
+  // has actually changed something. This removes the explicit edit-mode
+  // toggle which was a hidden affordance — most users didn't realise the
+  // disabled fields became editable after clicking "עריכת פרופיל".
+  const isDirty =
+    firstName !== (user?.firstName || "") ||
+    lastName !== (user?.lastName || "") ||
+    nickname !== (user?.displayName || "");
+
+  // Sync local state from the source-of-truth user record whenever the
+  // upstream value changes AND the user hasn't started typing. We don't
+  // want to clobber an in-flight edit if a Firestore listener fires.
   useEffect(() => {
-    if (!editing) {
+    if (!isDirty) {
       setFirstName(user?.firstName || "");
       setLastName(user?.lastName || "");
       setNickname(user?.displayName || "");
     }
-  }, [user?.firstName, user?.lastName, user?.displayName, editing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.firstName, user?.lastName, user?.displayName]);
 
   const { scoredForms, rankedLeaderboard } = useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
@@ -67,7 +79,6 @@ export default function Profile() {
       lastName,
       displayName: nickname || firstName || displayName,
     });
-    setEditing(false);
     showToast("עדכנתי. יאללה.");
   };
 
@@ -75,7 +86,6 @@ export default function Profile() {
     setFirstName(user.firstName || "");
     setLastName(user.lastName || "");
     setNickname(user.displayName || "");
-    setEditing(false);
   };
 
   return (
@@ -95,26 +105,28 @@ export default function Profile() {
           </div>
         </div>
 
-        {editing ? (
-          <div className="space-y-3 text-right">
+        <h2 className="text-2xl font-extrabold text-ink mb-3">{displayName}</h2>
+
+        <div className="space-y-3 text-right">
+          <div>
+            <label htmlFor="profile-firstName" className="block text-xs font-extrabold text-ink mb-1">שם פרטי</label>
+            <input id="profile-firstName" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" maxLength={30} />
+          </div>
+          <div>
+            <label htmlFor="profile-lastName" className="block text-xs font-extrabold text-ink mb-1">שם משפחה</label>
+            <input id="profile-lastName" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" maxLength={30} />
+          </div>
+          <div>
+            <label htmlFor="profile-nickname" className="block text-xs font-extrabold text-ink mb-1">כינוי</label>
+            <input id="profile-nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" maxLength={20} />
+          </div>
+          {email && (
             <div>
-              <label className="block text-xs font-extrabold text-ink mb-1">שם פרטי</label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-duo" maxLength={30} />
+              <label htmlFor="profile-email" className="block text-xs font-extrabold text-ink mb-1">אימייל</label>
+              <input id="profile-email" type="text" value={email} disabled className="input-duo opacity-60" />
             </div>
-            <div>
-              <label className="block text-xs font-extrabold text-ink mb-1">שם משפחה</label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-duo" maxLength={30} />
-            </div>
-            <div>
-              <label className="block text-xs font-extrabold text-ink mb-1">כינוי</label>
-              <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="input-duo" maxLength={20} />
-            </div>
-            {email && (
-              <div>
-                <label className="block text-xs font-extrabold text-ink mb-1">אימייל</label>
-                <input type="text" value={email} disabled className="input-duo opacity-60" />
-              </div>
-            )}
+          )}
+          {isDirty && (
             <div className="flex gap-2 pt-2">
               <button onClick={handleSave} className="btn-duo btn-duo-primary flex-1">
                 שמור
@@ -123,23 +135,11 @@ export default function Profile() {
                 ביטול
               </button>
             </div>
-          </div>
-        ) : (
-          <>
-            <h2 className="text-2xl font-extrabold text-ink">{displayName}</h2>
-            {user.firstName && (
-              <p className="text-sm text-ink-muted font-medium">{user.firstName} {user.lastName || ""}</p>
-            )}
-            {email && <p className="text-xs text-ink-muted mt-1 font-medium">{email}</p>}
-            {joinDate && <p className="text-xs text-ink-muted mt-1 font-medium">הצטרף {joinDate}</p>}
-            <button
-              onClick={() => setEditing(true)}
-              className="mt-4 text-sm text-secondary font-extrabold bg-transparent border-none cursor-pointer underline hover:text-secondary-dark"
-            >
-              עריכת פרופיל
-            </button>
-          </>
-        )}
+          )}
+          {!isDirty && joinDate && (
+            <p className="text-xs text-ink-muted mt-2 font-medium text-center">הצטרף {joinDate}</p>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -175,7 +175,15 @@ export default function Profile() {
 
       {forms.length > 0 && (
         <div className="card-duo mb-4">
-          <h3 className="font-extrabold text-base text-ink mb-3">📋 הטפסים שלי</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-extrabold text-base text-ink">📋 הטפסים שלי</h3>
+            <button
+              onClick={() => navigate("predict", { view: "all" })}
+              className="text-xs text-secondary font-extrabold bg-transparent border-none cursor-pointer p-0 hover:text-secondary-dark"
+            >
+              כל הטפסים ←
+            </button>
+          </div>
           <div className="space-y-2">
             {forms.map((form) => {
               const championCode = getCachedChampion(form.matches || {});
@@ -189,7 +197,12 @@ export default function Profile() {
               const position = lbEntry ? lbEntry.rank : null;
 
               return (
-                <div key={form.formId} className="bg-bg-soft rounded-xl p-3 flex items-center gap-3 border-2 border-border">
+                <button
+                  key={form.formId}
+                  onClick={() => navigate("predict", { form: form.formId })}
+                  className="w-full bg-bg-soft rounded-xl p-3 flex items-center gap-3 border-2 border-border text-right cursor-pointer hover:border-border-strong transition-colors"
+                  aria-label={`פתח את הטופס ${form.formName || "ללא שם"}`}
+                >
                   <FormAvatar form={form} size="md" />
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold text-sm truncate text-ink">{form.formName || "טופס ללא שם"}</div>
@@ -200,7 +213,7 @@ export default function Profile() {
                       #{position}
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
