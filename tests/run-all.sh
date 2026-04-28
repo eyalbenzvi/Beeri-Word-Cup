@@ -92,7 +92,7 @@ run_test "26. Stuck-Loading Protection (watchdogs, retry, escape hatch)" "store/
 run_test "27. Score Auto-Init (MatchCard + filled-check regressions)" "ui/test-score-auto-init.mjs" "no"
 run_test "28. Match Time Parsing (Israel -> UTC)" "data/test-match-time.mjs" "yes"
 run_test "29. Upcoming Matches Selector" "data/test-upcoming-matches.mjs" "yes"
-run_test "30. Prediction Alignment (home/away swap)" "bracket/test-prediction-align.mjs" "no"
+run_test "30. Prediction Alignment (home/away swap)" "bracket/test-prediction-align.mjs" "yes"
 run_test "31. Upcoming Matches Integration" "ui/test-upcoming-integration.mjs" "yes"
 run_test "32. Form Lock UI (hide new-form when locked)" "ui/test-form-lock-ui.mjs" "no"
 run_test "33. Welcome Screen Upcoming (unauth post-kickoff)" "ui/test-welcome-upcoming.mjs" "yes"

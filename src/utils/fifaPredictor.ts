@@ -122,7 +122,7 @@ export function predictAllMatches(
       }
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
-      const pred = predictMatch(teams.home, teams.away);
+      const pred: any = predictMatch(teams.home, teams.away);
       if (pred.homeScore === pred.awayScore) {
         const rankH = FIFA_RANK[teams.home] || DEFAULT_RANK;
         const rankA = FIFA_RANK[teams.away] || DEFAULT_RANK;

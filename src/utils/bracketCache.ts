@@ -5,7 +5,7 @@ import { calcBracketTeams, deriveChampion } from "../utils/bracket";
 const bracketCache = new Map();
 const championCache = new Map();
 
-function getStableKey(matchPredictions) {
+function getStableKey(matchPredictions: Record<string, any>) {
   const entries = Object.entries(matchPredictions);
   if (entries.length === 0) return 0;
   // Sort for determinism (JS object property order can vary)
@@ -14,7 +14,7 @@ function getStableKey(matchPredictions) {
   let hash = 0x811c9dc5; // FNV offset basis
   for (let i = 0; i < entries.length; i++) {
     const id = entries[i][0];
-    const p = entries[i][1];
+    const p = entries[i][1] as any;
     for (let j = 0; j < id.length; j++) {
       hash ^= id.charCodeAt(j);
       hash = Math.imul(hash, 0x01000193);

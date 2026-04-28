@@ -105,10 +105,12 @@ export function validateForm(activeForm, activeFormId, allPredictions, settings)
   } else {
     const trimmedName = activeForm.formName.trim().toLowerCase();
     const duplicateName = Object.entries(allPredictions || {}).some(
-      ([fid, f]) =>
-        fid !== activeFormId &&
-        f.formName?.trim().toLowerCase() === trimmedName &&
-        (f.status === "submitted" || f.status === "approved" || f.status === "pending"),
+      ([fid, fAny]) => {
+        const f = fAny as any;
+        return fid !== activeFormId &&
+          f.formName?.trim().toLowerCase() === trimmedName &&
+          (f.status === "submitted" || f.status === "approved" || f.status === "pending");
+      },
     );
     if (duplicateName) {
       errors.push({

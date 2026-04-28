@@ -75,7 +75,8 @@ export function computeMatchStats({
   let outcomeHitCount = 0;
   let totalForms = 0;
 
-  for (const [formId, form] of Object.entries(allPredictions || {})) {
+  for (const [formId, fAny] of Object.entries(allPredictions || {})) {
+    const form = fAny as any;
     if (!isScorableForm(form)) continue;
     totalForms++;
     const pred = getFormPrediction(form, matchId);
@@ -140,7 +141,8 @@ export function computeMatchStats({
   if (result && actualOutcome && actualOutcomePct > 0 && actualOutcomePct < HOOK_THRESHOLDS.underdogOutcomePct) {
     // We need to re-walk forms to grab names that picked the actual outcome.
     // Deliberately a second pass — keeps the main loop unchanged.
-    for (const [formId, form] of Object.entries(allPredictions || {})) {
+    for (const [formId, fAny] of Object.entries(allPredictions || {})) {
+      const form = fAny as any;
       if (!isScorableForm(form)) continue;
       const pred = getFormPrediction(form, matchId);
       if (!pred) continue;

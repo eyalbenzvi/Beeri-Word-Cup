@@ -35,11 +35,11 @@ for (const [groupName, teams] of Object.entries(GROUPS)) {
 // bracket.js and fifaPredictor.js cannot drift apart.
 import { FIFA_RANK_OFFICIAL as FIFA_RANKING } from "../data/fifaRanking";
 
-export function calcGroupStandings(matchPredictions) {
-  const standings = {};
+export function calcGroupStandings(matchPredictions: Record<string, any>) {
+  const standings: Record<string, any> = {};
 
   for (const [groupName, teams] of Object.entries(GROUPS)) {
-    const stats = {};
+    const stats: Record<string, any> = {};
     for (const team of teams) {
       stats[team.code] = {
         code: team.code,
@@ -103,9 +103,9 @@ export function calcGroupStandings(matchPredictions) {
       });
     }
 
-    function computeH2HStats(tiedCodes) {
+    function computeH2HStats(tiedCodes: string[]) {
       const codeSet = new Set(tiedCodes);
-      const h2h = {};
+      const h2h: Record<string, any> = {};
       for (const code of tiedCodes) {
         h2h[code] = { pts: 0, gd: 0, gf: 0 };
       }
@@ -131,7 +131,7 @@ export function calcGroupStandings(matchPredictions) {
 
     const teamList = Object.values(stats);
 
-    function sortTiedGroup(tiedTeams) {
+    function sortTiedGroup(tiedTeams: any[]): any[] {
       if (tiedTeams.length <= 1) return tiedTeams;
 
       const tiedCodes = tiedTeams.map((t) => t.code);
@@ -183,7 +183,7 @@ export function calcGroupStandings(matchPredictions) {
       return result;
     }
 
-    const pointGroups = {};
+    const pointGroups: Record<string, any[]> = {};
     for (const t of teamList) {
       const key = t.pts;
       if (!pointGroups[key]) pointGroups[key] = [];
@@ -246,9 +246,9 @@ function assignThirdPlaceTeams(qualifyingThird) {
   const annexAssignments = lookupThirdPlaceAssignment(qualGroups);
 
   if (annexAssignments) {
-    const result = {};
+    const result: Record<string, any> = {};
     for (const [slotId, groupLetter] of Object.entries(annexAssignments)) {
-      result[slotId] = qualTeamsByGroup[groupLetter] || null;
+      result[slotId] = qualTeamsByGroup[groupLetter as string] || null;
     }
     return result;
   }
@@ -256,7 +256,7 @@ function assignThirdPlaceTeams(qualifyingThird) {
   return {};
 }
 
-function resolvePosition(pos, standings) {
+function resolvePosition(pos: string, standings: Record<string, any>) {
   const position = parseInt(pos[0]);
   const group = pos.slice(1);
   const groupStandings = standings[group];
@@ -264,7 +264,7 @@ function resolvePosition(pos, standings) {
   return groupStandings[position - 1].code;
 }
 
-function getMatchWinner(matchId, matchPredictions, bracketTeams) {
+function getMatchWinner(matchId: string, matchPredictions: Record<string, any>, bracketTeams: Record<string, any>) {
   const teams = bracketTeams[matchId];
   if (!teams || !teams.home || !teams.away) return null;
 
@@ -289,12 +289,12 @@ function getMatchWinner(matchId, matchPredictions, bracketTeams) {
   return hs > as ? teams.home : teams.away;
 }
 
-export function calcBracketTeams(matchPredictions) {
+export function calcBracketTeams(matchPredictions: Record<string, any>) {
   const standings = calcGroupStandings(matchPredictions);
-  const bracket = {};
+  const bracket: Record<string, any> = {};
 
-  const hasGroupPredictions = Object.values(standings).some((group) =>
-    group.some((t) => t.played > 0),
+  const hasGroupPredictions = Object.values(standings).some((group: any) =>
+    group.some((t: any) => t.played > 0),
   );
   if (!hasGroupPredictions) return bracket;
 
@@ -386,11 +386,12 @@ export function calcBracketTeams(matchPredictions) {
   return bracket;
 }
 
-export function deriveAdvancingTeams(bracketTeams) {
-  const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
+export function deriveAdvancingTeams(bracketTeams: Record<string, any>) {
+  const advancing: Record<string, any[]> = { R32: [], R16: [], QF: [], SF: [], F: [] };
 
-  for (const [matchId, teams] of Object.entries(bracketTeams)) {
-    const addTeams = (round) => {
+  for (const [matchId, t] of Object.entries(bracketTeams)) {
+    const teams = t as any;
+    const addTeams = (round: string) => {
       if (teams.home && !advancing[round].includes(teams.home))
         advancing[round].push(teams.home);
       if (teams.away && !advancing[round].includes(teams.away))
@@ -420,13 +421,14 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
   }
   const completedGroups = new Set(
     Object.entries(groupMatchCounts)
-      .filter(([, count]) => count >= 6)
+      .filter(([, count]) => (count as number) >= 6)
       .map(([g]) => g),
   );
 
   const allGroupsComplete = completedGroups.size >= 12;
   if (allGroupsComplete) {
-    for (const [matchId, teams] of Object.entries(bracketTeams)) {
+    for (const [matchId, t] of Object.entries(bracketTeams)) {
+      const teams = t as any;
       if (!matchId.startsWith("R32-")) continue;
       if (teams.home && !advancing.R32.includes(teams.home)) {
         advancing.R32.push(teams.home);
@@ -437,22 +439,24 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
     }
   }
 
-  for (const [matchId, teams] of Object.entries(bracketTeams)) {
+  for (const [matchId, t] of Object.entries(bracketTeams)) {
+    const teams = t as any;
     if (matchId.startsWith("R32-") || matchId.startsWith("group-")) continue;
 
-    let round = null;
+    let round: string | null = null;
     if (matchId.startsWith("R16-")) round = "R16";
     else if (matchId.startsWith("QF-")) round = "QF";
     else if (matchId.startsWith("SF-")) round = "SF";
     else if (matchId === "F-1") round = "F";
     if (!round) continue;
 
-    const feedingMatchesPlayed = (teamCode) => {
+    const feedingMatchesPlayed = (teamCode: string) => {
       if (!teamCode) return false;
 
-      const priorRound = ROUND_PARENT[round];
+      const priorRound = ROUND_PARENT[round as string];
       if (!priorRound) return false;
-      for (const [mId, result] of Object.entries(actualResults)) {
+      for (const [mId, r] of Object.entries(actualResults)) {
+        const result = r as any;
         if (!mId.startsWith(priorRound + "-")) continue;
         if (result.homeScore === null || result.homeScore === undefined)
           continue;
@@ -482,7 +486,7 @@ export function deriveActualAdvancing(bracketTeams, actualResults) {
   return advancing;
 }
 
-export function deriveChampion(matchPredictions, bracketTeams) {
+export function deriveChampion(matchPredictions: Record<string, any>, bracketTeams: Record<string, any>) {
   const finalTeams = bracketTeams["F-1"];
   if (!finalTeams?.home || !finalTeams?.away) return null;
 

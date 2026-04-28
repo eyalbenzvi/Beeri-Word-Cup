@@ -50,11 +50,11 @@ function getOutcome(homeScore, awayScore) {
 }
 
 export function calculateMatchPoints(
-  prediction,
-  actual,
-  stage,
-  predTeams,
-  actualTeams,
+  prediction: any,
+  actual: any,
+  stage: string,
+  predTeams?: any,
+  actualTeams?: any,
 ) {
   if (!prediction || !actual || actual.homeScore == null || actual.awayScore == null) {
     return {
@@ -142,19 +142,19 @@ export function calculateMatchPoints(
 // predBracket = user's bracket derived from their predictions
 // actualBracket = bracket derived from actual results
 export function calculateFullScore(
-  userPredictions,
-  actualResults,
-  actualAdvancing,
-  actualBonuses,
-  predBracket,
-  actualBracket,
+  userPredictions: any,
+  actualResults: Record<string, any>,
+  actualAdvancing: any,
+  actualBonuses: any,
+  predBracket?: Record<string, any>,
+  actualBracket?: Record<string, any>,
 ) {
   let totalPoints = 0;
   let exactScoreCount = 0;
   let outcomeCount = 0;
   let correctChampion = false;
   let correctTopScorer = false;
-  const matchScores = {};
+  const matchScores: Record<string, any> = {};
 
   // 1. Match predictions (outcome + exact score)
   for (const [matchId, actual] of Object.entries(actualResults)) {
@@ -189,9 +189,10 @@ export function calculateFullScore(
 
   if (userPredictions.advancing) {
     const advancingSource = effectiveActualAdvancing || {};
-    for (const [round, predictedTeams] of Object.entries(
+    for (const [round, p] of Object.entries(
       userPredictions.advancing,
     )) {
+      const predictedTeams = p as string[];
       const actualTeams = advancingSource[round] || [];
       if (actualTeams.length === 0) continue;
       const stage =

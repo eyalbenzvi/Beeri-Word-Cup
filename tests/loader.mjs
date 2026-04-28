@@ -62,6 +62,7 @@ export function resolve(specifier, context, next) {
     !specifier.endsWith(".jsx") &&
     !specifier.endsWith(".ts") &&
     !specifier.endsWith(".tsx") &&
+    !specifier.endsWith(".mjs") &&
     !specifier.endsWith(".json")
   ) {
     const resolved = resolveRelative(specifier, context.parentURL);

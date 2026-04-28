@@ -1,6 +1,7 @@
 // Verifies lock-state messages are centralised in constants/messages.js
 // and consumed by Home, FormList, and AllForms (avoids drift between pages).
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -11,10 +12,10 @@ function assert(c, m) {
 
 console.log("=== LOCK MESSAGES TESTS ===\n");
 
-const messages = fs.readFileSync("src/constants/messages.js", "utf8");
-const home = fs.readFileSync("src/pages/Home.jsx", "utf8");
-const formList = fs.readFileSync("src/components/FormList.jsx", "utf8");
-const allForms = fs.readFileSync("src/pages/AllForms.jsx", "utf8");
+const messages = readMigratedSrc("src/constants/messages.js", "utf8");
+const home = readMigratedSrc("src/pages/Home.jsx", "utf8");
+const formList = readMigratedSrc("src/components/FormList.jsx", "utf8");
+const allForms = readMigratedSrc("src/pages/AllForms.jsx", "utf8");
 
 // --- Constants file defines all three keys ---
 assert(/LOCK_MESSAGES/.test(messages), "messages.js exports LOCK_MESSAGES");

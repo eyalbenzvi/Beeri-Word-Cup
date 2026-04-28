@@ -3,6 +3,7 @@
 // narrow xl middle column; CTA button that glues to the frame; and the
 // broken 'עוד עד' countdown header.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -13,9 +14,9 @@ function assert(c, m) {
 
 console.log("=== HOME + WELCOME TYPOGRAPHY TESTS ===\n");
 
-const home = fs.readFileSync("src/pages/Home.jsx", "utf8");
-const welcome = fs.readFileSync("src/pages/WelcomeScreen.jsx", "utf8");
-const messages = fs.readFileSync("src/constants/messages.js", "utf8");
+const home = readMigratedSrc("src/pages/Home.jsx", "utf8");
+const welcome = readMigratedSrc("src/pages/WelcomeScreen.jsx", "utf8");
+const messages = readMigratedSrc("src/constants/messages.js", "utf8");
 
 // --- BRAND constant is the single source of truth for title copy ---
 assert(/export const BRAND/.test(messages), "messages.js exports BRAND");
@@ -49,7 +50,7 @@ assert(
   /btn-duo-cta/.test(home),
   "Home CTA uses shared btn-duo-cta utility",
 );
-const indexCss = fs.readFileSync("src/index.css", "utf8");
+const indexCss = readMigratedSrc("src/index.css", "utf8");
 assert(
   /\.btn-duo-cta[\s\S]*?max-width:\s*320px/.test(indexCss),
   "btn-duo-cta utility caps width to 320px",

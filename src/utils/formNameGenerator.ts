@@ -19,15 +19,16 @@ export function generateDefaultFormName({
   nickname,
   userForms = [],
   allPredictions = {},
-} = {}) {
+}: { nickname?: string; userForms?: any[]; allPredictions?: Record<string, any> } = {}) {
   const base = (nickname || "").trim() || DEFAULT_FORM_NAME_FALLBACK;
 
-  const taken = new Set();
+  const taken = new Set<string>();
   for (const f of userForms) {
     const n = normalize(f?.formName);
     if (n) taken.add(n);
   }
-  for (const f of Object.values(allPredictions || {})) {
+  for (const fAny of Object.values(allPredictions || {})) {
+    const f = fAny as any;
     if (!BLOCKING_STATUSES.has(f?.status)) continue;
     const n = normalize(f?.formName);
     if (n) taken.add(n);

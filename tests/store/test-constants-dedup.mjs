@@ -14,6 +14,7 @@
 //     MISSING_MATCHES_PREVIEW_LIMIT each appear as a named constant in their
 //     home file (no surviving bare literals on the same lines).
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -76,10 +77,10 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
   const storeAudit = await import("../../src/storeAudit.js");
   assert(typeof storeAudit.MAX_AUDIT_LOG_SIZE === "number",
     "storeAudit exports MAX_AUDIT_LOG_SIZE");
-  const storeAuditSrc = fs.readFileSync("src/storeAudit.js", "utf8");
+  const storeAuditSrc = readMigratedSrc("src/storeAudit.js", "utf8");
   assert(/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeAuditSrc),
     "storeAudit.js owns the cap check");
-  const storeSrc = fs.readFileSync("src/store.js", "utf8");
+  const storeSrc = readMigratedSrc("src/store.js", "utf8");
   assert(!/auditLog\.length\s*>\s*200/.test(storeSrc),
     "store.js no longer hardcodes `auditLog.length > 200`");
   assert(!/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeSrc),
@@ -92,7 +93,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 4. KNOCKOUT_STAGE_ORDER not re-declared as a private array
 {
-  const adminResults = fs.readFileSync("src/components/AdminResultsTab.jsx", "utf8");
+  const adminResults = readMigratedSrc("src/components/AdminResultsTab.jsx", "utf8");
   assert(!/const\s+knockoutStageOrder\s*=\s*\[/.test(adminResults),
     "AdminResultsTab no longer declares its own knockoutStageOrder");
   assert(/import\s*\{[^}]*KNOCKOUT_STAGE_ORDER[^}]*\}\s*from\s*["']\.\.\/utils\/constants["']/.test(adminResults),
@@ -101,7 +102,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 5. retryDelay constants
 {
-  const storeSrc = fs.readFileSync("src/store.js", "utf8");
+  const storeSrc = readMigratedSrc("src/store.js", "utf8");
   assert(/RETRY_BASE_MS\s*=\s*2000/.test(storeSrc), "store.js defines RETRY_BASE_MS");
   assert(/RETRY_MAX_MS\s*=\s*30000/.test(storeSrc), "store.js defines RETRY_MAX_MS");
   assert(!/Math\.min\(2000\s*\*\s*Math\.pow/.test(storeSrc),
@@ -112,7 +113,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 6. THIRD_PLACE_QUALIFIERS in bracket.js
 {
-  const src = fs.readFileSync("src/utils/bracket.js", "utf8");
+  const src = readMigratedSrc("src/utils/bracket.js", "utf8");
   assert(/THIRD_PLACE_QUALIFIERS\s*=\s*8/.test(src),
     "bracket.js defines THIRD_PLACE_QUALIFIERS = 8");
   assert(!/thirdPlace\.slice\(0,\s*8\)/.test(src),
@@ -121,7 +122,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 7. MatchCard MAX_SCORE
 {
-  const src = fs.readFileSync("src/components/MatchCard.jsx", "utf8");
+  const src = readMigratedSrc("src/components/MatchCard.jsx", "utf8");
   assert(/const\s+MAX_SCORE\s*=\s*20/.test(src), "MatchCard defines MAX_SCORE");
   assert(!/Math\.min\(20,/.test(src),
     "MatchCard no longer has bare Math.min(20, …)");
@@ -131,7 +132,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 8. Leaderboard PAGE_SIZE + ADVANCING_POINTS_LABELS
 {
-  const src = fs.readFileSync("src/pages/Leaderboard.jsx", "utf8");
+  const src = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
   assert(/const\s+PAGE_SIZE\s*=\s*20/.test(src), "Leaderboard defines PAGE_SIZE");
   assert(!/useState\(20\)/.test(src), "Leaderboard useState uses PAGE_SIZE");
   assert(!/s\s*\+\s*20\)/.test(src), "Leaderboard show-more uses PAGE_SIZE");
@@ -143,13 +144,13 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 9. MatchSearch MAX_RESULTS, AdminDashboardTab MISSING_MATCHES_PREVIEW_LIMIT
 {
-  const ms = fs.readFileSync("src/components/MatchSearch.jsx", "utf8");
+  const ms = readMigratedSrc("src/components/MatchSearch.jsx", "utf8");
   assert(/const\s+MAX_RESULTS\s*=\s*20/.test(ms),
     "MatchSearch defines MAX_RESULTS");
   assert(!/results\.slice\(0,\s*20\)/.test(ms),
     "MatchSearch no longer slices with a bare 20");
 
-  const adt = fs.readFileSync("src/components/AdminDashboardTab.jsx", "utf8");
+  const adt = readMigratedSrc("src/components/AdminDashboardTab.jsx", "utf8");
   assert(/MISSING_MATCHES_PREVIEW_LIMIT\s*=\s*8/.test(adt),
     "AdminDashboardTab defines MISSING_MATCHES_PREVIEW_LIMIT");
   assert(!/\.slice\(0,\s*8\)/.test(adt),
@@ -158,7 +159,7 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
 
 // 10. ScoringTable BONUSES wiring
 {
-  const src = fs.readFileSync("src/components/ScoringTable.jsx", "utf8");
+  const src = readMigratedSrc("src/components/ScoringTable.jsx", "utf8");
   assert(/BONUSES\.champion/.test(src), "ScoringTable uses BONUSES.champion");
   assert(/BONUSES\.topScorer/.test(src), "ScoringTable uses BONUSES.topScorer");
   // The bonus values themselves shouldn't appear as bare literals next to LABELS.pointsShort.

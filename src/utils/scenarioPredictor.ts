@@ -279,10 +279,10 @@ export function predictScenario(
     throw new Error(`Unknown team code: ${champion} or ${runnerUp}`);
   }
 
-  const allPreds = {};
+  const allPreds: Record<string, any> = {};
   // Start by copying existing predictions (preserve verbatim — may be overwritten below)
   for (const [mid, p] of Object.entries(existingPreds)) {
-    if (isFilled(p)) allPreds[mid] = { ...p };
+    if (isFilled(p)) allPreds[mid] = { ...(p as object) };
   }
 
   const positions = pickGroupPositions(champGroup, runnerGroup);
@@ -355,7 +355,7 @@ export function predictScenario(
       } else if (hasRunner) {
         allPreds[m.id] = predictKnockoutBiased(teams.home, teams.away, runnerUp);
       } else {
-        const pred = predictMatch(teams.home, teams.away);
+        const pred: any = predictMatch(teams.home, teams.away);
         if (pred.homeScore === pred.awayScore) {
           pred.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
         }

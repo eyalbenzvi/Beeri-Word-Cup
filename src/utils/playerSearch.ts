@@ -57,7 +57,7 @@ export function getPlayerDisplayName(stored, playerList) {
 
 // True if two stored values refer to the same player (handles mixed En/He across legacy data).
 // Falls back to normalized string comparison when neither side is in the list.
-export function isSamePlayer(a, b, playerList) {
+export function isSamePlayer(a: string | null | undefined, b: string | null | undefined, playerList?: any[]) {
   if (a == null || b == null) return false;
   const as = String(a).trim();
   const bs = String(b).trim();
