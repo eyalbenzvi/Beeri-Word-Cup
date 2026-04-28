@@ -38,7 +38,6 @@ import { logAdminAction, getAuditLog, writeAuditLog } from "./audit";
 import {
   cache,
   notifyAndEmit,
-  notifyAllListeners,
   emitSaving,
   emitSaved,
   emitWriteError,
@@ -50,6 +49,34 @@ import {
   closeBroadcastChannel,
   broadcastActiveFormChange,
 } from "./cache";
+import {
+  getUsers,
+  getUserDirectory,
+  getUserPrivate,
+  getUserPrivateMap,
+  isUserPrivateReady,
+  getUser,
+  getCurrentUser,
+  setCurrentUser,
+  requireAdmin,
+  ensureUserInStore,
+  resetEnsureUserState,
+  getLastEnsuredUid,
+  clearLastEnsuredUid,
+  updateUser,
+  updateUserProfile,
+  touchUserLogin,
+  demoteAdmin,
+  setAdminClaim,
+  deleteUser,
+  writeGameDoc,
+  updateUserField,
+  createUserField,
+  removeUserField,
+  pickKnown,
+  DIRECTORY_FIELDS,
+  USER_PRIVATE_FIELDS,
+} from "./usersRepo";
 
 export {
   commitInBatches,
@@ -59,245 +86,27 @@ export {
   getMissingReadyKeys,
   subscribe,
   subscribeToKey,
+  getUsers,
+  getUserDirectory,
+  getUserPrivate,
+  getUserPrivateMap,
+  isUserPrivateReady,
+  getUser,
+  getCurrentUser,
+  setCurrentUser,
+  ensureUserInStore,
+  updateUser,
+  updateUserProfile,
+  touchUserLogin,
+  demoteAdmin,
+  setAdminClaim,
+  deleteUser,
 };
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
 
-import { MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
-
-async function writeGameDoc(docName, data, { force = false } = {}) {
-  // Safety guard: block writes that would dramatically shrink shared data.
-  // Pass { force: true } for explicit admin-initiated clears.
-  if (!force && (docName === "users" || docName === "matchResults")) {
-    const currentCount = Object.keys(cache[docName] || {}).length;
-    const newCount = Object.keys(data || {}).length;
-    if (currentCount > 2 && newCount < currentCount * 0.5) {
-      console.error(
-        `[SAFETY] Blocked write to ${docName}: would shrink from ${currentCount} to ${newCount} entries.`,
-      );
-      writeAuditLog("blocked-dangerous-write", {
-        docName,
-        currentCount,
-        newCount,
-      });
-      return false;
-    }
-  }
-  if (docName === "users") {
-    const currentCount = Object.keys(cache[docName] || {}).length;
-    const newCount = Object.keys(data || {}).length;
-    writeAuditLog("users-bulk-write", { currentCount, newCount });
-  }
-  cache[docName] = data;
-  notifyAndEmit(docName);
-  emitSaving(docName);
-  try {
-    await withTimeout(
-      setDoc(gameDocRef(docName), { data: safeClone(data) }),
-      10000,
-    );
-    emitSaved(docName);
-    return true;
-  } catch (err) {
-    console.error(`Failed to write ${docName}:`, err);
-    emitWriteError(docName, err);
-    captureClientError(err, { source: "writeGameDoc", docName, code: err?.code });
-    await maybeRefreshToken(err);
-    return false;
-  }
-}
-
-// PII migration Phase A: each user record is split across THREE Firestore
-// locations and dual-written atomically:
-//   1. gameData/users      — legacy doc (full record). Kept during the
-//                            compat window so admin tabs and the
-//                            set-admin-claim Netlify function keep
-//                            working unchanged.
-//   2. gameData/userDirectory — public-bounded {uid: {displayName, firstName?, lastName?}}.
-//   3. userPrivate/{uid}   — per-user private doc (email, isAdmin,
-//                            profileCompleted, lastLoginAt, createdAt,
-//                            photoURL).
-// These two arrays are the single source of truth for which destination
-// each field belongs to. They MUST stay in sync with firestore.rules
-// (userDirectoryEntryOk + userPrivateOwnerCreateOk).
-const DIRECTORY_FIELDS = ["displayName", "firstName", "lastName"];
-const USER_PRIVATE_FIELDS = [
-  "id", "email", "isAdmin", "profileCompleted",
-  "lastLoginAt", "createdAt", "photoURL",
-];
-
-// Pick the keys from `obj` that belong to `allowed`, dropping undefined.
-function pickKnown(obj, allowed) {
-  const out = {};
-  for (const k of allowed) {
-    if (obj && obj[k] !== undefined) out[k] = obj[k];
-  }
-  return out;
-}
-
-// Update a user's record. Writes to legacy users + directory + userPrivate
-// atomically via writeBatch. Caller passes whatever fields they want to
-// change; this fans them out to the right destinations.
-async function updateUserField(uid, fields) {
-  const dirFields = pickKnown(fields, DIRECTORY_FIELDS);
-  const privFields = pickKnown(fields, USER_PRIVATE_FIELDS);
-
-  // Optimistic cache updates.
-  cache.users = {
-    ...cache.users,
-    [uid]: { ...cache.users[uid], ...fields },
-  };
-  if (Object.keys(dirFields).length > 0) {
-    cache.userDirectory = {
-      ...cache.userDirectory,
-      [uid]: { ...cache.userDirectory[uid], ...dirFields },
-    };
-  }
-  if (Object.keys(privFields).length > 0) {
-    cache.userPrivate = {
-      ...cache.userPrivate,
-      [uid]: { ...cache.userPrivate[uid], ...privFields },
-    };
-  }
-  notifyAndEmit("users");
-  emitSaving("users");
-
-  const batch = writeBatch(db);
-  // Legacy users — dot-notation update.
-  const legacyPayload = {};
-  for (const [key, value] of Object.entries(fields)) {
-    legacyPayload[`data.${uid}.${key}`] = value;
-  }
-  batch.update(gameDocRef("users"), legacyPayload);
-  // Directory — setDoc(merge:true) so first-ever write creates the doc.
-  if (Object.keys(dirFields).length > 0) {
-    batch.set(
-      userDirectoryDocRef(),
-      { data: { [uid]: dirFields } },
-      { merge: true },
-    );
-  }
-  // userPrivate/{uid} — setDoc(merge:true) for create-or-update.
-  if (Object.keys(privFields).length > 0) {
-    batch.set(userPrivateDocRef(uid), privFields, { merge: true });
-  }
-
-  try {
-    await withTimeout(batch.commit(), 10000);
-    emitSaved("users");
-    return true;
-  } catch (err) {
-    console.error(`Failed to update user ${uid}:`, err);
-    emitWriteError("users", err);
-    captureClientError(err, {
-      source: "updateUserField",
-      uid,
-      fieldKeys: Object.keys(fields || {}),
-      code: err?.code,
-    });
-    await maybeRefreshToken(err);
-    return false;
-  }
-}
-
-// Firestore document size limit is 1MB. Warn when approaching.
-const MAX_USERS_WARNING = 1500;
-const MAX_USERS_HARD_LIMIT = USER_LIMIT;
-
-// Create a new user record across all three locations atomically. Caller
-// passes the full record; this splits the fields and dual-writes.
-async function createUserField(uid, userData) {
-  const currentCount = Object.keys(cache.users).length;
-  if (currentCount >= MAX_USERS_HARD_LIMIT) {
-    console.error(`[SAFETY] Cannot create user: ${currentCount} users already at hard limit of ${MAX_USERS_HARD_LIMIT}`);
-    writeAuditLog("blocked-user-create", { currentCount, uid });
-    return false;
-  }
-  if (currentCount >= MAX_USERS_WARNING) {
-    console.warn(`[WARNING] User count (${currentCount}) approaching Firestore 1MB document limit.`);
-  }
-
-  const dirFields = pickKnown(userData, DIRECTORY_FIELDS);
-  const privFields = pickKnown(userData, USER_PRIVATE_FIELDS);
-
-  // Optimistic cache updates.
-  cache.users = { ...cache.users, [uid]: userData };
-  cache.userDirectory = { ...cache.userDirectory, [uid]: dirFields };
-  cache.userPrivate = { ...cache.userPrivate, [uid]: privFields };
-  notifyAndEmit("users");
-  emitSaving("users");
-  writeAuditLog("user-create", {
-    targetUser: uid,
-    userCountAfter: Object.keys(cache.users).length,
-  });
-
-  // Use setDoc(merge:true) for the legacy users doc too — handles both the
-  // first-user-ever case (doc not yet created) and subsequent additions
-  // without a try/catch/fallback dance, and keeps the whole operation
-  // atomic under writeBatch.
-  const batch = writeBatch(db);
-  batch.set(
-    gameDocRef("users"),
-    { data: { [uid]: userData } },
-    { merge: true },
-  );
-  batch.set(
-    userDirectoryDocRef(),
-    { data: { [uid]: dirFields } },
-    { merge: true },
-  );
-  batch.set(userPrivateDocRef(uid), privFields, { merge: true });
-
-  try {
-    await withTimeout(batch.commit(), 10000);
-    emitSaved("users");
-    return true;
-  } catch (err) {
-    console.error(`Failed to create user ${uid}:`, err);
-    emitWriteError("users", err);
-    captureClientError(err, {
-      source: "createUserField",
-      uid,
-      code: err?.code,
-    });
-    await maybeRefreshToken(err);
-    return false;
-  }
-}
-
-// Remove a user from all three locations atomically. Admin-only path
-// (deleteUser is gated by requireAdmin); rules permit admin deletes on
-// userPrivate.
-async function removeUserField(uid) {
-  const newUsers = { ...cache.users };
-  delete newUsers[uid];
-  cache.users = newUsers;
-  const newDir = { ...cache.userDirectory };
-  delete newDir[uid];
-  cache.userDirectory = newDir;
-  const newPriv = { ...cache.userPrivate };
-  delete newPriv[uid];
-  cache.userPrivate = newPriv;
-  notifyAndEmit("users");
-  emitSaving("users");
-
-  const batch = writeBatch(db);
-  batch.update(gameDocRef("users"), { [`data.${uid}`]: deleteField() });
-  batch.update(userDirectoryDocRef(), { [`data.${uid}`]: deleteField() });
-  batch.delete(userPrivateDocRef(uid));
-
-  try {
-    await withTimeout(batch.commit(), 10000);
-    emitSaved("users");
-    return true;
-  } catch (err) {
-    console.error(`Failed to remove user ${uid}:`, err);
-    emitWriteError("users", err);
-    captureClientError(err, { source: "removeUserField", uid, code: err?.code });
-    return false;
-  }
-}
+import { MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 
 // Reverts cache.predictions[formId] back to a pre-write snapshot. Only used
 // for terminal errors (`permission-denied`) where the listener will never
@@ -651,15 +460,16 @@ export function initRealtimeListeners(userId) {
           // record of them, the write was rejected and the SDK reverted the
           // optimistic cache. Clear lastEnsuredUid so ensureUserInStore can
           // try again, and report to Sentry with context.
-          if (key === "users" && lastEnsuredUid) {
-            const stillThere = (cache.users || {})[lastEnsuredUid];
-            const wasThere = prevUsers && prevUsers[lastEnsuredUid];
+          const ensuredUid = getLastEnsuredUid();
+          if (key === "users" && ensuredUid) {
+            const stillThere = (cache.users || {})[ensuredUid];
+            const wasThere = prevUsers && prevUsers[ensuredUid];
             if (wasThere && !stillThere) {
               captureClientMessage("user-cache-reverted", {
-                uid: lastEnsuredUid,
+                uid: ensuredUid,
                 userCount: Object.keys(cache.users || {}).length,
               });
-              lastEnsuredUid = null;
+              clearLastEnsuredUid();
             }
           }
           notifyAndEmit(key);
@@ -1074,298 +884,16 @@ function setupUserPrivateListener(userId) {
 }
 
 // ============ USERS ============
+// (read accessors + write helpers + admin ops live in ./usersRepo and
+// are re-exported via the import block at the top of this file.)
 
-const EMPTY_OBJ = {};
 const DEFAULT_BONUSES = { champion: null, topScorers: [] };
 const DEFAULT_SETTINGS: Record<string, any> = { predictionsLocked: false };
-
-export function getUsers() {
-  return cache.users || EMPTY_OBJ;
-}
-
-// PII migration Phase A: public-bounded directory of {uid: {displayName,
-// firstName?, lastName?}}. Non-admin reads should prefer this over
-// `getUsers()` so the legacy users doc can be tightened to admin-only.
-export function getUserDirectory() {
-  return cache.userDirectory || EMPTY_OBJ;
-}
-
-// Returns the current authenticated user's private record or null. Admins
-// only have their own record materialised via this listener too — admin
-// tabs continue to read the legacy users doc for the full membership
-// during the compat window.
-export function getUserPrivate(uid) {
-  if (!uid) return null;
-  return (cache.userPrivate || EMPTY_OBJ)[uid] || null;
-}
-
-// Whole map of {uid -> private record}. Useful as the snapshot input for
-// useSyncExternalStore so consumers re-render when the user's own private
-// record changes (e.g. lastLoginAt updated, profileCompleted flipped).
-export function getUserPrivateMap() {
-  return cache.userPrivate || EMPTY_OBJ;
-}
-
-// Whether the userPrivate listener has fired at least once. Distinct
-// from `_ready.users` (legacy doc) so consumers that depend specifically
-// on the new path can wait correctly.
-export function isUserPrivateReady() {
-  return !!cache._ready.userPrivate;
-}
-
-let lastEnsuredUid = null;
-// A1: bounded retry counter per uid. Prevents infinite loop when the write
-// keeps failing for a permanent reason (rule violation we can't fix client-side).
-const ensureRetryCount = new Map();
-const MAX_ENSURE_RETRIES = 3;
-let ensureInFlight = null; // single-flight guard across parallel renders
-
-export async function ensureUserInStore(uid, displayName, email) {
-  if (!cache._ready.users) return uid;
-  // Skip if we already succeeded for this uid (cache has the user).
-  if (lastEnsuredUid === uid && getUsers()[uid]) return uid;
-  // Single-flight guard — parallel render cycles must not double-write.
-  if (ensureInFlight) return ensureInFlight;
-  ensureInFlight = doEnsureUserInStore(uid, displayName, email).finally(() => {
-    ensureInFlight = null;
-  });
-  return ensureInFlight;
-}
-
-async function doEnsureUserInStore(uid, displayName, email) {
-  const existing = getUsers()[uid];
-  if (existing) {
-    // Do NOT overwrite displayName on subsequent logins — the user's custom
-    // nickname (set via Profile / ProfileSetup) would be clobbered each time
-    // by the Google name or phone number coming from Firebase Auth.
-    const needsUpdate = email && !existing.email;
-    if (!needsUpdate) {
-      lastEnsuredUid = uid;
-      return uid;
-    }
-    const fields = { email };
-    const ok = await updateUserField(uid, fields);
-    if (ok) lastEnsuredUid = uid;
-    return uid;
-  }
-
-  // Bounded retry — avoid infinite loop on a permanent rule violation.
-  const attempts = ensureRetryCount.get(uid) || 0;
-  if (attempts >= MAX_ENSURE_RETRIES) {
-    captureClientMessage("ensure-user-retry-exhausted", {
-      uid,
-      attempts,
-      userCount: Object.keys(cache.users || {}).length,
-    });
-    return uid;
-  }
-  ensureRetryCount.set(uid, attempts + 1);
-
-  // User not in cache. Two possibilities:
-  //   A) Cache desync — user exists in Firestore. Per-field update preserves
-  //      isAdmin/firstName/lastName/etc.
-  //   B) Genuinely new user (or recreated after deletion) — not in Firestore.
-  //      A per-field update would be REJECTED by Firestore rules: new entries
-  //      require `isAdmin == false` in the resulting document. Without that,
-  //      the SDK reverts the optimistic cache and the user vanishes — App.jsx
-  //      then renders an infinite Loading screen because user becomes null.
-  // Disambiguate with a one-shot read (cheap, only on login) before writing.
-  let firestoreUser = null;
-  try {
-    const snap = await withTimeout(getDoc(gameDocRef("users")), 10000);
-    if (snap.exists()) firestoreUser = snap.data().data?.[uid] || null;
-  } catch (err) {
-    console.error("Failed to verify user in Firestore:", err);
-    captureClientError(err, {
-      source: "ensureUserInStore.getDoc",
-      uid,
-      code: err?.code,
-    });
-    await maybeRefreshToken(err);
-    return uid;
-  }
-
-  const now = new Date().toISOString();
-  let ok;
-  if (firestoreUser) {
-    // Case A: per-field update preserves existing fields (isAdmin, names, etc.).
-    // Don't overwrite displayName — preserve the user's custom nickname.
-    const fields: Record<string, any> = { id: uid, lastLoginAt: now };
-    if (email && !firestoreUser.email) fields.email = email;
-    cache.users = { ...cache.users, [uid]: { ...firestoreUser, ...fields } };
-    notifyAndEmit("users");
-    ok = await updateUserField(uid, fields);
-  } else {
-    // Case B: write full record so isAdmin: false satisfies the create-rule.
-    ok = await createUserField(uid, {
-      id: uid,
-      displayName: displayName || "משתמש",
-      isAdmin: false,
-      email: email || null,
-      profileCompleted: false,
-      createdAt: now,
-      lastLoginAt: now,
-    });
-  }
-  if (ok) {
-    lastEnsuredUid = uid;
-    ensureRetryCount.delete(uid);
-  }
-  return uid;
-}
-
-export function updateUser(userId, fields) {
-  if (!getUsers()[userId]) return;
-  updateUserField(userId, fields);
-}
-
-export async function updateUserProfile(uid: string, profileFields: Record<string, any>) {
-  if (!getUsers()[uid]) return false;
-  const { firstName, lastName, displayName, profileCompleted } = profileFields;
-  const fields: Record<string, any> = {};
-  if (firstName !== undefined) fields.firstName = firstName;
-  if (lastName !== undefined) fields.lastName = lastName;
-  if (displayName !== undefined) fields.displayName = displayName;
-  if (profileCompleted !== undefined)
-    fields.profileCompleted = profileCompleted;
-  if (Object.keys(fields).length === 0) return true;
-  return await updateUserField(uid, fields);
-}
-
-export function touchUserLogin(uid) {
-  if (!getUsers()[uid]) return;
-  updateUserField(uid, { lastLoginAt: new Date().toISOString() });
-}
-
-export function demoteAdmin(userId: string) {
-  const users = getUsers();
-  if (!users[userId] || !users[userId].isAdmin) return;
-  const adminCount = Object.values(users).filter((u: any) => u.isAdmin).length;
-  if (adminCount <= 1) return;
-  updateUserField(userId, { isAdmin: false });
-}
-
-/**
- * Set admin custom claim via server-side Netlify function.
- * This sets Firebase Custom Claims (tamper-proof) and updates Firestore.
- * Returns { success, error } object.
- */
-export async function setAdminClaim(targetUid, action) {
-  if (!requireAdmin()) return { error: "Not admin" };
-  try {
-    const { auth: firebaseAuth } = await import("../firebase");
-    const idToken = await firebaseAuth.currentUser?.getIdToken();
-    if (!idToken) return { error: "Not authenticated" };
-
-    const res = await fetch("/.netlify/functions/set-admin-claim", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ targetUid, action }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.success) {
-      return { error: data?.error || `Error ${res.status}` };
-    }
-    return { success: true };
-  } catch (err) {
-    console.error("setAdminClaim error:", err);
-    return { error: err.message };
-  }
-}
-
-export async function deleteUser(userId) {
-  if (!requireAdmin()) return;
-  const userCountBefore = Object.keys(getUsers()).length;
-
-  // Find user's forms to delete
-  const formsToDelete = Object.keys(cache.predictions).filter(
-    (fid) => cache.predictions[fid]?.userId === userId,
-  );
-
-  // Update local cache (legacy + directory + private + predictions)
-  const newUsers = { ...cache.users };
-  delete newUsers[userId];
-  cache.users = newUsers;
-  const newDir = { ...cache.userDirectory };
-  delete newDir[userId];
-  cache.userDirectory = newDir;
-  const newPriv = { ...cache.userPrivate };
-  delete newPriv[userId];
-  cache.userPrivate = newPriv;
-  for (const fid of formsToDelete) {
-    delete cache.predictions[fid];
-  }
-  cache.predictions = { ...cache.predictions };
-  notifyAllListeners();
-
-  writeAuditLog("user-delete", {
-    targetUser: userId,
-    userCountBefore,
-    userCountAfter: Object.keys(newUsers).length,
-    formsDeleted: formsToDelete.length,
-  });
-
-  // Single batch: remove user from all three locations + delete form docs.
-  // PII migration Phase A: dual-delete keeps the directory + userPrivate
-  // in sync with the legacy users doc.
-  const batch = writeBatch(db);
-  batch.update(gameDocRef("users"), { [`data.${userId}`]: deleteField() });
-  batch.update(userDirectoryDocRef(), { [`data.${userId}`]: deleteField() });
-  batch.delete(userPrivateDocRef(userId));
-  for (const fid of formsToDelete) {
-    batch.delete(formDocRef(fid));
-  }
-  await batch.commit();
-}
-
-// PII migration Phase B: cache.users is empty for non-admins (they get
-// permission-denied on the legacy doc). Merge from userDirectory +
-// userPrivate so own-user reads (Profile.jsx, getCurrentUser()) keep
-// working. For other-user reads, only directory data is returned —
-// non-admins never see another member's email / isAdmin / lastLoginAt
-// because rules deny their userPrivate read.
-export function getUser(userId) {
-  if (!userId) return null;
-  const fromUsers = (cache.users || EMPTY_OBJ)[userId];
-  if (fromUsers) return fromUsers;
-  const fromDirectory = (cache.userDirectory || EMPTY_OBJ)[userId] || null;
-  const fromPrivate = (cache.userPrivate || EMPTY_OBJ)[userId] || null;
-  if (!fromDirectory && !fromPrivate) return null;
-  return { ...(fromDirectory || {}), ...(fromPrivate || {}) };
-}
-
-export function getCurrentUser() {
-  try {
-    const userId = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
-    if (!userId) return null;
-    return getUser(userId);
-  } catch {
-    return null;
-  }
-}
-
-// Defense-in-depth: client-side admin guard (Firestore rules are the real security layer)
-function requireAdmin() {
-  const u = getCurrentUser();
-  if (!u?.isAdmin) {
-    console.warn("Admin operation blocked: user is not admin");
-    return false;
-  }
-  return true;
-}
-
-export function setCurrentUser(userId) {
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userId));
-  notifyAndEmit("currentUser");
-}
+const EMPTY_OBJ: Record<string, any> = {};
 
 export function logoutUser() {
   flushPendingWrites();
-  lastEnsuredUid = null;
-  ensureRetryCount.clear();
+  resetEnsureUserState();
   tokenRefreshedAt.clear();
   listenersInitialized = false;
   listenersHadError = false;

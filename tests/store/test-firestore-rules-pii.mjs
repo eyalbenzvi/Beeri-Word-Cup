@@ -29,7 +29,25 @@ function assert(cond, msg) {
 }
 
 const rules = readMigratedSrc(resolve(ROOT, "firestore.rules"), "utf8");
-const store = readMigratedSrc(resolve(ROOT, "src/store.js"), "utf8");
+// After the store/* split, user-write helpers live in store/usersRepo.ts;
+// the barrel only re-exports. Concatenate the relevant store modules so
+// pattern-grep assertions stay agnostic about which module owns each
+// declaration.
+let store = readMigratedSrc(resolve(ROOT, "src/store.js"), "utf8");
+const STORE_SUBMODULES = [
+  "src/store/usersRepo.ts",
+  "src/store/predictionsRepo.ts",
+  "src/store/summariesRepo.ts",
+  "src/store/publicMode.ts",
+  "src/store/listeners.ts",
+  "src/store/backupRestore.ts",
+  "src/store/cache.ts",
+  "src/store/firestoreClient.ts",
+  "src/store/audit.ts",
+];
+for (const rel of STORE_SUBMODULES) {
+  try { store += "\n" + readMigratedSrc(resolve(ROOT, rel), "utf8"); } catch { /* not split yet */ }
+}
 
 console.log("=== FIRESTORE RULES — PII MIGRATION (Phase A) ===\n");
 

@@ -62,7 +62,11 @@ if (iconPickerFile) {
 
 // ---- 4. Store: updateUserProfile function ----
 console.log("--- 4. Store profile functions ---");
-const storeFile = read(`${SRC}/store.js`);
+// After the store/* split, user code lives in store/usersRepo.ts; the
+// barrel only re-exports. Concatenate both so the assertions are agnostic.
+let storeFile = read(`${SRC}/store.js`);
+const usersRepo = tryRead(`${SRC}/store/usersRepo.ts`);
+if (usersRepo) storeFile += "\n" + usersRepo;
 assert(/export async function updateUserProfile/.test(storeFile), "Store: updateUserProfile exported as async");
 assert(storeFile.includes('firstName') && storeFile.includes('lastName'), "Store: handles firstName/lastName");
 assert(storeFile.includes('profileCompleted'), "Store: handles profileCompleted");
