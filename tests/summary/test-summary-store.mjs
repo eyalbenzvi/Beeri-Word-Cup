@@ -119,7 +119,24 @@ assert(nextSummaryNumber({ a: { number: 2 } }) === 3,
 
 // ============ 2. store.js source audit ============
 console.log("--- 2. store.js source audit ---");
-const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+// After the store/* split, summary code lives in store/summariesRepo.ts
+// and listener code in store/listeners.ts. Concatenate so static-grep
+// assertions stay agnostic about which module owns each declaration.
+let storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+const STORE_SUBMODULES = [
+  "/home/user/Beeri-World-Cup/src/store/summariesRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/usersRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/predictionsRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/listeners.ts",
+  "/home/user/Beeri-World-Cup/src/store/publicMode.ts",
+  "/home/user/Beeri-World-Cup/src/store/cache.ts",
+  "/home/user/Beeri-World-Cup/src/store/firestoreClient.ts",
+  "/home/user/Beeri-World-Cup/src/store/audit.ts",
+  "/home/user/Beeri-World-Cup/src/store/backupRestore.ts",
+];
+for (const p of STORE_SUBMODULES) {
+  try { storeSrc += "\n" + readMigratedSrc(p, "utf8"); } catch { /* not split yet */ }
+}
 assert(storeSrc.includes("summariesCollectionRef"), "summariesCollectionRef declared");
 assert(storeSrc.includes("setupSummariesListener"), "listener function declared");
 assert(storeSrc.includes('where("status", "==", "published")'),
