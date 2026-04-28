@@ -3,6 +3,7 @@
 // exercise them. A static-audit check at the bottom verifies the hook file
 // still contains the expected guardrails.
 import fs from "node:fs";
+import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -87,7 +88,7 @@ console.log("--- 3. round-trip ---");
 
 // ============ 4. static audit of the real source ============
 console.log("--- 4. static audit of useNavigation.jsx ---");
-const src = fs.readFileSync("/home/user/Beeri-World-Cup/src/hooks/useNavigation.jsx", "utf8");
+const src = readMigratedSrc("/home/user/Beeri-World-Cup/src/hooks/useNavigation.jsx", "utf8");
 assert(src.includes("popstate"), "popstate listener present");
 assert(src.includes("replaceState"), "history.replaceState used");
 assert(src.includes("URL_PAGES"), "URL_PAGES allowlist present");

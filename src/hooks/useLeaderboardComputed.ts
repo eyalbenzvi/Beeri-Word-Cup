@@ -8,10 +8,10 @@ import {
 import { getCachedBracket } from "../utils/bracketCache";
 
 export function useLeaderboardComputed(
-  results,
-  allPredictions,
-  users,
-  actualBonuses,
+  results: Record<string, any>,
+  allPredictions: Record<string, any>,
+  users: Record<string, any>,
+  actualBonuses: any,
 ) {
   const actualBracket = useMemo(() => getCachedBracket(results), [results]);
 
@@ -25,8 +25,9 @@ export function useLeaderboardComputed(
   );
 
   const formBracketMap = useMemo(() => {
-    const map = {};
-    for (const [formId, predData] of Object.entries(allPredictions)) {
+    const map: Record<string, any> = {};
+    for (const [formId, p] of Object.entries(allPredictions)) {
+      const predData = p as any;
       const s = predData.status;
       if (s !== "submitted" && s !== "approved") continue;
       const matchPreds = predData.matches || {};
@@ -43,7 +44,8 @@ export function useLeaderboardComputed(
   const scoredForms = useMemo(() => {
     return Object.entries(allPredictions)
       .filter(([formId]) => formBracketMap[formId])
-      .map(([formId, predData]) => {
+      .map(([formId, p]) => {
+        const predData = p as any;
         const { predBracket, advancing, champion } = formBracketMap[formId];
         const enrichedPredData = {
           ...predData,

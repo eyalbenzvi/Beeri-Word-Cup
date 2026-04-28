@@ -14,9 +14,9 @@ const SCROLL_DELAY = 100;
  * sessionStorage is per-tab, which is what we want — switching forms in
  * a different tab shouldn't reset position here.
  */
-export function usePredictPosition(activeFormId) {
-  const [selectedStage, setSelectedStage] = useState("group");
-  const [selectedGroup, setSelectedGroup] = useState("A");
+export function usePredictPosition(activeFormId: string | null) {
+  const [selectedStage, setSelectedStage] = useState<string>("group");
+  const [selectedGroup, setSelectedGroup] = useState<string>("A");
 
   // Restore on form change.
   useEffect(() => {
@@ -45,7 +45,7 @@ export function usePredictPosition(activeFormId) {
     }
   }, [activeFormId, selectedStage, selectedGroup]);
 
-  return [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup];
+  return [selectedStage, setSelectedStage, selectedGroup, setSelectedGroup] as const;
 }
 
 /**
@@ -70,6 +70,12 @@ export function usePredictTabFocus({
   filteredMatches,
   selectedStage,
   selectedGroup,
+}: {
+  matchPredictions: Record<string, any>;
+  canEdit: boolean;
+  filteredMatches: any[];
+  selectedStage: string;
+  selectedGroup: string;
 }) {
   const predictionsRef = useRef(matchPredictions);
   predictionsRef.current = matchPredictions;
@@ -95,7 +101,7 @@ export function usePredictTabFocus({
         if (!container) return;
         const p = predictionsRef.current[firstUnfilled.id];
         const inputs = container.querySelectorAll('input[type="number"]');
-        const target = p?.homeScore == null ? inputs[0] : inputs[1];
+        const target = (p?.homeScore == null ? inputs[0] : inputs[1]) as HTMLInputElement | undefined;
         container.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
         if (target) {
           target.focus();
@@ -128,10 +134,11 @@ export function usePredictTabFocus({
  * That guarantees `view` keeps the same reference across unrelated
  * cache notifications.
  */
-export function usePredictDuplicateNameView(allPredictions) {
+export function usePredictDuplicateNameView(allPredictions: Record<string, any>) {
   const submittedNamesKey = useMemo(() => {
-    const parts = [];
-    for (const [fid, f] of Object.entries(allPredictions || {})) {
+    const parts: string[] = [];
+    for (const [fid, fAny] of Object.entries(allPredictions || {})) {
+      const f = fAny as any;
       if (
         f.status === "submitted" ||
         f.status === "approved" ||
@@ -144,8 +151,9 @@ export function usePredictDuplicateNameView(allPredictions) {
   }, [allPredictions]);
 
   return useMemo(() => {
-    const view = {};
-    for (const [fid, f] of Object.entries(allPredictions || {})) {
+    const view: Record<string, { formName: string; status: string }> = {};
+    for (const [fid, fAny] of Object.entries(allPredictions || {})) {
+      const f = fAny as any;
       if (
         f.status === "submitted" ||
         f.status === "approved" ||

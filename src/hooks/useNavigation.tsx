@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 
-const NavigationContext = createContext();
+const NavigationContext = createContext<any>(null);
 
 // Pages supported via URL query parameters. Only these are rehydrated from
 // `?page=...` on load, so bogus or legacy values can't drop the user onto
@@ -12,23 +12,23 @@ const URL_PAGES = new Set(["home", "predict", "leaderboard", "results", "stats",
 const KNOWN_PARAM_KEYS = ["n"];
 
 function readInitialFromURL() {
-  if (typeof window === "undefined") return { page: "home", params: {} };
+  if (typeof window === "undefined") return { page: "home", params: {} as Record<string, string> };
   try {
     const sp = new URLSearchParams(window.location.search);
     const rawPage = sp.get("page");
     const page = rawPage && URL_PAGES.has(rawPage) ? rawPage : "home";
-    const params = {};
+    const params: Record<string, string> = {};
     for (const key of KNOWN_PARAM_KEYS) {
       const v = sp.get(key);
       if (v != null) params[key] = v;
     }
     return { page, params };
   } catch {
-    return { page: "home", params: {} };
+    return { page: "home", params: {} as Record<string, string> };
   }
 }
 
-function buildURL(page, params) {
+function buildURL(page: string, params: Record<string, any>) {
   try {
     const url = new URL(window.location.href);
     const sp = url.searchParams;
@@ -51,7 +51,7 @@ function buildURL(page, params) {
 // `replace` controls browser history: push (default) creates a new entry so
 // Back/Forward works across in-app navigation; replace is for URL-sync where
 // no new entry is desired (e.g. upgrading `?page=blog` to `?page=blog&n=3`).
-function writeURL(page, params, { replace = false } = {}) {
+function writeURL(page: string, params: Record<string, any>, { replace = false }: { replace?: boolean } = {}) {
   if (typeof window === "undefined") return;
   const newURL = buildURL(page, params);
   if (!newURL) return;
@@ -65,7 +65,7 @@ function writeURL(page, params, { replace = false } = {}) {
   }
 }
 
-export function NavigationProvider({ children }) {
+export function NavigationProvider({ children }: { children: any }) {
   const initial = useMemo(() => readInitialFromURL(), []);
   const [page, setPage] = useState(initial.page);
   const [params, setParams] = useState(initial.params);
@@ -88,7 +88,7 @@ export function NavigationProvider({ children }) {
   // default (false) pushes a new history entry so Back/Forward works.
   // `behavior: "auto"` is the spec value for an instant scroll; older code
   // used the non-standard "instant" alias which most browsers tolerate.
-  const navigate = useCallback((p, nextParams = {}, options = {}) => {
+  const navigate = useCallback((p: string, nextParams: Record<string, any> = {}, options: { replace?: boolean } = {}) => {
     setPage(p);
     setParams(nextParams || {});
     writeURL(p, nextParams || {}, { replace: !!options.replace });

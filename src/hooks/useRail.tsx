@@ -3,11 +3,15 @@
 // it auto-clears on unmount.
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-const RailContext = createContext({ content: null, setContent: () => {} });
+type RailContextValue = {
+  content: any;
+  setContent: (node: any) => void;
+};
+const RailContext = createContext<RailContextValue>({ content: null, setContent: () => {} });
 
-export function RailProvider({ children }) {
-  const [content, setContentRaw] = useState(null);
-  const setContent = useCallback((node) => setContentRaw(node), []);
+export function RailProvider({ children }: { children: any }) {
+  const [content, setContentRaw] = useState<any>(null);
+  const setContent = useCallback((node: any) => setContentRaw(node), []);
   return (
     <RailContext.Provider value={{ content, setContent }}>
       {children}
@@ -20,7 +24,7 @@ export function useRailContent() {
 }
 
 // Pages call this with their rail node. Passing null clears it.
-export function useRightRail(node) {
+export function useRightRail(node: any) {
   const { setContent } = useContext(RailContext);
   useEffect(() => {
     setContent(node);

@@ -9,14 +9,14 @@ const FOCUSABLE =
  * Also moves initial focus to the first focusable element and restores
  * focus to the previously-focused element on close.
  */
-export function useFocusTrap(ref, active) {
+export function useFocusTrap(ref: { current: HTMLElement | null }, active: boolean) {
   useEffect(() => {
     if (!active || !ref.current) return;
     const node = ref.current;
-    const previouslyFocused = document.activeElement;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
 
-    const getFocusable = () =>
-      Array.from(node.querySelectorAll(FOCUSABLE)).filter(
+    const getFocusable = (): HTMLElement[] =>
+      Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => !el.hasAttribute("inert") && el.offsetParent !== null,
       );
 
@@ -30,7 +30,7 @@ export function useFocusTrap(ref, active) {
       node.focus();
     }
 
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       const focusables = getFocusable();
       if (focusables.length === 0) {
@@ -39,7 +39,7 @@ export function useFocusTrap(ref, active) {
       }
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      const current = document.activeElement;
+      const current = document.activeElement as HTMLElement | null;
       if (e.shiftKey && (current === first || !node.contains(current))) {
         last.focus();
         e.preventDefault();

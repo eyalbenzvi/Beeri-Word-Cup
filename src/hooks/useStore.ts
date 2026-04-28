@@ -22,7 +22,9 @@ const USER_WATCHDOG_MS = READY_WATCHDOG_MS;
 
 function connectionInfo() {
   try {
-    const c = navigator.connection;
+    // navigator.connection is non-standard (Network Information API);
+    // not in lib.dom.d.ts. Defensive cast keeps the read robust.
+    const c = (navigator as any).connection;
     if (!c) return { effectiveType: null, saveData: null };
     return { effectiveType: c.effectiveType || null, saveData: !!c.saveData };
   } catch {
@@ -30,7 +32,7 @@ function connectionInfo() {
   }
 }
 
-function useStoreValue(getSnapshot) {
+function useStoreValue<T>(getSnapshot: () => T): T {
   return useSyncExternalStore(store.subscribe, getSnapshot);
 }
 
