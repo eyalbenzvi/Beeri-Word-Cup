@@ -293,15 +293,25 @@ function bestGroupCombo(
   workingResults: Record<string, any>,
 ): GroupCombo {
   const combos = enumerateGroupCombos(groupRem, trackedForms[targetId]);
-  let bestObj = Infinity;
+  let bestAbove = Infinity;
+  let bestScore = -Infinity;
   let bestCombo: GroupCombo = combos[0] ?? {};
 
   for (const combo of combos) {
     const trial = { ...workingResults, ...combo };
     const scores = scoreForms(trackedForms, formPreds, trial);
     const above = countAbove(targetId, trackedIds, scores);
-    if (above < bestObj) {
-      bestObj = above;
+    const score = scores[targetId]?.totalPoints ?? 0;
+    // Lexicographic objective: minimize (above, -targetScore). Many trials
+    // tie on `above` (especially when few results are locked), so without
+    // the score tiebreak the optimizer would settle on the first combo it
+    // visited (typically all-home-wins) — a scenario unrelated to the
+    // target's predictions. Tiebreaking on target score guarantees the
+    // displayed scenario reflects the form whenever doing so achieves the
+    // best rank.
+    if (above < bestAbove || (above === bestAbove && score > bestScore)) {
+      bestAbove = above;
+      bestScore = score;
       bestCombo = combo;
     }
   }
@@ -329,7 +339,10 @@ function getTopKShapes(
   // are merged — they yield the same downstream bracket structure for
   // this group, so refining over them is redundant. The R32 entrants
   // are derived via deriveAdvancingTeams (the canonical source).
-  const shapeBest = new Map<string, { combo: GroupCombo; obj: number }>();
+  const shapeBest = new Map<
+    string,
+    { combo: GroupCombo; above: number; score: number }
+  >();
 
   for (const combo of combos) {
     const trial = { ...workingResults, ...combo };
@@ -342,15 +355,20 @@ function getTopKShapes(
 
     const scores = scoreForms(trackedForms, formPreds, trial);
     const above = countAbove(targetId, trackedIds, scores);
+    const score = scores[targetId]?.totalPoints ?? 0;
 
     const existing = shapeBest.get(shapeKey);
-    if (!existing || above < existing.obj) {
-      shapeBest.set(shapeKey, { combo, obj: above });
+    if (
+      !existing ||
+      above < existing.above ||
+      (above === existing.above && score > existing.score)
+    ) {
+      shapeBest.set(shapeKey, { combo, above, score });
     }
   }
 
   return Array.from(shapeBest.values())
-    .sort((a, b) => a.obj - b.obj)
+    .sort((a, b) => a.above - b.above || b.score - a.score)
     .slice(0, K)
     .map((s) => s.combo);
 }
@@ -387,15 +405,18 @@ function optimizeKnockout(
         actualTeams,
       );
 
-      let bestObj = Infinity;
+      let bestAbove = Infinity;
+      let bestScore = -Infinity;
       let bestCand = candidates[0];
 
       for (const cand of candidates) {
         const trial = { ...workingResults, ...koRes, [match.id]: cand };
         const scores = scoreForms(trackedForms, formPreds, trial);
         const above = countAbove(targetId, trackedIds, scores);
-        if (above < bestObj) {
-          bestObj = above;
+        const score = scores[targetId]?.totalPoints ?? 0;
+        if (above < bestAbove || (above === bestAbove && score > bestScore)) {
+          bestAbove = above;
+          bestScore = score;
           bestCand = cand;
         }
       }
@@ -426,7 +447,9 @@ function refineGroups(
   allIds: string[],
 ): Record<string, any> {
   let best = { ...workingResults };
-  let bestRank = countAbove(targetId, allIds, scoreForms(scoringForms, scoringPreds, best));
+  const bestScores = scoreForms(scoringForms, scoringPreds, best);
+  let bestRank = countAbove(targetId, allIds, bestScores);
+  let bestScore = bestScores[targetId]?.totalPoints ?? 0;
 
   for (let iter = 0; iter < 4; iter++) {
     let improved = false;
@@ -449,12 +472,16 @@ function refineGroups(
         );
         Object.assign(trial, newKO);
 
-        const trialRank = countAbove(
-          targetId, allIds, scoreForms(scoringForms, scoringPreds, trial),
-        );
+        const trialScores = scoreForms(scoringForms, scoringPreds, trial);
+        const trialRank = countAbove(targetId, allIds, trialScores);
+        const trialScore = trialScores[targetId]?.totalPoints ?? 0;
 
-        if (trialRank < bestRank) {
+        if (
+          trialRank < bestRank ||
+          (trialRank === bestRank && trialScore > bestScore)
+        ) {
           bestRank = trialRank;
+          bestScore = trialScore;
           best = trial;
           improved = true;
           break;
