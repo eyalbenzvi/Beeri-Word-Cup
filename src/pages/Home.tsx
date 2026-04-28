@@ -33,7 +33,13 @@ export default function Home() {
         <button
           onClick={() => {
             if (user) {
-              try { createForm(user.id); } catch (err) { showToast(err.message, "error"); }
+              try {
+                const formId = createForm(user.id);
+                if (formId) {
+                  navigate("predict", { form: formId });
+                  return;
+                }
+              } catch (err) { showToast(err.message, "error"); }
             }
             navigate("predict");
           }}

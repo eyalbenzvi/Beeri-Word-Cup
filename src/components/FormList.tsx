@@ -1,21 +1,24 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { normalizeStatus } from "../utils/helpers";
-import { reopenForm, createForm, deleteForm, setActiveFormId } from "../store";
+import { reopenForm, createForm, deleteForm } from "../store";
 import { getCachedChampion } from "../utils/bracketCache";
 import { getTeamByCode } from "../data/teams";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { generateDefaultFormName } from "../utils/formNameGenerator";
 import { useAllPredictions } from "../hooks/useStore";
+import { useNavigation } from "../hooks/useNavigation";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 import FormAvatar from "./FormAvatar";
 import FormSummaryLines from "./FormSummaryLines";
 import EmptyState from "./EmptyState";
+import StatusOnboarding from "./StatusOnboarding";
 import { LOCK_MESSAGES } from "../constants/messages";
 
 export default function FormList({ forms, user, settings, onShowAllForms }) {
   const showToast = useToast();
   const confirm = useConfirm();
+  const { navigate } = useNavigation();
   const allPredictions = useAllPredictions();
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
@@ -39,14 +42,16 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     if (!user || locked) return;
     const name = newFormName.trim() || defaultFormName;
     try {
-      createForm(user.id, name);
+      const formId = createForm(user.id, name);
       setNewFormName("");
       setShowNewForm(false);
       showToast(`"${name}" נוצר בהצלחה`);
+      // Open the freshly created form in the URL so Back returns here.
+      if (formId) navigate("predict", { form: formId });
     } catch (err) {
       showToast(err.message, "error");
     }
-  }, [user, locked, newFormName, defaultFormName, showToast]);
+  }, [user, locked, newFormName, defaultFormName, showToast, navigate]);
 
   const handleDeleteForm = useCallback(
     (formId) => {
@@ -76,12 +81,26 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
     [confirm, showToast],
   );
 
+  const newFormBtnRef = useRef<HTMLButtonElement | null>(null);
+  // After deleting a form (or returning here from a submit), the previously
+  // focused element is gone. Without explicit focus restore, focus falls to
+  // <body> and screen readers go silent. Re-focus the "+ טופס חדש" button —
+  // a stable, always-visible target — whenever the forms list shrinks.
+  const prevFormCountRef = useRef(forms.length);
+  useEffect(() => {
+    if (forms.length < prevFormCountRef.current) {
+      newFormBtnRef.current?.focus({ preventScroll: true });
+    }
+    prevFormCountRef.current = forms.length;
+  }, [forms.length]);
+
   return (
     <div>
       <div className="sticky top-16 z-10 bg-bg pb-3 pt-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-extrabold text-ink tracking-tight">הטפסים שלך</h1>
           <button
+            ref={newFormBtnRef}
             onClick={() => setShowNewForm(true)}
             className="btn-duo btn-duo-primary btn-duo-sm"
             disabled={locked}
@@ -111,6 +130,8 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
           />
         </div>
       )}
+
+      {forms.length > 0 && <StatusOnboarding />}
 
       <div className="space-y-3 mb-4">
         {forms.map((form) => {
@@ -151,7 +172,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
                 </span>
               </div>
               <div className="flex gap-2 mt-3 justify-end">
-                <button onClick={() => setActiveFormId(form.formId)} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
+                <button onClick={() => navigate("predict", { form: form.formId })} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
                 {(form.status === "pending" || formStatus === "submitted") && !settings.predictionsLocked && (

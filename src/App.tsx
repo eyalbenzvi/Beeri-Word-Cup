@@ -20,6 +20,7 @@ const Predict = lazyWithRetry(() => import("./pages/Predict"));
 const Leaderboard = lazyWithRetry(() => import("./pages/Leaderboard"));
 const Results = lazyWithRetry(() => import("./pages/Results"));
 const Stats = lazyWithRetry(() => import("./pages/Stats"));
+const Simulator = lazyWithRetry(() => import("./pages/Simulator"));
 const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const DailySummary = lazyWithRetry(() => import("./pages/DailySummary"));
@@ -30,6 +31,7 @@ const PAGES = {
   leaderboard: Leaderboard,
   results: Results,
   stats: Stats,
+  simulator: Simulator,
   admin: Admin,
   profile: Profile,
   blog: DailySummary,

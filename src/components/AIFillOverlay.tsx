@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 const AI_MESSAGES = [
   "⚽ סורק דירוגי FIFA...",
@@ -35,7 +36,20 @@ function AiProgressMessage({ step }) {
   );
 }
 
-export default function AIFillOverlay({ aiProgress }) {
+export default function AIFillOverlay({ aiProgress, onCancel }: { aiProgress: any; onCancel?: () => void }) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // Focus-trap is gated on whether the overlay is open. Without trap, Tab
+  // walks out to the form behind, and ESC silently swallowed by the body.
+  useFocusTrap(dialogRef, !!aiProgress);
+  useEffect(() => {
+    if (!aiProgress || !onCancel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aiProgress, onCancel]);
+
   if (!aiProgress) return null;
   return (
     <div
@@ -44,7 +58,7 @@ export default function AIFillOverlay({ aiProgress }) {
       aria-modal="true"
       aria-label="מילוי אוטומטי בעזרת AI"
     >
-      <div className="bg-white rounded-3xl p-8 mx-4 max-w-sm w-full text-center border-2 border-border animate-pop-in">
+      <div ref={dialogRef} className="bg-white rounded-3xl p-8 mx-4 max-w-sm w-full text-center border-2 border-border animate-pop-in">
         <div className="text-6xl mb-4 animate-bounce" aria-hidden="true">🤖</div>
         <div className="text-xl font-extrabold text-ink mb-4">
           הבינה המלאכותית מנתחת
@@ -63,6 +77,15 @@ export default function AIFillOverlay({ aiProgress }) {
           />
         </div>
         <AiProgressMessage step={aiProgress.current} />
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn-duo btn-duo-ghost btn-duo-sm mt-4"
+          >
+            ביטול
+          </button>
+        )}
       </div>
     </div>
   );
