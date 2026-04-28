@@ -104,7 +104,7 @@ export default function PlayerAutocomplete({ value, onChange, disabled = false, 
         disabled={disabled}
       />
       {hint && (
-        <div className="absolute top-full left-0 right-0 mt-0.5 text-xs text-danger font-bold pointer-events-none">
+        <div className="mt-1 text-xs text-danger font-bold">
           {hint}
         </div>
       )}
