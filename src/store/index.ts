@@ -1,4 +1,3 @@
-import { db, auth } from "../firebase";
 import {
   doc,
   getDoc,
@@ -8,7 +7,6 @@ import {
   deleteField,
   onSnapshot,
   writeBatch,
-  collection,
   getDocs,
   query,
   where,
@@ -22,6 +20,26 @@ import {
   logAdminAction as logAdminActionToBuffer,
   getAuditLog as getAuditLogFromBuffer,
 } from "../storeAudit";
+import {
+  db,
+  auth,
+  DOCS,
+  gameDocRef,
+  formDocRef,
+  predictionsCollectionRef,
+  summaryDocRef,
+  summariesCollectionRef,
+  userPrivateDocRef,
+  userPrivateCollectionRef,
+  userDirectoryDocRef,
+  commitInBatches,
+  withTimeout,
+  safeClone,
+  tokenRefreshedAt,
+  maybeRefreshToken,
+} from "./firestoreClient";
+
+export { commitInBatches };
 
 // ============ AUDIT LOG ============
 // Single source of truth in storeAudit.js — these are thin re-exports that
@@ -50,51 +68,6 @@ function writeAuditLog(action, details = {}) {
     captureClientError(err, { source: "auditLog.setDoc", action });
   });
 }
-
-// ============ TOKEN REFRESH HELPER (A2) ============
-// Force at most one ID-token refresh per uid per TOKEN_REFRESH_TTL_MS window
-// when Firestore returns permission-denied. The TTL avoids rate-limit abuse
-// (refreshing on every retry would hammer Firebase) while still allowing a
-// later, genuinely-different denial hours into the session to trigger one
-// fresh attempt. Without the TTL, a single early refresh disabled the
-// recovery path forever.
-const TOKEN_REFRESH_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const tokenRefreshedAt = new Map(); // uid -> last-refresh timestamp
-async function maybeRefreshToken(err) {
-  if (err?.code !== "permission-denied") return false;
-  const u = auth.currentUser;
-  if (!u) return false;
-  const last = tokenRefreshedAt.get(u.uid);
-  if (last && Date.now() - last < TOKEN_REFRESH_TTL_MS) return false;
-  tokenRefreshedAt.set(u.uid, Date.now());
-  try {
-    await u.getIdToken(true);
-    captureClientMessage("token-refreshed-after-denied", { uid: u.uid });
-    return true;
-  } catch (refreshErr) {
-    captureClientError(refreshErr, {
-      source: "maybeRefreshToken",
-      originalCode: err?.code,
-    });
-    return false;
-  }
-}
-
-// ============ DOCUMENT STRUCTURE ============
-// gameData/{users, matchResults, actualAdvancing, actualBonuses, settings} — single docs
-// predictions/{formId} — one document per form (NEW)
-
-const DOCS = {
-  users: "users",
-  // PII migration Phase A: directory holds {uid: {displayName, firstName?, lastName?}}
-  // and is auth-readable. The leaderboard / AllForms / etc. read from here
-  // instead of the legacy users doc once migrated.
-  userDirectory: "userDirectory",
-  matchResults: "matchResults",
-  actualAdvancing: "actualAdvancing",
-  actualBonuses: "actualBonuses",
-  settings: "settings",
-};
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
@@ -130,66 +103,7 @@ const cache: CacheShape = {
   _ready: {},
 };
 
-// ============ FIRESTORE HELPERS ============
-
-import { FIRESTORE_BATCH_LIMIT as BATCH_LIMIT, MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
-
-// Splits operations across multiple batches when exceeding Firestore's 500 op limit
-export async function commitInBatches(operations) {
-  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
-    const chunk = operations.slice(i, i + BATCH_LIMIT);
-    const batch = writeBatch(db);
-    for (const op of chunk) {
-      if (op.type === "set") batch.set(op.ref, op.data);
-      else if (op.type === "update") batch.update(op.ref, op.data);
-      else if (op.type === "delete") batch.delete(op.ref);
-    }
-    await batch.commit();
-  }
-}
-
-function withTimeout(promise, ms = 10000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), ms),
-    ),
-  ]);
-}
-
-// Lightweight clone using JSON parse/stringify — faster than structuredClone for plain data
-function safeClone(obj) {
-  try {
-    return JSON.parse(JSON.stringify(obj));
-  } catch {
-    return structuredClone(obj);
-  }
-}
-
-function gameDocRef(docName) {
-  return doc(db, "gameData", docName);
-}
-
-function formDocRef(formId) {
-  return doc(db, "predictions", formId);
-}
-
-const predictionsCollectionRef = collection(db, "predictions");
-
-function summaryDocRef(summaryId) {
-  return doc(db, "summaries", summaryId);
-}
-
-const summariesCollectionRef = collection(db, "summaries");
-
-// PII migration Phase A: per-user private record lives at userPrivate/{uid}.
-function userPrivateDocRef(uid) {
-  return doc(db, "userPrivate", uid);
-}
-
-const userPrivateCollectionRef = collection(db, "userPrivate");
-
-const userDirectoryDocRef = () => gameDocRef("userDirectory");
+import { MAX_USERS_HARD_LIMIT as USER_LIMIT, MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 
 async function writeGameDoc(docName, data, { force = false } = {}) {
   // Safety guard: block writes that would dramatically shrink shared data.
