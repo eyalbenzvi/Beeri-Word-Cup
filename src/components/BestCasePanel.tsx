@@ -93,7 +93,7 @@ export default function BestCasePanel({ formId, onReset }: Props) {
             )}
           </div>
           <div className="text-ink-muted font-bold mt-0.5">
-            מיקום מירבי
+            דירוג מוקרן
           </div>
           <div className="text-ink-muted font-medium">מתוך {totalForms}</div>
         </div>
@@ -102,7 +102,7 @@ export default function BestCasePanel({ formId, onReset }: Props) {
           <div className="text-xl font-extrabold text-primary tabular-nums">
             <bdi>{projectedScore}</bdi>
           </div>
-          <div className="text-ink-muted font-bold mt-0.5">ניקוד מירבי</div>
+          <div className="text-ink-muted font-bold mt-0.5">ניקוד מוקרן</div>
           <div className="text-ink-muted font-medium">ללא מלך שערים</div>
         </div>
       </div>
