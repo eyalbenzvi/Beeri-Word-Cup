@@ -85,10 +85,14 @@ console.log("=== CONSTANTS DEDUP STATIC AUDIT ===\n");
     "store.js no longer hardcodes `auditLog.length > 200`");
   assert(!/auditLog\.length\s*>\s*MAX_AUDIT_LOG_SIZE/.test(storeSrc),
     "store.js no longer duplicates the cap check (delegates to storeAudit)");
-  assert(/from\s+["']\.\.?\/storeAudit["']/.test(storeSrc),
-    "store imports from storeAudit");
-  assert(/logAdminAction\s+as\s+logAdminActionToBuffer/.test(storeSrc),
-    "store.js imports logAdminAction (renamed to avoid shadowing)");
+  // After the store/ split, storeAudit is imported by store/audit.ts, not
+  // the barrel. Probe the audit module if the import isn't on the barrel.
+  let auditSrc = "";
+  try { auditSrc = readMigratedSrc("src/store/audit.ts", "utf8"); } catch { /* not split yet */ }
+  assert(/from\s+["']\.\.?\.?\/storeAudit["']/.test(storeSrc + auditSrc),
+    "store imports from storeAudit (barrel or audit.ts)");
+  assert(/logAdminAction\s+as\s+logAdminActionToBuffer/.test(storeSrc + auditSrc),
+    "store imports logAdminAction (renamed to avoid shadowing)");
 }
 
 // 4. KNOCKOUT_STAGE_ORDER not re-declared as a private array

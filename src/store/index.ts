@@ -17,10 +17,6 @@ import {
 import { captureClientError, captureClientMessage } from "../sentry";
 import { generateDefaultFormName } from "../utils/formNameGenerator";
 import {
-  logAdminAction as logAdminActionToBuffer,
-  getAuditLog as getAuditLogFromBuffer,
-} from "../storeAudit";
-import {
   db,
   auth,
   DOCS,
@@ -38,36 +34,9 @@ import {
   tokenRefreshedAt,
   maybeRefreshToken,
 } from "./firestoreClient";
+import { logAdminAction, getAuditLog, writeAuditLog } from "./audit";
 
-export { commitInBatches };
-
-// ============ AUDIT LOG ============
-// Single source of truth in storeAudit.js — these are thin re-exports that
-// bind the userId from Firebase auth (not the localStorage cache, which can
-// be spoofed on a shared device). Callers below use writeAuditLog to also
-// persist to Firestore for forensic recovery.
-export function logAdminAction(action, details = {}) {
-  return logAdminActionToBuffer(action, details, auth.currentUser?.uid || null);
-}
-
-export function getAuditLog() {
-  return getAuditLogFromBuffer();
-}
-
-function writeAuditLog(action, details = {}) {
-  const entry = logAdminAction(action, details);
-  if (!entry) return;
-  // Also persist to Firestore for forensic recovery beyond a single device.
-  const auditRef = doc(
-    db,
-    "auditLog",
-    `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-  );
-  setDoc(auditRef, entry).catch((err) => {
-    console.error("Audit log write failed:", err);
-    captureClientError(err, { source: "auditLog.setDoc", action });
-  });
-}
+export { commitInBatches, logAdminAction, getAuditLog };
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
