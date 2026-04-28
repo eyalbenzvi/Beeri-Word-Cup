@@ -135,6 +135,7 @@ run_test "69. Summary Public Mode + AI Hardening" "summary/test-summary-public-a
 run_test "70. Summary Review Fixes (deep review regressions)" "summary/test-summary-review-fixes.mjs" "no"
 run_test "71. Constants Dedup (static + runtime audit)" "store/test-constants-dedup.mjs" "yes"
 run_test "72. Firestore Rules PII Migration (userDirectory + userPrivate)" "store/test-firestore-rules-pii.mjs" "no"
+run_test "73. Random Hashed UID Migration (phone PII)" "store/test-uid-hash-migration.mjs" "no"
 
 echo ""
 echo "==========================================="

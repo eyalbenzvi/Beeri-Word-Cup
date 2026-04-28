@@ -2,6 +2,7 @@ import crypto from "crypto";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
 import { normalizeIsraeliMobile } from "../../src/utils/phone.js";
+import { deriveHashedUid } from "../../src/utils/uidHash.js";
 
 let adminInitialized = false;
 
@@ -134,11 +135,69 @@ async function phoneVerifyOtpHandler(event) {
     console.error("Token invalidation failed:", err?.message || err);
   }
 
-  // Create Firebase custom auth token
-  // Use phone number as UID (prefixed to avoid collisions with Google UIDs)
+  // Resolve the Firebase Auth UID for this phone number.
+  //
+  // Two formats coexist during the PII migration:
+  //   - Legacy:  phone_<E.164-ish phone>             (PII embedded in UID)
+  //   - Hashed:  phone_<first 16 hex of SHA-256(salt+phone)>  (opaque)
+  //
+  // Resolution rules:
+  //   - If USE_HASHED_UID="true" AND OTP_SALT is set:
+  //       * Compute the deterministic hashed UID for this phone.
+  //       * Read gameData/uidMigrationMap.  If it carries an explicit mapping
+  //         from the legacy UID to a different hashed UID (e.g. after a salt
+  //         rotation, or because the migration tool decided the canonical
+  //         target), honour it — the map is the source of truth so that
+  //         records aren't orphaned.
+  //       * Otherwise mint the freshly computed hashed UID. New users land
+  //         here directly; pre-migrated users land on a hashed UID that
+  //         matches whatever the migration script wrote.
+  //   - Else: stay on the legacy `phone_<phone>` UID.
+  //
+  // Code is INERT until OTP_SALT is set + USE_HASHED_UID flipped to "true",
+  // so this PR can land without changing any existing user's UID.
+  let uid = `phone_${cleanPhone}`;
   try {
-    const uid = `phone_${cleanPhone}`;
-    const customToken = await admin.auth().createCustomToken(uid, { phone: cleanPhone });
+    const useHashed = process.env.USE_HASHED_UID === "true";
+    const salt = process.env.OTP_SALT;
+    if (useHashed && salt) {
+      const hashedUid = deriveHashedUid(cleanPhone, salt);
+      let mappedUid = null;
+      try {
+        const mapSnap = await admin
+          .firestore()
+          .collection("gameData")
+          .doc("uidMigrationMap")
+          .get();
+        const mapData = mapSnap.exists ? mapSnap.data()?.data : null;
+        if (mapData && typeof mapData === "object") {
+          const candidate = mapData[uid];
+          if (typeof candidate === "string" && candidate.startsWith("phone_")) {
+            mappedUid = candidate;
+          }
+        }
+      } catch (err) {
+        // Failing closed here would lock users out during a Firestore blip.
+        // Fall back to the deterministic hashed UID — it's what the migration
+        // script targets by default, so existing users still resolve to their
+        // own data.
+        console.error("uidMigrationMap lookup failed:", err?.message || err);
+      }
+      uid = mappedUid || hashedUid;
+    }
+  } catch (err) {
+    // Defensive: never let a config error block a legitimate login. We log
+    // and fall through to the legacy UID rather than refusing to mint a
+    // token.
+    console.error("UID resolution failed, falling back to legacy:", err?.message || err);
+    uid = `phone_${cleanPhone}`;
+  }
+
+  // Create Firebase custom auth token. We deliberately do NOT include the
+  // phone number in the token's custom claims when using the hashed UID —
+  // the whole point is that the UID stops carrying PII.
+  try {
+    const customToken = await admin.auth().createCustomToken(uid);
 
     return {
       statusCode: 200,

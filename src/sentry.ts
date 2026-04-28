@@ -22,6 +22,28 @@ function getTabId() {
 // Deduplicate noisy watchdog events within a single session.
 const emittedOnce = new Set();
 
+// Strip legacy phone-UID PII (`phone_<10-digit>`) from any string before it
+// leaves the browser. Hashed UIDs (`phone_<16 hex>`) are intentionally
+// preserved — they're opaque by construction.
+const LEGACY_PHONE_UID_RE = /phone_(0\d{8,9}|972\d{8,9}|\+972\d{8,9})/g;
+export function scrubPhoneUid(input: unknown): unknown {
+  if (typeof input === "string") {
+    return input.replace(LEGACY_PHONE_UID_RE, "phone_<redacted>");
+  }
+  if (input && typeof input === "object") {
+    try {
+      const json = JSON.stringify(input);
+      if (!LEGACY_PHONE_UID_RE.test(json)) return input;
+      return JSON.parse(
+        JSON.stringify(input).replace(LEGACY_PHONE_UID_RE, "phone_<redacted>"),
+      );
+    } catch {
+      return input;
+    }
+  }
+  return input;
+}
+
 export function initSentry() {
   if (initialized) return false;
   // חשוב: import.meta.env קיים רק ב-Vite; בזמן ריצה רגיל (ssr/test) נחזיר
@@ -53,6 +75,42 @@ export function initSentry() {
         /Importing a module script failed/i,
         /Loading chunk \d+ failed/i,
       ],
+      // Defense-in-depth during the phone-UID PII migration: redact any
+      // legacy `phone_<phone>` substring from breadcrumb/event payloads
+      // before they leave the browser. Hashed UIDs are opaque and pass
+      // through unchanged.
+      beforeBreadcrumb(breadcrumb) {
+        try {
+          if (breadcrumb.message) {
+            breadcrumb.message = scrubPhoneUid(breadcrumb.message) as string;
+          }
+          if (breadcrumb.data) {
+            breadcrumb.data = scrubPhoneUid(breadcrumb.data) as Record<string, any>;
+          }
+        } catch {
+          // never let scrubbing throw and drop a real breadcrumb
+        }
+        return breadcrumb;
+      },
+      beforeSend(event) {
+        try {
+          if (event.message) {
+            event.message = scrubPhoneUid(event.message) as string;
+          }
+          if (event.extra) {
+            event.extra = scrubPhoneUid(event.extra) as Record<string, any>;
+          }
+          if (event.tags) {
+            event.tags = scrubPhoneUid(event.tags) as Record<string, any>;
+          }
+          if (event.request?.url) {
+            event.request.url = scrubPhoneUid(event.request.url) as string;
+          }
+        } catch {
+          // never block error reporting on scrub failure
+        }
+        return event;
+      },
     });
     Sentry.setTag("tabId", getTabId());
     initialized = true;
