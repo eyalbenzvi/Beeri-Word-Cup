@@ -100,10 +100,18 @@ const leaderboardFile = read(`${SRC}/pages/Leaderboard.jsx`);
 assert(leaderboardFile.includes('FormAvatar'), "Leaderboard: renders FormAvatar (initials, formIcon deprecated)");
 assert(!leaderboardFile.includes('photoURL'), "Leaderboard: photoURL UI is intentionally absent");
 
-// ---- 6. FormDetailsTab ----
-console.log("--- 6. FormDetailsTab ---");
-const fdtFile = read(`${SRC}/components/FormDetailsTab.jsx`);
-assert(fdtFile.includes('formName') || fdtFile.includes('שם הטופס'), "FormDetailsTab: has form name field");
+// ---- 6. Form details fields rendered inline in Predict ----
+// FormDetailsTab was removed; the form-name / budget / top-scorer trio is
+// now rendered directly in Predict.tsx so it sits above the matches list.
+console.log("--- 6. Form details (inline in Predict) ---");
+const predictFile = read(`${SRC}/pages/Predict.jsx`);
+assert(predictFile.includes('שם הטופס') || predictFile.includes('input-formName'), "Predict: has form name field");
+assert(predictFile.includes('input-budget') || predictFile.includes('budgetNumber'), "Predict: has budget field");
+assert(predictFile.includes('PlayerAutocomplete'), "Predict: has top-scorer field");
+// The orphan FormDetailsTab component has been deleted — make sure nobody
+// re-imports it.
+assert(!existsSync(`${SRC}/components/FormDetailsTab.jsx`) && !existsSync(`${SRC}/components/FormDetailsTab.tsx`), "FormDetailsTab component is removed");
+assert(!predictFile.includes('FormDetailsTab'), "Predict: no stale reference to FormDetailsTab");
 
 // ---- 7. New user flow ----
 console.log("--- 7. New user creation ---");

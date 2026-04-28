@@ -938,32 +938,48 @@ console.log("--- 4.3/4.4: MatchCard bracketEntry resolution ---");
 }
 
 // ============================================================
-// FIX 5.1: isBudgetValid — shared helper for inline + submit checks
-// Regression: budget validation was duplicated in formValidation.js and
-// FormDetailsTab.jsx with subtly different rules. The helper unifies them.
-// (Static-source assertions; the helper itself is exercised via the
-// existing FIX 4.1 inline simulation.)
+// FIX 5.1: isBudgetValid — shared helper, single source of truth
+// Regression: budget validation used to be duplicated (formValidation.js
+// vs an inline copy in FormDetailsTab.jsx, now removed) with subtly
+// different rules. The helper unifies them; this block guards against
+// any future re-duplication.
 // ============================================================
 console.log("--- 5.1: isBudgetValid shared helper (static checks) ---");
 
 {
   const fs = await import("node:fs");
   const validationSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/utils/formValidation.js", "utf8");
-  const detailsSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/components/FormDetailsTab.jsx", "utf8");
 
-  // Helper exists and exposes the named constants used by both call sites.
+  // Helper exists and exposes the named constants used by call sites.
   assert(/export function isBudgetValid\(/.test(validationSrc), "isBudgetValid is exported");
   assert(/export const BUDGET_MIN\s*=\s*100/.test(validationSrc), "BUDGET_MIN exported as 100");
   assert(/export const BUDGET_MAX\s*=\s*9999/.test(validationSrc), "BUDGET_MAX exported as 9999");
   assert(/export const BUDGET_RANGE_MESSAGE/.test(validationSrc), "BUDGET_RANGE_MESSAGE exported");
 
-  // validateForm + FormDetailsTab both use the helper rather than inline regex.
+  // validateForm uses the helper rather than inline regex/comparisons.
   assert(validationSrc.includes("isBudgetValid(activeForm?.budgetNumber)"), "validateForm uses isBudgetValid");
-  assert(detailsSrc.includes("isBudgetValid(budgetValue)"), "FormDetailsTab uses isBudgetValid");
-  assert(detailsSrc.includes("BUDGET_RANGE_MESSAGE"), "FormDetailsTab uses shared message");
-  // Old inline regex must not coexist — would silently desynchronize from helper.
-  assert(!detailsSrc.match(/parseInt\(budgetValue\)\s*<\s*100/), "FormDetailsTab no longer inlines lower bound");
-  assert(!detailsSrc.match(/parseInt\(budgetValue\)\s*>\s*9999/), "FormDetailsTab no longer inlines upper bound");
+
+  // Sweep the rest of src for inline copies of the budget bounds — anything
+  // that hard-codes 100 or 9999 against budgetValue / budgetNumber is a
+  // duplicate of the shared helper and must be removed.
+  const path = await import("node:path");
+  const SRC_DIR = "/home/user/Beeri-World-Cup/src";
+  const offenders = [];
+  function walk(dir) {
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
+      const st = fs.statSync(p);
+      if (st.isDirectory()) { walk(p); continue; }
+      if (!/\.(ts|tsx|js|jsx)$/.test(name)) continue;
+      if (p.endsWith("formValidation.ts") || p.endsWith("formValidation.js")) continue;
+      const txt = fs.readFileSync(p, "utf8");
+      if (/parseInt\(\s*budget(?:Value|Number)\s*\)\s*[<>]\s*(?:100|9999)/.test(txt)) {
+        offenders.push(p);
+      }
+    }
+  }
+  walk(SRC_DIR);
+  assert(offenders.length === 0, `No duplicate inline budget bounds outside the shared helper (found: ${offenders.join(", ")})`);
 
   // Reimplement the helper here and exercise it with edge cases. The static
   // assertions above guarantee the source matches; this block guards the

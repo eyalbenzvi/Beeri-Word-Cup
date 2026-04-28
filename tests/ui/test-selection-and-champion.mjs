@@ -41,7 +41,6 @@ function assert(c, m) {
 const matchCardSrc = readMigratedSrc(resolve(ROOT, "src/components/MatchCard.jsx"), "utf8");
 const formListSrc = readMigratedSrc(resolve(ROOT, "src/components/FormList.jsx"), "utf8");
 const reviewScreenSrc = readMigratedSrc(resolve(ROOT, "src/components/ReviewScreen.jsx"), "utf8");
-const formDetailsTabSrc = readMigratedSrc(resolve(ROOT, "src/components/FormDetailsTab.jsx"), "utf8");
 const predictSrc = readMigratedSrc(resolve(ROOT, "src/pages/Predict.jsx"), "utf8");
 
 // ============================================================
@@ -414,11 +413,14 @@ console.log("\n--- 5. Champion display in form views (source verification) ---")
   assert(passesChamp, "5.9 Predict passes championName to ReviewScreen");
 }
 
-// 5.10 Predict page passes championName to FormDetailsTab
+// 5.10 Predict computes championName and renders it inline above the
+// matches list (FormDetailsTab was removed — its fields are now inline in
+// Predict.tsx).
 {
-  const detailsSection = predictSrc.match(/<FormDetailsTab[\s\S]*?\/>/)?.[0] || "";
-  const passesChamp = /championName=\{championName\}/.test(detailsSection);
-  assert(passesChamp, "5.10 Predict passes championName to FormDetailsTab");
+  const computesChamp = /championName\s*=\s*championCode/.test(predictSrc);
+  const rendersChamp = /\{championName\}/.test(predictSrc);
+  assert(computesChamp, "5.10a Predict computes championName from championCode");
+  assert(rendersChamp, "5.10b Predict renders championName inline");
 }
 
 // 5.11 ReviewScreen accepts championName prop
@@ -433,26 +435,30 @@ console.log("\n--- 5. Champion display in form views (source verification) ---")
   assert(hasFallback, "5.13 ReviewScreen shows 'טרם נקבע' when no champion");
 }
 
-// 5.14 FormDetailsTab accepts championName prop
+// 5.14 Predict (inline replacement for FormDetailsTab) renders championName
 {
-  const acceptsProp = /championName/.test(formDetailsTabSrc);
-  assert(acceptsProp, "5.14 FormDetailsTab accepts championName prop");
+  const acceptsProp = /championName/.test(predictSrc);
+  assert(acceptsProp, "5.14 Predict references championName for the inline display");
 }
 
-// 5.16 FormDetailsTab shows fallback text when no champion
+// 5.16 The champion section is conditional: it renders only when a champion
+// is known. (The old FormDetailsTab showed a 'טרם נקבע' fallback; the
+// inline replacement just hides the line, which is the equivalent contract.)
 {
-  const hasFallback = /טרם נקבע/.test(formDetailsTabSrc);
-  assert(hasFallback, "5.16 FormDetailsTab shows 'טרם נקבע' when no champion");
+  const conditional = /\{championName\s*&&\s*\(/.test(predictSrc);
+  assert(conditional, "5.16 Predict renders the champion line only when championName is set");
 }
 
-// 5.17 FormDetailsTab champion is read-only (no onChange, no input)
+// 5.17 Champion is read-only (derived from bracket, never editable)
 {
-  // The champion div should not be an input or have onChange
-  const champSection = formDetailsTabSrc.match(/אלופה[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/)?.[0] || "";
+  // Capture the champion JSX block: from `{championName && (` up to the
+  // matching `</div>` on its own line. Non-greedy + DOM-anchored so it
+  // doesn't bleed into nearby form inputs.
+  const champSection = predictSrc.match(/championName\s*&&\s*\(\s*<div[\s\S]*?<\/div>\s*\)\}/)?.[0] || "";
   const hasInput = /<input/.test(champSection);
   const hasOnChange = /onChange/.test(champSection);
-  assert(!hasInput, "5.17a FormDetailsTab champion has no input element");
-  assert(!hasOnChange, "5.17b FormDetailsTab champion has no onChange handler");
+  assert(!hasInput, "5.17a Champion is not an input");
+  assert(!hasOnChange, "5.17b Champion has no onChange handler");
 }
 
 // ============================================================

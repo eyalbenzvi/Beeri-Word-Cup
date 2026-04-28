@@ -32,7 +32,6 @@ import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import FormList from "../components/FormList";
-import FormDetailsTab from "../components/FormDetailsTab";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import ProgressHub from "../components/ProgressHub";
@@ -730,15 +729,6 @@ export default function Predict() {
             )}
           </div>
         </>
-      )}
-
-      {activeTab === "details" && (
-        <FormDetailsTab
-          activeForm={activeForm}
-          activeFormId={activeFormId}
-          canEdit={canEdit}
-          championName={championName}
-        />
       )}
 
       {showSearch && (

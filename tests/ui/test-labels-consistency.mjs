@@ -43,10 +43,10 @@ assert(
 // --- 2. Consumers that display the top-scorer label pull it from LABELS ---
 const consumers = [
   "src/components/ReviewScreen.jsx",
-  "src/components/FormDetailsTab.jsx",
   "src/components/ScoringTable.jsx",
   "src/components/AdminFormsTab.jsx",
   "src/components/AdminToolsTab.jsx",
+  "src/pages/Predict.jsx",
   "src/pages/Leaderboard.jsx",
   "src/pages/Profile.jsx",
   "src/pages/AllForms.jsx",
@@ -78,9 +78,9 @@ const definiteOnly = [
   "src/pages/Leaderboard.jsx",
   "src/pages/AllForms.jsx",
   "src/pages/Profile.jsx",
+  "src/pages/Predict.jsx",
   "src/components/FormList.jsx",
   "src/components/ReviewScreen.jsx",
-  "src/components/FormDetailsTab.jsx",
   "src/components/ScoringTable.jsx",
   "src/components/AdminFormsTab.jsx",
   "src/components/AdminToolsTab.jsx",

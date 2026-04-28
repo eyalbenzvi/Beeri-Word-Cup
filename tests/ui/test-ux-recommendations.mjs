@@ -142,6 +142,19 @@ assert(/lb-form-\$\{/.test(leaderboard), "Leaderboard cards have lb-form-{id} an
 assert(/הטפסים שלך:/.test(leaderboard), "Leaderboard shows 'your forms:' jump banner");
 assert(/autoScrolledRef/.test(leaderboard), "Leaderboard guards against double auto-scroll");
 
+// ---------- Phase 9: dead-code references in Predict ----------
+// PR #153 removed the activeTab/setActiveTab state from Predict but left a
+// `{activeTab === "details" && <FormDetailsTab .../>}` JSX block behind.
+// Every render of the form-editing view threw ReferenceError: activeTab is
+// not defined, which the per-page ErrorBoundary surfaced as the "משהו השתבש
+// בעמוד הזה" screen. tsc would have flagged this (TS2304) but typecheck was
+// not run on the PR. Lock the floor: no stale tab references and no orphan
+// FormDetailsTab import.
+console.log("--- Phase 9: no stale activeTab refs in Predict ---");
+assert(!/\bactiveTab\b/.test(predict), "Predict.tsx: no reference to removed activeTab state");
+assert(!/\bsetActiveTab\b/.test(predict), "Predict.tsx: no reference to removed setActiveTab setter");
+assert(!/FormDetailsTab/.test(predict), "Predict.tsx: no orphan FormDetailsTab import/usage");
+
 // ---------- Summary ----------
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
