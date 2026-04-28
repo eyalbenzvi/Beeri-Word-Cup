@@ -43,8 +43,8 @@ export default function DailySummary() {
 
   // Non-admin users see only published summaries. Admins can preview drafts
   // as well, which is useful for checking how a post will render.
-  const visibleSummaries = useMemo(() => {
-    const arr = Object.values(summaries || {});
+  const visibleSummaries = useMemo<any[]>(() => {
+    const arr = Object.values(summaries || {}) as any[];
     return arr
       .filter((s) => s.status === "published" || user?.isAdmin)
       .sort((a, b) => (a.number || 0) - (b.number || 0));

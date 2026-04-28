@@ -50,6 +50,17 @@ function MatchCard({
   points = null,
   isKnockout = false,
   importance = "group",
+}: {
+  match: any;
+  bracketEntry?: any;
+  prediction?: any;
+  actualResult?: any;
+  onPredictionChange?: any;
+  editable?: boolean;
+  showPoints?: boolean;
+  points?: any;
+  isKnockout?: boolean;
+  importance?: string;
 }) {
   const homeInputRef = useRef(null);
   const awayInputRef = useRef(null);

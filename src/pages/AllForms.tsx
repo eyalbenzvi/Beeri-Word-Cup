@@ -184,8 +184,9 @@ export default function AllFormsView({ onBack }) {
 
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
-      .filter(([, form]) => normalizeStatus(form.status) === "submitted")
-      .map(([formId, form]) => {
+      .filter(([, formAny]) => normalizeStatus((formAny as any).status) === "submitted")
+      .map(([formId, formAny]) => {
+        const form = formAny as any;
         const predictions = form.matches || EMPTY_MATCHES;
         const championCode = getCachedChampion(predictions);
         const championTeam = championCode ? getTeamByCode(championCode) : null;

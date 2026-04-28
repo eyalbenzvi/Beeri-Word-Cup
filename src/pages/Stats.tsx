@@ -76,7 +76,7 @@ function MatchPredictions({ forms }) {
       scoreCounts[key] = (scoreCounts[key] || 0) + 1;
     });
     const topScores = Object.entries(scoreCounts)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
       .slice(0, 5);
 
     // Average goals
@@ -243,7 +243,7 @@ function ChampionStats({ forms }) {
         counts[name] = (counts[name] || 0) + 1;
       }
     });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return Object.entries(counts).sort((a, b) => (b[1] as number) - (a[1] as number));
   }, [forms]);
 
   if (distribution.length === 0) return null;
@@ -279,7 +279,7 @@ function TopScorerStats({ forms, playerList }) {
       counts[display] = (counts[display] || 0) + 1;
     });
     return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
       .slice(0, 10);
   }, [forms, playerList]);
 
@@ -307,7 +307,8 @@ function GeneralStats({ forms, results }) {
   const stats = useMemo(() => {
     let totalGoals = 0, totalMatches = 0, draws = 0;
     for (const f of forms) {
-      for (const p of Object.values(f.matches || {})) {
+      for (const pAny of Object.values(f.matches || {})) {
+        const p = pAny as any;
         if (p?.homeScore != null) {
           totalGoals += (p.homeScore || 0) + (p.awayScore || 0);
           totalMatches++;
@@ -431,7 +432,8 @@ function SearchStats({ forms, playerList }) {
       const [, h, a] = scoreMatch;
       let count = 0;
       forms.forEach((f) => {
-        Object.values(f.matches || {}).forEach((p) => {
+        Object.values(f.matches || {}).forEach((pAny) => {
+          const p = pAny as any;
           if (p?.homeScore === parseInt(h) && p?.awayScore === parseInt(a))
             count++;
         });
@@ -515,8 +517,8 @@ export default function Stats() {
   // the hook count between renders and React throws.
   const submittedForms = useMemo(() => {
     return Object.entries(allPredictions)
-      .filter(([, f]) => normalizeStatus(f.status) === "submitted")
-      .map(([formId, f]) => ({ formId, ...f }));
+      .filter(([, fAny]) => normalizeStatus((fAny as any).status) === "submitted")
+      .map(([formId, fAny]) => ({ formId, ...(fAny as any) }));
   }, [allPredictions]);
 
   const playerList = useMemo(

@@ -194,12 +194,12 @@ export default function Leaderboard({
           </div>
         </div>
 
-        {Object.entries(matchesByStage).map(([stage, matches]) => (
+        {Object.entries(matchesByStage).map(([stage, matchesAny]) => (
           <div key={stage} className="mb-4">
             <h3 className="text-sm font-extrabold text-ink mb-2">
               {STAGES[stage] || stage}
             </h3>
-            {matches.map(({ matchId, match, result }) => {
+            {(matchesAny as any[]).map(({ matchId, match, result }) => {
               const prediction = predData.matches?.[matchId];
               const predTeams = predBracket[matchId] || null;
               const actTeams = actualBracket[matchId] || null;

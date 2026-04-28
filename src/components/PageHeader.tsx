@@ -1,6 +1,6 @@
 // Editorial-style page header: eyebrow + title + subtitle + divider.
 // Replaces lone `<h1>` tags across pages for consistent hierarchy.
-export default function PageHeader({ eyebrow, title, subtitle, action }) {
+export default function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow?: any; title?: any; subtitle?: any; action?: any }) {
   return (
     <header className="mb-5 md:mb-7 pb-4 border-b border-border">
       <div className="flex items-start justify-between gap-3">

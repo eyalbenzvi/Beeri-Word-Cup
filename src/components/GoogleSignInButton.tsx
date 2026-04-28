@@ -4,7 +4,7 @@ import { signInWithGoogle } from "../firebase";
 import { captureClientError } from "../sentry";
 import ErrorBanner from "./ErrorBanner";
 
-export default function GoogleSignInButton({ onSuccess }) {
+export default function GoogleSignInButton({ onSuccess }: { onSuccess?: () => void }) {
   const showToast = useToast();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
