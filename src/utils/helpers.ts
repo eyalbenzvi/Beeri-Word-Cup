@@ -31,3 +31,16 @@ export function preferredScrollBehavior() {
     return "smooth";
   }
 }
+
+// Source labels are written semantically as "{home} vs {away}" (e.g.
+// "1A vs 3rd place"). In the RTL card layout the home team renders on the
+// RIGHT and the away team on the LEFT, but the label is an LTR sub-run, so
+// "1A" lands on the LEFT of the label — visually contradicting the team
+// columns below. Swap the two sides so home appears on the right of the
+// LTR run, matching the home column underneath.
+export function flipMatchLabelForRtl(label: string): string {
+  if (!label) return label;
+  const m = label.match(/^(.+?)\s+vs\s+(.+)$/);
+  if (!m) return label;
+  return `${m[2]} vs ${m[1]}`;
+}

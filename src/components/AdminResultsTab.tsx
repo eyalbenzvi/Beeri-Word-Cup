@@ -4,7 +4,7 @@ import { saveMatchResult, deleteMatchResult } from "../store";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
-import { randomScore } from "../utils/helpers";
+import { randomScore, flipMatchLabelForRtl } from "../utils/helpers";
 import { KNOCKOUT_STAGE_ORDER } from "../utils/constants";
 import GroupTable from "./GroupTable";
 import GroupSelector from "./GroupSelector";
@@ -296,7 +296,7 @@ export default function AdminResultsTab() {
                 <div className="flex justify-between items-center mb-1.5">
                   {isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label) ? (
                     <span className="text-xs text-ink-muted font-medium">
-                      {match.label}
+                      {flipMatchLabelForRtl(match.label)}
                     </span>
                   ) : <span />}
                   <span className="text-xs text-ink-light">
