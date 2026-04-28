@@ -11,11 +11,13 @@ type Props = {
 export default function BestCasePanel({ formId, onReset }: Props) {
   const { state, compute, reset } = useBestCase(formId);
 
-  // Reset whenever formId changes (user navigates to a different form)
+  // Reset whenever formId changes (user navigates to a different form).
+  // `reset` is referentially stable (useCallback []), `onReset` is included
+  // so a parent that updates its callback gets the latest version.
   useEffect(() => {
     reset();
     onReset?.();
-  }, [formId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [formId, reset, onReset]);
 
   // Not yet triggered
   if (state.phase === "idle") {

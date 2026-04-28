@@ -40,6 +40,10 @@ export function useBestCase(formId: string | null): {
   const allForms = useAllPredictions();
   const matchResults = useMatchResults();
   const workerRef = useRef<Worker | null>(null);
+  // Tracks whether the component is still mounted — guards every async
+  // setState inside the worker handlers against post-unmount calls
+  // (React 18 strict-mode double-invoke or rapid navigation).
+  const mountedRef = useRef(true);
 
   const [state, setState] = useState<BestCaseState>({
     loading: false,
@@ -51,16 +55,25 @@ export function useBestCase(formId: string | null): {
   });
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       workerRef.current?.terminate();
       workerRef.current = null;
     };
   }, []);
 
+  const safeSetState = useCallback(
+    (updater: BestCaseState | ((s: BestCaseState) => BestCaseState)) => {
+      if (mountedRef.current) setState(updater as any);
+    },
+    [],
+  );
+
   const reset = useCallback(() => {
     workerRef.current?.terminate();
     workerRef.current = null;
-    setState({
+    safeSetState({
       loading: false,
       phase: "idle",
       phaseLabel: "",
@@ -68,7 +81,7 @@ export function useBestCase(formId: string | null): {
       result: null,
       error: false,
     });
-  }, []);
+  }, [safeSetState]);
 
   const compute = useCallback(() => {
     if (!formId) return;
@@ -76,7 +89,7 @@ export function useBestCase(formId: string | null): {
     // Terminate any prior worker
     workerRef.current?.terminate();
 
-    setState({
+    safeSetState({
       loading: true,
       phase: "prep",
       phaseLabel: PHASE_LABELS.prep,
@@ -91,43 +104,8 @@ export function useBestCase(formId: string | null): {
     );
     workerRef.current = worker;
 
-    worker.onmessage = (e: MessageEvent) => {
-      const { type } = e.data;
-      if (type === "progress") {
-        const phase = e.data.phase as Phase;
-        setState((s) => ({
-          ...s,
-          phase,
-          phaseLabel: PHASE_LABELS[phase] ?? s.phaseLabel,
-          percent: e.data.percent,
-        }));
-      } else if (type === "result") {
-        setState({
-          loading: false,
-          phase: "done",
-          phaseLabel: PHASE_LABELS.done,
-          percent: 100,
-          result: e.data.result,
-          error: false,
-        });
-        worker.terminate();
-        workerRef.current = null;
-      } else if (type === "error") {
-        setState({
-          loading: false,
-          phase: "error",
-          phaseLabel: PHASE_LABELS.error,
-          percent: 0,
-          result: null,
-          error: true,
-        });
-        worker.terminate();
-        workerRef.current = null;
-      }
-    };
-
-    worker.onerror = () => {
-      setState({
+    const fail = () => {
+      safeSetState({
         loading: false,
         phase: "error",
         phaseLabel: PHASE_LABELS.error,
@@ -139,12 +117,47 @@ export function useBestCase(formId: string | null): {
       workerRef.current = null;
     };
 
+    worker.onmessage = (e: MessageEvent) => {
+      const { type } = e.data;
+      if (type === "progress") {
+        const phase = e.data.phase as Phase;
+        safeSetState((s) => ({
+          ...s,
+          phase,
+          phaseLabel: PHASE_LABELS[phase] ?? s.phaseLabel,
+          percent: e.data.percent,
+        }));
+      } else if (type === "result") {
+        // A null result means the target form was not found among
+        // submitted forms — surface it as an error so the panel doesn't
+        // collapse to a silent blank state after the loading spinner.
+        if (!e.data.result) {
+          fail();
+          return;
+        }
+        safeSetState({
+          loading: false,
+          phase: "done",
+          phaseLabel: PHASE_LABELS.done,
+          percent: 100,
+          result: e.data.result,
+          error: false,
+        });
+        worker.terminate();
+        workerRef.current = null;
+      } else if (type === "error") {
+        fail();
+      }
+    };
+
+    worker.onerror = fail;
+
     worker.postMessage({
       targetFormId: formId,
       allForms,
       playedResults: matchResults,
     });
-  }, [formId, allForms, matchResults]);
+  }, [formId, allForms, matchResults, safeSetState]);
 
   return { state, compute, reset };
 }

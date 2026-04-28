@@ -62,7 +62,7 @@ export default function Leaderboard({
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
-  const [selectedForm, setSelectedForm] = useState(null);
+  const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const autoScrolledRef = useRef(false);
 
