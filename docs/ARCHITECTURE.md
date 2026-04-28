@@ -285,8 +285,108 @@ or a derived view.
 
 UIDs are still phone-derived (`phone_05XXXXXXXX`) so any signed-in
 member can derive any other member's mobile number from form IDs
-(`<uid>__<ts>`). That's addressed in a separate follow-up (Task 2 —
-random hashed UIDs).
+(`<uid>__<ts>`). Addressed by the random-hashed-UID migration below.
+
+## Random hashed UIDs (audit Task 2)
+
+The legacy phone-auth UID format `phone_05XXXXXXXX` embeds the user's
+phone number, which then leaks into:
+
+- Prediction form IDs (`<uid>__<ts>`) — visible to every signed-in user
+  on AllForms / Leaderboard.
+- Audit log entries (`userId` field).
+- Sentry events (set as `user.id`).
+
+The fix is to mint UIDs of the form `phone_<16 hex>` derived as
+`SHA-256(salt + phone).slice(0, 16)`. Same input + same salt → same UID
+(deterministic so the verify-OTP function can resolve a returning user
+to the right Firestore data), but the phone is not recoverable from the
+UID.
+
+### Components
+
+- **`src/utils/uidHash.ts`** — `deriveHashedUid(phone, salt)`,
+  `isPhoneUid(uid)`, `PHONE_UID_PREFIX`. Throws on empty inputs.
+- **`netlify/functions/phone-verify-otp.js`** — Resolves the UID at
+  login time. If `USE_HASHED_UID === "true"` AND `OTP_SALT` is set:
+  computes the deterministic hashed UID, then consults
+  `gameData/uidMigrationMap` for an explicit override (takes
+  precedence so the map can survive a salt rotation). Otherwise stays
+  on the legacy `phone_<phone>`. The custom token no longer carries
+  the phone in its claims.
+- **`scripts/migrate-uids.mjs`** — Idempotent migration tool. Refuses
+  to run unless predictions are locked. Detects hash collisions before
+  any writes. Per-user `writeBatch` rewrites predictions
+  (`<legacy>__<ts>` → `<hashed>__<ts>`), `userPrivate/{uid}`,
+  `userDirectory[uid]`, `gameData/users[uid]`, then records the
+  legacy → hashed entry in `gameData/uidMigrationMap`. Optional
+  `--revoke-tokens` invalidates server-side sessions for the legacy
+  UID.
+- **Firestore rule** — `gameData/uidMigrationMap` is admin-only for
+  both read AND write. Exposing it to authed users would re-leak the
+  phone number via the legacy-UID side of the mapping.
+- **`src/sentry.ts`** — Defense-in-depth: `beforeBreadcrumb` +
+  `beforeSend` strip the legacy `phone_<10-digit>` pattern from
+  outgoing events. Hashed UIDs (16 hex chars) pass through unchanged.
+- **`tests/store/test-uid-hash-migration.mjs`** — Static rules + code
+  grep that pins all of the above invariants.
+
+### Migration runbook (separate maintenance window)
+
+Code is **inert** until you set both `OTP_SALT` and `USE_HASHED_UID=true`
+on Netlify. The PR can land months before flipping the switch.
+
+1. **Generate a salt.** `node -e 'console.log(require("crypto").randomBytes(32).toString("base64"))'`
+   Save it in your password manager — losing it means every existing
+   phone user gets a brand-new UID and orphans their data. Set
+   `OTP_SALT` on Netlify (do **not** redeploy yet).
+2. **Backup.** Export all data from the admin tab. Verify the JSON
+   opens and counts look right.
+3. **Lock the tournament** (admin tab → predictionsLocked = true). The
+   migration script refuses to run otherwise — predictions get renamed
+   en masse and a mid-edit user would lose writes.
+4. **Dry-run the migration** from a machine with the service account:
+
+   ```sh
+   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/svc.json \
+   OTP_SALT=<the same salt you set on Netlify> \
+     node scripts/migrate-uids.mjs --dry-run --verbose
+   ```
+
+   Eyeball the planned `legacy → hashed` lines. The script aborts
+   before any writes if it detects a hash collision (astronomically
+   unlikely, but check).
+5. **Real run.** Same command with `--confirm-prod` (and optionally
+   `--revoke-tokens` if you want to invalidate active sessions). It's
+   idempotent — re-running skips already-migrated users.
+6. **Spot-check** in the Firebase Console:
+   - `gameData/uidMigrationMap.data` has one entry per migrated user.
+   - `gameData/users.data` no longer contains `phone_05*` keys.
+   - A sample prediction's formId begins with `phone_<hex>__`.
+7. **Flip the flag.** Set `USE_HASHED_UID=true` on Netlify and
+   redeploy `phone-verify-otp`. Now new logins resolve to hashed UIDs.
+8. **Smoke test.** Log in with a test phone account. The custom
+   token's `sub` claim should be `phone_<hex>`. Confirm you can read
+   your own predictions.
+9. **Unlock** the tournament.
+10. **Salt rotation** (rare): change `OTP_SALT`, rerun
+    `migrate-uids.mjs --confirm-prod` — it will detect that
+    `existingMap` already maps each legacy UID and skip them. To
+    actively rotate every UID, drop `gameData/uidMigrationMap` first.
+
+### Rollback
+
+If something breaks AFTER step 7 but BEFORE significant new data has
+been written: set `USE_HASHED_UID=false` and redeploy. New logins go
+back to the legacy UID, which is empty post-migration; users will
+appear to have lost their data. To restore, either:
+
+- Re-flip the flag and debug forward (preferred), OR
+- Restore from the Phase 2 backup (admin tab → Restore).
+
+Because migrated data is at the new hashed UID and the verify-OTP
+function looks up the same hashed UID on every login, the
+flag-on/flag-off boundary is the only meaningful failure mode.
 
 ## Other migration backlog
 
