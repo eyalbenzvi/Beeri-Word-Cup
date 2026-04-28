@@ -186,18 +186,24 @@ assert(progressHubIsFilled(undefined) === false, "NOT filled: undefined predicti
 assert(progressHubIsFilled({}) === false, "NOT filled: empty object");
 
 // ============================================================
-// 4. Related bug: AllForms "hasScore" must require both scores.
+// 4. Related bug: FormMatchesView "hasScore" must require both scores.
+//    (Originally inlined in AllForms.jsx — extracted Apr 2026 into the
+//    shared FormMatchesView component so the BestCasePanel scenario view
+//    reuses the same row rendering. Test now points at the new home.)
 // ============================================================
-console.log("--- 4. AllForms.jsx hasScore check ---");
+console.log("--- 4. FormMatchesView hasScore check ---");
 
-const allFormsSrc = readMigratedSrc(resolve(ROOT, "src/pages/AllForms.jsx"), "utf8");
+const allFormsSrc = readMigratedSrc(
+  resolve(ROOT, "src/components/FormMatchesView.jsx"),
+  "utf8",
+);
 
 // Extract the hasScore assignment (the first one)
 const hasScoreMatch = allFormsSrc.match(/const\s+hasScore\s*=\s*([\s\S]+?);/);
-assert(hasScoreMatch !== null, "AllForms hasScore declaration exists");
+assert(hasScoreMatch !== null, "FormMatchesView hasScore declaration exists");
 const hasScoreExpr = hasScoreMatch ? hasScoreMatch[1] : "";
-assert(/awayScore/.test(hasScoreExpr), "AllForms hasScore now references awayScore too");
-assert(/homeScore/.test(hasScoreExpr), "AllForms hasScore still references homeScore");
+assert(/awayScore/.test(hasScoreExpr), "FormMatchesView hasScore references awayScore");
+assert(/homeScore/.test(hasScoreExpr), "FormMatchesView hasScore references homeScore");
 
 // Simulate
 function allFormsHasScore(prediction) {

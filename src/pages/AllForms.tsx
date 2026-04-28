@@ -4,7 +4,7 @@ import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
-import Score from "../components/Score";
+import FormMatchesView from "../components/FormMatchesView";
 import {
   useAllPredictions,
   useUserDirectory,
@@ -12,65 +12,17 @@ import {
   useCurrentUser,
 } from "../hooks/useStore";
 import { normalizeStatus } from "../utils/helpers";
-import {
-  generateGroupMatches,
-  generateKnockoutMatches,
-  STAGES,
-} from "../data/matches";
-import { GROUPS, getTeamByCode } from "../data/teams";
-import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
+import { getTeamByCode } from "../data/teams";
+import { getCachedChampion } from "../utils/bracketCache";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { LOCK_MESSAGES, LABELS } from "../constants/messages";
 
-const groupMatches = generateGroupMatches();
-const knockoutMatches = generateKnockoutMatches();
 const EMPTY_MATCHES = {};
 
-
-function MatchRow({ match, prediction }) {
-  const home = getTeamByCode(match.homeTeam);
-  const away = getTeamByCode(match.awayTeam);
-  const homeName = home?.name || "טרם נקבע";
-  const awayName = away?.name || "טרם נקבע";
-  const hasScore =
-    prediction?.homeScore != null && prediction?.awayScore != null;
-
-  const isTie =
-    match.stage !== "group" &&
-    hasScore &&
-    prediction.homeScore === prediction.awayScore &&
-    prediction.advancingTeam;
-
-  return (
-    <div className="py-1.5 border-b border-border last:border-0 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex-1 text-center truncate text-ink font-medium">
-          <bdi>{homeName}</bdi>
-        </div>
-        <div className="w-14 text-center font-extrabold text-ink tabular-nums">
-          {hasScore ? <Score home={prediction.homeScore} away={prediction.awayScore} /> : "–"}
-        </div>
-        <div className="flex-1 text-center truncate text-ink font-medium">
-          <bdi>{awayName}</bdi>
-        </div>
-      </div>
-      {isTie && (
-        <div className="text-[10px] text-ink-muted font-bold text-center mt-0.5">
-          בעיטות הכרעה: {getTeamByCode(prediction.advancingTeam)?.name}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerList, expanded, onToggle }) {
   const canExpand = locked || isOwnForm;
   const predictions = form.matches || EMPTY_MATCHES;
-  // Lazy: only compute bracket when the card is expanded (not for all 250 forms on load)
-  const bracketTeams = useMemo(
-    () => expanded ? getCachedBracket(predictions) : null,
-    [predictions, expanded],
-  );
 
   const topScorerName = form.topScorer
     ? getPlayerDisplayName(form.topScorer, playerList)
@@ -108,54 +60,10 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
       </button>
 
       {expanded && canExpand && (
-        <div className="px-4 pb-4 space-y-3">
-          {Object.keys(GROUPS).map((group) => {
-            const matches = groupMatches.filter((m) => m.group === group);
-            return (
-              <div key={group}>
-                <div className="text-xs font-extrabold text-ink-muted mb-1">
-                  בית {group}
-                </div>
-                {matches.map((m) => (
-                  <MatchRow
-                    key={m.id}
-                    match={m}
-                    prediction={predictions[m.id]}
-                  />
-                ))}
-              </div>
-            );
-          })}
+        <div className="px-4 pb-4">
+          <FormMatchesView predictions={predictions} />
 
-          {["R32", "R16", "QF", "SF", "3RD", "F"].map((stage) => {
-            const matches = knockoutMatches.filter((m) => m.stage === stage);
-            if (matches.length === 0) return null;
-            return (
-              <div key={stage}>
-                <div className="text-xs font-extrabold text-ink-muted mb-1">
-                  {STAGES[stage]}
-                </div>
-                {matches.map((m) => {
-                  const derived = bracketTeams[m.id]
-                    ? {
-                        ...m,
-                        homeTeam: bracketTeams[m.id].home,
-                        awayTeam: bracketTeams[m.id].away,
-                      }
-                    : m;
-                  return (
-                    <MatchRow
-                      key={m.id}
-                      match={derived}
-                      prediction={predictions[m.id]}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
-
-          <div className="pt-2 border-t-2 border-border">
+          <div className="pt-2 mt-3 border-t-2 border-border">
             <div className="flex justify-between text-sm">
               <span className="text-ink-muted font-bold">⚽ {LABELS.topScorer}</span>
               <span className="font-extrabold text-ink">
