@@ -19,6 +19,7 @@ import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
 import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 import { LABELS } from "../constants/messages";
+import BestCasePanel from "../components/BestCasePanel";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -61,7 +62,7 @@ export default function Leaderboard({
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
-  const [selectedForm, setSelectedForm] = useState(null);
+  const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const autoScrolledRef = useRef(false);
 
@@ -240,6 +241,9 @@ export default function Leaderboard({
               {score.correctTopScorer ? " ✅" : ""}
             </span>
           </div>
+          {predData.status === "submitted" || predData.status === "approved" ? (
+            <BestCasePanel formId={selectedForm} />
+          ) : null}
         </div>
 
         {Object.entries(matchesByStage).map(([stage, matchesAny]) => (

@@ -43,7 +43,7 @@ export const BONUSES = {
   topScorer: 8,
 };
 
-function getOutcome(homeScore, awayScore) {
+export function getOutcome(homeScore, awayScore) {
   if (homeScore > awayScore) return "home";
   if (awayScore > homeScore) return "away";
   return "draw";
