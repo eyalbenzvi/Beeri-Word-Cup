@@ -110,6 +110,14 @@ export default function Leaderboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myForms, rankedLeaderboard, embedded, selectedForm]);
 
+  // When a form is opened from the leaderboard, jump to the top of the page
+  // so the user starts reading from the form header instead of inheriting the
+  // scroll offset of the row they tapped. Skipped in embedded admin preview.
+  useEffect(() => {
+    if (embedded || !selectedForm) return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [selectedForm, embedded]);
+
   // Rank delta: compare current rank per formId with the rank we saw last
   // visit. Stored in localStorage under "beeri:prevRanks". Deltas show for 3s
   // before we overwrite the snapshot.

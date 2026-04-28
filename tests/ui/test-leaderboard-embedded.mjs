@@ -21,6 +21,14 @@ if (/TrendingUp|TrendingDown|rankDelta|previousRank/.test(src)) {
     "when rank delta exists, it is gated by !embedded");
 }
 
+// --- Selecting a form must reset scroll to top (regression lock) ---
+// Without this, opening a form deep in the leaderboard leaves the user
+// scrolled past the form header.
+assert(
+  /selectedForm[\s\S]*window\.scrollTo|scrollTo\([^)]*top:\s*0/.test(src),
+  "selecting a form scrolls window to top",
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error("\nFailures:");
