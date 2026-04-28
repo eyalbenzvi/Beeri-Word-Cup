@@ -12,6 +12,24 @@ import { resolve } from "node:path";
 
 const REPO_ROOT = "/home/user/Beeri-World-Cup";
 
+function readSplitModule(baseDir, encoding) {
+  // For a directory like src/store/, return the concatenation of every
+  // *.ts / *.tsx file inside (including index). This mirrors the
+  // pre-split flat file: tests that grep for symbols in "store.js" still
+  // find them after the module split, regardless of which submodule owns
+  // the declaration.
+  if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) {
+    return null;
+  }
+  const parts = [];
+  for (const name of fs.readdirSync(baseDir).sort()) {
+    if (/\.(ts|tsx|js|jsx)$/.test(name) && !name.endsWith(".test.ts") && !name.endsWith(".test.tsx")) {
+      parts.push(fs.readFileSync(`${baseDir}/${name}`, encoding));
+    }
+  }
+  return parts.length > 0 ? parts.join("\n\n") : null;
+}
+
 export function readMigratedSrc(relOrAbsPath, encoding = "utf8") {
   const absPath = relOrAbsPath.startsWith("/") ? relOrAbsPath : resolve(REPO_ROOT, relOrAbsPath);
   try {
@@ -22,12 +40,12 @@ export function readMigratedSrc(relOrAbsPath, encoding = "utf8") {
       if (absPath.endsWith(from)) {
         const swapped = absPath.slice(0, -from.length) + to;
         try { return fs.readFileSync(swapped, encoding); } catch { /* fall through */ }
-        // Module-split: src/foo.js -> src/foo/index.{ts,tsx,js,jsx}
+        // Module-split: src/foo.js -> src/foo/*.{ts,tsx,js,jsx}.
+        // Returns the concatenation so static-grep tests still find every
+        // symbol after the split.
         const baseDir = absPath.slice(0, -from.length);
-        for (const ext of [".ts", ".tsx", ".js", ".jsx"]) {
-          const indexPath = `${baseDir}/index${ext}`;
-          try { return fs.readFileSync(indexPath, encoding); } catch { /* fall through */ }
-        }
+        const split = readSplitModule(baseDir, encoding);
+        if (split !== null) return split;
       }
     }
     throw err;

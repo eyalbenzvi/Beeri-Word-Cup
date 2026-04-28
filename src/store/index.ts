@@ -92,6 +92,31 @@ import {
   unpublishSummary,
   deleteSummary,
 } from "./summariesRepo";
+import {
+  rebuildUserFormIndex,
+  getAllPredictions,
+  getFormsForUser,
+  getForm,
+  clearPendingWritesForForm,
+  flushPendingWrites,
+  hasPendingWrites,
+  setActiveFormId,
+  getActiveFormId,
+  createForm,
+  deleteForm,
+  updateFormDetails,
+  savePrediction,
+  savePredictionsBatch,
+  saveBonusPrediction,
+  submitPredictions,
+  reopenForm,
+  adminApprovePrediction,
+  adminForceSubmitForm,
+  adminReopenForm,
+  adminDeleteForm,
+  adminUpdateForm,
+  adminSaveMatchPrediction,
+} from "./predictionsRepo";
 
 export {
   commitInBatches,
@@ -129,6 +154,27 @@ export {
   publishSummary,
   unpublishSummary,
   deleteSummary,
+  getAllPredictions,
+  getFormsForUser,
+  getForm,
+  clearPendingWritesForForm,
+  hasPendingWrites,
+  setActiveFormId,
+  getActiveFormId,
+  createForm,
+  deleteForm,
+  updateFormDetails,
+  savePrediction,
+  savePredictionsBatch,
+  saveBonusPrediction,
+  submitPredictions,
+  reopenForm,
+  adminApprovePrediction,
+  adminForceSubmitForm,
+  adminReopenForm,
+  adminDeleteForm,
+  adminUpdateForm,
+  adminSaveMatchPrediction,
 };
 
 const CURRENT_USER_KEY = "wc2026_currentUser";
@@ -139,113 +185,6 @@ import { MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 // Reverts cache.predictions[formId] back to a pre-write snapshot. Only used
 // for terminal errors (`permission-denied`) where the listener will never
 // auto-correct, since the server rejected the change and nothing changed
-// upstream to broadcast back. Transient errors (network/timeout) are left
-// alone so the listener's eventual snapshot can resolve them.
-function revertOptimisticForm(formId, snapshot) {
-  const next = { ...cache.predictions };
-  if (snapshot === undefined) {
-    delete next[formId];
-  } else {
-    next[formId] = snapshot;
-  }
-  cache.predictions = next;
-  notifyAndEmit("predictions");
-}
-
-async function writeFormDoc(formId, formData) {
-  const prevSnapshot = cache.predictions?.[formId];
-  cache.predictions = { ...cache.predictions, [formId]: formData };
-  notifyAndEmit("predictions");
-  emitSaving("predictions");
-  try {
-    await withTimeout(
-      setDoc(formDocRef(formId), safeClone(formData)),
-      10000,
-    );
-    emitSaved("predictions");
-    return true;
-  } catch (err) {
-    console.error(`Failed to write form ${formId}:`, err);
-    if (err?.code === "permission-denied") {
-      revertOptimisticForm(formId, prevSnapshot);
-    }
-    emitWriteError("predictions", err);
-    captureClientError(err, { source: "writeFormDoc", formId, code: err?.code });
-    await maybeRefreshToken(err);
-    return false;
-  }
-}
-
-const pendingWrites = {};
-
-function debouncedWriteForm(formId, formData, delay = 500) {
-  // Block writes immediately if predictions are locked
-  if (cache.settings?.predictionsLocked) return;
-  const prevSnapshot = cache.predictions?.[formId];
-  cache.predictions = { ...cache.predictions, [formId]: formData };
-  notifyAndEmit("predictions");
-  emitSaving("predictions");
-  const key = `form:${formId}`;
-  clearTimeout(pendingWrites[key]);
-  pendingWrites[key] = setTimeout(() => {
-    delete pendingWrites[key];
-    if (cache.settings?.predictionsLocked) return; // double-check at write time
-    setDoc(formDocRef(formId), safeClone(formData))
-      .then(() => emitSaved("predictions"))
-      .catch((err) => {
-        console.error(`Failed to write form ${formId}:`, err);
-        if (err?.code === "permission-denied") {
-          // Only revert if the cache still matches what we tried to write —
-          // otherwise the user has typed since, and we'd discard their
-          // latest edits. The listener will eventually reconcile any
-          // transient errors that fall through this guard.
-          if (cache.predictions?.[formId] === formData) {
-            revertOptimisticForm(formId, prevSnapshot);
-          }
-        }
-        emitWriteError("predictions", err);
-        captureClientError(err, {
-          source: "debouncedWriteForm",
-          formId,
-          code: err?.code,
-        });
-        maybeRefreshToken(err);
-      });
-  }, delay);
-}
-
-export function clearPendingWritesForForm(formId) {
-  const key = `form:${formId}`;
-  if (pendingWrites[key]) {
-    clearTimeout(pendingWrites[key]);
-    delete pendingWrites[key];
-  }
-}
-
-function flushPendingWrites() {
-  for (const key of Object.keys(pendingWrites)) {
-    clearTimeout(pendingWrites[key]);
-    delete pendingWrites[key];
-    try {
-      if (key.startsWith("form:")) {
-        const formId = key.slice(5);
-        const data = safeClone(cache.predictions[formId]);
-        if (data) {
-          setDoc(formDocRef(formId), data).catch((err) =>
-            console.error(`Failed to flush ${key}:`, err),
-          );
-        }
-      }
-    } catch (err) {
-      console.error(`Failed to clone for flush ${key}:`, err);
-    }
-  }
-}
-
-export function hasPendingWrites() {
-  return Object.keys(pendingWrites).length > 0;
-}
-
 // ============ REALTIME LISTENERS ============
 
 let listenersInitialized = false;
@@ -961,300 +900,10 @@ export function logoutUser() {
   notifyAndEmit("currentUser");
 }
 
-// ============ ACTIVE FORM (local per-browser) ============
-
-export function getActiveFormId() {
-  try {
-    return JSON.parse(localStorage.getItem(ACTIVE_FORM_KEY)) || null;
-  } catch {
-    return null;
-  }
-}
-
-export function setActiveFormId(formId) {
-  localStorage.setItem(ACTIVE_FORM_KEY, JSON.stringify(formId));
-  notifyAndEmit("activeForm");
-  broadcastActiveFormChange();
-}
-
-// ============ PREDICTIONS (PER-FORM DOCUMENTS) ============
-
-// userId -> Set<formId> index for O(1) user form lookup
-const userFormIndex = {};
-
-function rebuildUserFormIndex() {
-  for (const key of Object.keys(userFormIndex)) delete userFormIndex[key];
-  for (const [formId, data] of Object.entries(cache.predictions || {})) {
-    const uid = data.userId;
-    if (uid) {
-      if (!userFormIndex[uid]) userFormIndex[uid] = new Set();
-      userFormIndex[uid].add(formId);
-    }
-  }
-}
-
-function indexAddForm(formId, userId) {
-  if (!userId) return;
-  if (!userFormIndex[userId]) userFormIndex[userId] = new Set();
-  userFormIndex[userId].add(formId);
-}
-
-function indexRemoveForm(formId, userId) {
-  if (!userId || !userFormIndex[userId]) return;
-  userFormIndex[userId].delete(formId);
-  if (userFormIndex[userId].size === 0) delete userFormIndex[userId];
-}
-
-export function getAllPredictions() {
-  return cache.predictions || EMPTY_OBJ;
-}
-
-const DEFAULT_FORM = {
-  matches: {},
-  advancing: {},
-  champion: null,
-  topScorer: "",
-  status: "draft",
-};
-
-export function getFormsForUser(userId) {
-  const all = getAllPredictions();
-  const formIds = userFormIndex[userId];
-  if (!formIds || formIds.size === 0) return [];
-  const forms = [];
-  for (const formId of formIds) {
-    const data = all[formId];
-    if (data) forms.push({ formId, ...data });
-  }
-  forms.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
-  return forms;
-}
-
-export function getForm(formId) {
-  const all = getAllPredictions();
-  return all[formId] || null;
-}
-
-const MAX_FORMS_PER_USER = FORMS_LIMIT;
-
-export function createForm(userId: string, formName?: string) {
-  if (getSettings().predictionsLocked) {
-    throw new Error("ההגשה נסגרה — לא ניתן ליצור טפסים חדשים");
-  }
-  const userForms = getFormsForUser(userId);
-  if (userForms.length >= MAX_FORMS_PER_USER) {
-    throw new Error(`מקסימום ${MAX_FORMS_PER_USER} טפסים למשתמש`);
-  }
-  const formId = `${userId}__${Date.now()}`;
-  const user = getUser(userId);
-  const defaultName = generateDefaultFormName({
-    nickname: user?.displayName,
-    userForms,
-    allPredictions: cache.predictions,
-  });
-
-  const formData = {
-    userId,
-    formName: (typeof formName === "string" && formName.trim()) ? formName : defaultName,
-    budgetNumber: "",
-    ...DEFAULT_FORM,
-    createdAt: new Date().toISOString(),
-  };
-  indexAddForm(formId, userId);
-  writeFormDoc(formId, formData);
-  setActiveFormId(formId);
-  return formId;
-}
-
-export async function deleteForm(formId) {
-  const form = getForm(formId);
-  if (!form || (form.status !== "draft" && form.status !== "pending")) return;
-
-  clearPendingWritesForForm(formId);
-  indexRemoveForm(formId, form.userId);
-  const newPreds = { ...cache.predictions };
-  delete newPreds[formId];
-  cache.predictions = newPreds;
-  notifyAndEmit("predictions");
-
-  await deleteDoc(formDocRef(formId));
-
-  if (getActiveFormId() === formId) {
-    localStorage.removeItem(ACTIVE_FORM_KEY);
-    notifyAndEmit("activeForm");
-  }
-}
-
-export function updateFormDetails(formId, fields) {
-  if (getSettings().predictionsLocked) return;
-  const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
-  const updated = { ...form, ...fields };
-  debouncedWriteForm(formId, updated);
-}
-
-export function savePrediction(formId, matchId, prediction) {
-  if (getSettings().predictionsLocked) return;
-  const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
-  const updated = {
-    ...form,
-    matches: { ...form.matches, [matchId]: prediction },
-    updatedAt: new Date().toISOString(),
-  };
-  debouncedWriteForm(formId, updated);
-}
-
-export function savePredictionsBatch(formId, matchPredictions) {
-  if (getSettings().predictionsLocked) return;
-  const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
-  const updated = {
-    ...form,
-    matches: { ...form.matches, ...matchPredictions },
-    updatedAt: new Date().toISOString(),
-  };
-  // Use writeFormDoc (not debounced) for immediate batch write
-  writeFormDoc(formId, updated);
-}
-
-export function saveBonusPrediction(formId, field, value) {
-  if (getSettings().predictionsLocked) return;
-  const form = getForm(formId);
-  if (!form || form.status !== "draft") return;
-  const updated = {
-    ...form,
-    [field]: value,
-    updatedAt: new Date().toISOString(),
-  };
-  debouncedWriteForm(formId, updated);
-}
-
-export function submitPredictions(formId) {
-  if (getSettings().predictionsLocked) return;
-  flushPendingWrites();
-  const form = getForm(formId);
-  if (!form) return;
-  const updated = {
-    ...form,
-    status: "pending",
-    submittedAt: new Date().toISOString(),
-  };
-  writeFormDoc(formId, updated);
-}
-
-export function adminApprovePrediction(formId) {
-  if (!requireAdmin()) return;
-  writeAuditLog("approve-form", { formId });
-  const form = getForm(formId);
-  if (!form || form.status !== "pending") return;
-  writeFormDoc(formId, {
-    ...form,
-    status: "submitted",
-    approvedAt: new Date().toISOString(),
-  });
-}
-
-export function reopenForm(formId) {
-  if (getSettings().predictionsLocked) return;
-  const form = getForm(formId);
-  if (!form) return;
-  // Users may reopen their own pending or submitted forms back to draft as
-  // long as the tournament isn't locked. Firestore rules enforce the same.
-  if (form.status !== "pending" && form.status !== "submitted") return;
-  const updated = {
-    ...form,
-    status: "draft",
-    reopenedAt: new Date().toISOString(),
-  };
-  writeFormDoc(formId, updated);
-}
-
-export function adminForceSubmitForm(formId) {
-  if (!requireAdmin()) return;
-  writeAuditLog("force-submit", { formId });
-  flushPendingWrites();
-  const form = getForm(formId);
-  if (!form) return;
-  const now = new Date().toISOString();
-  writeFormDoc(formId, {
-    ...form,
-    status: "submitted",
-    submittedAt: now,
-    adminSubmittedAt: now,
-  });
-}
-
-export function adminReopenForm(formId) {
-  if (!requireAdmin()) return;
-  writeAuditLog("reopen-form", { formId });
-  flushPendingWrites();
-  const form = getForm(formId);
-  if (!form) return;
-  const now = new Date().toISOString();
-  writeFormDoc(formId, {
-    ...form,
-    status: "draft",
-    reopenedAt: now,
-    adminReopenedAt: now,
-  });
-}
-
-export async function adminDeleteForm(formId) {
-  if (!requireAdmin()) return false;
-  writeAuditLog("delete-form", { formId });
-  flushPendingWrites();
-  emitSaving("predictions");
-  try {
-    await deleteDoc(formDocRef(formId));
-  } catch (err) {
-    console.error(`adminDeleteForm failed for ${formId}:`, err);
-    emitWriteError("predictions", err);
-    captureClientError(err, { source: "adminDeleteForm", formId, code: err?.code });
-    return false;
-  }
-  // Only update cache after successful delete
-  const newPreds = { ...cache.predictions };
-  delete newPreds[formId];
-  cache.predictions = newPreds;
-  emitSaved("predictions");
-  notifyAndEmit("predictions");
-  if (getActiveFormId() === formId) {
-    localStorage.removeItem(ACTIVE_FORM_KEY);
-    notifyAndEmit("activeForm");
-  }
-  return true;
-}
-
-export function adminUpdateForm(formId, fields) {
-  if (!requireAdmin()) return;
-  flushPendingWrites();
-  const form = getForm(formId);
-  if (!form) return;
-  // userId is immutable — never allow reassignment even by admin
-  const { userId: _drop, ...safeFields } = fields;
-  const updated = {
-    ...form,
-    ...safeFields,
-    updatedAt: new Date().toISOString(),
-  };
-  if (fields.adminNote != null) {
-    updated.adminEditedAt = new Date().toISOString();
-  }
-  writeFormDoc(formId, updated);
-}
-
-export function adminSaveMatchPrediction(formId, matchId, prediction) {
-  if (!requireAdmin()) return;
-  flushPendingWrites();
-  const form = getForm(formId);
-  if (!form) return;
-  writeFormDoc(formId, {
-    ...form,
-    matches: { ...form.matches, [matchId]: prediction },
-    updatedAt: new Date().toISOString(),
-  });
-}
+// ============ PREDICTIONS / ACTIVE FORM ============
+// (read accessors + form CRUD + admin mutators + the userFormIndex +
+// active-form storage live in ./predictionsRepo and are re-exported via
+// the import block at the top of this file.)
 
 // ============ MATCH RESULTS (admin) ============
 
