@@ -504,7 +504,7 @@ button:focus-visible { border-radius: 14px; }
 
 /* Reading column cap — used by long-form prose pages (the blog).
    Keeps lines ~65–75 Hebrew chars wide on desktop; no-op on mobile. */
-.prose-column { max-width: 68ch; margin-inline: auto; }
+.prose-column { max-width: 68ch; margin-inline: 0 auto; }
 
 /* --------- Scrollbar --------- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

@@ -114,7 +114,7 @@ export default function Layout({ children, rightRail = null }) {
           - Mobile/tablet: single column capped at max-w-4xl
           - xl:  3-column grid (RTL: DesktopSideNav on right, content center, rightRail on left) */}
       <div
-        className={`mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-24 xl:pb-8 ${
+        className={`mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-24 xl:pb-8 xl:min-h-[calc(100vh-4rem)] ${
           rightRail
             ? "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)_320px] xl:gap-8"
             : "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-8"
@@ -125,7 +125,7 @@ export default function Layout({ children, rightRail = null }) {
           {children}
         </main>
         {rightRail && (
-          <aside className="hidden xl:block xl:sticky xl:top-6 xl:self-start xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto" aria-label="פאנל הקשרי">
+          <aside className="hidden xl:block xl:sticky xl:top-[5.5rem] xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto" aria-label="פאנל הקשרי">
             {rightRail}
           </aside>
         )}
