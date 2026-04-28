@@ -119,7 +119,7 @@ for (const filePath of jsxFiles) {
 
 // ---- 12. Store: shared-doc safety guards ----
 console.log("--- 12. Firestore API contract ---");
-const storeFile = readFileSync('/home/user/Beeri-World-Cup/src/store.js', 'utf8');
+const storeFile = readMigratedSrc('/home/user/Beeri-World-Cup/src/store.js');
 // `merge: true` is permitted for the userDirectory + userPrivate dual-write
 // (PII migration Phase A) — those writes target per-uid subpaths where merge
 // is the correct tool. The historical concern was accidentally merging into

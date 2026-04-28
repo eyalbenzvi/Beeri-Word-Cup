@@ -99,7 +99,19 @@ const DOCS = {
 const CURRENT_USER_KEY = "wc2026_currentUser";
 const ACTIVE_FORM_KEY = "wc2026_activeForm";
 
-const cache = {
+type CacheShape = {
+  users: Record<string, any>;
+  userDirectory: Record<string, any>;
+  userPrivate: Record<string, any>;
+  predictions: Record<string, any>;
+  matchResults: Record<string, any>;
+  actualAdvancing: Record<string, any>;
+  actualBonuses: any;
+  settings: Record<string, any>;
+  summaries: Record<string, any>;
+  _ready: Record<string, boolean>;
+};
+const cache: CacheShape = {
   users: {},
   // {uid: {displayName, firstName?, lastName?}} — auth-readable directory.
   userDirectory: {},
@@ -1218,10 +1230,11 @@ export function getMissingReadyKeys() {
 
 // ============ SUBSCRIPTIONS ============
 
-const listeners = new Set();
-const keyedListeners = new Map(); // key -> Set<listener>
+type Listener = () => void;
+const listeners = new Set<Listener>();
+const keyedListeners = new Map<string, Set<Listener>>();
 
-export function subscribe(listener) {
+export function subscribe(listener: Listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -1236,19 +1249,19 @@ export function subscribeToKey(key, listener) {
   };
 }
 
-function notifyListeners(event) {
+function notifyListeners(event?: any) {
   for (const listener of listeners) listener();
   // Also notify keyed listeners
   const key = event?.detail?.key;
   if (key && keyedListeners.has(key)) {
-    for (const listener of keyedListeners.get(key)) listener();
+    for (const listener of keyedListeners.get(key)!) listener();
   }
 }
 
 // Registered once at module load — notifyListeners dispatched via notifyAndEmit
-if (!window.__storeListenerRegistered) {
-  window.__storeListenerRegistered = true;
-  window.addEventListener("store-updated", notifyListeners);
+if (!(window as any).__storeListenerRegistered) {
+  (window as any).__storeListenerRegistered = true;
+  window.addEventListener("store-updated", notifyListeners as EventListener);
 }
 
 // Cross-tab sync: notify other tabs when active form changes
@@ -1277,7 +1290,7 @@ openBroadcastChannel();
 
 const EMPTY_OBJ = {};
 const DEFAULT_BONUSES = { champion: null, topScorers: [] };
-const DEFAULT_SETTINGS = { predictionsLocked: false };
+const DEFAULT_SETTINGS: Record<string, any> = { predictionsLocked: false };
 
 export function getUsers() {
   return cache.users || EMPTY_OBJ;
@@ -1390,7 +1403,7 @@ async function doEnsureUserInStore(uid, displayName, email) {
   if (firestoreUser) {
     // Case A: per-field update preserves existing fields (isAdmin, names, etc.).
     // Don't overwrite displayName — preserve the user's custom nickname.
-    const fields = { id: uid, lastLoginAt: now };
+    const fields: Record<string, any> = { id: uid, lastLoginAt: now };
     if (email && !firestoreUser.email) fields.email = email;
     cache.users = { ...cache.users, [uid]: { ...firestoreUser, ...fields } };
     notifyAndEmit("users");
@@ -1419,10 +1432,10 @@ export function updateUser(userId, fields) {
   updateUserField(userId, fields);
 }
 
-export async function updateUserProfile(uid, profileFields) {
+export async function updateUserProfile(uid: string, profileFields: Record<string, any>) {
   if (!getUsers()[uid]) return false;
   const { firstName, lastName, displayName, profileCompleted } = profileFields;
-  const fields = {};
+  const fields: Record<string, any> = {};
   if (firstName !== undefined) fields.firstName = firstName;
   if (lastName !== undefined) fields.lastName = lastName;
   if (displayName !== undefined) fields.displayName = displayName;
@@ -1437,10 +1450,10 @@ export function touchUserLogin(uid) {
   updateUserField(uid, { lastLoginAt: new Date().toISOString() });
 }
 
-export function demoteAdmin(userId) {
+export function demoteAdmin(userId: string) {
   const users = getUsers();
   if (!users[userId] || !users[userId].isAdmin) return;
-  const adminCount = Object.values(users).filter((u) => u.isAdmin).length;
+  const adminCount = Object.values(users).filter((u: any) => u.isAdmin).length;
   if (adminCount <= 1) return;
   updateUserField(userId, { isAdmin: false });
 }
@@ -1566,7 +1579,7 @@ export function logoutUser() {
   flushPendingWrites();
   lastEnsuredUid = null;
   ensureRetryCount.clear();
-  tokenRefreshedFor.clear();
+  tokenRefreshedAt.clear();
   listenersInitialized = false;
   listenersHadError = false;
   for (const key of Object.keys(retryState)) delete retryState[key];
@@ -1681,7 +1694,7 @@ export function getForm(formId) {
 
 const MAX_FORMS_PER_USER = FORMS_LIMIT;
 
-export function createForm(userId, formName) {
+export function createForm(userId: string, formName?: string) {
   if (getSettings().predictionsLocked) {
     throw new Error("ההגשה נסגרה — לא ניתן ליצור טפסים חדשים");
   }
@@ -2018,7 +2031,7 @@ export function validateBackupShape(data) {
         orphanForms++;
         continue;
       }
-      if (form.userId && !users[form.userId]) orphanForms++;
+      if ((form as any).userId && !users[(form as any).userId]) orphanForms++;
     }
     if (badFormIds > 0) errors.push(`${badFormIds} מזהי טפסים בפורמט לא תקין`);
     if (orphanForms > 0) errors.push(`${orphanForms} טפסים ללא משתמש תואם בקובץ`);
@@ -2238,7 +2251,7 @@ export function getSummary(summaryId) {
 
 // Returns published summaries ordered by `number` ascending.
 export function getPublishedSummariesSorted() {
-  return Object.values(getSummaries())
+  return (Object.values(getSummaries()) as any[])
     .filter((s) => s.status === "published")
     .sort((a, b) => (a.number || 0) - (b.number || 0));
 }
@@ -2250,16 +2263,17 @@ export function getLatestPublishedSummary() {
 }
 
 // Finds a summary by its sequential number (string or number).
-export function getSummaryByNumber(n) {
+export function getSummaryByNumber(n: any) {
   const num = Number(n);
   if (!Number.isFinite(num)) return null;
-  return Object.values(getSummaries()).find((s) => s.number === num) || null;
+  return (Object.values(getSummaries()) as any[]).find((s) => s.number === num) || null;
 }
 
 // Compute the union of matchIds already referenced in any summary (drafts + published).
 export function getCoveredMatchIds() {
-  const covered = new Set();
-  for (const s of Object.values(getSummaries())) {
+  const covered = new Set<string>();
+  for (const sAny of Object.values(getSummaries())) {
+    const s = sAny as any;
     for (const mid of s.coveredMatchIds || []) covered.add(mid);
   }
   return covered;
@@ -2361,9 +2375,9 @@ export async function createSummary(fields = {}) {
  * Update an existing summary's fields. `fields.status` can be omitted;
  * pass "published" / "draft" to change visibility.
  */
-export async function updateSummary(summaryId, fields = {}) {
+export async function updateSummary(summaryId: string, fields: Record<string, any> = {}) {
   if (!requireAdmin()) return false;
-  const existing = getSummary(summaryId);
+  const existing = getSummary(summaryId) as any;
   if (!existing) return false;
   const now = new Date().toISOString();
   // `id`, `number`, `authorUid`, and `createdAt` are never mutated after creation.
@@ -2373,7 +2387,7 @@ export async function updateSummary(summaryId, fields = {}) {
     authorUid: _dropAuthor,
     createdAt: _dropCreated,
     ...safeFields
-  } = fields;
+  }: Record<string, any> = fields;
   // Sanity: status must stay on the allowed set if provided.
   if (
     safeFields.status != null &&
@@ -2388,7 +2402,7 @@ export async function updateSummary(summaryId, fields = {}) {
     console.warn("updateSummary size validation:", sizeErr);
     throw new Error(sizeErr);
   }
-  const patch = { ...safeFields, updatedAt: now };
+  const patch: Record<string, any> = { ...safeFields, updatedAt: now };
   if (fields.status === "published" && existing.status !== "published") {
     patch.publishedAt = now;
   }

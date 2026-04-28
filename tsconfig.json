@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "allowJs": true,
+    "allowJs": false,
     "checkJs": false,
     "strict": false,
     "noImplicitAny": false,
@@ -16,6 +16,7 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "types": ["@testing-library/jest-dom"],
     "verbatimModuleSyntax": false,
     "forceConsistentCasingInFileNames": true
   },

@@ -93,7 +93,7 @@ export function captureClientError(err, context = {}) {
 // Lightweight signal event (not an Error). Used for watchdog timeouts,
 // recovery-button taps, etc. Dedup'd by key so one stuck session produces
 // at most one event per watchdog.
-export function captureClientMessage(key, context = {}, level = "warning") {
+export function captureClientMessage(key: string, context: Record<string, any> = {}, level: import("@sentry/react").SeverityLevel = "warning") {
   if (!initialized) return;
   if (emittedOnce.has(key)) return;
   emittedOnce.add(key);
