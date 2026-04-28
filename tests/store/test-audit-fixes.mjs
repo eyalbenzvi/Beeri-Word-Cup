@@ -1001,7 +1001,8 @@ console.log("--- 5.2: adminDeleteForm error contract ---");
   const adminTabSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/components/AdminFormsTab.jsx", "utf8");
 
   // Function shape: declares return values + try/catch around deleteDoc.
-  const fnMatch = storeSrc.match(/export async function adminDeleteForm\(formId\)\s*\{([\s\S]*?)\n\}\n/);
+  // Loose param match — TS migration adds `: string` annotations.
+  const fnMatch = storeSrc.match(/export async function adminDeleteForm\(formId[^)]*\)\s*\{([\s\S]*?)\n\}/);
   assert(!!fnMatch, "adminDeleteForm function found");
   const body = fnMatch?.[1] || "";
   assert(body.includes("return false"), "Returns false on early rejection / failure");
@@ -1034,14 +1035,15 @@ console.log("--- 5.3: Optimistic write revert on permission-denied ---");
   assert(storeSrc.includes("function revertOptimisticForm"), "revertOptimisticForm helper exists");
 
   // writeFormDoc must capture snapshot before optimistic update + revert on permission-denied.
-  const writeFn = storeSrc.match(/async function writeFormDoc\(formId, formData\)\s*\{([\s\S]*?)\n\}\n/)?.[1] || "";
+  // Loose param match — TS migration adds `: string` / `: any` annotations.
+  const writeFn = storeSrc.match(/async function writeFormDoc\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] || "";
   assert(writeFn.includes("const prevSnapshot = cache.predictions"), "writeFormDoc captures pre-write snapshot");
   assert(writeFn.match(/if \(err\?\.code === "permission-denied"\)/), "writeFormDoc gates revert on permission-denied");
   assert(writeFn.includes("revertOptimisticForm(formId, prevSnapshot)"), "writeFormDoc calls revertOptimisticForm");
 
   // debouncedWriteForm must do the same, with an extra freshness guard so a
   // racing later call's optimistic state isn't wiped.
-  const debFn = storeSrc.match(/function debouncedWriteForm\(formId, formData[^)]*\)\s*\{([\s\S]*?)\n\}\n/)?.[1] || "";
+  const debFn = storeSrc.match(/function debouncedWriteForm\([^)]*\)\s*\{([\s\S]*?)\n\}/)?.[1] || "";
   assert(debFn.includes("const prevSnapshot = cache.predictions"), "debouncedWriteForm captures snapshot");
   assert(debFn.match(/if \(err\?\.code === "permission-denied"\)/), "debouncedWriteForm gates revert on permission-denied");
   assert(debFn.includes("cache.predictions?.[formId] === formData"), "debouncedWriteForm has freshness guard before reverting");

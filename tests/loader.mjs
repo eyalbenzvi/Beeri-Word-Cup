@@ -22,6 +22,17 @@ function resolveRelative(specifier, parentURL) {
       return specifier + ext;
     }
   }
+  // Directory import — e.g. `from "../store"` where `../store/` is a
+  // directory with an index file. Vite + Node ESM both resolve this in
+  // their respective worlds; we mirror it here so legacy tests follow.
+  if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+    for (const ext of RESOLVE_EXTS) {
+      if (fs.existsSync(pathResolve(candidate, "index" + ext))) {
+        const sep = specifier.endsWith("/") ? "" : "/";
+        return specifier + sep + "index" + ext;
+      }
+    }
+  }
   return null;
 }
 

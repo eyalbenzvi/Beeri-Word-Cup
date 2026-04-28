@@ -187,7 +187,8 @@ console.log("--- 5. Static source audits ---");
   // 5b. src/store.js reopenForm must accept pending OR submitted, and must
   //     short-circuit when locked.
   const store = readMigratedSrc("src/store.js", "utf8");
-  const reopenMatch = store.match(/export function reopenForm\(formId\)\s*\{[\s\S]*?\n\}/);
+  // Loose param match — TS migration adds `: string` annotations.
+  const reopenMatch = store.match(/export function reopenForm\([^)]*\)\s*\{[\s\S]*?\n\}/);
   assert(reopenMatch, "store.js: reopenForm export found");
   const body = reopenMatch ? reopenMatch[0] : "";
   assert(/predictionsLocked/.test(body), "store.js reopenForm: checks predictionsLocked");

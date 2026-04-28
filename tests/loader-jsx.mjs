@@ -20,6 +20,15 @@ function resolveRelative(specifier, parentURL) {
       return specifier + ext;
     }
   }
+  // Directory import — see loader.mjs for the rationale.
+  if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+    for (const ext of RESOLVE_EXTS) {
+      if (fs.existsSync(pathResolve(candidate, "index" + ext))) {
+        const sep = specifier.endsWith("/") ? "" : "/";
+        return specifier + sep + "index" + ext;
+      }
+    }
+  }
   return null;
 }
 

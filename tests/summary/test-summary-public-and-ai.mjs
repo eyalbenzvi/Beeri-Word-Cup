@@ -16,7 +16,18 @@ console.log("=== SUMMARY PUBLIC + AI AUDIT ===\n");
 
 // ============ 1. Public-readonly mode ============
 console.log("--- 1. public-readonly mode in store.js ---");
-const storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+// After store/* split, summary + listener code lives in store/*.ts modules.
+let storeSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/store.js", "utf8");
+for (const p of [
+  "/home/user/Beeri-World-Cup/src/store/summariesRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/listeners.ts",
+  "/home/user/Beeri-World-Cup/src/store/publicMode.ts",
+  "/home/user/Beeri-World-Cup/src/store/usersRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/cache.ts",
+  "/home/user/Beeri-World-Cup/src/store/firestoreClient.ts",
+]) {
+  try { storeSrc += "\n" + readMigratedSrc(p, "utf8"); } catch { /* not split yet */ }
+}
 assert(storeSrc.includes("initPublicReadonlyMode"), "public init exported");
 assert(storeSrc.includes("teardownPublicReadonlyMode"), "public teardown exists");
 assert(/initRealtimeListeners[\s\S]*?teardownPublicReadonlyMode/.test(storeSrc),

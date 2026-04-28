@@ -16,7 +16,18 @@ console.log("=== SUMMARY REVIEW FIXES ===\n");
 
 const R = (p) => readMigratedSrc(p);
 const nav = R("/home/user/Beeri-World-Cup/src/hooks/useNavigation.jsx");
-const store = R("/home/user/Beeri-World-Cup/src/store.js");
+let store = R("/home/user/Beeri-World-Cup/src/store.js");
+// After store/* split, the relevant code lives in store/*.ts modules.
+for (const p of [
+  "/home/user/Beeri-World-Cup/src/store/summariesRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/listeners.ts",
+  "/home/user/Beeri-World-Cup/src/store/publicMode.ts",
+  "/home/user/Beeri-World-Cup/src/store/usersRepo.ts",
+  "/home/user/Beeri-World-Cup/src/store/cache.ts",
+  "/home/user/Beeri-World-Cup/src/store/firestoreClient.ts",
+]) {
+  try { store += "\n" + R(p); } catch { /* not split yet */ }
+}
 const app = R("/home/user/Beeri-World-Cup/src/App.jsx");
 const editor = R("/home/user/Beeri-World-Cup/src/components/SummaryEditor.jsx");
 const adminTab = R("/home/user/Beeri-World-Cup/src/components/AdminSummariesTab.jsx");
