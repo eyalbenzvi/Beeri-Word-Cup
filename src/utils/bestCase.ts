@@ -386,30 +386,12 @@ function optimizeKnockout(
   trackedForms: Record<string, any>,
   formPreds: Record<string, FormPreds>,
 ): Record<string, any> {
-  // Played KO matches that the admin entered as a tie but hasn't picked an
-  // advancingTeam for yet. The bracket can't resolve downstream rounds
-  // until that pick exists, so the optimizer must fill it in (keeping the
-  // admin's score) — otherwise the best-case display propagates "טרם
-  // נקבע" through every round fed by the unresolved match.
-  const unresolvedPlayedKO = knockoutMatches.filter((m) => {
-    const r = workingResults[m.id];
-    return (
-      r &&
-      r.homeScore != null &&
-      r.awayScore != null &&
-      r.homeScore === r.awayScore &&
-      !r.advancingTeam
-    );
-  });
+  if (remKO.length === 0) return {};
 
-  if (remKO.length === 0 && unresolvedPlayedKO.length === 0) return {};
-
-  const toOptimize = [...remKO, ...unresolvedPlayedKO];
-  const playedTieIds = new Set(unresolvedPlayedKO.map((m) => m.id));
   const koRes: Record<string, any> = {};
 
   for (const round of ["R32", "R16", "QF", "SF", "3RD", "F"]) {
-    const roundMatches = toOptimize.filter((m) => m.stage === round);
+    const roundMatches = remKO.filter((m) => m.stage === round);
     if (!roundMatches.length) continue;
 
     for (const match of roundMatches) {
@@ -418,20 +400,10 @@ function optimizeKnockout(
       const actualTeams = actualBracket[match.id];
       if (!actualTeams?.home || !actualTeams?.away) continue;
 
-      let candidates: any[];
-      if (playedTieIds.has(match.id)) {
-        // Admin's score is locked — only choose advancingTeam.
-        const played = workingResults[match.id];
-        candidates = [
-          { ...played, advancingTeam: actualTeams.home },
-          { ...played, advancingTeam: actualTeams.away },
-        ];
-      } else {
-        candidates = expandKnockoutCandidates(
-          getCandidates(match.id, trackedForms),
-          actualTeams,
-        );
-      }
+      const candidates = expandKnockoutCandidates(
+        getCandidates(match.id, trackedForms),
+        actualTeams,
+      );
 
       let bestAbove = Infinity;
       let bestScore = -Infinity;
