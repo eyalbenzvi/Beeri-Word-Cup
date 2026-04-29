@@ -265,17 +265,25 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
   );
 
   // Regression: knockout cards must derive teams from the bracket (computed
-  // from real results) when the match itself has no result yet — otherwise
-  // R32/R16/QF/SF cards stay on "טרם נקבע" forever even after every group
-  // game has been entered by the admin.
+  // from real results). The admin's saveMatchResult stores `homeTeam: null,
+  // awayTeam: null` for knockout matches (because match.homeTeam/awayTeam
+  // is null in the static schedule), so the derivation must fall back to
+  // the bracket EVEN when `result` exists — otherwise R32 cards keep
+  // showing "טרם נקבע" after the admin enters scores. Earlier fix only
+  // helped the no-result case; the working fix uses `result?.homeTeam ||
+  // bracketTeams[...]` as a chained fallback.
   assert(
     /getCachedBracket\(\s*results\s*\)/.test(results),
-    "Results.tsx: knockout teams derived via getCachedBracket(results) when result missing",
+    "Results.tsx: bracket derived via getCachedBracket(results)",
   );
   assert(
-    /bracketTeams\[match\.id\]\?\.home/.test(results) &&
-      /bracketTeams\[match\.id\]\?\.away/.test(results),
-    "Results.tsx: knockout fallback uses bracketTeams[match.id] for home/away",
+    /result\?\.homeTeam\s*\|\|\s*bracketTeams\[match\.id\]\?\.home/.test(
+      results,
+    ) &&
+      /result\?\.awayTeam\s*\|\|\s*bracketTeams\[match\.id\]\?\.away/.test(
+        results,
+      ),
+    "Results.tsx: knockout teams chain result?.homeTeam || bracketTeams[id]?.home (fallback works even when result has null teams)",
   );
 
   const sim = readMigratedSrc("src/components/SimulatorPanel.jsx", "utf8");

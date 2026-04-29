@@ -58,15 +58,18 @@ export default function Results() {
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== "group";
           const result = results[match.id];
-          const derived =
-            isKnockout && result
-              ? { home: result.homeTeam, away: result.awayTeam }
-              : isKnockout
-                ? {
-                    home: bracketTeams[match.id]?.home || null,
-                    away: bracketTeams[match.id]?.away || null,
-                  }
-                : { home: match.homeTeam, away: match.awayTeam };
+          const derived = isKnockout
+            ? {
+                home:
+                  result?.homeTeam ||
+                  bracketTeams[match.id]?.home ||
+                  null,
+                away:
+                  result?.awayTeam ||
+                  bracketTeams[match.id]?.away ||
+                  null,
+              }
+            : { home: match.homeTeam, away: match.awayTeam };
           const homeTeam = derived.home ? getTeamByCode(derived.home) : null;
           const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
 
