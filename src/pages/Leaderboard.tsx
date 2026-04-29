@@ -78,46 +78,44 @@ export default function Leaderboard({
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
 
-  // Build filtered leaderboard for the search box. We match against form
-  // name, the owner's display name, the predicted champion's team name and
-  // the predicted top scorer's resolved Hebrew name. `normalizeSearch`
-  // lower-cases and strips niqqud so the same query lands on
-  // "ארגנטינה" as on "ארגנטינה" (with vowel marks). Search is restricted
-  // to canView entries upstream so privacy holds (champion / top-scorer
-  // matches on locked previews are deliberately rejected below).
-  const filteredLeaderboard = useMemo(() => {
-    const q = normalizeSearch(searchQuery);
-    if (!q) return rankedLeaderboard;
-    return rankedLeaderboard.filter((entry) => {
+  // Precomputed search haystack per form — built once whenever the
+  // underlying data (users / brackets / predictions / lock state) changes,
+  // and re-used for every keystroke. Matches form name, owner display
+  // name, predicted champion's team name and predicted top scorer's
+  // resolved Hebrew name. `normalizeSearch` lower-cases and strips niqqud
+  // so "ארגנטינה" matches both vowelled and unvowelled queries.
+  //
+  // Privacy: champion + top-scorer are only included when the row is
+  // viewable to the current user — otherwise the search would leak
+  // private predictions before lock.
+  //
+  // Two-stage memo (data → haystack, query → filter): keeps every
+  // keystroke at O(N) `.includes` instead of re-resolving team names and
+  // re-running niqqud-stripping per row per character.
+  const searchHaystacks = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const entry of rankedLeaderboard) {
       const owner = users[entry.userId];
       const ownerName = owner?.firstName
         ? owner.lastName
           ? `${owner.firstName} ${owner.lastName}`
           : owner.firstName
         : owner?.displayName || "";
+      const canView = locked || forceUnlockView || entry.userId === user?.id;
       const championCode = formBracketMap[entry.formId]?.champion;
-      const championName = championCode ? getTeamByCode(championCode)?.name || "" : "";
-      const topScorerRaw = allPredictions[entry.formId]?.topScorer;
+      const championName =
+        canView && championCode ? getTeamByCode(championCode)?.name || "" : "";
+      const topScorerRaw = canView ? allPredictions[entry.formId]?.topScorer : null;
       const topScorerName = topScorerRaw
         ? getPlayerDisplayName(topScorerRaw, playerList)
         : "";
-      // Only let a champion / top-scorer match count when the row is
-      // actually viewable — otherwise the search would silently leak
-      // private predictions.
-      const canView = locked || forceUnlockView || entry.userId === user?.id;
-      const haystack = [
-        entry.formName,
-        ownerName,
-        canView ? championName : "",
-        canView ? topScorerName : "",
-      ]
+      out[entry.formId] = [entry.formName, ownerName, championName, topScorerName]
         .filter(Boolean)
         .map(normalizeSearch)
         .join(" ");
-      return haystack.includes(q);
-    });
+    }
+    return out;
   }, [
-    searchQuery,
     rankedLeaderboard,
     users,
     formBracketMap,
@@ -129,6 +127,15 @@ export default function Leaderboard({
   ]);
 
   const isSearching = searchQuery.trim().length > 0;
+
+  const filteredLeaderboard = useMemo(() => {
+    const q = normalizeSearch(searchQuery);
+    if (!q) return rankedLeaderboard;
+    return rankedLeaderboard.filter((entry) => {
+      const haystack = searchHaystacks[entry.formId] || "";
+      return haystack.includes(q);
+    });
+  }, [searchQuery, rankedLeaderboard, searchHaystacks]);
 
   // Smooth jump to a leaderboard row, expanding the page-size if the row
   // would otherwise be clipped behind "show more". Used by both the
@@ -151,9 +158,18 @@ export default function Leaderboard({
   // pos #1-3 just to show the user their #5 is more annoying than helpful).
   // Skipped in embedded admin preview, when a form is being inspected, or
   // when the user has 0/1 forms — the latter is auto-pinned anyway.
+  //
+  // While the search box has a value we ALSO mark the auto-scroll as
+  // consumed: otherwise typing-then-clearing the query re-runs the effect
+  // mid-session and yanks the page to the user's best form unexpectedly.
+  // The auto-scroll is meant as a one-shot landing affordance on entry,
+  // not a behaviour that re-arms after every interaction.
   useEffect(() => {
     if (embedded || selectedForm || autoScrolledRef.current) return;
-    if (isSearching) return;
+    if (isSearching) {
+      autoScrolledRef.current = true;
+      return;
+    }
     if (myForms.length === 0) return;
     const best = myForms[0];
     const idx = rankedLeaderboard.findIndex((e) => e.formId === best.formId);

@@ -39,16 +39,22 @@ assert(
 
 // --- Privacy gate: champion + top scorer must NOT be searchable when the form is
 // not viewable to the current user (otherwise the search would silently leak
-// private predictions before the lock).
+// private predictions before the lock). The haystack builder gates each
+// resolved value behind canView before resolving (so we never even call the
+// resolver for hidden rows). Match either form: `canView && X` or
+// `canView ? X : ""`.
 assert(
+  /canView\s*&&\s*championCode/.test(src) ||
   /canView\s*\?\s*championName\s*:\s*""/.test(src) ||
   /canView\s*&&\s*championName/.test(src),
-  "search filter only includes champion when row is viewable",
+  "search haystack only includes champion when row is viewable",
 );
 assert(
+  /canView\s*\?\s*allPredictions\[entry\.formId\]\?\.topScorer/.test(src) ||
   /canView\s*\?\s*topScorerName\s*:\s*""/.test(src) ||
-  /canView\s*&&\s*topScorerName/.test(src),
-  "search filter only includes top scorer when row is viewable",
+  /canView\s*&&\s*topScorerName/.test(src) ||
+  /canView\s*&&\s*topScorerRaw/.test(src),
+  "search haystack only includes top scorer when row is viewable",
 );
 
 // --- Filtered list is what's rendered (regression lock so the search isn't dead UI) ---
@@ -71,9 +77,20 @@ assert(
 
 // --- Auto-scroll-to-my-form must NOT fire while the user is searching
 // (otherwise typing a query yanks the page to a row that isn't visible).
+// The effect guards against this AND marks the one-shot ref as consumed
+// while searching, so clearing the query later doesn't re-arm the scroll.
 assert(
+  /if\s*\(\s*isSearching\s*\)\s*\{[\s\S]*?autoScrolledRef\.current\s*=\s*true/.test(src) ||
   /if\s*\(\s*isSearching\s*\)\s*return;?/.test(src),
-  "auto-scroll effect bails when isSearching",
+  "auto-scroll effect bails when isSearching (and ideally marks the one-shot ref as consumed)",
+);
+// Specific regression lock for the "clearing search re-arms the scroll" bug:
+// once we've seen `isSearching` the ref must be flipped, not just an early
+// return. If a future change reverts to `if (isSearching) return;`, this
+// assertion documents the expected stronger guarantee.
+assert(
+  /if\s*\(\s*isSearching\s*\)\s*\{[\s\S]*?autoScrolledRef\.current\s*=\s*true/.test(src),
+  "auto-scroll one-shot ref is consumed when isSearching, preventing re-arm on clear",
 );
 
 // --- Empty-state for "no matches" exists (so a typo doesn't drop the user

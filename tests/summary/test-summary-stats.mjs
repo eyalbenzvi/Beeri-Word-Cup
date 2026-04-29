@@ -496,7 +496,11 @@ console.log("--- 22. global suggestions: form-level chip surfaces ---");
     { match: mkMatch("m1"), result: { homeScore: 1, awayScore: 0 } },
     { match: mkMatch("m2"), result: { homeScore: 2, awayScore: 1 } },
   ];
-  // Form-A nails both; rest miss outcome on both → expect day-top-points + perfect chip
+  // Form-A nails both; rest miss outcome on both → expect day-top-points + zero chip.
+  // The day-perfect-outcome chip is INTENTIONALLY suppressed here because the
+  // only perfect form is also the day-top-points winner — naming the same
+  // form on two adjacent chips reads as redundant praise. See the dedup
+  // guard in statStarters.ts (`namedFormIds`).
   const allPredictions = {
     fA: mkForm("uA", {
       m1: { homeScore: 1, awayScore: 0 },
@@ -514,11 +518,77 @@ console.log("--- 22. global suggestions: form-level chip surfaces ---");
   });
   const ids = sugg.map((s) => s.id);
   assert(ids.includes("day-top-points"), `expected day-top-points chip, got ${ids.join(",")}`);
-  assert(ids.includes("day-perfect-outcome"), `expected day-perfect-outcome chip, got ${ids.join(",")}`);
+  assert(!ids.includes("day-perfect-outcome"),
+    `day-perfect-outcome chip should be deduped against day-top-points for the same form, got ${ids.join(",")}`);
   assert(ids.includes("day-zero-outcome"), `expected day-zero-outcome chip, got ${ids.join(",")}`);
   // The top-points chip should mention the winning form by name in its text.
   const topChip = sugg.find((s) => s.id === "day-top-points");
   assert(topChip.text.includes("טופס מנצח"), `top-points text should name the winner, got: ${topChip.text}`);
+}
+
+console.log("--- 22b. perfect-outcome chip surfaces when names diverge from top-points ---");
+{
+  // 2 group matches. Form-A has 1 exact + 1 outcome (4+1=5pts, perfect outcomes).
+  // Form-B has 2 exacts (4+4=8pts, perfect outcomes) — the day's top-points winner.
+  // Both are perfect-outcome forms but multi-form (length=2), so the chip is
+  // a multi-name observation that ADDS info on top of day-top-points naming
+  // only the leader → keep it.
+  const matches = [
+    { match: mkMatch("m1"), result: { homeScore: 1, awayScore: 0 } },
+    { match: mkMatch("m2"), result: { homeScore: 2, awayScore: 1 } },
+  ];
+  const allPredictions = {
+    fA: mkForm("uA", {
+      m1: { homeScore: 1, awayScore: 0 }, // exact
+      m2: { homeScore: 3, awayScore: 0 }, // outcome only (home wins)
+    }, "submitted", "טופס א"),
+    fB: mkForm("uB", {
+      m1: { homeScore: 1, awayScore: 0 },
+      m2: { homeScore: 2, awayScore: 1 },
+    }, "submitted", "טופס ב"),
+  };
+  const sugg = getGlobalSuggestions({
+    coveredMatches: matches,
+    allPredictions,
+    users: USERS,
+  });
+  const ids = sugg.map((s) => s.id);
+  assert(ids.includes("day-top-points"), `expected day-top-points, got ${ids.join(",")}`);
+  assert(ids.includes("day-perfect-outcome"),
+    `expected day-perfect-outcome chip when 2 forms share perfect outcome, got ${ids.join(",")}`);
+}
+
+console.log("--- 22c. exact-hits chip handles ties (mirrors top-points behaviour) ---");
+{
+  // 3 group matches; 4 forms all tie at exactly 2 exacts each.
+  // top-points may also tie; either way, the day-top-exact chip should
+  // either name all 4 (it won't, since cap is 3) or be SUPPRESSED — never
+  // single out one of them and pretend they were alone.
+  const matches = [
+    { match: mkMatch("m1"), result: { homeScore: 1, awayScore: 0 } },
+    { match: mkMatch("m2"), result: { homeScore: 2, awayScore: 1 } },
+    { match: mkMatch("m3"), result: { homeScore: 0, awayScore: 0 } },
+  ];
+  const exact = (m1, m2) => ({
+    m1: { homeScore: 1, awayScore: 0 },
+    m2: { homeScore: 2, awayScore: 1 },
+    m3: { homeScore: m1, awayScore: m2 }, // miss m3 to keep exactCount = 2
+  });
+  const allPredictions = {
+    f1: mkForm("u1", exact(1, 0), "submitted", "T1"),
+    f2: mkForm("u2", exact(2, 0), "submitted", "T2"),
+    f3: mkForm("u3", exact(3, 0), "submitted", "T3"),
+    f4: mkForm("u4", exact(4, 0), "submitted", "T4"),
+  };
+  const sugg = getGlobalSuggestions({
+    coveredMatches: matches,
+    allPredictions,
+    users: USERS,
+  });
+  const exactChip = sugg.find((s) => s.id === "day-top-exact");
+  // Tied at 4 forms → exceeds cap=3, so the chip is suppressed entirely.
+  assert(!exactChip,
+    `4-way tie on exact-hits should suppress the chip (cap=3); got ${exactChip?.text}`);
 }
 
 console.log("--- 23. global suggestions: tied leaders → no individual chip ---");

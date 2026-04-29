@@ -232,6 +232,13 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
 
   if (formAggregates.length > 0) {
     const topByPoints = formAggregates[0];
+    // Track which formIds we've already named in a chip — keeps a single
+    // form from being congratulated three times in a row when it's both
+    // the day's top scorer AND has a perfect outcome AND the most exacts
+    // (very common: those three things tend to coincide). Multi-form chips
+    // (ties / shared lists) are exempt — those add information.
+    const namedFormIds = new Set<string>();
+
     // Only worth a chip if the leader did better than zero AND clearly stood
     // out (no 5-way tie at 1 point). Tied leaders -> mention all of them up
     // to 3 names, no count badge ("X, Y ו-Z חלקו את הראש").
@@ -249,29 +256,51 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
           : `${topByPoints.formName} זכה בהכי הרבה נקודות מהמשחקים היום (${topByPoints.totalPoints}).`,
         kind: "dayTopPoints",
       });
+      // Only mark as "named" when this chip names a single form.
+      if (!tied) namedFormIds.add(topByPoints.formId);
     }
 
     // Most exact hits — only mention if it's a meaningful number AND the
-    // form is NOT the same one we already named for top-points (avoids
-    // duplicate praise). Tied at the top is fine to mention.
-    const sortedByExact = [...formAggregates].sort((a, b) => {
-      if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
-      return a.formId.localeCompare(b.formId);
-    });
-    const topByExact = sortedByExact[0];
-    if (topByExact && topByExact.exactCount >= 2 && topByExact.formId !== topByPoints.formId) {
-      out.push({
-        id: "day-top-exact",
-        label: `🎯 ${topByExact.formName} עם ${topByExact.exactCount} קליעות מדויקות היום`,
-        text: `${topByExact.formName} קלע ${topByExact.exactCount} תוצאות בדיוק היום.`,
-        kind: "dayTopExact",
-      });
+    // form (or every tied leader) hasn't already been named in another
+    // chip. Mirrors the tie handling of day-top-points so the chip never
+    // points at a single form when the count is in fact shared.
+    const maxExact = formAggregates.reduce((m, f) => Math.max(m, f.exactCount), 0);
+    const exactLeaders = formAggregates.filter((f) => f.exactCount === maxExact);
+    if (maxExact >= 2 && exactLeaders.length <= 3) {
+      const tied = exactLeaders.length > 1;
+      // Suppress when the single named winner is already on another chip.
+      const allAlreadyNamed = exactLeaders.every((f) => namedFormIds.has(f.formId));
+      if (!allAlreadyNamed) {
+        const top = exactLeaders[0];
+        const names = namesList(exactLeaders);
+        out.push({
+          id: "day-top-exact",
+          label: tied
+            ? `🎯 ${exactLeaders.length} טפסים עם ${maxExact} קליעות מדויקות היום`
+            : `🎯 ${top.formName} עם ${maxExact} קליעות מדויקות היום`,
+          text: tied
+            ? `${names} קלעו ${maxExact} תוצאות בדיוק כל אחד היום.`
+            : `${top.formName} קלע ${maxExact} תוצאות בדיוק היום.`,
+          kind: "dayTopExact",
+        });
+        if (!tied) namedFormIds.add(top.formId);
+      }
     }
 
     // Perfect outcome day — filled in every covered match AND got the
     // outcome on every one. Single-match days are excluded by the flag.
+    // Skip when the only perfect form is already the named day-top-points
+    // winner (the praise overlaps); keep when there's more than one
+    // perfect form (multi-name chip is informative on its own).
     const perfectForms = formAggregates.filter((f) => f.perfectOutcome);
-    if (matchesWithResults.length >= 2 && perfectForms.length > 0 && perfectForms.length <= 3) {
+    const perfectIsRedundant =
+      perfectForms.length === 1 && namedFormIds.has(perfectForms[0].formId);
+    if (
+      matchesWithResults.length >= 2 &&
+      perfectForms.length > 0 &&
+      perfectForms.length <= 3 &&
+      !perfectIsRedundant
+    ) {
       const names = namesList(perfectForms);
       out.push({
         id: "day-perfect-outcome",
@@ -285,6 +314,7 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
             : `${perfectForms.length} טפסים — ${names} — צדקו בכיוון של כל המשחקים היום.`,
         kind: "dayPerfectOutcome",
       });
+      if (perfectForms.length === 1) namedFormIds.add(perfectForms[0].formId);
     }
 
     // Memorable zero day — only on multi-match summaries.
