@@ -1,6 +1,7 @@
 // Aggregators for the daily-summary blog: given a match and all forms,
 // compute how many predicted home/draw/away, the exact-score distribution,
 // the most-common predicted scoreline, and who got the exact score right.
+import { POINTS } from "./scoring";
 
 // Editorial thresholds for the "piquant" hooks that drive the suggestion
 // panel in the admin editor. Tuned to surface roughly one or two hooks per
@@ -193,4 +194,98 @@ export function computeMatchStats({
     underdogHeroes,
     wasUnpredictable,
   };
+}
+
+/**
+ * Per-form aggregates across a set of covered matches — used to surface
+ * day-level "who shone today" suggestions in the blog editor (e.g. "טופס X
+ * זכה בהכי הרבה נקודות היום"). Pure: same inputs → same output.
+ *
+ * `coveredMatches` is `[{ match, result }]` exactly the way `getGlobalSuggestions`
+ * already consumes it. Matches without a result are silently skipped — a form
+ * can't earn points from an unplayed match.
+ *
+ * `pointsPerMatch` for each match uses `POINTS[match.stage]` exactly the way
+ * `calculateMatchPoints` does (outcome + exact additive). Knockout
+ * matchup-alignment is intentionally NOT enforced here: the blog cares about
+ * "did the score prediction match the score" as an observational stat, not
+ * about whether the form ALSO predicted the right teams reaching that round.
+ * Using the strict bracket-aware scoring would silently zero-out knockout
+ * predictions whose bracket diverged, which would make the suggestions
+ * useless for any form that bracket-mispredicted earlier.
+ *
+ * Returns: sorted array (best first) of
+ *   { formId, formName, exactCount, outcomeCount, totalPoints,
+ *     predictedCount, missedAllOutcome, perfectOutcome }
+ *
+ * Where:
+ *   - predictedCount = matches the form actually filled in (out of covered).
+ *   - missedAllOutcome = true iff the form filled in every covered match AND
+ *                       got 0 outcome hits across all of them (and there are
+ *                       at least 2 covered matches — single-match "all-zero"
+ *                       isn't a story).
+ *   - perfectOutcome  = true iff the form filled in every covered match AND
+ *                       got the outcome right on every one.
+ */
+export function computeFormDayAggregates({
+  coveredMatches = [],
+  allPredictions,
+}) {
+  const matchesWithResults = (coveredMatches || []).filter((cm) => !!cm?.result);
+  const aggregates = [];
+  if (matchesWithResults.length === 0) return aggregates;
+
+  const totalCovered = matchesWithResults.length;
+
+  for (const [formId, fAny] of Object.entries(allPredictions || {})) {
+    const form = fAny as any;
+    if (!isScorableForm(form)) continue;
+
+    let exactCount = 0;
+    let outcomeCount = 0;
+    let totalPoints = 0;
+    let predictedCount = 0;
+
+    for (const { match, result } of matchesWithResults) {
+      const pred = getFormPrediction(form, match.id);
+      if (!pred) continue;
+      predictedCount++;
+      const stagePoints = POINTS[match.stage] || POINTS.group;
+      const predOutcome = outcomeOf(pred.homeScore, pred.awayScore);
+      const actualOutcome = outcomeOf(result.homeScore, result.awayScore);
+      if (predOutcome && predOutcome === actualOutcome) {
+        outcomeCount++;
+        totalPoints += stagePoints.outcome;
+        if (
+          pred.homeScore === Number(result.homeScore) &&
+          pred.awayScore === Number(result.awayScore)
+        ) {
+          exactCount++;
+          totalPoints += stagePoints.exactScore;
+        }
+      }
+    }
+
+    if (predictedCount === 0) continue;
+    aggregates.push({
+      formId,
+      formName: form.formName || "טופס",
+      exactCount,
+      outcomeCount,
+      totalPoints,
+      predictedCount,
+      // Only flag forms that engaged with the whole day.
+      perfectOutcome: predictedCount === totalCovered && outcomeCount === totalCovered,
+      missedAllOutcome:
+        totalCovered >= 2 && predictedCount === totalCovered && outcomeCount === 0,
+    });
+  }
+
+  aggregates.sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+    if (b.outcomeCount !== a.outcomeCount) return b.outcomeCount - a.outcomeCount;
+    return a.formId.localeCompare(b.formId);
+  });
+  return aggregates;
 }

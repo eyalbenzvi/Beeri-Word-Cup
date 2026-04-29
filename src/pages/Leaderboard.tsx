@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowRight, TrendingUp, TrendingDown, Search, X } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
   useCurrentUser,
@@ -17,7 +17,7 @@ import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
-import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 
@@ -64,6 +64,7 @@ export default function Leaderboard({
   );
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState("");
   const autoScrolledRef = useRef(false);
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
@@ -76,6 +77,58 @@ export default function Leaderboard({
     if (!user?.id) return [];
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
+
+  // Build filtered leaderboard for the search box. We match against form
+  // name, the owner's display name, the predicted champion's team name and
+  // the predicted top scorer's resolved Hebrew name. `normalizeSearch`
+  // lower-cases and strips niqqud so the same query lands on
+  // "ארגנטינה" as on "ארגנטינה" (with vowel marks). Search is restricted
+  // to canView entries upstream so privacy holds (champion / top-scorer
+  // matches on locked previews are deliberately rejected below).
+  const filteredLeaderboard = useMemo(() => {
+    const q = normalizeSearch(searchQuery);
+    if (!q) return rankedLeaderboard;
+    return rankedLeaderboard.filter((entry) => {
+      const owner = users[entry.userId];
+      const ownerName = owner?.firstName
+        ? owner.lastName
+          ? `${owner.firstName} ${owner.lastName}`
+          : owner.firstName
+        : owner?.displayName || "";
+      const championCode = formBracketMap[entry.formId]?.champion;
+      const championName = championCode ? getTeamByCode(championCode)?.name || "" : "";
+      const topScorerRaw = allPredictions[entry.formId]?.topScorer;
+      const topScorerName = topScorerRaw
+        ? getPlayerDisplayName(topScorerRaw, playerList)
+        : "";
+      // Only let a champion / top-scorer match count when the row is
+      // actually viewable — otherwise the search would silently leak
+      // private predictions.
+      const canView = locked || forceUnlockView || entry.userId === user?.id;
+      const haystack = [
+        entry.formName,
+        ownerName,
+        canView ? championName : "",
+        canView ? topScorerName : "",
+      ]
+        .filter(Boolean)
+        .map(normalizeSearch)
+        .join(" ");
+      return haystack.includes(q);
+    });
+  }, [
+    searchQuery,
+    rankedLeaderboard,
+    users,
+    formBracketMap,
+    allPredictions,
+    playerList,
+    locked,
+    forceUnlockView,
+    user?.id,
+  ]);
+
+  const isSearching = searchQuery.trim().length > 0;
 
   // Smooth jump to a leaderboard row, expanding the page-size if the row
   // would otherwise be clipped behind "show more". Used by both the
@@ -100,6 +153,7 @@ export default function Leaderboard({
   // when the user has 0/1 forms — the latter is auto-pinned anyway.
   useEffect(() => {
     if (embedded || selectedForm || autoScrolledRef.current) return;
+    if (isSearching) return;
     if (myForms.length === 0) return;
     const best = myForms[0];
     const idx = rankedLeaderboard.findIndex((e) => e.formId === best.formId);
@@ -108,7 +162,7 @@ export default function Leaderboard({
     if (idx < PAGE_SIZE) return; // already on the first screen, no scroll needed
     jumpToForm(best.formId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myForms, rankedLeaderboard, embedded, selectedForm]);
+  }, [myForms, rankedLeaderboard, embedded, selectedForm, isSearching]);
 
   // When a form is opened from the leaderboard, jump to the top of the page
   // so the user starts reading from the form header instead of inheriting the
@@ -372,8 +426,64 @@ export default function Leaderboard({
               </div>
             </div>
           )}
+
+          {!embedded && rankedLeaderboard.length > 0 && (
+            <div className="card-duo mb-3">
+              <label htmlFor="lb-search" className="block text-xs font-extrabold text-ink-muted mb-1.5">
+                חיפוש בטבלת הדירוג
+              </label>
+              <div className="relative">
+                <Search
+                  size={16}
+                  aria-hidden="true"
+                  className="absolute top-1/2 -translate-y-1/2 right-3 text-ink-light pointer-events-none"
+                />
+                <input
+                  id="lb-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    // Reset pagination so the user always sees the first
+                    // chunk of matches for their new query, regardless of
+                    // how far they had scrolled the unfiltered list.
+                    setShowCount(PAGE_SIZE);
+                  }}
+                  placeholder={`חפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}...`}
+                  className="input-duo w-full"
+                  style={{ paddingInlineStart: "2.25rem" }}
+                  maxLength={50}
+                  aria-label="חיפוש בטבלת הדירוג"
+                />
+                {isSearching && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setShowCount(PAGE_SIZE);
+                    }}
+                    aria-label="נקה חיפוש"
+                    className="absolute top-1/2 -translate-y-1/2 left-3 text-ink-muted hover:text-ink bg-transparent border-none cursor-pointer p-0.5"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              {isSearching && (
+                <p
+                  className="text-xs text-ink-muted font-bold mt-2"
+                  aria-live="polite"
+                >
+                  {filteredLeaderboard.length === 0
+                    ? "לא נמצאו טפסים תואמים"
+                    : `מציג ${filteredLeaderboard.length} מתוך ${rankedLeaderboard.length} טפסים`}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {rankedLeaderboard.slice(0, showCount).map((entry) => {
+            {filteredLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
               const isTop3 = currentRank <= 3;
               const canView =
@@ -494,9 +604,9 @@ export default function Leaderboard({
               );
             })}
 
-            {showCount < leaderboard.length && (
+            {showCount < filteredLeaderboard.length && (
               <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
-                הצג {Math.min(PAGE_SIZE, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
+                הצג {Math.min(PAGE_SIZE, filteredLeaderboard.length - showCount)} נוספים (נותרו {filteredLeaderboard.length - showCount})
               </button>
             )}
 
@@ -505,6 +615,14 @@ export default function Leaderboard({
                 icon="🏟️"
                 title="אין ניחושים עדיין"
                 description="היה הראשון להגיש טופס"
+              />
+            )}
+
+            {leaderboard.length > 0 && filteredLeaderboard.length === 0 && (
+              <EmptyState
+                icon="🔍"
+                title="לא נמצאו טפסים תואמים"
+                description={`נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`}
               />
             )}
           </div>

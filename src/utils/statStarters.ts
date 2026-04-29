@@ -8,14 +8,17 @@
 // Pure functions — no React, no I/O. Fed by `summaryStats.computeMatchStats`
 // which already exposes lonePicks, consensusFlop, underdogHeroes, etc.
 
-import { computeMatchStats } from "./summaryStats";
+import { computeMatchStats, computeFormDayAggregates } from "./summaryStats";
 import { getMatchById } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 
 // Maximum chips per match panel. More than this and the admin tunes out.
 const PER_MATCH_CAP = 4;
-// Maximum chips on the global panel (cross-match observations).
-const GLOBAL_CAP = 5;
+// Maximum chips on the global panel (cross-match observations + per-form
+// "who shone" observations). Bumped from 5 to 7 when form-level suggestions
+// were added — the editor benefits from a couple of extra angles, but more
+// than ~7 starts to look like a wall of chips.
+const GLOBAL_CAP = 7;
 
 function teamName(code) {
   return getTeamByCode(code)?.name || code || "";
@@ -215,6 +218,92 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
       text: `${totalExactHitsToday} קליעות מדויקות סה"כ על פני ${matchesWithResults.length} המשחקים — יום נדיב.`,
       kind: "totalExact",
     });
+  }
+
+  // 6+. Form-level "who shone today" suggestions — derived from the per-form
+  // aggregates across the covered matches. We surface up to three observations
+  // here: the day's top scorer, the most precise form (if distinct from #1),
+  // a perfect-outcome form, and — only if it's a multi-match day — a form
+  // that filled in every match yet missed every outcome (a memorable zero).
+  const formAggregates = computeFormDayAggregates({
+    coveredMatches: matchesWithResults,
+    allPredictions,
+  });
+
+  if (formAggregates.length > 0) {
+    const topByPoints = formAggregates[0];
+    // Only worth a chip if the leader did better than zero AND clearly stood
+    // out (no 5-way tie at 1 point). Tied leaders -> mention all of them up
+    // to 3 names, no count badge ("X, Y ו-Z חלקו את הראש").
+    const leaders = formAggregates.filter((f) => f.totalPoints === topByPoints.totalPoints);
+    if (topByPoints.totalPoints > 0 && leaders.length <= 3) {
+      const names = namesList(leaders);
+      const tied = leaders.length > 1;
+      out.push({
+        id: "day-top-points",
+        label: tied
+          ? `🏆 ${leaders.length} טפסים חלקו את הצמרת היום`
+          : `🏆 ${topByPoints.formName} זכה בהכי הרבה נקודות היום (${topByPoints.totalPoints})`,
+        text: tied
+          ? `${names} חלקו את הראש היום עם ${topByPoints.totalPoints} נקודות כל אחד.`
+          : `${topByPoints.formName} זכה בהכי הרבה נקודות מהמשחקים היום (${topByPoints.totalPoints}).`,
+        kind: "dayTopPoints",
+      });
+    }
+
+    // Most exact hits — only mention if it's a meaningful number AND the
+    // form is NOT the same one we already named for top-points (avoids
+    // duplicate praise). Tied at the top is fine to mention.
+    const sortedByExact = [...formAggregates].sort((a, b) => {
+      if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+      return a.formId.localeCompare(b.formId);
+    });
+    const topByExact = sortedByExact[0];
+    if (topByExact && topByExact.exactCount >= 2 && topByExact.formId !== topByPoints.formId) {
+      out.push({
+        id: "day-top-exact",
+        label: `🎯 ${topByExact.formName} עם ${topByExact.exactCount} קליעות מדויקות היום`,
+        text: `${topByExact.formName} קלע ${topByExact.exactCount} תוצאות בדיוק היום.`,
+        kind: "dayTopExact",
+      });
+    }
+
+    // Perfect outcome day — filled in every covered match AND got the
+    // outcome on every one. Single-match days are excluded by the flag.
+    const perfectForms = formAggregates.filter((f) => f.perfectOutcome);
+    if (matchesWithResults.length >= 2 && perfectForms.length > 0 && perfectForms.length <= 3) {
+      const names = namesList(perfectForms);
+      out.push({
+        id: "day-perfect-outcome",
+        label:
+          perfectForms.length === 1
+            ? `✅ ${perfectForms[0].formName} צדק בכיוון בכל המשחקים היום`
+            : `✅ ${perfectForms.length} טפסים צדקו בכיוון בכל המשחקים`,
+        text:
+          perfectForms.length === 1
+            ? `${perfectForms[0].formName} צדק בכיוון של כל ${matchesWithResults.length} המשחקים היום.`
+            : `${perfectForms.length} טפסים — ${names} — צדקו בכיוון של כל המשחקים היום.`,
+        kind: "dayPerfectOutcome",
+      });
+    }
+
+    // Memorable zero day — only on multi-match summaries.
+    const zeroForms = formAggregates.filter((f) => f.missedAllOutcome);
+    if (matchesWithResults.length >= 2 && zeroForms.length >= 1 && zeroForms.length <= 3) {
+      const names = namesList(zeroForms);
+      out.push({
+        id: "day-zero-outcome",
+        label:
+          zeroForms.length === 1
+            ? `💤 ${zeroForms[0].formName} לא צדק באף כיוון היום`
+            : `💤 ${zeroForms.length} טפסים סיימו את היום בלי כיוון אחד`,
+        text:
+          zeroForms.length === 1
+            ? `${zeroForms[0].formName} פספס את הכיוון בכל המשחקים היום.`
+            : `${zeroForms.length} טפסים — ${names} — פספסו את הכיוון בכל המשחקים היום.`,
+        kind: "dayZeroOutcome",
+      });
+    }
   }
 
   return out.slice(0, GLOBAL_CAP);

@@ -137,6 +137,7 @@ run_test "71. Constants Dedup (static + runtime audit)" "store/test-constants-de
 run_test "72. Firestore Rules PII Migration (userDirectory + userPrivate)" "store/test-firestore-rules-pii.mjs" "no"
 run_test "73. Random Hashed UID Migration (phone PII)" "store/test-uid-hash-migration.mjs" "no"
 run_test "74. UX Recommendations (URL state, live errors, focus, accordion, onboarding)" "ui/test-ux-recommendations.mjs" "no"
+run_test "75. Leaderboard Search (form/user/champion/top-scorer filter)" "ui/test-leaderboard-search.mjs" "no"
 
 echo ""
 echo "==========================================="
