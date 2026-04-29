@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowRight, TrendingUp, TrendingDown, Search, X } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
   useCurrentUser,
@@ -17,7 +17,7 @@ import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
-import { getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
+import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 
@@ -34,6 +34,11 @@ const PAGE_SIZE = 20;
 // actual element. Below ~120ms the scroll lands a few hundred pixels off on
 // long lists.
 const AUTO_SCROLL_DELAY_MS = 150;
+
+// Cap on the search query length. Matches AllForms' filter input so a user
+// who copies a string between the two pages doesn't get a different
+// truncation. Form names themselves are limited far below this elsewhere.
+const SEARCH_MAX_LEN = 50;
 
 // Compact stage labels for the "נקודות עליה" badges. Intentionally shorter
 // than STAGES (e.g. "שמינית" not "שמינית גמר") so the chips fit on a phone
@@ -64,6 +69,7 @@ export default function Leaderboard({
   );
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
+  const [searchQuery, setSearchQuery] = useState("");
   const autoScrolledRef = useRef(false);
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
@@ -76,6 +82,65 @@ export default function Leaderboard({
     if (!user?.id) return [];
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
+
+  // Precomputed search haystack per form — built once whenever the
+  // underlying data (users / brackets / predictions / lock state) changes,
+  // and re-used for every keystroke. Matches form name, owner display
+  // name, predicted champion's team name and predicted top scorer's
+  // resolved Hebrew name. `normalizeSearch` lower-cases and strips niqqud
+  // so "ארגנטינה" matches both vowelled and unvowelled queries.
+  //
+  // Privacy: champion + top-scorer are only included when the row is
+  // viewable to the current user — otherwise the search would leak
+  // private predictions before lock.
+  //
+  // Two-stage memo (data → haystack, query → filter): keeps every
+  // keystroke at O(N) `.includes` instead of re-resolving team names and
+  // re-running niqqud-stripping per row per character.
+  const searchHaystacks = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const entry of rankedLeaderboard) {
+      const owner = users[entry.userId];
+      const ownerName = owner?.firstName
+        ? owner.lastName
+          ? `${owner.firstName} ${owner.lastName}`
+          : owner.firstName
+        : owner?.displayName || "";
+      const canView = locked || forceUnlockView || entry.userId === user?.id;
+      const championCode = formBracketMap[entry.formId]?.champion;
+      const championName =
+        canView && championCode ? getTeamByCode(championCode)?.name || "" : "";
+      const topScorerRaw = canView ? allPredictions[entry.formId]?.topScorer : null;
+      const topScorerName = topScorerRaw
+        ? getPlayerDisplayName(topScorerRaw, playerList)
+        : "";
+      out[entry.formId] = [entry.formName, ownerName, championName, topScorerName]
+        .filter(Boolean)
+        .map(normalizeSearch)
+        .join(" ");
+    }
+    return out;
+  }, [
+    rankedLeaderboard,
+    users,
+    formBracketMap,
+    allPredictions,
+    playerList,
+    locked,
+    forceUnlockView,
+    user?.id,
+  ]);
+
+  const isSearching = searchQuery.trim().length > 0;
+
+  const filteredLeaderboard = useMemo(() => {
+    const q = normalizeSearch(searchQuery);
+    if (!q) return rankedLeaderboard;
+    return rankedLeaderboard.filter((entry) => {
+      const haystack = searchHaystacks[entry.formId] || "";
+      return haystack.includes(q);
+    });
+  }, [searchQuery, rankedLeaderboard, searchHaystacks]);
 
   // Smooth jump to a leaderboard row, expanding the page-size if the row
   // would otherwise be clipped behind "show more". Used by both the
@@ -98,8 +163,18 @@ export default function Leaderboard({
   // pos #1-3 just to show the user their #5 is more annoying than helpful).
   // Skipped in embedded admin preview, when a form is being inspected, or
   // when the user has 0/1 forms — the latter is auto-pinned anyway.
+  //
+  // While the search box has a value we ALSO mark the auto-scroll as
+  // consumed: otherwise typing-then-clearing the query re-runs the effect
+  // mid-session and yanks the page to the user's best form unexpectedly.
+  // The auto-scroll is meant as a one-shot landing affordance on entry,
+  // not a behaviour that re-arms after every interaction.
   useEffect(() => {
     if (embedded || selectedForm || autoScrolledRef.current) return;
+    if (isSearching) {
+      autoScrolledRef.current = true;
+      return;
+    }
     if (myForms.length === 0) return;
     const best = myForms[0];
     const idx = rankedLeaderboard.findIndex((e) => e.formId === best.formId);
@@ -108,7 +183,7 @@ export default function Leaderboard({
     if (idx < PAGE_SIZE) return; // already on the first screen, no scroll needed
     jumpToForm(best.formId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myForms, rankedLeaderboard, embedded, selectedForm]);
+  }, [myForms, rankedLeaderboard, embedded, selectedForm, isSearching]);
 
   // When a form is opened from the leaderboard, jump to the top of the page
   // so the user starts reading from the form header instead of inheriting the
@@ -372,8 +447,72 @@ export default function Leaderboard({
               </div>
             </div>
           )}
+
+          {!embedded && rankedLeaderboard.length > 0 && (
+            <div className="card-duo mb-3">
+              <label htmlFor="lb-search" className="block text-xs font-extrabold text-ink-muted mb-1.5">
+                חיפוש בטבלת הדירוג
+              </label>
+              <div className="relative">
+                <Search
+                  size={16}
+                  aria-hidden="true"
+                  className="absolute top-1/2 -translate-y-1/2 right-3 text-ink-light pointer-events-none"
+                />
+                <input
+                  id="lb-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    // Reset pagination so the user always sees the first
+                    // chunk of matches for their new query, regardless of
+                    // how far they had scrolled the unfiltered list.
+                    setShowCount(PAGE_SIZE);
+                  }}
+                  placeholder={`חפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}...`}
+                  className="input-duo w-full"
+                  // 2.25rem = the .input-duo's 1rem horizontal padding plus
+                  // ~1.25rem to clear the 16px Search icon parked at right-3.
+                  // Inline style because the .input-duo class uses the
+                  // `padding` shorthand and a Tailwind `ps-9` modifier
+                  // wouldn't override a single side cleanly.
+                  style={{ paddingInlineStart: "2.25rem" }}
+                  maxLength={SEARCH_MAX_LEN}
+                  aria-label="חיפוש בטבלת הדירוג"
+                />
+                {isSearching && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setShowCount(PAGE_SIZE);
+                    }}
+                    aria-label="נקה חיפוש"
+                    // `tap-44` enforces the 44×44 minimum touch target on
+                    // coarse pointers (brand book accessibility rule); the
+                    // visible icon stays small thanks to the centered flex.
+                    className="tap-44 absolute top-1/2 -translate-y-1/2 left-1 text-ink-muted hover:text-ink bg-transparent border-none cursor-pointer rounded-full inline-flex items-center justify-center"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              {isSearching && (
+                <p
+                  className="text-xs text-ink-muted font-bold mt-2"
+                  aria-live="polite"
+                >
+                  {filteredLeaderboard.length === 0
+                    ? "לא נמצאו טפסים תואמים"
+                    : `מציג ${filteredLeaderboard.length} מתוך ${rankedLeaderboard.length} טפסים`}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {rankedLeaderboard.slice(0, showCount).map((entry) => {
+            {filteredLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
               const isTop3 = currentRank <= 3;
               const canView =
@@ -494,9 +633,9 @@ export default function Leaderboard({
               );
             })}
 
-            {showCount < leaderboard.length && (
+            {showCount < filteredLeaderboard.length && (
               <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
-                הצג {Math.min(PAGE_SIZE, leaderboard.length - showCount)} נוספים (נותרו {leaderboard.length - showCount})
+                הצג {Math.min(PAGE_SIZE, filteredLeaderboard.length - showCount)} נוספים (נותרו {filteredLeaderboard.length - showCount})
               </button>
             )}
 
@@ -505,6 +644,14 @@ export default function Leaderboard({
                 icon="🏟️"
                 title="אין ניחושים עדיין"
                 description="היה הראשון להגיש טופס"
+              />
+            )}
+
+            {leaderboard.length > 0 && filteredLeaderboard.length === 0 && (
+              <EmptyState
+                icon="🔍"
+                title="לא נמצאו טפסים תואמים"
+                description={`נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`}
               />
             )}
           </div>
