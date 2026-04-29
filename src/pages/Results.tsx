@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMatchResults } from "../hooks/useStore";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
+import { getCachedBracket } from "../utils/bracketCache";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
@@ -14,6 +15,7 @@ export default function Results() {
   const [selectedGroup, setSelectedGroup] = useState("A");
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
+  const bracketTeams = useMemo(() => getCachedBracket(results), [results]);
 
   const playedCount = Object.keys(results).length;
   const totalMatches = groupMatches.length + knockoutMatches.length;
@@ -56,12 +58,18 @@ export default function Results() {
         {filteredMatches.map((match) => {
           const isKnockout = match.stage !== "group";
           const result = results[match.id];
-          const derived =
-            isKnockout && result
-              ? { home: result.homeTeam, away: result.awayTeam }
-              : isKnockout
-                ? { home: null, away: null }
-                : { home: match.homeTeam, away: match.awayTeam };
+          const derived = isKnockout
+            ? {
+                home:
+                  result?.homeTeam ||
+                  bracketTeams[match.id]?.home ||
+                  null,
+                away:
+                  result?.awayTeam ||
+                  bracketTeams[match.id]?.away ||
+                  null,
+              }
+            : { home: match.homeTeam, away: match.awayTeam };
           const homeTeam = derived.home ? getTeamByCode(derived.home) : null;
           const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
 

@@ -264,6 +264,28 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
     "Results.jsx: no inline {home}–{away} pair (each score is its own span)",
   );
 
+  // Regression: knockout cards must derive teams from the bracket (computed
+  // from real results). The admin's saveMatchResult stores `homeTeam: null,
+  // awayTeam: null` for knockout matches (because match.homeTeam/awayTeam
+  // is null in the static schedule), so the derivation must fall back to
+  // the bracket EVEN when `result` exists — otherwise R32 cards keep
+  // showing "טרם נקבע" after the admin enters scores. Earlier fix only
+  // helped the no-result case; the working fix uses `result?.homeTeam ||
+  // bracketTeams[...]` as a chained fallback.
+  assert(
+    /getCachedBracket\(\s*results\s*\)/.test(results),
+    "Results.tsx: bracket derived via getCachedBracket(results)",
+  );
+  assert(
+    /result\?\.homeTeam\s*\|\|\s*bracketTeams\[match\.id\]\?\.home/.test(
+      results,
+    ) &&
+      /result\?\.awayTeam\s*\|\|\s*bracketTeams\[match\.id\]\?\.away/.test(
+        results,
+      ),
+    "Results.tsx: knockout teams chain result?.homeTeam || bracketTeams[id]?.home (fallback works even when result has null teams)",
+  );
+
   const sim = readMigratedSrc("src/components/SimulatorPanel.jsx", "utf8");
   assert(
     /result \? result\.homeScore : "—"/.test(sim) &&
