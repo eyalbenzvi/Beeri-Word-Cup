@@ -264,6 +264,20 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
     "Results.jsx: no inline {home}–{away} pair (each score is its own span)",
   );
 
+  // Regression: knockout cards must derive teams from the bracket (computed
+  // from real results) when the match itself has no result yet — otherwise
+  // R32/R16/QF/SF cards stay on "טרם נקבע" forever even after every group
+  // game has been entered by the admin.
+  assert(
+    /getCachedBracket\(\s*results\s*\)/.test(results),
+    "Results.tsx: knockout teams derived via getCachedBracket(results) when result missing",
+  );
+  assert(
+    /bracketTeams\[match\.id\]\?\.home/.test(results) &&
+      /bracketTeams\[match\.id\]\?\.away/.test(results),
+    "Results.tsx: knockout fallback uses bracketTeams[match.id] for home/away",
+  );
+
   const sim = readMigratedSrc("src/components/SimulatorPanel.jsx", "utf8");
   assert(
     /result \? result\.homeScore : "—"/.test(sim) &&
