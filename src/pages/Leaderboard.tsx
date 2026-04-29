@@ -35,6 +35,11 @@ const PAGE_SIZE = 20;
 // long lists.
 const AUTO_SCROLL_DELAY_MS = 150;
 
+// Cap on the search query length. Matches AllForms' filter input so a user
+// who copies a string between the two pages doesn't get a different
+// truncation. Form names themselves are limited far below this elsewhere.
+const SEARCH_MAX_LEN = 50;
+
 // Compact stage labels for the "נקודות עליה" badges. Intentionally shorter
 // than STAGES (e.g. "שמינית" not "שמינית גמר") so the chips fit on a phone
 // row. Keep the order = KNOCKOUT_STAGE_ORDER minus 3RD (3RD has no
@@ -467,8 +472,13 @@ export default function Leaderboard({
                   }}
                   placeholder={`חפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}...`}
                   className="input-duo w-full"
+                  // 2.25rem = the .input-duo's 1rem horizontal padding plus
+                  // ~1.25rem to clear the 16px Search icon parked at right-3.
+                  // Inline style because the .input-duo class uses the
+                  // `padding` shorthand and a Tailwind `ps-9` modifier
+                  // wouldn't override a single side cleanly.
                   style={{ paddingInlineStart: "2.25rem" }}
-                  maxLength={50}
+                  maxLength={SEARCH_MAX_LEN}
                   aria-label="חיפוש בטבלת הדירוג"
                 />
                 {isSearching && (
@@ -479,7 +489,10 @@ export default function Leaderboard({
                       setShowCount(PAGE_SIZE);
                     }}
                     aria-label="נקה חיפוש"
-                    className="absolute top-1/2 -translate-y-1/2 left-3 text-ink-muted hover:text-ink bg-transparent border-none cursor-pointer p-0.5"
+                    // `tap-44` enforces the 44×44 minimum touch target on
+                    // coarse pointers (brand book accessibility rule); the
+                    // visible icon stays small thanks to the centered flex.
+                    className="tap-44 absolute top-1/2 -translate-y-1/2 left-1 text-ink-muted hover:text-ink bg-transparent border-none cursor-pointer rounded-full inline-flex items-center justify-center"
                   >
                     <X size={16} aria-hidden="true" />
                   </button>
