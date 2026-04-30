@@ -10,19 +10,19 @@ import { flattenAll } from "../../utils/adminQuery/flatten";
 import { canonicalize } from "../../utils/adminQuery/canonicalize";
 import { validateQuerySpec } from "../../utils/adminQuery/schemas";
 import { resolveResidual } from "../../utils/adminQuery/resolveResidual";
+import { evaluate } from "../../utils/adminQuery/evaluate";
+import { interpretSpec } from "../../utils/adminQuery/interpret";
 import { parseChipsFromText, defaultLabelLookup } from "../../utils/adminQuery/chipSerialize";
 import type { QuerySpec, EvalResult, FlatForm } from "../../utils/adminQuery/types";
 import ChipInput from "./ChipInput";
-import VerificationPanel from "./VerificationPanel";
 import ResultPanel from "./ResultPanel";
 import CannedQueryGallery from "./CannedQueryGallery";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "translating" }
-  | { kind: "ready"; spec: QuerySpec; warnings: string[] }
   | { kind: "clarify"; question: string }
-  | { kind: "done"; spec: QuerySpec; result: EvalResult }
+  | { kind: "done"; spec: QuerySpec; result: EvalResult; warnings: string[] }
   | { kind: "error"; message: string };
 
 export default function AdminQueryTab() {
@@ -55,8 +55,20 @@ export default function AdminQueryTab() {
     [flatForms],
   );
 
+  // Run a validated spec straight to a result. Shared between the free-text
+  // path (after LLM translation) and the canned-query path. Per user request,
+  // there is no middle verification step.
+  const runSpec = (spec: QuerySpec, warnings: string[] = []): Phase => {
+    try {
+      const result = evaluate(spec, flatForms);
+      return { kind: "done", spec, result, warnings };
+    } catch (e: any) {
+      return { kind: "error", message: e?.message || "שגיאה בהרצת השאילתה" };
+    }
+  };
+
   const handlePickCanned = (spec: QuerySpec) => {
-    setPhase({ kind: "ready", spec, warnings: [] });
+    setPhase(runSpec(canonicalize(spec)));
   };
 
   const handleAsk = async () => {
@@ -70,85 +82,81 @@ export default function AdminQueryTab() {
         setPhase({ kind: "error", message: "לא מחובר. נסה/י להתחבר מחדש." });
         return;
       }
-      const res = await fetch("/.netlify/functions/admin-query-translate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ question, resolvedEntities: resolved }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setPhase({ kind: "error", message: err.error || `HTTP ${res.status}` });
-        return;
-      }
-      const data = await res.json();
-      const raw = data.raw || "{}";
-      let parsed: any;
+
+      const callTranslate = async (retryError?: string) => {
+        const res = await fetch("/.netlify/functions/admin-query-translate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            question,
+            resolvedEntities: resolved,
+            ...(retryError ? { retryError } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        return data.raw || "{}";
+      };
+
+      // First call.
+      let raw: string;
       try {
-        parsed = JSON.parse(raw);
-      } catch {
-        // One retry: ask the function to fix the JSON.
-        const retry = await fetch("/.netlify/functions/admin-query-translate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            question,
-            resolvedEntities: resolved,
-            retryError: `${raw}\n--RETRY--\nNot valid JSON.`,
-          }),
-        });
-        if (!retry.ok) {
-          setPhase({ kind: "error", message: "התרגום נכשל. נסה/י שאילתה אחרת." });
-          return;
-        }
-        const data2 = await retry.json();
-        parsed = JSON.parse(data2.raw || "{}");
-      }
-      if (parsed.clarifyingQuestion) {
-        setPhase({ kind: "clarify", question: parsed.clarifyingQuestion });
+        raw = await callTranslate();
+      } catch (e: any) {
+        setPhase({ kind: "error", message: e?.message || "התרגום נכשל" });
         return;
       }
-      const c = canonicalize(parsed.spec);
-      const v = validateQuerySpec(c);
-      if (!v.ok) {
-        // Single retry path with validation error fed back.
-        const retry = await fetch("/.netlify/functions/admin-query-translate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            question,
-            resolvedEntities: resolved,
-            retryError: `${raw}\n--RETRY--\n${(v as any).error}`,
-          }),
-        });
-        if (!retry.ok) {
-          setPhase({ kind: "error", message: `תרגום שגוי: ${(v as any).error}` });
+
+      // Parse + validate, with a single retry on failure (JSON or schema).
+      const tryParseValidate = (text: string) => {
+        try {
+          const obj = JSON.parse(text);
+          if (obj.clarifyingQuestion) {
+            return { kind: "clarify" as const, question: obj.clarifyingQuestion };
+          }
+          const c = canonicalize(obj.spec);
+          const v = validateQuerySpec(c);
+          if (!v.ok) return { kind: "invalid" as const, error: (v as any).error };
+          return { kind: "ok" as const, spec: c };
+        } catch {
+          return { kind: "invalid" as const, error: "Not valid JSON" };
+        }
+      };
+
+      let outcome = tryParseValidate(raw);
+      if (outcome.kind === "invalid") {
+        try {
+          const raw2 = await callTranslate(`${raw}\n--RETRY--\n${outcome.error}`);
+          outcome = tryParseValidate(raw2);
+        } catch (e: any) {
+          setPhase({ kind: "error", message: e?.message || "התרגום נכשל" });
           return;
         }
-        const data2 = await retry.json();
-        const parsed2 = JSON.parse(data2.raw || "{}");
-        const c2 = canonicalize(parsed2.spec);
-        const v2 = validateQuerySpec(c2);
-        if (!v2.ok) {
-          setPhase({ kind: "error", message: `תרגום שגוי: ${(v2 as any).error}` });
-          return;
-        }
-        setPhase({ kind: "ready", spec: c2, warnings: resolved.warnings });
+      }
+
+      if (outcome.kind === "clarify") {
+        setPhase({ kind: "clarify", question: outcome.question });
         return;
       }
-      setPhase({ kind: "ready", spec: c, warnings: resolved.warnings });
+      if (outcome.kind === "invalid") {
+        setPhase({ kind: "error", message: `תרגום שגוי: ${outcome.error}` });
+        return;
+      }
+
+      // Translate succeeded → run immediately. No checkbox gate.
+      setPhase(runSpec(outcome.spec, resolved.warnings));
     } catch (e: any) {
       setPhase({ kind: "error", message: e?.message || "שגיאה לא ידועה" });
     }
   };
+
+  const interpreted = phase.kind === "done" ? interpretSpec(phase.spec) : null;
 
   return (
     <div className="space-y-4">
@@ -157,7 +165,7 @@ export default function AdminQueryTab() {
           שאילתות חופשיות
         </h3>
         <p className="text-xs text-ink-muted mb-3 font-medium">
-          הקלד/י שאלה בעברית. ה-AI יתרגם אותה לשאילתה. סמן/י את כל הסעיפים בפירוש לפני הרצה.
+          הקלד/י שאלה בעברית. ה-AI יתרגם אותה ויריץ את השאילתה.
         </p>
         <ChipInput
           value={question}
@@ -172,7 +180,7 @@ export default function AdminQueryTab() {
             disabled={phase.kind === "translating" || !question.trim()}
             className="btn-duo btn-duo-primary"
           >
-            {phase.kind === "translating" ? "מתרגם..." : "תרגם שאילתה"}
+            {phase.kind === "translating" ? "מריץ..." : "הרץ שאילתה"}
           </button>
           <button
             type="button"
@@ -201,27 +209,23 @@ export default function AdminQueryTab() {
         </div>
       )}
 
-      {phase.kind === "ready" && (
-        <VerificationPanel
-          spec={phase.spec}
-          flatForms={flatForms}
-          warnings={phase.warnings}
-          onRun={(spec, result) =>
-            setPhase({ kind: "done", spec, result })
-          }
-        />
-      )}
-
-      {phase.kind === "done" && (
+      {phase.kind === "done" && interpreted && (
         <div className="space-y-3">
+          {phase.warnings.length > 0 && (
+            <div className="card-duo bg-yellow-50 border-yellow-300">
+              <h4 className="font-extrabold text-sm text-ink mb-1">⚠ שים/י לב</h4>
+              <ul className="text-xs text-ink-muted list-disc pr-4 space-y-0.5">
+                {phase.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="card-duo bg-bg-soft">
+            <h4 className="font-extrabold text-sm text-ink mb-1">פירוש השאילתה</h4>
+            <p className="text-sm text-ink-muted">{interpreted.sentence}</p>
+          </div>
           <ResultPanel result={phase.result} />
-          <button
-            type="button"
-            onClick={() => setPhase({ kind: "ready", spec: phase.spec, warnings: [] })}
-            className="btn-duo btn-duo-sm"
-          >
-            ערוך שאילתה
-          </button>
         </div>
       )}
 
