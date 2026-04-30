@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { flattenForm, flattenAll, buildScoringContext } from "./flatten";
+import { evaluate } from "./evaluate";
 import { calculateFullScore } from "../scoring";
 import { getCachedBracket } from "../bracketCache";
 import { deriveAdvancingTeams } from "../bracket";
@@ -128,17 +129,89 @@ describe("flattenForm parity with calculateFullScore", () => {
   });
 });
 
-describe("FlatForm stage-score components", () => {
-  // Bug #4: pairings vs matchupsBySlot semantics.
-  it("pairings counts unordered pair, matchupsBySlot is order-sensitive", () => {
-    // Build a form where one knockout-stage pair is swapped from the actual.
-    // We can't easily construct a real bracket here without setting up groups,
-    // so we just construct synthetic stage rosters directly via flatten +
-    // a hand-made bracket override using calculateFullScore's path.
-    // For pairings semantics, rely on a unit-style test of the function
-    // through the public API: if both teams appear in actual pair set,
-    // pairings counts even when home/away swapped.
-    // (Full flatten path tested above — this is a structural smoke test.)
-    expect(true).toBe(true);
+describe("FlatForm flow with finals known (champion bonus)", () => {
+  // Build a complete tournament where the final is decided so champion bonus
+  // can fire, and verify that flatten records correctChampion=true.
+  it("correctChampion flips true when form.champion matches actual final winner", () => {
+    const groupResults = makeGroupResults(0);
+    // Add a final result so deriveChampion can return a winner.
+    const results = {
+      ...groupResults,
+      "F-1": { homeScore: 2, awayScore: 1, stage: "F" },
+    };
+    const actualBonuses = { topScorers: [] };
+    const ctx = buildScoringContext(results as any, actualBonuses);
+    // The actual champion is whoever resolves to F-1.home in the actual bracket.
+    // We can't construct that easily without a full bracket walk, so we
+    // assert that whatever the actual champion is, the parity holds: a form
+    // that picks that exact champion gets correctChampion=true; a form that
+    // picks a different code gets false (or null when actualChampion is null).
+    const actualChampion = ctx.actualChampion;
+    if (actualChampion) {
+      const matchingForm = makeForm("m1", actualChampion, 0);
+      const flat = flattenForm(matchingForm, ctx, results as any, actualBonuses, "owner");
+      expect(flat.correctChampion).toBe(true);
+
+      const wrongForm = makeForm("m2", "ZZZ", 0);
+      const flatWrong = flattenForm(wrongForm, ctx, results as any, actualBonuses, "owner");
+      expect(flatWrong.correctChampion).toBe(false);
+    } else {
+      // If the synthetic data doesn't yield a champion (no path through
+      // bracket), at least confirm the field is null (not falsely false).
+      const form = makeForm("m1", "ARG", 0);
+      const flat = flattenForm(form, ctx, results as any, actualBonuses, "owner");
+      expect(flat.correctChampion).toBeNull();
+    }
+  });
+});
+
+describe("evaluator dedupe — stage:ALL with teams:true", () => {
+  // Bug from code-review item #4: a team that reached SF appears in
+  // r32+r16+qf+sf rosters; without dedupe, containsAtLeast would 4x-inflate.
+  it("stage:ALL teams flat is unique (no 4x inflation)", () => {
+    const partial = {
+      r32Teams: ["ARG", "BRA", "GER", null, null, null],
+      r16Teams: ["ARG", "BRA", "GER", null],
+      qfTeams: ["ARG", "BRA", null],
+      sfTeams: ["ARG", null],
+      finalTeams: ["ARG", null],
+    };
+    const flat: any = {
+      formId: "1",
+      formName: "n",
+      ownerName: "o",
+      status: "submitted",
+      champion: null,
+      topScorer: null,
+      correctChampion: null,
+      correctTopScorer: null,
+      ...partial,
+      stageScore: {
+        groups: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+        R32: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+        R16: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+        QF: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+        SF: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+        F: { teams: 0, matchupsBySlot: 0, pairings: 0, scores: 0, outcomes: 0 },
+      },
+      matches: {},
+      totalPoints: 0,
+    };
+    // ARG appears 5 times across stage rosters; without dedupe, contains 5
+    // would falsely match.
+    const r = evaluate(
+      {
+        filter: {
+          op: "containsAtLeast",
+          field: { stage: "ALL", teams: true },
+          values: ["ARG", "BRA", "GER", "FRA", "ESP"],
+          n: 5,
+        },
+        aggregate: { kind: "count" },
+      },
+      [flat],
+    );
+    // Real distinct teams in ALL = {ARG, BRA, GER}; not 5.
+    expect((r as any).value).toBe(0);
   });
 });

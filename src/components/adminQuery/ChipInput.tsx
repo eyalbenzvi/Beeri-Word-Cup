@@ -5,8 +5,8 @@
 // We render a separate "chips preview" line that decodes the codes to Hebrew
 // labels for readability — the textarea stays as the source of truth.
 
-import { useRef, useState } from "react";
-import AutocompleteDropdown from "./AutocompleteDropdown";
+import { useMemo, useRef, useState } from "react";
+import AutocompleteDropdown, { buildSuggestions } from "./AutocompleteDropdown";
 import type { Chip } from "../../utils/adminQuery/types";
 import {
   parseChipsFromText,
@@ -78,23 +78,30 @@ export default function ChipInput({
     }
   };
 
+  // Recompute suggestions in the parent so keyboard "Enter/Tab" can pick
+  // directly without dispatching events into the dropdown DOM. The dropdown
+  // recomputes the same list via useMemo internally — same input, same
+  // output, same React render cycle, so they stay in lockstep.
+  const suggestions = useMemo(
+    () => (showAutocomplete ? buildSuggestions(autocompleteQuery, forms) : []),
+    [showAutocomplete, autocompleteQuery, forms],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showAutocomplete) {
+    if (showAutocomplete && suggestions.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setHighlightedIndex((i) => i + 1);
+        setHighlightedIndex((i) => Math.min(suggestions.length - 1, i + 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setHighlightedIndex((i) => Math.max(0, i - 1));
       } else if (e.key === "Escape") {
         setShowAutocomplete(false);
       } else if (e.key === "Enter" || e.key === "Tab") {
-        // Pick the highlighted suggestion.
         e.preventDefault();
-        const pickEvent = new CustomEvent("__autocomplete-pick", {
-          detail: { index: highlightedIndex },
-        });
-        document.dispatchEvent(pickEvent);
+        const it =
+          suggestions[Math.min(highlightedIndex, suggestions.length - 1)];
+        if (it) insertChip({ kind: it.kind, code: it.code, label: it.label });
       }
     } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -102,8 +109,6 @@ export default function ChipInput({
     }
   };
 
-  // Bridge: when keyboard fires "pick", the dropdown component's onPick
-  // handler gets the current item via index.
   const { chips } = parseChipsFromText(value, defaultLabelLookup);
 
   return (

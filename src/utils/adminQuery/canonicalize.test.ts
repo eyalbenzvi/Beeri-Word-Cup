@@ -142,4 +142,13 @@ describe("validateQuerySpec", () => {
     });
     expect(r.ok).toBe(true);
   });
+
+  it("rejects empty and/or filter (vacuous truth)", () => {
+    const r = validateQuerySpec({
+      filter: { op: "and", args: [] },
+      aggregate: { kind: "count" },
+    });
+    expect(r.ok).toBe(false);
+    expect((r as any).error).toMatch(/at least one/);
+  });
 });

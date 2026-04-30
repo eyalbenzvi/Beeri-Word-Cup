@@ -26,11 +26,16 @@ export default function VerificationPanel({
   );
   const [json, setJson] = useState(initialJson);
   const [confirmed, setConfirmed] = useState<Record<number, boolean>>({});
-  const [parseError, setParseError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
-  // Re-parse on every keystroke; the interpreter+preview are pure functions of
-  // the JSON, so admin sees them update live.
-  useEffect(() => setJson(initialJson), [initialJson]);
+  // When the spec changes, reset BOTH json AND confirmed — otherwise old
+  // checkbox ticks survive a spec change and admin "approves" rows that no
+  // longer match the new spec's filters.
+  useEffect(() => {
+    setJson(initialJson);
+    setConfirmed({});
+    setRunError(null);
+  }, [initialJson]);
 
   let parsed: QuerySpec | null = null;
   let validationError: string | null = null;
@@ -44,7 +49,6 @@ export default function VerificationPanel({
     parsed = null;
     validationError = "JSON לא תקין";
   }
-  void parseError;
 
   const interpreted = parsed ? interpretSpec(parsed) : null;
 
@@ -84,7 +88,7 @@ export default function VerificationPanel({
       const r = evaluate(parsed, flatForms);
       onRun(parsed, r);
     } catch (e: any) {
-      setParseError(e?.message || "שגיאה בהרצת השאילתה");
+      setRunError(e?.message || "שגיאה בהרצת השאילתה");
     }
   };
 
@@ -176,10 +180,13 @@ export default function VerificationPanel({
       >
         הרץ שאילתה
       </button>
-      {!allConfirmed && interpreted && (
+      {!allConfirmed && interpreted && interpreted.structured.length > 0 && (
         <p className="text-xs text-ink-muted text-center">
           סמן/י ✓ ליד כל שורה כדי לאשר את השאילתה.
         </p>
+      )}
+      {runError && (
+        <p className="text-xs text-red-600 text-center">{runError}</p>
       )}
     </div>
   );

@@ -30,13 +30,23 @@ function resolveField(form: FlatForm, ref: FieldRef): any {
   }
   if ("teams" in ref && ref.teams === true) {
     if (ref.stage === "ALL") {
-      return [
+      // Dedupe: a team that reached SF appears in r32+r16+qf+sf rosters,
+      // so concatenation would 4x-inflate any contains/containsAtLeast count.
+      const seen = new Set<string>();
+      const out: (string | null)[] = [];
+      for (const t of [
         ...form.r32Teams,
         ...form.r16Teams,
         ...form.qfTeams,
         ...form.sfTeams,
         ...form.finalTeams,
-      ];
+      ]) {
+        if (t == null) continue;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        out.push(t);
+      }
+      return out;
     }
     const key = STAGE_TEAMS_KEY[ref.stage as string];
     return key ? (form as any)[key] : [];
@@ -157,13 +167,10 @@ function evalPredicate(form: FlatForm, p: Predicate): boolean {
       if (p.matchId) ids.push(p.matchId);
       else {
         for (const s of stages) {
-          const teamsField = resolveField(form, { stage: s, teams: true } as any);
-          // Iterate by walking matches to find matchIds at this stage.
           for (const id of Object.keys(form.matches)) {
-            if (matchIsAtStage(id, s as Exclude<Stage, "ALL" | "groups">)) ids.push(id);
+            if (matchIsAtStage(id, s as Exclude<Stage, "ALL" | "groups">))
+              ids.push(id);
           }
-          // Also use stage-team field for completeness (already done via match scan).
-          void teamsField;
         }
       }
       for (const id of ids) {
@@ -172,8 +179,8 @@ function evalPredicate(form: FlatForm, p: Predicate): boolean {
         if (p.ordered) {
           if (m.home === a && m.away === b) return true;
         } else {
-          const set = new Set([m.home, m.away]);
-          if (set.has(a) && set.has(b)) return true;
+          const matchSet = new Set([m.home, m.away]);
+          if (matchSet.has(a) && matchSet.has(b)) return true;
         }
       }
       return false;

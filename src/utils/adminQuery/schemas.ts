@@ -131,6 +131,11 @@ function validatePredicate(p: any, path: string): ValidationResult<Predicate> {
     case "and":
     case "or": {
       if (!Array.isArray(p.args)) return err(`${path}.args: must be array`);
+      // Empty and/or evaluates vacuously (and→true, or→false), which would
+      // silently match all forms or none. Require at least one arg so admin
+      // never gets a surprise "all forms" result from an empty filter.
+      if (p.args.length === 0)
+        return err(`${path}.args: must have at least one predicate`);
       for (let i = 0; i < p.args.length; i++) {
         const r = validatePredicate(p.args[i], `${path}.args[${i}]`);
         if (!r.ok) return passErr(r);
