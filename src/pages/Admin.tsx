@@ -16,6 +16,7 @@ import AdminDashboardTab from "../components/AdminDashboardTab";
 import AdminFormsTab from "../components/AdminFormsTab";
 import AdminToolsTab from "../components/AdminToolsTab";
 import AdminSummariesTab from "../components/AdminSummariesTab";
+import AdminQueryTab from "../components/adminQuery/AdminQueryTab";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import PageHeader from "../components/PageHeader";
 import { isSamePlayer, getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
@@ -81,6 +82,7 @@ export default function Admin() {
           { id: "topscorer", label: "מלך שערים" },
           { id: "users", label: "משתמשים" },
           { id: "tools", label: "כלים" },
+          { id: "query", label: "שאילתות" },
           { id: "settings", label: "הגדרות" },
         ].map((tab) => (
           <button
@@ -120,6 +122,8 @@ export default function Admin() {
       {activeTab === "summaries" && <AdminSummariesTab />}
 
       {activeTab === "tools" && <AdminToolsTab />}
+
+      {activeTab === "query" && <AdminQueryTab />}
 
       {activeTab === "topscorer" && (
         <div className="space-y-4">
