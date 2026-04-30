@@ -98,6 +98,26 @@ function canonicalizePredicate(p: any): any {
   if (OP_SYNONYMS[lower]) op = OP_SYNONYMS[lower];
   if (OP_SYNONYMS[op]) op = OP_SYNONYMS[op];
 
+  // Coerce-to-array for `values` fields. LLMs frequently emit a single
+  // literal where the schema expects [literal]; we forgive this rather than
+  // bouncing the spec through a retry.
+  const coerced: any = { ...p };
+  if (
+    (op === "in" || op === "containsAtLeast") &&
+    coerced.values !== undefined &&
+    !Array.isArray(coerced.values)
+  ) {
+    coerced.values = [coerced.values];
+  }
+  if (
+    (op === "and" || op === "or") &&
+    coerced.args !== undefined &&
+    !Array.isArray(coerced.args)
+  ) {
+    coerced.args = [coerced.args];
+  }
+  p = coerced;
+
   // notIn → in negated
   if (lower === "notin") return canonicalizePredicate({ ...p, op: "in", negated: true });
   if (lower === "notcontains" || lower === "doesnotcontain")

@@ -23,7 +23,7 @@ type Phase =
   | { kind: "translating" }
   | { kind: "clarify"; question: string }
   | { kind: "done"; spec: QuerySpec; result: EvalResult; warnings: string[] }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; detail?: string };
 
 export default function AdminQueryTab() {
   const allPredictions = useAllPredictions();
@@ -145,7 +145,12 @@ export default function AdminQueryTab() {
         return;
       }
       if (outcome.kind === "invalid") {
-        setPhase({ kind: "error", message: `תרגום שגוי: ${outcome.error}` });
+        setPhase({
+          kind: "error",
+          message:
+            "ה-AI לא הצליח לתרגם את השאלה. נסה/י לנסח אותה אחרת או להוסיף פרטים.",
+          detail: outcome.error,
+        });
         return;
       }
 
@@ -206,6 +211,16 @@ export default function AdminQueryTab() {
         <div className="card-duo bg-red-50 border-red-300">
           <h4 className="font-extrabold text-sm text-ink">שגיאה</h4>
           <p className="text-sm text-ink-muted mt-1">{phase.message}</p>
+          {phase.detail && (
+            <details className="mt-2">
+              <summary className="text-xs text-ink-muted cursor-pointer">
+                פרטים טכניים
+              </summary>
+              <pre className="text-xs text-ink-muted mt-1 whitespace-pre-wrap font-mono">
+                {phase.detail}
+              </pre>
+            </details>
+          )}
         </div>
       )}
 

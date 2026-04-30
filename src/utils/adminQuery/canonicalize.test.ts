@@ -96,6 +96,39 @@ describe("canonicalize", () => {
     expect((a.filter as any).op).toBe("in");
     expect((a.filter as any).negated).toBe(true);
   });
+
+  // Real-world LLM mistake from production: emitted `values: "D"` instead of
+  // `values: ["D"]`. Canonicalize wraps the bare literal so the spec validates.
+  it("coerces non-array values to array for in/containsAtLeast", () => {
+    const a = canonicalize({
+      filter: { op: "in", field: "champion", values: "ARG" },
+      aggregate: { kind: "count" },
+    });
+    expect((a.filter as any).values).toEqual(["ARG"]);
+
+    const b = canonicalize({
+      filter: {
+        op: "containsAtLeast",
+        field: "champion",
+        values: "ARG",
+        n: 1,
+      },
+      aggregate: { kind: "count" },
+    });
+    expect((b.filter as any).values).toEqual(["ARG"]);
+  });
+
+  it("coerces non-array args for and/or to a singleton array (then lifted)", () => {
+    const a = canonicalize({
+      filter: {
+        op: "and",
+        args: { op: "cmp", field: "champion", operator: "eq", value: "ARG" },
+      },
+      aggregate: { kind: "count" },
+    });
+    // After coerce-to-array + singleton lifting, the inner cmp surfaces.
+    expect((a.filter as any).op).toBe("cmp");
+  });
 });
 
 describe("validateQuerySpec", () => {
