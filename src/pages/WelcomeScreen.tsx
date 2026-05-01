@@ -21,12 +21,28 @@ export default function WelcomeScreen() {
   const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
   // Show upcoming matches when predictions are admin-locked OR kickoff has passed.
   const tournamentStarted = !!publicSettings?.predictionsLocked || countdown.started;
+  // Until the public-settings fetch resolves we don't actually know whether
+  // the admin has flipped the lock — so showing the countdown by default
+  // would briefly mis-render and then snap to the upcoming-matches panel
+  // once the fetch landed. Suppress the panel choice until either the
+  // fetch resolves or the local kickoff-time check has flipped (kickoff is
+  // a one-way door, so once true it stays true regardless of network).
+  const lockStateKnown = publicSettings.loaded || countdown.started;
 
   // Parity with Home: when the tournament is running, show the same
   // MatchdayHero (featured today's match) above the upcoming-matches list
   // so logged-in and logged-out users see the same current match.
   // MatchdayHero carries its own mb-4 — no wrapper spacing needed.
-  const countdownPanel = tournamentStarted ? (
+  const countdownPanel = !lockStateKnown ? (
+    <div className="card-duo opacity-0" aria-hidden="true">
+      <TournamentCountdown
+        countdown={countdown}
+        variant="large"
+        headerText={BRAND.countdownHeader}
+        footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
+      />
+    </div>
+  ) : tournamentStarted ? (
     <>
       <MatchdayHero results={results} />
       <UpcomingMatches matchResultsOverride={results} />
