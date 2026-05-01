@@ -422,16 +422,21 @@ async function doEnsureUserInStore(uid: string, displayName: string, email: stri
   // User not in cache. Two possibilities:
   //   A) Cache desync — user exists in Firestore. Per-field update preserves
   //      isAdmin/firstName/lastName/etc.
-  //   B) Genuinely new user (or recreated after deletion) — not in Firestore.
-  //      A per-field update would be REJECTED by Firestore rules: new entries
-  //      require `isAdmin == false` in the resulting document. Without that,
-  //      the SDK reverts the optimistic cache and the user vanishes — App.tsx
-  //      then renders an infinite Loading screen because user becomes null.
-  // Disambiguate with a one-shot read (cheap, only on login) before writing.
+  //   B) Genuinely new user (or recreated after admin clearAllData) — not in
+  //      Firestore. A per-field update would be REJECTED by Firestore rules:
+  //      new entries require `isAdmin == false` in the resulting document.
+  //      Without that, the SDK reverts the optimistic cache and the user
+  //      vanishes — App.tsx then renders an infinite Loading screen because
+  //      user becomes null.
+  // Disambiguate via userPrivate/{uid} (owner-readable per firestore.rules
+  // — works for admins AND non-admins). Reading the legacy gameData/users
+  // doc here used to 403 every non-admin post-Phase B (admin-only read), so
+  // a non-admin login after clearAllData wiped their record fell straight
+  // into the catch and bailed without writing — the bouncing-ball trap.
   let firestoreUser: any = null;
   try {
-    const snap = await withTimeout(getDoc(gameDocRef("users")), 10000);
-    if (snap.exists()) firestoreUser = (snap.data() as any).data?.[uid] || null;
+    const snap = await withTimeout(getDoc(userPrivateDocRef(uid)), 10000);
+    if (snap.exists()) firestoreUser = snap.data() as any;
   } catch (err: any) {
     console.error("Failed to verify user in Firestore:", err);
     captureClientError(err, {
