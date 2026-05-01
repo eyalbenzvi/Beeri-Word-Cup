@@ -338,6 +338,33 @@ console.log("--- 13. reportListenerError dedups permission-denied; other codes g
   assert(errors.length === 2, "Other non-permission codes reach captureClientError");
 }
 
+// ============ 14. Disambiguation read targets userPrivate, not gameData/users ============
+console.log("--- 14. ensureUserInStore reads userPrivate/{uid} so non-admins can recover ---");
+
+{
+  // After admin clearAllData wipes Firestore, the user re-logs in. They no
+  // longer have isAdmin: true in Firestore, and (if they were never granted
+  // a custom claim) they cannot read gameData/users — that doc is admin-only
+  // post-Phase B. The disambiguation read MUST hit userPrivate/{uid} (which
+  // is owner-readable) so Case B (createUserField) can run.
+  const fs = await import("node:fs");
+  const src = fs.readFileSync("src/store/usersRepo.ts", "utf8");
+
+  // Look for the disambiguation getDoc call inside doEnsureUserInStore.
+  const ensureFn = src.slice(src.indexOf("function doEnsureUserInStore"));
+  const blockEnd = ensureFn.indexOf("\nasync function ", 1);
+  const ensureBody = blockEnd > 0 ? ensureFn.slice(0, blockEnd) : ensureFn;
+
+  assert(
+    ensureBody.includes("getDoc(userPrivateDocRef(uid))"),
+    "doEnsureUserInStore reads userPrivate/{uid} for the existence check",
+  );
+  assert(
+    !ensureBody.includes("getDoc(gameDocRef(\"users\"))"),
+    "doEnsureUserInStore must NOT read gameData/users (admin-only; would 403 non-admins)",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
