@@ -13,6 +13,7 @@ const POLL_INTERVAL_MS = 20_000;
 const DEFAULT_STATE = {
   predictionsLocked: false,
   matchResults: {},
+  loaded: false,
 };
 
 export function usePublicSettings() {
@@ -22,6 +23,8 @@ export function usePublicSettings() {
     let cancelled = false;
 
     async function fetchOnce() {
+      let nextLocked: boolean | null = null;
+      let nextResults: Record<string, any> | null = null;
       try {
         // Bust any intermediate caches so the client always gets fresh
         // match results right after the admin updates them.
@@ -29,19 +32,29 @@ export function usePublicSettings() {
           credentials: "omit",
           cache: "no-store",
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-        setState({
-          predictionsLocked: !!data?.predictionsLocked,
-          matchResults:
+        if (res.ok) {
+          const data = await res.json();
+          if (cancelled) return;
+          nextLocked = !!data?.predictionsLocked;
+          nextResults =
             data?.matchResults && typeof data.matchResults === "object"
               ? data.matchResults
-              : {},
-        });
+              : {};
+        }
       } catch {
         // Network / parsing errors: keep last-known value silently.
       }
+      if (cancelled) return;
+      // Always flip `loaded` after the first attempt — even on failure — so
+      // the welcome screen exits its "unknown lock state" placeholder rather
+      // than waiting on a network round-trip that may never succeed. On
+      // success we adopt the new values; on failure we keep the last-known
+      // ones (matching the pre-existing silent-fail behaviour).
+      setState((prev) => ({
+        predictionsLocked: nextLocked === null ? prev.predictionsLocked : nextLocked,
+        matchResults: nextResults === null ? prev.matchResults : nextResults,
+        loaded: true,
+      }));
     }
 
     fetchOnce();

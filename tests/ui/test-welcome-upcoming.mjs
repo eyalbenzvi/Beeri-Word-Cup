@@ -355,27 +355,33 @@ console.log("--- 9. Netlify function response shape ---");
 // ============================================================
 console.log("--- 10. usePublicSettings polling logic ---");
 {
-  // Simulates the effect body in src/hooks/usePublicSettings.js
+  // Simulates the effect body in src/hooks/usePublicSettings.ts
   async function driveHook(responses) {
-    let state = { predictionsLocked: false, matchResults: {} };
+    let state = { predictionsLocked: false, matchResults: {}, loaded: false };
     let fetchCount = 0;
     let cancelled = false;
 
     async function fetchOnce() {
       if (cancelled) return;
       const res = responses[fetchCount++];
+      let nextLocked = null;
+      let nextResults = null;
       try {
-        if (!res.ok) return;
-        state = {
-          predictionsLocked: !!res.body?.predictionsLocked,
-          matchResults:
+        if (res.ok) {
+          nextLocked = !!res.body?.predictionsLocked;
+          nextResults =
             res.body?.matchResults && typeof res.body.matchResults === "object"
               ? res.body.matchResults
-              : {},
-        };
+              : {};
+        }
       } catch {
         // swallow
       }
+      state = {
+        predictionsLocked: nextLocked === null ? state.predictionsLocked : nextLocked,
+        matchResults: nextResults === null ? state.matchResults : nextResults,
+        loaded: true,
+      };
     }
 
     await fetchOnce();
@@ -516,6 +522,127 @@ console.log("--- 12. UpcomingMatches grid layout ---");
   assert(!gridClass(1).includes("md:grid-cols-2"), "Single match: no md:grid-cols-2");
   assert(gridClass(2).includes("md:grid-cols-2"), "Two matches: grid applied");
   assert(gridClass(5).includes("md:grid-cols-2"), "Many matches: grid applied");
+}
+
+// ============================================================
+// 13. Lock-state-known gate: don't render countdown vs upcoming until we know
+// Regression: previously usePublicSettings defaulted predictionsLocked=false,
+// so a locked-but-pre-kickoff visitor first saw the countdown for a frame
+// and then snapped to "upcoming matches" once the fetch resolved.
+// ============================================================
+console.log("--- 13. lockStateKnown gate ---");
+{
+  function lockStateKnown({ loaded, countdownStarted }) {
+    return loaded || countdownStarted;
+  }
+  function panel({ loaded, countdownStarted, predictionsLocked }) {
+    if (!lockStateKnown({ loaded, countdownStarted })) return "placeholder";
+    return predictionsLocked || countdownStarted ? "upcoming-matches" : "countdown";
+  }
+
+  // Real bug scenario: admin locked predictions before kickoff. First render
+  // (loaded=false, countdownStarted=false) MUST show neither widget — not
+  // the countdown that the old code showed.
+  assert(panel({ loaded: false, countdownStarted: false, predictionsLocked: true }) === "placeholder",
+    "Pre-fetch + locked: render placeholder, not stale countdown");
+  assert(panel({ loaded: false, countdownStarted: false, predictionsLocked: false }) === "placeholder",
+    "Pre-fetch + unlocked: also placeholder (we don't yet know either way)");
+
+  // After fetch lands with locked=true → upcoming matches
+  assert(panel({ loaded: true, countdownStarted: false, predictionsLocked: true }) === "upcoming-matches",
+    "Loaded + locked + pre-kickoff: upcoming matches");
+  // After fetch lands with locked=false → countdown
+  assert(panel({ loaded: true, countdownStarted: false, predictionsLocked: false }) === "countdown",
+    "Loaded + unlocked + pre-kickoff: countdown");
+
+  // Kickoff already passed locally → can render upcoming matches without
+  // waiting for the network (kickoff is a one-way door, time-based).
+  assert(panel({ loaded: false, countdownStarted: true, predictionsLocked: false }) === "upcoming-matches",
+    "Pre-fetch but post-kickoff: upcoming matches (no network wait)");
+  assert(panel({ loaded: true, countdownStarted: true, predictionsLocked: true }) === "upcoming-matches",
+    "Loaded + locked + post-kickoff: upcoming matches");
+
+  // Network failure path: usePublicSettings still flips loaded=true after
+  // the first attempt so we don't trap the visitor on the placeholder.
+  assert(lockStateKnown({ loaded: true, countdownStarted: false }) === true,
+    "First fetch failure still flips loaded → exits placeholder");
+}
+
+// ============================================================
+// 14. usePublicSettings flips `loaded` even on fetch failure
+// ============================================================
+console.log("--- 14. usePublicSettings sets loaded after first attempt ---");
+{
+  // Reuse the same simulator shape used elsewhere in the file. We can't
+  // import the real hook (it's a React hook that calls useState/useEffect),
+  // so we mirror the resolve-on-first-attempt behaviour directly.
+  async function driveLoaded(responses) {
+    let state = { predictionsLocked: false, matchResults: {}, loaded: false };
+    for (const res of responses) {
+      let nextLocked = null;
+      let nextResults = null;
+      if (res.ok) {
+        nextLocked = !!res.body?.predictionsLocked;
+        nextResults =
+          res.body?.matchResults && typeof res.body.matchResults === "object"
+            ? res.body.matchResults
+            : {};
+      }
+      state = {
+        predictionsLocked: nextLocked === null ? state.predictionsLocked : nextLocked,
+        matchResults: nextResults === null ? state.matchResults : nextResults,
+        loaded: true,
+      };
+    }
+    return state;
+  }
+
+  // Successful first fetch
+  {
+    const s = await driveLoaded([{ ok: true, body: { predictionsLocked: true } }]);
+    assert(s.loaded === true, "First success: loaded=true");
+    assert(s.predictionsLocked === true, "First success: lock value applied");
+  }
+
+  // Failed first fetch — loaded must still flip
+  {
+    const s = await driveLoaded([{ ok: false }]);
+    assert(s.loaded === true, "First failure: loaded still flips true (no infinite placeholder)");
+    assert(s.predictionsLocked === false, "First failure: keeps default lock=false");
+  }
+
+  // Failure then success — last-known wins
+  {
+    const s = await driveLoaded([
+      { ok: false },
+      { ok: true, body: { predictionsLocked: true } },
+    ]);
+    assert(s.loaded === true, "Two attempts: loaded=true");
+    assert(s.predictionsLocked === true, "Recovery: real value supersedes default");
+  }
+}
+
+// ============================================================
+// 15. WelcomeScreen source still gates panel render on lockStateKnown
+// Static check guarding against future regressions where someone reverts
+// the gate and reintroduces the countdown→upcoming-matches flicker.
+// ============================================================
+console.log("--- 15. WelcomeScreen source enforces lockStateKnown gate ---");
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(
+    "/home/user/Beeri-World-Cup/src/pages/WelcomeScreen.tsx",
+    "utf8",
+  );
+  assert(src.includes("lockStateKnown"), "WelcomeScreen references lockStateKnown");
+  assert(
+    src.includes("publicSettings.loaded"),
+    "WelcomeScreen reads publicSettings.loaded for gating",
+  );
+  assert(
+    /!lockStateKnown\s*\?/.test(src),
+    "WelcomeScreen branches its panel render on !lockStateKnown",
+  );
 }
 
 // ============================================================
