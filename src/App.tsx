@@ -122,7 +122,7 @@ const GUEST_PAGES = new Set([
 
 function AppContent() {
   const ready = useStoreReady();
-  const { page } = useNavigation();
+  const { page, navigate } = useNavigation();
   const { user, authReady, isLoggedIn } = useCurrentUser();
   const [profileDone, setProfileDone] = useState(false);
 
@@ -137,6 +137,21 @@ function AppContent() {
       initPublicReadonlyMode();
     }
   }, [authReady, isLoggedIn]);
+
+  // Guest URL normalisation: when a logged-out visitor lands on a page
+  // that isn't reachable for guests (admin / profile shared from a
+  // logged-in session, or a stale bookmark), the WelcomeScreen renders
+  // but the URL still says e.g. ?page=admin. Without this normalisation,
+  // signing in via the welcome auth panel would route the freshly-authed
+  // user straight into the Admin permission gate (a non-admin sees
+  // "נדרשת גישת מנהל" immediately after login — confusing UX). Replace
+  // (not push) so Back doesn't bounce the user into the bad URL again.
+  useEffect(() => {
+    if (!authReady || isLoggedIn) return;
+    if (page !== "home" && !GUEST_PAGES.has(page)) {
+      navigate("home", {}, { replace: true });
+    }
+  }, [authReady, isLoggedIn, page, navigate]);
 
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading reason="auth-init" />;

@@ -110,9 +110,43 @@ assert(/page\s*!==\s*"home"\s*&&\s*\(/.test(layout),
   "Layout header hides the guest 'התחבר' CTA on the home tab");
 
 // ============================================================
-// 4. Mobile/desktop responsiveness audit on the offline-mode rollout
+// 4. Guest URL normalisation — collapse unknown pages to home
 // ============================================================
-console.log("\n--- 4. Responsiveness of LoginPrompt + FormsHub ---");
+console.log("\n--- 4. Guest URL normalisation ---");
+
+// Without this, a logged-out visitor on ?page=admin sees the welcome
+// screen but the URL stays admin. Signing in via the auth panel would
+// then route them straight into the Admin permission gate (a non-admin
+// gets a "נדרשת גישת מנהל" lockout immediately after login). The effect
+// rewrites the URL to home (replace, not push) so the address bar and
+// the rendered view stay in sync.
+assert(/page\s*!==\s*"home"\s*&&\s*!GUEST_PAGES\.has\(page\)/.test(app),
+  "App.tsx detects a non-home, non-guest page id for the URL fix-up");
+assert(/navigate\(\s*"home"\s*,\s*\{\s*\}\s*,\s*\{\s*replace:\s*true\s*\}\s*\)/.test(app),
+  "App.tsx normalises the URL to home via replace-navigate (no Back trap)");
+
+// Guard the unconditional public-mode init: the effect must NOT add a
+// per-page guard (e.g. `&& page === "blog"`) — every guest tab needs
+// the public listeners.
+assert(/if\s*\(\s*authReady\s*&&\s*!isLoggedIn\s*\)\s*\{[\s\S]{0,80}initPublicReadonlyMode\(\)/.test(app),
+  "initPublicReadonlyMode runs unconditionally on authReady && !isLoggedIn");
+assert(!/authReady\s*&&\s*!isLoggedIn\s*&&\s*page\s*===\s*"[a-z]+"\s*\)\s*\{[\s\S]{0,80}initPublicReadonlyMode/.test(app),
+  "initPublicReadonlyMode is NOT gated on a specific page id");
+
+// ============================================================
+// 5. Mobile/desktop responsiveness audit on the offline-mode rollout
+// ============================================================
+console.log("\n--- 5. Responsiveness of LoginPrompt + FormsHub ---");
+
+// FormsHub tab buttons must hit the 44×44 minimum tap target on coarse
+// pointers per the brand book. The `tap-44` utility class enforces it
+// inside @media (pointer: coarse) {}; py-2.5 keeps the desktop pill
+// visually tight. (Code-review nit on the second pass.)
+const formsHubTapCount = (formsHub.match(/tap-44/g) || []).length;
+assert(formsHubTapCount >= 2,
+  `FormsHub tab buttons use tap-44 (at least 2 occurrences; found ${formsHubTapCount})`);
+assert(/py-2\.5\s+text-sm/.test(formsHub),
+  "FormsHub tab buttons use py-2.5 (≥36px desktop, ≥44px coarse via tap-44)");
 
 // LoginPrompt card variant: capped to max-w-md, centered. Banner
 // variant: scales padding p-3 → md:p-4. Inner buttons widen with
@@ -127,7 +161,7 @@ assert(/text-base\s+md:text-lg/.test(loginPrompt),
   "LoginPrompt title scales text-base → md:text-lg");
 
 // FormsHub tabs are flex-1 (stretch to fill the row on every width).
-assert(/flex-1\s+py-2\s+text-sm/.test(formsHub),
+assert(/flex-1\s+py-2\.5\s+text-sm/.test(formsHub),
   "FormsHub tab buttons stretch with flex-1 (mobile + desktop friendly)");
 // The hub's content is wrapped in a regular <div> with no width cap,
 // inheriting AppShell's main-column width — so it works in both the

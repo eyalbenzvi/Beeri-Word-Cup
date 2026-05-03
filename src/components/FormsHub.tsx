@@ -90,11 +90,15 @@ export default function FormsHub({
         role="tablist"
         aria-label="בחירת תצוגת טפסים"
       >
+        {/* tap-44 enforces the 44×44 minimum touch target on coarse
+            pointers (phones) per the brand book accessibility rule;
+            py-2.5 keeps the pill visually tight on desktop where
+            pointer:fine waives the minimum. */}
         <button
           role="tab"
           aria-selected={tab === "mine"}
           onClick={() => setTab("mine")}
-          className={`flex-1 py-2 text-sm font-extrabold rounded-xl transition border-none cursor-pointer ${
+          className={`tap-44 flex-1 py-2.5 text-sm font-extrabold rounded-xl transition border-none cursor-pointer ${
             tab === "mine"
               ? "bg-white text-ink"
               : "bg-transparent text-ink-muted"
@@ -106,7 +110,7 @@ export default function FormsHub({
           role="tab"
           aria-selected={tab === "all"}
           onClick={() => setTab("all")}
-          className={`flex-1 py-2 text-sm font-extrabold rounded-xl transition border-none cursor-pointer ${
+          className={`tap-44 flex-1 py-2.5 text-sm font-extrabold rounded-xl transition border-none cursor-pointer ${
             tab === "all"
               ? "bg-white text-ink"
               : "bg-transparent text-ink-muted"
