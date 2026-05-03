@@ -245,13 +245,18 @@ assert(!/useSummaries/.test(homePage),
 assert(!/Newspaper/.test(homePage),
   "Home.jsx must not import the Newspaper icon (it was only used for the blog callout)");
 
-// ---- Blog tab visibility: every logged-in user sees it ----
-// Product change: the blog tab must appear for any signed-in user, not only
-// admins or only after the tournament starts. Guests retain the legacy gate
-// (predictionsLocked + a published post).
-console.log("--- REGRESSION: blog tab visible to every logged-in user ---");
-assert(/showBlogTab\s*=\s*!!user\s*\|\|\s*\(predictionsLocked\s*&&\s*hasPublishedSummary\)/.test(layout),
-  "Layout.showBlogTab is truthy for any signed-in user");
+// ---- Blog tab visibility: every visitor (guest + logged-in) sees it ----
+// Product change: the blog tab must appear unconditionally in the tab bar.
+// Guests previously had to wait for predictionsLocked + a published post;
+// that gate has been removed so the icon is consistent with the other
+// primary tabs. DailySummary owns the per-state empty rendering.
+console.log("--- REGRESSION: blog tab is unconditional in Layout nav ---");
+assert(/{\s*id:\s*["']blog["']/.test(layout),
+  "Layout's allNavItems always contains the blog tab");
+assert(!/showBlogTab/.test(layout),
+  "Layout no longer gates the blog tab behind a showBlogTab flag");
+assert(!/hasPublishedSummary/.test(layout),
+  "Layout no longer reads hasPublishedSummary to gate the blog tab");
 
 // ---- Empty-state body line removed ----
 // Product change: when there are no summaries yet, only the title is shown —
