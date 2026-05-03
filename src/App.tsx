@@ -141,18 +141,19 @@ function AppContent() {
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading reason="auth-init" />;
 
-  // Logged-out visitor: render the requested page in guest mode. Home
-  // (and unknown pages) fall through to WelcomeScreen so the auth panel
-  // is still front-and-centre for first-time visitors. Every other tab
-  // shows its own guest view with an inline LoginPrompt.
+  // Logged-out visitor: render every recognised page through AppShell so
+  // the tab navigation (mobile bottom-nav + DesktopSideNav) is always
+  // present, including on the home/welcome screen. Pages outside
+  // GUEST_PAGES (admin, profile, etc. shared from a logged-in session)
+  // collapse to the welcome view but still inside AppShell, with the
+  // page-id forced back to "home" so the highlight + URL match what's
+  // actually rendered.
   if (!isLoggedIn) {
-    if (page === "home" || !GUEST_PAGES.has(page)) {
-      return <WelcomeScreen />;
-    }
-    const Page = PAGES[page] || Home;
+    const isGuestHome = page === "home" || !GUEST_PAGES.has(page);
+    const Page = isGuestHome ? WelcomeScreen : PAGES[page] || WelcomeScreen;
     return (
       <RailProvider>
-        <AppShell page={page} Page={Page} />
+        <AppShell page={isGuestHome ? "home" : page} Page={Page} />
       </RailProvider>
     );
   }

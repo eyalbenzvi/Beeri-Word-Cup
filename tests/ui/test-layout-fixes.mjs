@@ -139,15 +139,23 @@ assert(
 // ============================================================
 console.log("--- Issue #1: WelcomeScreen vertical spacing tightened ---");
 
-// Main container: py-3 md:py-6 instead of py-4 md:py-8
+// As of the offline-mode rollout WelcomeScreen no longer owns its own
+// header / outer min-h-dvh wrapper — the page is rendered inside
+// AppShell so Layout supplies the surrounding padding (pt-3 md:pt-6).
+// What's left to pin here is the WelcomeScreen body's own outer flex
+// and inner gap so the previously-tight 1366x768 viewport fit doesn't
+// regress as the component is moved.
 assert(
-  /flex-1[^"`]*py-3\s+md:py-6/.test(welcome),
-  "Main container uses py-3 md:py-6 (not py-4 md:py-8)",
+  /flex\s+flex-col\s+items-center\s+gap-3/.test(welcome),
+  "Body wrapper uses flex flex-col items-center gap-3 (tight inner gap)",
 );
-// Outer gap between hero-block and countdown-block: gap-3 not gap-4
 assert(
-  /min-h-0\s+flex\s+flex-col\s+items-center\s+justify-start\s+gap-3/.test(welcome),
-  "Outer flex uses gap-3 (tighter than the prior gap-4)",
+  !/min-h-dvh/.test(welcome),
+  "Body no longer reserves min-h-dvh (delegated to AppShell)",
+);
+assert(
+  !/<header/.test(welcome),
+  "WelcomeScreen no longer renders its own <header> (Layout owns chrome)",
 );
 // Auth card padding: p-4 md:p-5 (not p-5 md:p-6)
 assert(
