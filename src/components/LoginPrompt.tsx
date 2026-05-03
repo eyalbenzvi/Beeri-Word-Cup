@@ -9,7 +9,7 @@ import GoogleSignInButton from "./GoogleSignInButton";
 import PhoneSignIn from "./PhoneSignIn";
 
 export default function LoginPrompt({
-  title = "התחבר כדי לראות עוד",
+  title = "התחבר כדי להמשיך",
   subtitle,
   variant = "card",
 }: {

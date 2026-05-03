@@ -49,10 +49,9 @@ import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import AIFillOverlay from "../components/AIFillOverlay";
 import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import InlineError from "../components/InlineError";
-import LoginPrompt from "../components/LoginPrompt";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
-import { AUTH_COPY, LABELS } from "../constants/messages";
+import { LABELS } from "../constants/messages";
 
 import { getStageLabel } from "../utils/constants";
 const EMPTY_MATCHES = {};
@@ -450,22 +449,12 @@ export default function Predict() {
   }, [activeForm, matchPredictions]);
   useRightRail(railNode);
 
-  // Guest visitor: render the FormsHub directly. The hub's default tab is
-  // "all" for guests (so they immediately see every submitted form) and
-  // "mine" is gated behind a LoginPrompt (the user has no forms to show).
-  // The "create new form" path inside FormList stays gated to authenticated
-  // users via the same hub fork.
+  // Guest visitor: hand off to FormsHub. The hub renders its own
+  // LoginPrompt banner above the tabs and an EmptyState for the empty
+  // "mine" view, so we DON'T add a second prompt here — that previously
+  // produced two stacked sign-in cards on the mine tab.
   if (!user) {
-    return (
-      <>
-        <LoginPrompt
-          variant="banner"
-          title={AUTH_COPY.loginRequiredTitle}
-          subtitle={AUTH_COPY.loginRequiredSubtitle}
-        />
-        <FormsHub forms={[]} user={null} settings={settings} />
-      </>
-    );
+    return <FormsHub forms={[]} user={null} settings={settings} />;
   }
 
   if (!activeForm) {

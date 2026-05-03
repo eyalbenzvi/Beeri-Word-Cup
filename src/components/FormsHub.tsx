@@ -4,7 +4,14 @@
 //
 // Default tab:
 //   - Authenticated user → "mine"
-//   - Guest visitor       → "all" (mine is gated behind a LoginPrompt)
+//   - Guest visitor       → "all" (mine is gated behind an EmptyState)
+//
+// Guest banner:
+//   When `user` is null we render a single LoginPrompt banner above the
+//   tabs. Both tabs then share that banner — the "mine" tab body collapses
+//   to a tight EmptyState rather than a duplicate sign-in card. (Earlier
+//   the parent Predict page rendered its own banner AND FormsHub rendered
+//   a card on the mine tab → two stacked sign-in panels.)
 //
 // URL contract:
 //   ?view=mine — explicit mine
@@ -13,13 +20,18 @@
 // We keep `view` as the param name because it already steered AllForms
 // pre-refactor (Predict.tsx used `view=all` as the deep-link). New URL
 // values stay backward-compatible.
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import FormList from "./FormList";
 import LoginPrompt from "./LoginPrompt";
+import EmptyState from "./EmptyState";
 import Spinner from "./Spinner";
+import { AUTH_COPY } from "../constants/messages";
 import { useNavigation } from "../hooks/useNavigation";
 
-const AllFormsView = lazy(() => import("../pages/AllForms"));
+// Module-level loader so the chunk only fetches once across re-mounts.
+// Reuse this same callable for both `lazy` and the tab-mount preload below.
+const loadAllForms = () => import("../pages/AllForms");
+const AllFormsView = lazy(loadAllForms);
 
 const VIEW_TAB_VALUES = ["mine", "all"] as const;
 type ViewTab = (typeof VIEW_TAB_VALUES)[number];
@@ -34,10 +46,20 @@ export default function FormsHub({
   settings: any;
 }) {
   const { params, setParamsPatch } = useNavigation();
+
+  // Eagerly fetch the AllForms chunk when the hub mounts so a tab toggle
+  // doesn't trigger a Suspense fallback flash on first switch. The dynamic
+  // import is module-cached, so the actual `lazy(loadAllForms)` evaluation
+  // a moment later is a free hit. Errors are swallowed — the lazy import
+  // below will re-attempt with the same loader if the preload fails.
+  useEffect(() => {
+    loadAllForms().catch(() => {});
+  }, []);
+
   // Default: mine when logged in, all for guests. Bogus values (?view=foo)
   // fall back to the default rather than rendering nothing.
   const defaultTab: ViewTab = user ? "mine" : "all";
-  const requested = (params?.view as string) || "";
+  const requested = params?.view || "";
   const tab: ViewTab = (VIEW_TAB_VALUES as readonly string[]).includes(
     requested,
   )
@@ -53,6 +75,16 @@ export default function FormsHub({
 
   return (
     <div>
+      {!user && (
+        <div id="forms-hub-login-banner">
+          <LoginPrompt
+            variant="banner"
+            title={AUTH_COPY.loginRequiredTitle}
+            subtitle={AUTH_COPY.loginRequiredSubtitle}
+          />
+        </div>
+      )}
+
       <div
         className="flex gap-1 mb-3 bg-bg-soft rounded-xl p-1 border-2 border-border"
         role="tablist"
@@ -88,9 +120,26 @@ export default function FormsHub({
         user ? (
           <FormList forms={forms} user={user} settings={settings} />
         ) : (
-          <LoginPrompt
-            title="התחבר כדי לראות את הטפסים שלך"
-            subtitle="לאחר התחברות תוכל ליצור טפסים, לערוך ולעקוב אחרי התוצאות"
+          // Guest's mine tab — banner above already provides the
+          // sign-in CTA. We still surface a "התחבר" button inside the
+          // empty state so a phone user who's scrolled past the banner
+          // can re-focus it without scrolling back to the top manually.
+          <EmptyState
+            icon="📋"
+            title="עדיין אין כאן טפסים"
+            description="לאחר התחברות תוכל ליצור טפסים, לערוך אותם ולעקוב אחרי התוצאות"
+            cta={
+              <button
+                onClick={() => {
+                  document
+                    .getElementById("forms-hub-login-banner")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="btn-duo btn-duo-primary btn-duo-sm"
+              >
+                התחבר
+              </button>
+            }
           />
         )
       ) : (

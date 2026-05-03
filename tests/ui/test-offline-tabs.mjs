@@ -92,6 +92,41 @@ assert(/cache\._ready\.actualAdvancing\s*=\s*true/.test(store),
 assert(/publicTournamentTimer\s*\)\s*\{[\s\S]{0,80}clearInterval\(publicTournamentTimer\)/.test(store),
   "teardownPublicReadonlyMode clears publicTournamentTimer");
 
+// Code review #4: teardown must zero the cache slices the public
+// fetchers populated, so a re-rendered consumer can't read stale guest
+// data in the gap between teardown and the first authed snapshot.
+const teardownBlock = store.match(/export function teardownPublicReadonlyMode[\s\S]*?\n\}/)?.[0] || "";
+assert(/cache\.predictions\s*=\s*\{\s*\}/.test(teardownBlock),
+  "teardown zeros cache.predictions");
+assert(/cache\.userDirectory\s*=\s*\{\s*\}/.test(teardownBlock),
+  "teardown zeros cache.userDirectory");
+assert(/cache\.actualBonuses\s*=\s*\{[\s\S]*?champion:\s*null/.test(teardownBlock),
+  "teardown resets cache.actualBonuses to its empty shape");
+assert(/cache\.actualAdvancing\s*=\s*\{\s*\}/.test(teardownBlock),
+  "teardown zeros cache.actualAdvancing");
+
+// Symmetric negative assertion: teardown must NOT clear cache.settings
+// or cache.summaries. cache.settings drives the locked-state gate that
+// the authed listener path also relies on; cache.summaries is owned by
+// its own listener that gets re-subscribed on sign-in. Clearing either
+// would cause a render flash where the locked panel briefly appears or
+// the blog list briefly empties.
+assert(!/cache\.settings\s*=\s*\{/.test(teardownBlock),
+  "teardown does NOT clear cache.settings (would flash locked panel)");
+assert(!/cache\.summaries\s*=\s*\{/.test(teardownBlock),
+  "teardown does NOT clear cache.summaries (owned by summaries listener)");
+
+// AllForms's filteredForms useMemo dep array must NOT include `users`
+// (closure no longer reads it — kept tight so a directory tick doesn't
+// recompute the filter). #6 from the code-review.
+const allFormsSrc = readMigratedSrc("src/pages/AllForms.jsx");
+const filteredFormsBlock = allFormsSrc.match(/const filteredForms\s*=\s*useMemo\([\s\S]*?\}\s*,\s*\[[^\]]*\]\)/)?.[0] || "";
+assert(filteredFormsBlock.length > 0,
+  "AllForms.filteredForms useMemo block found for dep audit");
+assert(!/\busers\b/.test(filteredFormsBlock.match(/\[[^\]]*\]\)$/)?.[0] || ""),
+  "AllForms.filteredForms dep array no longer includes `users`");
+
+
 // ============================================================
 // 4. Netlify function — privacy gate on predictionsLocked
 // ============================================================
@@ -114,6 +149,32 @@ assert(/predictions:\s*\{\s*\}/.test(preLockBlock),
 assert(/userDirectory:\s*\{\s*\}/.test(preLockBlock),
   "Pre-lock response has empty userDirectory");
 
+// Code review #5: a missing or malformed FIREBASE_SERVICE_ACCOUNT must
+// NOT echo the raw JSON.parse / config error message to anonymous
+// clients (would leak our internal config layout). Use a dedicated
+// ConfigError class + sanitised generic message.
+assert(/class\s+ConfigError\s+extends\s+Error/.test(netlifyFn),
+  "Function defines a dedicated ConfigError class for env-var failures");
+assert(/FIREBASE_SERVICE_ACCOUNT not set/.test(netlifyFn),
+  "Function throws ConfigError when env var is missing");
+assert(/throw\s+new\s+ConfigError\([^)]*parse failed/.test(netlifyFn),
+  "Function wraps JSON.parse failure in ConfigError");
+// Catch path must NOT echo err.message verbatim — should map to a
+// stable string like 'Service unavailable' / 'Internal error'.
+const catchBlock = netlifyFn.match(/\}\s*catch\s*\(err\)\s*\{[\s\S]*?\}\s*\}/)?.[0] || "";
+assert(!/error:\s*err\?\.message/.test(catchBlock),
+  "Catch block no longer echoes raw err.message in 500 body");
+assert(/Service unavailable|Internal error/.test(catchBlock),
+  "Catch block returns sanitised generic error strings");
+
+// ConfigError catch path must call Sentry directly — withSentry only
+// sees errors that escape the handler, and the handler swallows its
+// own errors to return a sanitised body. Without an explicit capture,
+// a misconfig would 500 silently with no ops signal. (Code-review
+// second-pass nit A2.)
+assert(/Sentry\.captureException/.test(netlifyFn),
+  "get-public-tournament-data captures errors directly in its catch");
+
 // ============================================================
 // 5. LoginPrompt component + usage
 // ============================================================
@@ -128,15 +189,21 @@ assert(/PhoneSignIn/.test(loginPrompt),
 assert(/data-testid="login-prompt"/.test(loginPrompt),
   "LoginPrompt has stable data-testid for tests");
 
-// Each guest-relevant page should import LoginPrompt.
-for (const page of ["Predict", "Leaderboard", "Stats", "Results"]) {
+// Each guest-relevant page should import LoginPrompt — except Predict,
+// which delegates the guest banner to FormsHub (post code-review #1
+// fix). Leaderboard / Stats / Results render LoginPrompt inline.
+for (const page of ["Leaderboard", "Stats", "Results"]) {
   const src = readMigratedSrc(`src/pages/${page}.jsx`);
   assert(/import\s+LoginPrompt/.test(src),
     `${page}.jsx imports LoginPrompt for guest fallback`);
 }
+// FormsHub imports LoginPrompt on Predict's behalf.
+const formsHubSrc = readMigratedSrc("src/components/FormsHub.jsx");
+assert(/import\s+LoginPrompt/.test(formsHubSrc),
+  "FormsHub.jsx imports LoginPrompt (renders the Predict banner for guests)");
 
 // ============================================================
-// 6. FormsHub — tabbed shell with auth-aware default
+// 6. FormsHub — tabbed shell with auth-aware default + single banner
 // ============================================================
 console.log("\n--- 6. FormsHub mine/all tabs ---");
 assert(existsMigratedSrc("src/components/FormsHub.jsx"),
@@ -151,14 +218,43 @@ assert(/הטפסים שלי/.test(formsHub) && /כל הטפסים/.test(formsHub
 // Default-tab rule: mine for authed user, all for guest.
 assert(/defaultTab[\s\S]{0,80}user\s*\?\s*"mine"\s*:\s*"all"/.test(formsHub),
   "FormsHub default tab is mine when authed, all when guest");
-// Mine-tab guest fork: must show a LoginPrompt (no forms to display).
-assert(/tab\s*===\s*"mine"[\s\S]{0,400}LoginPrompt/.test(formsHub),
-  "FormsHub renders LoginPrompt for guest's 'mine' tab");
+
+// Single-banner contract (post code-review fix): for guests there is
+// EXACTLY one LoginPrompt, rendered as a banner above the tabs. Both
+// tabs share that banner — the mine-tab body must NOT render its own
+// LoginPrompt card (that previously stacked two prompts under each
+// other when Predict's outer banner was also present).
+assert(/!user\s*&&[\s\S]{0,200}<LoginPrompt[\s\S]{0,200}variant="banner"/.test(formsHub),
+  "FormsHub renders a single LoginPrompt banner for guests above the tabs");
+// Mine-tab guest fork must use EmptyState, not a second LoginPrompt.
+assert(/tab\s*===\s*"mine"\s*\?[\s\S]{0,400}<EmptyState/.test(formsHub),
+  "FormsHub guest mine-tab body is an EmptyState (no duplicate LoginPrompt)");
+const loginPromptCount = (formsHub.match(/<LoginPrompt/g) || []).length;
+assert(loginPromptCount === 1,
+  `FormsHub has exactly one <LoginPrompt> usage (found ${loginPromptCount})`);
+
 // All-tab uses the shared AllFormsView component.
 assert(/AllFormsView/.test(formsHub), "FormsHub renders AllFormsView for all tab");
 
+// Eager-preload of the AllForms chunk so first tab switch doesn't flash
+// a Suspense fallback. Implemented as a useEffect calling the same
+// loader the lazy() factory uses (module-cached single fetch).
+assert(/loadAllForms\s*=\s*\(\)\s*=>\s*import\(/.test(formsHub),
+  "FormsHub defines a shared loadAllForms loader for lazy + preload");
+assert(/useEffect\(\s*\(\)\s*=>\s*\{[\s\S]{0,150}loadAllForms\(\)/.test(formsHub),
+  "FormsHub eagerly preloads the AllForms chunk on mount");
+
+// The login CTA inside FormsHub's guest mine-tab EmptyState must be
+// wired to scroll back to the banner — otherwise a phone user who's
+// scrolled past the banner sees only an empty state with no reachable
+// affordance to sign in. (Code-review second-pass nit A1.)
+assert(/forms-hub-login-banner/.test(formsHub),
+  "FormsHub banner has a stable id for the EmptyState CTA to target");
+assert(/scrollIntoView/.test(formsHub),
+  "FormsHub guest EmptyState CTA scrolls back to the LoginPrompt banner");
+
 // FormList no longer renders the bottom 'צפייה בטפסים של כולם' button
-// unconditionally — the tab is now the entry point. Onlu render when
+// unconditionally — the tab is now the entry point. Only render when
 // `onShowAllForms` is explicitly passed (back-compat shim).
 const formList = readMigratedSrc("src/components/FormList.jsx");
 assert(/onShowAllForms\s*&&[\s\S]{0,200}צפייה בטפסים של כולם/.test(formList),
@@ -175,7 +271,7 @@ assert(/onBack\?:/.test(allForms) || /onBack\s*=\s*[^,)]/.test(allForms),
   "AllForms onBack is optional");
 
 // ============================================================
-// 7. Predict — guest fork uses FormsHub instead of dead-end card
+// 7. Predict — guest fork hands off to FormsHub (single banner only)
 // ============================================================
 console.log("\n--- 7. Predict guest renders FormsHub ---");
 const predict = readMigratedSrc("src/pages/Predict.jsx");
@@ -183,8 +279,11 @@ assert(/<FormsHub/.test(predict),
   "Predict renders FormsHub when no active form");
 assert(/!user[\s\S]{0,400}<FormsHub[\s\S]{0,200}user=\{null\}/.test(predict),
   "Predict guest fork renders FormsHub with user=null");
-assert(/!user[\s\S]{0,400}<LoginPrompt/.test(predict),
-  "Predict guest fork includes a LoginPrompt banner");
+// Important: post code-review fix, Predict no longer renders its own
+// LoginPrompt for the guest path — FormsHub owns the prompt now.
+// Stacking two banners on /predict produced duplicate sign-in cards.
+assert(!/import\s+LoginPrompt/.test(predict),
+  "Predict no longer imports LoginPrompt (FormsHub owns it)");
 // The old 🔒 dead-end card with navigate('home') must be gone.
 assert(!/loginRequiredTitle[\s\S]{0,200}navigate\("home"\)/.test(predict),
   "Predict no longer dead-ends guest at a navigate('home') card");

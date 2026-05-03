@@ -368,4 +368,14 @@ export function teardownPublicReadonlyMode() {
     clearTimeout(publicReadinessWatchdog);
     publicReadinessWatchdog = null;
   }
+  // Symmetry with logoutUser() in the barrel: drop any data the public
+  // fetchers populated so the next authenticated session starts from a
+  // clean slate. The authed listeners overwrite these cache slices a
+  // moment later anyway, but zeroing here prevents a brief window where
+  // a re-rendered consumer could read stale public-mode data after the
+  // listener teardown but before the first authed snapshot lands.
+  cache.predictions = {};
+  cache.userDirectory = {};
+  cache.actualBonuses = { champion: null, topScorers: [] };
+  cache.actualAdvancing = {};
 }

@@ -33,7 +33,7 @@ export default function Results() {
         <LoginPrompt
           variant="banner"
           title="התחבר כדי לנחש תוצאות"
-          subtitle="כל אחד יכול לראות את התוצאות. כדי לקבל ניקוד על ניחושים — צריך חשבון."
+          subtitle="כל אחד יכול לראות את התוצאות. כדי לצבור נקודות — צריך חשבון."
         />
       )}
 

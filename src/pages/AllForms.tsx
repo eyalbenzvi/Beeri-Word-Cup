@@ -135,7 +135,10 @@ export default function AllFormsView({
       }
       return (form.championName || "").toLowerCase().includes(query);
     });
-  }, [submittedForms, filterText, activeFilter, users]);
+    // `users` was previously listed here but the closure no longer reads
+    // the directory — name lookup happens in the row map below. Kept the
+    // dep set tight so a directory tick doesn't recompute the filter.
+  }, [submittedForms, filterText, activeFilter]);
 
   // If the user expanded a card and then filtered it out, drop the
   // expansion — otherwise an invisible drawer keeps the bracket compute

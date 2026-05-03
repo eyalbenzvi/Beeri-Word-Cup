@@ -18,13 +18,37 @@
 // Uses the Firebase Admin SDK (bypasses Firestore security rules).
 
 import admin from "firebase-admin";
+import * as Sentry from "@sentry/node";
 import { withSentry } from "./_sentry.js";
 
 let adminInitialized = false;
 
+// Sentinel error: thrown when FIREBASE_SERVICE_ACCOUNT is missing or
+// malformed JSON. Carries a stable `code` so the handler can return a
+// generic 500 without echoing the raw `JSON.parse` message back to the
+// client (which would surface our internal config layout in the response
+// body — minor info leak otherwise).
+class ConfigError extends Error {
+  constructor(message) {
+    super(message);
+    this.code = "config-error";
+  }
+}
+
 function initAdmin() {
   if (adminInitialized) return;
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) {
+    throw new ConfigError("FIREBASE_SERVICE_ACCOUNT not set");
+  }
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch (err) {
+    throw new ConfigError(
+      `FIREBASE_SERVICE_ACCOUNT parse failed: ${err?.message || "unknown"}`,
+    );
+  }
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   adminInitialized = true;
 }
@@ -131,10 +155,33 @@ async function getPublicTournamentDataHandler(event) {
       }),
     };
   } catch (err) {
+    // Don't echo raw error messages to anonymous clients — they may
+    // reveal config / dependency internals. ConfigError (env var bad)
+    // gets a generic "Service unavailable"; everything else gets a
+    // generic "Internal error".
+    //
+    // Ops visibility: withSentry only sees errors that escape the
+    // handler, so we MUST capture directly here — otherwise a misconfig
+    // would 500 silently with no Sentry event. Capture is best-effort
+    // (try/catch) so a Sentry-SDK fault can't itself crash the response.
+    const isConfigError =
+      err instanceof ConfigError || err?.code === "config-error";
+    try {
+      Sentry.captureException(err, {
+        tags: {
+          function: "get-public-tournament-data",
+          configError: String(isConfigError),
+        },
+      });
+    } catch {
+      /* never let Sentry break the response */
+    }
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err?.message || "Internal error" }),
+      body: JSON.stringify({
+        error: isConfigError ? "Service unavailable" : "Internal error",
+      }),
     };
   }
 }
