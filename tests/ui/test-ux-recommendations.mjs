@@ -30,7 +30,12 @@ assert(/params\?\.form/.test(predict), "Predict reads activeFormId from params.f
 assert(/params\?\.modal\s*===\s*"review"/.test(predict), "Predict reads ReviewScreen state from params.modal");
 assert(/params\?\.modal\s*===\s*"search"/.test(predict), "Predict reads MatchSearch state from params.modal");
 assert(/params\?\.modal\s*===\s*"scenario"/.test(predict), "Predict reads scenario modal from params.modal");
-assert(/params\?\.view\s*===\s*"all"/.test(predict), "Predict reads AllForms view from params.view");
+// The AllForms view is now selected via FormsHub, which reads params.view
+// itself and routes the "mine"/"all" tabs. Predict no longer cares about
+// the param directly — it just renders FormsHub when no form is active.
+const formsHub = readMigratedSrc("src/components/FormsHub.jsx");
+assert(/params\?\.view/.test(formsHub), "FormsHub reads tab selection from params.view");
+assert(/<FormsHub/.test(predict), "Predict renders FormsHub for the no-active-form view");
 assert(!/setShowConfirm\(/.test(predict), "Predict no longer mutates showConfirm via setState");
 assert(!/setShowSearch\(/.test(predict), "Predict no longer mutates showSearch via setState");
 assert(!/setShowScenarioModal\(/.test(predict), "Predict no longer mutates showScenarioModal via setState");

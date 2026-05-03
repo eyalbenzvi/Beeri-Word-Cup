@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMatchResults } from "../hooks/useStore";
+import { useMatchResults, useCurrentUser } from "../hooks/useStore";
 import { groupMatches, knockoutMatches } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
@@ -8,9 +8,11 @@ import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
 import PageHeader from "../components/PageHeader";
+import LoginPrompt from "../components/LoginPrompt";
 
 export default function Results() {
   const results = useMatchResults();
+  const { user } = useCurrentUser();
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
 
@@ -27,6 +29,13 @@ export default function Results() {
         title="תוצאות"
         subtitle={`${playedCount} מתוך ${totalMatches} משחקים שוחקו`}
       />
+      {!user && (
+        <LoginPrompt
+          variant="banner"
+          title="התחבר כדי לנחש תוצאות"
+          subtitle="כל אחד יכול לראות את התוצאות. כדי לצבור נקודות — צריך חשבון."
+        />
+      )}
 
       <div className="mb-4">
         <div className="w-full bg-bg-soft rounded-full h-2 overflow-hidden">

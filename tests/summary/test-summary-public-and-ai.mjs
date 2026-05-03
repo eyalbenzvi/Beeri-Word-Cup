@@ -126,12 +126,21 @@ assert(/teardownPublicReadonlyMode[\s\S]*?clearTimeout\(\s*publicReadinessWatchd
 }
 
 // ============ 2. App.jsx gating ============
-console.log("--- 2. App.jsx blog bypass ---");
+console.log("--- 2. App.jsx public-mode gating ---");
 const appSrc = readMigratedSrc("/home/user/Beeri-World-Cup/src/App.jsx", "utf8");
 assert(appSrc.includes("initPublicReadonlyMode"), "App imports public init");
-assert(/page\s*===\s*"blog"/.test(appSrc), "blog page gets bypass branch");
-assert(/!isLoggedIn[\s\S]{0,200}page\s*===\s*"blog"/.test(appSrc),
-  "unauth + blog page renders blog");
+// Offline-mode rollout: every guest tab now shares the public-readonly
+// listener, not just blog. Two contracts replace the previous blog-only
+// branch:
+//   1. The GUEST_PAGES allow-list explicitly enumerates which pages a
+//      logged-out visitor may render (blog must be in there).
+//   2. The unauth branch still routes to AppShell for any tab inside
+//      GUEST_PAGES — meaning a shared blog link still resolves to the
+//      DailySummary page exactly like before.
+assert(/GUEST_PAGES\s*=\s*new\s+Set\(\[[^\]]*"blog"/.test(appSrc),
+  "GUEST_PAGES set includes blog");
+assert(/!isLoggedIn[\s\S]{0,300}GUEST_PAGES\.has\(page\)/.test(appSrc),
+  "unauth branch consults GUEST_PAGES allow-list");
 
 // ============ 3. firestore.rules hardened shape ============
 console.log("--- 3. firestore.rules shape caps ---");

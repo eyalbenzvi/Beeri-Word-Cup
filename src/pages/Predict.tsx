@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
@@ -31,9 +31,8 @@ import MatchCard from "../components/MatchCard";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import StageSelector from "../components/StageSelector";
-import FormList from "../components/FormList";
+import FormsHub from "../components/FormsHub";
 import Badge from "../components/Badge";
-import Spinner from "../components/Spinner";
 import ProgressHub from "../components/ProgressHub";
 import { useRightRail } from "../hooks/useRail";
 import {
@@ -41,8 +40,6 @@ import {
   usePredictTabFocus,
   usePredictDuplicateNameView,
 } from "../hooks/usePredict";
-import { lazyWithRetry } from "../utils/lazyWithRetry";
-const AllFormsView = lazyWithRetry(() => import("./AllForms"));
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/ConfirmModal";
 import SaveIndicator from "../components/SaveIndicator";
@@ -54,7 +51,7 @@ import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import InlineError from "../components/InlineError";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
-import { AUTH_COPY, LABELS } from "../constants/messages";
+import { LABELS } from "../constants/messages";
 
 import { getStageLabel } from "../utils/constants";
 const EMPTY_MATCHES = {};
@@ -124,7 +121,6 @@ export default function Predict() {
   const showConfirm = params?.modal === "review";
   const showSearch = params?.modal === "search";
   const showScenarioModal = params?.modal === "scenario";
-  const showAllForms = params?.view === "all";
   const allPredictions = useAllPredictions();
 
   const activeForm =
@@ -453,40 +449,16 @@ export default function Predict() {
   }, [activeForm, matchPredictions]);
   useRightRail(railNode);
 
+  // Guest visitor: hand off to FormsHub. The hub renders its own
+  // LoginPrompt banner above the tabs and an EmptyState for the empty
+  // "mine" view, so we DON'T add a second prompt here — that previously
+  // produced two stacked sign-in cards on the mine tab.
   if (!user) {
-    return (
-      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
-        <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-xl font-extrabold text-ink mb-2">
-          {AUTH_COPY.loginRequiredTitle}
-        </h2>
-        <p className="text-ink-muted text-sm mb-6 font-medium">
-          {AUTH_COPY.loginRequiredSubtitle}
-        </p>
-        <button onClick={() => navigate("home")} className="btn-duo btn-duo-primary w-full">
-          {AUTH_COPY.loginCta}
-        </button>
-      </div>
-    );
-  }
-
-  if (!activeForm && showAllForms) {
-    return (
-      <Suspense fallback={<div className="text-center py-8 text-ink-muted font-bold"><Spinner label="טוען..." /></div>}>
-        <AllFormsView onBack={() => setParamsPatch({ view: null })} />
-      </Suspense>
-    );
+    return <FormsHub forms={[]} user={null} settings={settings} />;
   }
 
   if (!activeForm) {
-    return (
-      <FormList
-        forms={forms}
-        user={user}
-        settings={settings}
-        onShowAllForms={() => setParamsPatch({ view: "all" })}
-      />
-    );
+    return <FormsHub forms={forms} user={user} settings={settings} />;
   }
 
   // === FORM EDITING VIEW ===

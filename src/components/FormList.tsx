@@ -15,7 +15,16 @@ import EmptyState from "./EmptyState";
 import StatusOnboarding from "./StatusOnboarding";
 import { LOCK_MESSAGES } from "../constants/messages";
 
-export default function FormList({ forms, user, settings, onShowAllForms }) {
+// `onShowAllForms` is legacy: pre-FormsHub, FormList rendered a bottom CTA
+// that deep-linked into AllForms via `?view=all`. FormsHub now exposes that
+// view via a top-of-page tab pair, so the bottom CTA is gone. We keep the
+// prop for backward-compat (unused if not provided).
+export default function FormList({ forms, user, settings, onShowAllForms }: {
+  forms: any[];
+  user: any;
+  settings: any;
+  onShowAllForms?: () => void;
+}) {
   const showToast = useToast();
   const confirm = useConfirm();
   const { navigate } = useNavigation();
@@ -203,9 +212,11 @@ export default function FormList({ forms, user, settings, onShowAllForms }) {
         })}
       </div>
 
-      <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost btn-duo-cta">
-        צפייה בטפסים של כולם
-      </button>
+      {onShowAllForms && (
+        <button onClick={onShowAllForms} className="btn-duo btn-duo-ghost btn-duo-cta">
+          צפייה בטפסים של כולם
+        </button>
+      )}
 
       {showNewForm && !locked && (
         <div className="card-duo-lg mt-3 md:max-w-md md:mx-auto" style={{ borderColor: "var(--color-primary)" }}>

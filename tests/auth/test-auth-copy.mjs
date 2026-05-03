@@ -15,6 +15,9 @@ console.log("=== AUTH COPY TESTS ===\n");
 
 const messages = readMigratedSrc("src/constants/messages.js", "utf8");
 const predict = readMigratedSrc("src/pages/Predict.jsx", "utf8");
+// FormsHub now owns the guest banner that previously lived inside
+// Predict.jsx (offline-mode rollout — single-banner contract).
+const formsHub = readMigratedSrc("src/components/FormsHub.jsx", "utf8");
 
 // --- Constants file exports AUTH_COPY with the consolidated title ---
 assert(/AUTH_COPY/.test(messages), "messages.js exports AUTH_COPY");
@@ -23,14 +26,16 @@ assert(
   "AUTH_COPY.loginRequiredTitle uses 'התחבר' wording (not 'הצטרף')",
 );
 
-// --- Predict page uses the constant, not hardcoded strings ---
+// --- The guest banner uses the constant. Live in FormsHub now; we
+// also check Predict to lock in that the constant isn't reintroduced
+// hardcoded there.
 assert(
-  /AUTH_COPY\.loginRequiredTitle/.test(predict),
-  "Predict.jsx uses AUTH_COPY.loginRequiredTitle",
+  /AUTH_COPY\.loginRequiredTitle/.test(formsHub),
+  "FormsHub.jsx uses AUTH_COPY.loginRequiredTitle (Predict guest banner moved here)",
 );
 assert(
-  !/"הצטרף למשחק קודם"/.test(predict),
-  "Predict.jsx no longer contains hardcoded 'הצטרף למשחק קודם'",
+  !/"הצטרף למשחק קודם"/.test(predict) && !/"הצטרף למשחק קודם"/.test(formsHub),
+  "No file contains hardcoded 'הצטרף למשחק קודם'",
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);
