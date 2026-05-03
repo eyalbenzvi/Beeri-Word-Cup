@@ -1,3 +1,9 @@
+// Welcome page body for logged-out visitors. Rendered as a regular page
+// inside AppShell (Layout) — the shell provides the header, hamburger
+// menu, mobile bottom-nav, and DesktopSideNav. This file used to be a
+// stand-alone full-page replacement with its own header; we delegate
+// chrome to Layout so guests see the same tab navigation that authed
+// users (and other guest tabs) get.
 import { useState } from "react";
 import { useCountdown } from "../hooks/useCountdown";
 import { usePublicSettings } from "../hooks/usePublicSettings";
@@ -6,8 +12,7 @@ import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
-import MenuOverlay from "../components/MenuOverlay";
-import { Menu, Phone, ArrowRight, Info } from "lucide-react";
+import { Phone, ArrowRight } from "lucide-react";
 import { BRAND } from "../constants/messages";
 
 export default function WelcomeScreen() {
@@ -17,10 +22,10 @@ export default function WelcomeScreen() {
   // results are empty. Use the public endpoint's results instead so the
   // "next match" widget correctly hides already-played matches.
   const results = publicSettings.matchResults;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [authMethod, setAuthMethod] = useState("google"); // "google" | "phone"
+  const [authMethod, setAuthMethod] = useState<"google" | "phone">("google");
   // Show upcoming matches when predictions are admin-locked OR kickoff has passed.
-  const tournamentStarted = !!publicSettings?.predictionsLocked || countdown.started;
+  const tournamentStarted =
+    !!publicSettings?.predictionsLocked || countdown.started;
   // Until the public-settings fetch resolves we don't actually know whether
   // the admin has flipped the lock — so showing the countdown by default
   // would briefly mis-render and then snap to the upcoming-matches panel
@@ -39,7 +44,11 @@ export default function WelcomeScreen() {
         countdown={countdown}
         variant="large"
         headerText={BRAND.countdownHeader}
-        footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
+        footerText={
+          <>
+            11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}
+          </>
+        }
       />
     </div>
   ) : tournamentStarted ? (
@@ -53,7 +62,11 @@ export default function WelcomeScreen() {
         countdown={countdown}
         variant="large"
         headerText={BRAND.countdownHeader}
-        footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
+        footerText={
+          <>
+            11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}
+          </>
+        }
       />
     </div>
   );
@@ -86,59 +99,36 @@ export default function WelcomeScreen() {
     </div>
   );
 
+  // Body-only — Layout owns the surrounding chrome (header + viewport
+  // sizing), so this returns just the auth card + countdown. The two
+  // share a centered column that caps at max-w-md on small screens and
+  // widens to max-w-xl on xl+, matching the previous look inside the
+  // new AppShell layout.
   return (
-    <div className="min-h-dvh bg-bg flex flex-col">
-      {/* Header */}
-      <header className="header-duo sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="text-ink-muted bg-transparent border-none cursor-pointer p-1.5 leading-none hover:text-ink rounded-xl hover:bg-bg-soft lg:hidden"
-              aria-label="תפריט"
-            >
-              <Menu size={24} />
-            </button>
-            <span className="text-lg font-extrabold text-ink flex items-center gap-2 tracking-tight">
-              <img src="https://static.wixstatic.com/media/db36e0_1fb01ba1e87241ecbe761094b74ef14d~mv2.png" alt="בארי" width="36" height="36" loading="eager" decoding="async" className="h-9 w-auto object-contain" />
-              <span className="hidden sm:inline">בארי מונדיאל</span>
-            </span>
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-full max-w-md space-y-3">
+        {/* Branding */}
+        <div className="text-center">
+          <div className="text-4xl md:text-5xl mb-1 animate-pop-in" aria-hidden="true">
+            ⚽🏆
           </div>
-          {/* Desktop: info button in header (no hamburger) */}
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="hidden lg:inline-flex items-center gap-1.5 text-sm font-bold text-ink-muted bg-transparent border-none cursor-pointer hover:text-ink px-3 py-1.5 rounded-xl hover:bg-bg-soft"
-            aria-label="מידע וחוקים"
-          >
-            <Info size={18} aria-hidden="true" />
-            מידע
-          </button>
-        </div>
-      </header>
-      <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
-
-      <div className="flex-1 px-4 md:px-6 py-3 md:py-6 min-h-0 flex flex-col items-center justify-start gap-3">
-        <div className="w-full max-w-md space-y-3">
-          {/* Branding */}
-          <div className="text-center">
-            <div className="text-4xl md:text-5xl mb-1 animate-pop-in" aria-hidden="true">⚽🏆</div>
-            <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
-              {BRAND.tournamentTitle}
-            </h1>
-            <p className="text-ink-muted text-sm md:text-base font-bold">{BRAND.tagline}</p>
-          </div>
-
-          {/* Auth card */}
-          <div className="text-center space-y-3 bg-white border-2 border-border rounded-3xl p-4 md:p-5 shadow-sm">
-            {authPanel}
-          </div>
+          <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-ink tracking-tight mb-1 leading-tight text-balance">
+            {BRAND.tournamentTitle}
+          </h1>
+          <p className="text-ink-muted text-sm md:text-base font-bold">
+            {BRAND.tagline}
+          </p>
         </div>
 
-        {/* Countdown/upcoming-matches panel widens on xl — 4 timer units reach 432px at xl:w-24, too wide for max-w-md. */}
-        <div className="w-full max-w-md xl:max-w-xl">
-          {countdownPanel}
+        {/* Auth card */}
+        <div className="text-center space-y-3 bg-white border-2 border-border rounded-3xl p-4 md:p-5 shadow-sm">
+          {authPanel}
         </div>
       </div>
+
+      {/* Countdown / upcoming-matches panel widens on xl — 4 timer units
+          reach 432px at xl:w-24, too wide for max-w-md. */}
+      <div className="w-full max-w-md xl:max-w-xl">{countdownPanel}</div>
     </div>
   );
 }

@@ -122,7 +122,7 @@ const GUEST_PAGES = new Set([
 
 function AppContent() {
   const ready = useStoreReady();
-  const { page } = useNavigation();
+  const { page, navigate } = useNavigation();
   const { user, authReady, isLoggedIn } = useCurrentUser();
   const [profileDone, setProfileDone] = useState(false);
 
@@ -138,21 +138,37 @@ function AppContent() {
     }
   }, [authReady, isLoggedIn]);
 
+  // Guest URL normalisation: when a logged-out visitor lands on a page
+  // that isn't reachable for guests (admin / profile shared from a
+  // logged-in session, or a stale bookmark), the WelcomeScreen renders
+  // but the URL still says e.g. ?page=admin. Without this normalisation,
+  // signing in via the welcome auth panel would route the freshly-authed
+  // user straight into the Admin permission gate (a non-admin sees
+  // "נדרשת גישת מנהל" immediately after login — confusing UX). Replace
+  // (not push) so Back doesn't bounce the user into the bad URL again.
+  useEffect(() => {
+    if (!authReady || isLoggedIn) return;
+    if (page !== "home" && !GUEST_PAGES.has(page)) {
+      navigate("home", {}, { replace: true });
+    }
+  }, [authReady, isLoggedIn, page, navigate]);
+
   // Wait for Firebase Auth to determine login state
   if (!authReady) return <Loading reason="auth-init" />;
 
-  // Logged-out visitor: render the requested page in guest mode. Home
-  // (and unknown pages) fall through to WelcomeScreen so the auth panel
-  // is still front-and-centre for first-time visitors. Every other tab
-  // shows its own guest view with an inline LoginPrompt.
+  // Logged-out visitor: render every recognised page through AppShell so
+  // the tab navigation (mobile bottom-nav + DesktopSideNav) is always
+  // present, including on the home/welcome screen. Pages outside
+  // GUEST_PAGES (admin, profile, etc. shared from a logged-in session)
+  // collapse to the welcome view but still inside AppShell, with the
+  // page-id forced back to "home" so the highlight + URL match what's
+  // actually rendered.
   if (!isLoggedIn) {
-    if (page === "home" || !GUEST_PAGES.has(page)) {
-      return <WelcomeScreen />;
-    }
-    const Page = PAGES[page] || Home;
+    const isGuestHome = page === "home" || !GUEST_PAGES.has(page);
+    const Page = isGuestHome ? WelcomeScreen : PAGES[page] || WelcomeScreen;
     return (
       <RailProvider>
-        <AppShell page={page} Page={Page} />
+        <AppShell page={isGuestHome ? "home" : page} Page={Page} />
       </RailProvider>
     );
   }

@@ -100,12 +100,18 @@ export default function Layout({ children, rightRail = null }) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => navigate("home")}
-              className="btn-duo btn-duo-primary btn-duo-sm xl:hidden"
-            >
-              התחבר
-            </button>
+            // Hide the header "התחבר" CTA on the home tab — the welcome
+            // screen renders its own auth panel directly below the
+            // header, so a second button right above it is redundant
+            // and creates two competing primary CTAs in the same view.
+            page !== "home" && (
+              <button
+                onClick={() => navigate("home")}
+                className="btn-duo btn-duo-primary btn-duo-sm xl:hidden"
+              >
+                התחבר
+              </button>
+            )
           )}
         </div>
       </header>
