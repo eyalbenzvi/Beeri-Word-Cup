@@ -17,6 +17,7 @@ import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
+import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
@@ -405,13 +406,27 @@ export default function Leaderboard({
 
   if (!embedded && !forceUnlockView && !locked) {
     return (
-      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
-        <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-2xl font-extrabold text-ink mb-2">טבלת דירוג</h2>
-        <p className="text-sm text-ink-muted font-medium">הדירוג יתגלה כשהמשחקים יתחילו.</p>
-      </div>
+      <>
+        <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-extrabold text-ink mb-2">טבלת דירוג</h2>
+          <p className="text-sm text-ink-muted font-medium">הדירוג יתגלה כשהמשחקים יתחילו.</p>
+        </div>
+        {!user && (
+          <LoginPrompt
+            title="עדיין לא הצטרפת?"
+            subtitle="התחבר עכשיו וצור טפסים — הדירוג ייפתח בשריקת הפתיחה"
+          />
+        )}
+      </>
     );
   }
+
+  // Guest visitors see the same ranked board (post-lock the data is fetched
+  // by the public-mode endpoint), but we hide own-form jump-buttons (none
+  // exist for a logged-out user) and surface an inline LoginPrompt at the
+  // top so they can sign in to track their own forms.
+  const isGuest = !user;
 
   return (
     <div>
@@ -420,6 +435,13 @@ export default function Leaderboard({
         <p className="text-sm font-extrabold text-ink mb-3">
           תצוגה מקדימה (מנהל)
         </p>
+      )}
+      {!embedded && isGuest && (
+        <LoginPrompt
+          variant="banner"
+          title="התחבר כדי לעקוב אחרי הטפסים שלך"
+          subtitle="הדירוג גלוי לכולם. כדי להגיש טופס וליהנות מהקפיצה הישירה למיקום שלך — צריך חשבון."
+        />
       )}
 
       {selectedForm ? (

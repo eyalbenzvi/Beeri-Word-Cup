@@ -77,7 +77,19 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
   );
 }
 
-export default function AllFormsView({ onBack }) {
+// `onBack` is supported for legacy callers (Predict's old `?view=all`
+// deep-link), but not required: FormsHub renders this view inside its own
+// tabbed shell, so no back navigation is needed there. When `onBack` is
+// omitted, the page header collapses to a plain title (no back button) —
+// or, if FormsHub already rendered the page header, you can hide ours
+// entirely by passing `hideHeader`.
+export default function AllFormsView({
+  onBack,
+  hideHeader = false,
+}: {
+  onBack?: () => void;
+  hideHeader?: boolean;
+} = {}) {
   const allPredictions = useAllPredictions();
   const users = useUserDirectory();
   const settings = useSettings();
@@ -137,31 +149,43 @@ export default function AllFormsView({ onBack }) {
 
   return (
     <div>
-      <PageHeader
-        title="כל הטפסים"
-        subtitle={submittedForms.length > 0 ? `${submittedForms.length} טפסים הוגשו` : undefined}
-        action={
-          <div className="flex items-center gap-2">
-            {expandedFormId && (
-              <button
-                onClick={() => setExpandedFormId(null)}
-                className="btn-duo-flat"
-                style={{ padding: "0.45rem 0.85rem", fontSize: "0.8rem" }}
-              >
-                סגור הכל
-              </button>
-            )}
-            <button
-              onClick={onBack}
-              className="btn-duo-flat"
-              style={{ background: "var(--color-secondary)", color: "white", padding: "0.45rem 1rem" }}
-            >
-              חזרה
-              <ArrowRight size={16} aria-hidden="true" />
-            </button>
-          </div>
-        }
-      />
+      {!hideHeader && (
+        <PageHeader
+          title="כל הטפסים"
+          subtitle={
+            submittedForms.length > 0
+              ? `${submittedForms.length} טפסים הוגשו`
+              : undefined
+          }
+          action={
+            <div className="flex items-center gap-2">
+              {expandedFormId && (
+                <button
+                  onClick={() => setExpandedFormId(null)}
+                  className="btn-duo-flat"
+                  style={{ padding: "0.45rem 0.85rem", fontSize: "0.8rem" }}
+                >
+                  סגור הכל
+                </button>
+              )}
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="btn-duo-flat"
+                  style={{
+                    background: "var(--color-secondary)",
+                    color: "white",
+                    padding: "0.45rem 1rem",
+                  }}
+                >
+                  חזרה
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          }
+        />
+      )}
 
       {submittedForms.length === 0 ? (
         <EmptyState icon="📋" title="אף אחד עוד לא הגיש. הראשון קובע את הסטנדרט." />

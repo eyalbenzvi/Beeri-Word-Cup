@@ -28,6 +28,7 @@ let publicModeInitialized = false;
 let publicSummariesTimer: ReturnType<typeof setInterval> | null = null;
 let publicSettingsUnsub: (() => void) | null = null;
 let publicSettingsTimer: ReturnType<typeof setInterval> | null = null;
+let publicTournamentTimer: ReturnType<typeof setInterval> | null = null;
 let publicReadinessWatchdog: ReturnType<typeof setTimeout> | null = null;
 
 // Hard upper bound on how long a guest viewer can stay on the blog's
@@ -53,6 +54,22 @@ function markPublicReadinessForced() {
     cache._ready.matchResults = true;
     changed = true;
   }
+  if (!cache._ready.predictions) {
+    cache._ready.predictions = true;
+    changed = true;
+  }
+  if (!cache._ready.userDirectory) {
+    cache._ready.userDirectory = true;
+    changed = true;
+  }
+  if (!cache._ready.actualBonuses) {
+    cache._ready.actualBonuses = true;
+    changed = true;
+  }
+  if (!cache._ready.actualAdvancing) {
+    cache._ready.actualAdvancing = true;
+    changed = true;
+  }
   if (changed) {
     captureClientMessage("public-readiness-watchdog", {
       thresholdMs: PUBLIC_READINESS_WATCHDOG_MS,
@@ -62,6 +79,10 @@ function markPublicReadinessForced() {
     notifyAndEmit("summaries");
     notifyAndEmit("settings");
     notifyAndEmit("matchResults");
+    notifyAndEmit("predictions");
+    notifyAndEmit("userDirectory");
+    notifyAndEmit("actualBonuses");
+    notifyAndEmit("actualAdvancing");
   }
 }
 
@@ -166,6 +187,74 @@ async function fetchPublicSummariesOnce() {
   }
 }
 
+// Tournament data (predictions + userDirectory + actualBonuses +
+// actualAdvancing) for guest visitors. Mirrors fetchPublicSettingsOnce —
+// same Admin-SDK-via-function pattern, same teardown re-check, same failsafe
+// readiness flip. Pre-lock the function returns an empty payload (keys
+// flipped to ready so leaderboard/stats render their existing pre-lock
+// "locked until tournament starts" panel without spinning).
+async function fetchPublicTournamentDataOnce() {
+  if (!publicModeInitialized) return;
+  let succeeded = false;
+  try {
+    const res = await fetch(
+      `/.netlify/functions/get-public-tournament-data?t=${Date.now()}`,
+      { credentials: "omit", cache: "no-store" },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      // Re-check after the await: teardown may have happened during the fetch.
+      if (!publicModeInitialized) return;
+      if (data?.predictions && typeof data.predictions === "object") {
+        cache.predictions = data.predictions;
+      }
+      if (data?.userDirectory && typeof data.userDirectory === "object") {
+        cache.userDirectory = data.userDirectory;
+      }
+      if (data?.actualBonuses && typeof data.actualBonuses === "object") {
+        cache.actualBonuses = data.actualBonuses;
+      }
+      if (data?.actualAdvancing && typeof data.actualAdvancing === "object") {
+        cache.actualAdvancing = data.actualAdvancing;
+      }
+      cache._ready.predictions = true;
+      cache._ready.userDirectory = true;
+      cache._ready.actualBonuses = true;
+      cache._ready.actualAdvancing = true;
+      notifyAndEmit("predictions");
+      notifyAndEmit("userDirectory");
+      notifyAndEmit("actualBonuses");
+      notifyAndEmit("actualAdvancing");
+      succeeded = true;
+    } else {
+      captureClientMessage(
+        `public-tournament-fetch-${res.status}`,
+        { status: res.status, statusText: res.statusText },
+        "warning",
+      );
+    }
+  } catch (err: any) {
+    captureClientMessage(
+      "public-tournament-fetch-threw",
+      { message: err?.message || "unknown" },
+      "warning",
+    );
+  }
+  // Failsafe — same rationale as fetchPublicSettingsOnce: never trap a
+  // guest viewer on an indefinite spinner because of an outage. Default
+  // empty cache values are safe for every consumer.
+  if (!succeeded && publicModeInitialized) {
+    cache._ready.predictions = true;
+    cache._ready.userDirectory = true;
+    cache._ready.actualBonuses = true;
+    cache._ready.actualAdvancing = true;
+    notifyAndEmit("predictions");
+    notifyAndEmit("userDirectory");
+    notifyAndEmit("actualBonuses");
+    notifyAndEmit("actualAdvancing");
+  }
+}
+
 export function initPublicReadonlyMode() {
   if (publicModeInitialized) return;
   publicModeInitialized = true;
@@ -222,6 +311,12 @@ export function initPublicReadonlyMode() {
   fetchPublicSettingsOnce();
   publicSettingsTimer = setInterval(fetchPublicSettingsOnce, 30_000);
 
+  // Tournament data (predictions + userDirectory + actualBonuses +
+  // actualAdvancing). Pre-lock the response is empty; post-lock guests can
+  // read the same data authed users have always read.
+  fetchPublicTournamentDataOnce();
+  publicTournamentTimer = setInterval(fetchPublicTournamentDataOnce, 30_000);
+
   // Hard watchdog: if any of the readiness flags haven't flipped after
   // PUBLIC_READINESS_WATCHDOG_MS, force them so the blog page exits the
   // "טוען..." gate. Must come AFTER the listeners are set up so the
@@ -232,6 +327,10 @@ export function initPublicReadonlyMode() {
   );
 
   // Mark other keys ready so the UI doesn't block on unused streams.
+  // userDirectory / actualBonuses / actualAdvancing / predictions get their
+  // real values from fetchPublicTournamentDataOnce post-lock; we still flip
+  // the readiness flag here so isStoreReady() resolves on the first render
+  // before the fetch has landed (same rationale as the watchdog).
   for (const key of [
     "users",
     "userDirectory",
@@ -260,6 +359,10 @@ export function teardownPublicReadonlyMode() {
   if (publicSettingsTimer) {
     clearInterval(publicSettingsTimer);
     publicSettingsTimer = null;
+  }
+  if (publicTournamentTimer) {
+    clearInterval(publicTournamentTimer);
+    publicTournamentTimer = null;
   }
   if (publicReadinessWatchdog) {
     clearTimeout(publicReadinessWatchdog);

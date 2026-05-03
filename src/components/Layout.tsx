@@ -30,15 +30,17 @@ export default function Layout({ children, rightRail = null }) {
   );
   const showBlogTab = !!user || (predictionsLocked && hasPublishedSummary);
 
-  const allNavItems = user
-    ? [
-        { id: "home", label: "בית", Icon: HomeIcon },
-        { id: "predict", label: "טפסים", Icon: ClipboardList },
-        { id: "leaderboard", label: "דירוג", Icon: Trophy },
-        { id: "results", label: "תוצאות", Icon: Goal },
-        { id: "stats", label: "נתונים", Icon: BarChart3 },
-      ]
-    : [{ id: "home", label: "בית", Icon: HomeIcon }];
+  // Guests now see every primary tab. The pages themselves render guest
+  // fallbacks (LoginPrompt + empty-data states) when an authenticated
+  // feature isn't accessible. The motivation is that "tabs only when
+  // signed in" used to dead-end first-time visitors on a single home page.
+  const allNavItems = [
+    { id: "home", label: "בית", Icon: HomeIcon },
+    { id: "predict", label: "טפסים", Icon: ClipboardList },
+    { id: "leaderboard", label: "דירוג", Icon: Trophy },
+    { id: "results", label: "תוצאות", Icon: Goal },
+    { id: "stats", label: "נתונים", Icon: BarChart3 },
+  ];
   if (showBlogTab) {
     allNavItems.push({ id: "blog", label: BLOG.navLabel, Icon: Newspaper });
   }

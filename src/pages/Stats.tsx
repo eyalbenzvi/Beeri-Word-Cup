@@ -14,6 +14,7 @@ import { getCachedChampion } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
+import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
@@ -550,15 +551,24 @@ export default function Stats() {
 
   if (!settings.predictionsLocked) {
     return (
-      <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
-        <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
-        <p className="text-sm text-ink-muted font-medium">הנתונים יתגלו כשהמשחקים יתחילו.</p>
-      </div>
+      <>
+        <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-extrabold text-ink mb-2">סטטיסטיקות</h2>
+          <p className="text-sm text-ink-muted font-medium">הנתונים יתגלו כשהמשחקים יתחילו.</p>
+        </div>
+        {!currentUser && (
+          <LoginPrompt
+            title="עדיין לא הצטרפת?"
+            subtitle="התחבר עכשיו וצור טפסים — הסטטיסטיקות ייפתחו בשריקת הפתיחה"
+          />
+        )}
+      </>
     );
   }
 
   const isSearching = searchQuery.trim().length > 0;
+  const isGuest = !currentUser;
 
   return (
     <div>
@@ -567,6 +577,13 @@ export default function Stats() {
         title="סטטיסטיקות"
         subtitle={submittedForms.length > 0 ? `${submittedForms.length} טפסים הוגשו` : undefined}
       />
+      {isGuest && (
+        <LoginPrompt
+          variant="banner"
+          title="התחבר לחוויה מלאה"
+          subtitle="הסטטיסטיקות גלויות לכולם. התחבר כדי להגיש טופס משלך."
+        />
+      )}
 
 
       {submittedForms.length === 0 ? (
