@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useCurrentUser, useSummaries, useSettings } from "../hooks/useStore";
+import { useCurrentUser } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import MenuOverlay from "./MenuOverlay";
 import DesktopSideNav from "./DesktopSideNav";
@@ -9,8 +9,6 @@ import { BLOG } from "../constants/messages";
 export default function Layout({ children, rightRail = null }) {
   const { user } = useCurrentUser();
   const { page, navigate } = useNavigation();
-  const summaries = useSummaries();
-  const settings = useSettings();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -19,31 +17,20 @@ export default function Layout({ children, rightRail = null }) {
     return () => document.removeEventListener("open-info-drawer", handler);
   }, []);
 
-  // Blog tab visibility:
-  //  - any signed-in user sees it always (admins to manage drafts; everyone
-  //    else lands on the published list or an empty state).
-  //  - guests see it only after the admin locks predictions (= tournament
-  //    started) AND at least one summary is published.
-  const predictionsLocked = !!settings?.predictionsLocked;
-  const hasPublishedSummary = Object.values(summaries || {}).some(
-    (s: any) => s.status === "published",
-  );
-  const showBlogTab = !!user || (predictionsLocked && hasPublishedSummary);
-
-  // Guests now see every primary tab. The pages themselves render guest
-  // fallbacks (LoginPrompt + empty-data states) when an authenticated
-  // feature isn't accessible. The motivation is that "tabs only when
-  // signed in" used to dead-end first-time visitors on a single home page.
+  // Guests now see every primary tab — including the blog. The pages
+  // themselves render guest fallbacks (LoginPrompt + empty-data states)
+  // when an authenticated feature isn't accessible, and DailySummary has
+  // its own pre-tournament empty state for logged-out visitors. The
+  // motivation is that "tabs only when signed in" used to dead-end
+  // first-time visitors on a single home page.
   const allNavItems = [
     { id: "home", label: "בית", Icon: HomeIcon },
     { id: "predict", label: "טפסים", Icon: ClipboardList },
     { id: "leaderboard", label: "דירוג", Icon: Trophy },
     { id: "results", label: "תוצאות", Icon: Goal },
     { id: "stats", label: "נתונים", Icon: BarChart3 },
+    { id: "blog", label: BLOG.navLabel, Icon: Newspaper },
   ];
-  if (showBlogTab) {
-    allNavItems.push({ id: "blog", label: BLOG.navLabel, Icon: Newspaper });
-  }
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול", Icon: Settings });
 
   return (
