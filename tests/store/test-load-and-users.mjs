@@ -310,6 +310,18 @@ assert(getAdminUserIdentifier("phone_3a4b5c6d7e8f9a0b", null) === null, "Hashed 
 assert(getAdminUserIdentifier("phone_0521234567", "also@gmail.com") === "also@gmail.com", "Email takes priority over phone UID");
 assert(getAdminUserIdentifier("google-uid-xyz", null) === null, "Google user without email: shows nothing");
 
+// ---- 22. Admin users tab: no truncation on name/email divs ----
+console.log("--- 22. Admin users tab: name/email not truncated ---");
+import { readFileSync } from 'fs';
+const adminUsersTabSrc = readFileSync('/home/user/Beeri-World-Cup/src/components/AdminUsersTab.tsx', 'utf8');
+// Name div must not carry "truncate" — names should wrap, not clip
+assert(!/font-medium truncate/.test(adminUsersTabSrc), "displayName div must not have truncate class");
+assert(/font-medium break-words/.test(adminUsersTabSrc), "displayName div must have break-words class");
+// Email div must not carry "truncate" — email should wrap with break-all, not clip
+assert(!/text-ink-muted truncate/.test(adminUsersTabSrc), "email div must not have truncate class");
+// Email div must carry break-all so long addresses wrap instead of overflowing
+assert(/text-ink-muted break-all/.test(adminUsersTabSrc), "email div must have break-all class");
+
 console.log(`\n=== LOAD & USER TESTS: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach(f => console.log("  - " + f)); }
 process.exit(failed > 0 ? 1 : 0);

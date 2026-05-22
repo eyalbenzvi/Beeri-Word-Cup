@@ -69,11 +69,11 @@ export default function AdminUsersTab({ users, allPredictions }) {
               {(u.displayName || "?").charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
+              <div className="text-sm font-medium break-words">
                 {u.displayName}
               </div>
               {(() => {
-                if (u.email) return <div className="text-xs text-ink-muted truncate">{u.email}</div>;
+                if (u.email) return <div className="text-xs text-ink-muted break-all">{u.email}</div>;
                 if (uid.startsWith("phone_")) {
                   const phone = uid.replace("phone_", "");
                   if (/^\d+$/.test(phone)) return <div className="text-xs text-ink-muted">{phone}</div>;
