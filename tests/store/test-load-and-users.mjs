@@ -294,6 +294,22 @@ const s20b = calculateFullScore(
 );
 assert(s20b.correctTopScorer === true, "Hebrew top scorer matches");
 
+// ---- 21. Admin users tab: identifier extraction logic ----
+console.log("--- 21. Admin users tab identifier logic ---");
+function getAdminUserIdentifier(uid, email) {
+  if (email) return email;
+  if (uid.startsWith("phone_")) {
+    const phone = uid.replace("phone_", "");
+    if (/^\d+$/.test(phone)) return phone;
+  }
+  return null;
+}
+assert(getAdminUserIdentifier("google-uid-abc", "user@gmail.com") === "user@gmail.com", "Google user: shows email");
+assert(getAdminUserIdentifier("phone_0521234567", null) === "0521234567", "Legacy phone UID: shows digits");
+assert(getAdminUserIdentifier("phone_3a4b5c6d7e8f9a0b", null) === null, "Hashed phone UID: shows nothing");
+assert(getAdminUserIdentifier("phone_0521234567", "also@gmail.com") === "also@gmail.com", "Email takes priority over phone UID");
+assert(getAdminUserIdentifier("google-uid-xyz", null) === null, "Google user without email: shows nothing");
+
 console.log(`\n=== LOAD & USER TESTS: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach(f => console.log("  - " + f)); }
 process.exit(failed > 0 ? 1 : 0);
