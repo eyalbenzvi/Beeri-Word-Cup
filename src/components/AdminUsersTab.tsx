@@ -72,6 +72,14 @@ export default function AdminUsersTab({ users, allPredictions }) {
               <div className="text-sm font-medium truncate">
                 {u.displayName}
               </div>
+              {(() => {
+                if (u.email) return <div className="text-xs text-ink-muted truncate">{u.email}</div>;
+                if (uid.startsWith("phone_")) {
+                  const phone = uid.replace("phone_", "");
+                  if (/^\d+$/.test(phone)) return <div className="text-xs text-ink-muted">{phone}</div>;
+                }
+                return null;
+              })()}
               <div className="text-xs text-ink-muted">
                 {userForms.length} טפסים
                 {submittedCount > 0 && ` • ${submittedCount} הוגשו`}
