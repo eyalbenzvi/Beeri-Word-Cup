@@ -298,38 +298,40 @@ export default function AdminFormsTab({ users, allPredictions }) {
   const showToast = useToast();
   const confirm = useConfirm();
 
+  const pendingCount = useMemo(
+    () => Object.values(allPredictions).filter((p: any) => p.status === "pending").length,
+    [allPredictions],
+  );
+
   const rows = useMemo(() => {
-    return Object.entries(allPredictions)
-      .map(([formId, pAny]) => {
-        const p = pAny as any;
-        return {
-          formId,
-          ...p,
-          userName: users[p.userId]?.displayName || p.userId,
-        };
-      })
-      .filter((r) => {
-        if (statusFilter === "draft" && r.status !== "draft") return false;
-        if (
-          statusFilter === "submitted" &&
-          r.status !== "submitted" &&
-          r.status !== "approved" &&
-          r.status !== "pending"
-        )
-          return false;
-        if (!query.trim()) return true;
-        const q = query.toLowerCase();
-        return (
-          (r.formName || "").toLowerCase().includes(q) ||
-          (r.userName || "").toLowerCase().includes(q) ||
-          r.formId.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) =>
-        (b.submittedAt || b.updatedAt || "").localeCompare(
-          a.submittedAt || a.updatedAt || "",
-        ),
+    const mapped = Object.entries(allPredictions).map(([formId, pAny]) => {
+      const p = pAny as any;
+      return { formId, ...p, userName: users[p.userId]?.displayName || p.userId };
+    });
+
+    const filtered = mapped.filter((r) => {
+      if (statusFilter === "draft" && r.status !== "draft") return false;
+      if (statusFilter === "submitted" && r.status !== "submitted" && r.status !== "approved") return false;
+      if (statusFilter === "pending" && r.status !== "pending") return false;
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        (r.formName || "").toLowerCase().includes(q) ||
+        (r.userName || "").toLowerCase().includes(q) ||
+        r.formId.toLowerCase().includes(q)
       );
+    });
+
+    if (statusFilter === "pending") {
+      return filtered.sort((a, b) =>
+        (a.submittedAt || "").localeCompare(b.submittedAt || ""),
+      );
+    }
+    return filtered.sort((a, b) =>
+      (b.submittedAt || b.updatedAt || "").localeCompare(
+        a.submittedAt || a.updatedAt || "",
+      ),
+    );
   }, [allPredictions, users, query, statusFilter]);
 
   return (
@@ -346,19 +348,29 @@ export default function AdminFormsTab({ users, allPredictions }) {
           {[
             { id: "all", label: "הכל" },
             { id: "submitted", label: "הוגשו" },
+            { id: "pending", label: "ממתינים לאישור", count: pendingCount },
             { id: "draft", label: "טיוטות" },
           ].map((f) => (
             <button
               key={f.id}
               type="button"
               onClick={() => setStatusFilter(f.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 ${
                 statusFilter === f.id
                   ? "bg-primary text-white"
                   : "bg-bg-soft text-ink-muted"
               }`}
             >
               {f.label}
+              {f.count != null && f.count > 0 && (
+                <span
+                  className={`inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full text-[10px] font-bold ${
+                    statusFilter === f.id ? "bg-white text-primary" : "bg-primary text-white"
+                  }`}
+                >
+                  {f.count > 9 ? "9+" : f.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -397,7 +409,12 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {r.status === "pending" && (
                 <button
                   type="button"
-                  onClick={() => adminApprovePrediction(r.formId)}
+                  onClick={async () => {
+                    if (await confirm(`לאשר את הטופס "${r.formName || "ללא שם"}"?`)) {
+                      adminApprovePrediction(r.formId);
+                      showToast("הטופס אושר");
+                    }
+                  }}
                   className="btn-duo-flat"
                   style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                 >
