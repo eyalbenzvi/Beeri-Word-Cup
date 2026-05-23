@@ -364,11 +364,11 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {f.label}
               {f.count != null && f.count > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                  className={`inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full text-[10px] font-bold ${
                     statusFilter === f.id ? "bg-white text-primary" : "bg-primary text-white"
                   }`}
                 >
-                  {f.count}
+                  {f.count > 9 ? "9+" : f.count}
                 </span>
               )}
             </button>
@@ -409,7 +409,12 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {r.status === "pending" && (
                 <button
                   type="button"
-                  onClick={() => adminApprovePrediction(r.formId)}
+                  onClick={async () => {
+                    if (await confirm(`לאשר את הטופס "${r.formName || "ללא שם"}"?`)) {
+                      adminApprovePrediction(r.formId);
+                      showToast("הטופס אושר");
+                    }
+                  }}
                   className="btn-duo-flat"
                   style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
                 >
