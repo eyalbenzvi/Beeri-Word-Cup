@@ -128,6 +128,24 @@ export default function Predict() {
   const status = normalizeStatus(activeForm?.status);
   const canEdit = status === "draft" && !settings.predictionsLocked;
 
+  // If a form we were actively viewing disappears mid-session — e.g. an admin
+  // transferred its ownership to someone else, or it was deleted in another
+  // tab — the mount-only guard above won't fire. We track that we'd actually
+  // rendered THIS form (so a still-loading pointer is never clobbered), and
+  // when it vanishes we drop the stale URL param so the page falls back
+  // cleanly to the forms hub instead of stranding the user on a blank view.
+  const seenActiveFormRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeForm) {
+      seenActiveFormRef.current = activeFormId;
+      return;
+    }
+    if (activeFormId && seenActiveFormRef.current === activeFormId) {
+      seenActiveFormRef.current = null;
+      setParamsPatch({ form: null, stage: null, group: null });
+    }
+  }, [activeForm, activeFormId, setParamsPatch]);
+
   const matchPredictions = activeForm?.matches || EMPTY_MATCHES;
   const bracketTeams = useMemo(
     () => getCachedBracket(matchPredictions),

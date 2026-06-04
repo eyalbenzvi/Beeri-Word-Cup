@@ -36,6 +36,7 @@ import {
 } from "./cache";
 import { writeAuditLog } from "./audit";
 import { getUser, getUsers, requireAdmin } from "./usersRepo";
+import { planFormTransfer } from "./transferPlan";
 
 // ============ FORM INDEX ============
 //
@@ -479,26 +480,19 @@ export function adminSaveMatchPrediction(formId: string, matchId: string, predic
 export async function adminTransferForm(oldFormId: string, targetUid: string) {
   if (!requireAdmin()) return { ok: false, error: "not-admin" };
   // Re-read the form from the live cache (the caller passes only an id, so a
-  // double-click after the first transfer safely no-ops here on null).
+  // double-click after the first transfer safely no-ops here on null). The
+  // pure planner owns validation + formId generation + the field-preserving
+  // copy (see transferPlan.ts) so that logic is unit-tested directly.
   const form = getForm(oldFormId) as any;
-  if (!form) return { ok: false, error: "form-not-found" };
-  // Validate the target against the SAME map the picker renders from
-  // (cache.users), not getUser() — which would also accept a stale
-  // directory-only entry with no real account.
-  if (!getUsers()[targetUid]) return { ok: false, error: "target-not-found" };
-  const fromUid = form.userId;
-  if (targetUid === fromUid) return { ok: true, newFormId: oldFormId };
+  const plan = planFormTransfer(form, targetUid, getUsers());
+  if ("error" in plan) return { ok: false, error: plan.error };
+  if ("noop" in plan) return { ok: true, newFormId: oldFormId };
+  const { fromUid, newFormId, newData } = plan;
 
   // Kill any pending debounced write for the old form so a late timer can't
   // resurrect the doc after we delete it. (Debounced writes already mirror
   // into cache.predictions, so `form` above holds the latest edits.)
   clearPendingWritesForForm(oldFormId);
-
-  // Collision-safe, fixed-width formId: 13-digit epoch + 3 random digits = 16
-  // digits, which also stays within the create-rule's ^uid__\d{10,16}$ bound.
-  const suffix = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
-  const newFormId = `${targetUid}__${Date.now()}${suffix}`;
-  const newData = { ...form, userId: targetUid };
 
   emitSaving("predictions");
   const batch = writeBatch(db);
