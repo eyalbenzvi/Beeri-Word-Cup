@@ -100,6 +100,7 @@ export {
   adminDeleteForm,
   adminUpdateForm,
   adminSaveMatchPrediction,
+  adminTransferForm,
 } from "./predictionsRepo";
 export { initPublicReadonlyMode } from "./publicMode";
 export { initRealtimeListeners } from "./listeners";

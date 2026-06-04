@@ -15,11 +15,13 @@
 import {
   deleteDoc,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { captureClientError } from "../sentry";
 import { generateDefaultFormName } from "../utils/formNameGenerator";
 import { MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 import {
+  db,
   formDocRef,
   withTimeout,
   safeClone,
@@ -33,7 +35,8 @@ import {
   emitWriteError,
 } from "./cache";
 import { writeAuditLog } from "./audit";
-import { getUser, requireAdmin } from "./usersRepo";
+import { getUser, getUsers, requireAdmin } from "./usersRepo";
+import { planFormTransfer } from "./transferPlan";
 
 // ============ FORM INDEX ============
 //
@@ -457,4 +460,84 @@ export function adminSaveMatchPrediction(formId: string, matchId: string, predic
     matches: { ...form.matches, [matchId]: prediction },
     updatedAt: new Date().toISOString(),
   });
+}
+
+// Transfer ownership of ONE form from its current owner to `targetUid`.
+//
+// Ownership is determined SOLELY by the `userId` field (userFormIndex,
+// leaderboard, "my forms" all key off it — nothing parses the formId
+// prefix). But changing `userId` in place is blocked by both firestore.rules
+// (update requires userId stay equal) and adminUpdateForm. So we DELETE the
+// old doc and CREATE a fresh one under a B-prefixed formId with userId=B —
+// the admin branch of `allow create`/`allow delete` permits this with no
+// rules change, even while the tournament is locked.
+//
+// The whole form body travels verbatim (status / submittedAt / approvedAt /
+// matches / topScorer / adminNote / …) so scoring + lifecycle continuity is
+// preserved; only `userId` is overridden. This is a MOVE — A loses the form.
+//
+// Returns { ok, newFormId? , error? }.
+export async function adminTransferForm(oldFormId: string, targetUid: string) {
+  if (!requireAdmin()) return { ok: false, error: "not-admin" };
+  // Re-read the form from the live cache (the caller passes only an id, so a
+  // double-click after the first transfer safely no-ops here on null). The
+  // pure planner owns validation + formId generation + the field-preserving
+  // copy (see transferPlan.ts) so that logic is unit-tested directly.
+  const form = getForm(oldFormId) as any;
+  const plan = planFormTransfer(form, targetUid, getUsers());
+  if ("error" in plan) return { ok: false, error: plan.error };
+  if ("noop" in plan) return { ok: true, newFormId: oldFormId };
+  const { fromUid, newFormId, newData } = plan;
+
+  // Kill any pending debounced write for the old form so a late timer can't
+  // resurrect the doc after we delete it. (Debounced writes already mirror
+  // into cache.predictions, so `form` above holds the latest edits.)
+  clearPendingWritesForForm(oldFormId);
+
+  emitSaving("predictions");
+  const batch = writeBatch(db);
+  batch.set(formDocRef(newFormId), safeClone(newData));
+  batch.delete(formDocRef(oldFormId));
+  try {
+    await withTimeout(batch.commit(), 10000);
+  } catch (err: any) {
+    console.error(`adminTransferForm failed (${oldFormId} -> ${targetUid}):`, err);
+    emitWriteError("predictions", err);
+    captureClientError(err, {
+      source: "adminTransferForm",
+      oldFormId,
+      newFormId,
+      code: err?.code,
+    });
+    await maybeRefreshToken(err);
+    return { ok: false, error: err?.code || "commit-failed" };
+  }
+
+  // Commit succeeded — mutate off the LIVE cache reference (a showAll
+  // listener snapshot may have fired during the await; don't clobber it with
+  // a pre-commit copy). Mirror adminDeleteForm's post-await pattern.
+  const next = { ...cache.predictions };
+  delete next[oldFormId];
+  next[newFormId] = newData;
+  cache.predictions = next;
+  rebuildUserFormIndex();
+  emitSaved("predictions");
+  notifyAndEmit("predictions");
+
+  writeAuditLog("transfer-form", {
+    fromUid,
+    toUid: targetUid,
+    oldFormId,
+    newFormId,
+  });
+
+  // Clear a stale active-form pointer on THIS device (the owner's other
+  // devices self-heal: the filtered listener drops the old doc and Predict
+  // clears the pointer when it no longer maps to an owned form).
+  if (getActiveFormId() === oldFormId) {
+    localStorage.removeItem(ACTIVE_FORM_KEY);
+    notifyAndEmit("activeForm");
+  }
+
+  return { ok: true, newFormId };
 }
