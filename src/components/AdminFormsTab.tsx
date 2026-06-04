@@ -6,6 +6,7 @@ import {
   adminUpdateForm,
   adminSaveMatchPrediction,
   adminApprovePrediction,
+  adminTransferForm,
 } from "../store";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
@@ -291,10 +292,153 @@ function AdminFormEditModal({ formId, form, onClose }) {
   );
 }
 
+// Transfer a single form's ownership to another user. Two-step inside one
+// modal (search → inline confirm) so we never stack a second overlay.
+function TransferOwnerModal({ formId, form, users, onClose }) {
+  const showToast = useToast();
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const currentOwnerId = form.userId;
+  const ownerName = (users[currentOwnerId]?.displayName) || currentOwnerId;
+
+  const candidates = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return Object.entries(users)
+      .filter(([uid]) => uid !== currentOwnerId)
+      .map(([uid, uAny]) => {
+        const u = uAny as any;
+        const name = [u.displayName, u.firstName, u.lastName]
+          .filter(Boolean)
+          .join(" ");
+        return { uid, email: u.email || "", name: name || uid };
+      })
+      .filter(({ uid, email, name }) => {
+        if (!q) return true;
+        return (
+          name.toLowerCase().includes(q) ||
+          email.toLowerCase().includes(q) ||
+          uid.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, "he"))
+      .slice(0, 50);
+  }, [users, query, currentOwnerId]);
+
+  const selectedName =
+    candidates.find((c) => c.uid === selected)?.name ||
+    (selected ? (users[selected]?.displayName || selected) : "");
+
+  async function handleConfirm() {
+    if (saving || !selected) return;
+    setSaving(true);
+    const res = await adminTransferForm(formId, selected);
+    setSaving(false);
+    if (res?.ok) {
+      showToast("הבעלות הועברה");
+      onClose();
+    } else {
+      showToast("העברת הבעלות נכשלה", "error");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-2 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-h-[90vh] overflow-hidden flex flex-col max-w-lg shadow-xl">
+        <div className="px-4 pt-4 pb-2 border-b border-border">
+          <div className="font-bold text-primary">העברת בעלות</div>
+          <div className="text-xs text-ink-muted mt-0.5">
+            טופס: {form.formName || "ללא שם"} · בעלים נוכחי: {ownerName}
+          </div>
+        </div>
+
+        {!selected && (
+          <>
+            <div className="p-3">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="חיפוש משתמש לפי שם / כינוי / אימייל..."
+                className="w-full border border-border rounded-xl px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 px-3 pb-3 space-y-1">
+              {candidates.map(({ uid, name, email }) => (
+                <button
+                  key={uid}
+                  type="button"
+                  onClick={() => setSelected(uid)}
+                  className="w-full text-right card-duo-tight hover:border-primary transition-colors"
+                >
+                  <div className="text-sm font-medium break-words">{name}</div>
+                  {email && (
+                    <div className="text-xs text-ink-muted break-all">{email}</div>
+                  )}
+                </button>
+              ))}
+              {candidates.length === 0 && (
+                <p className="text-center text-ink-muted py-6 text-sm">
+                  אין משתמשים תואמים
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {selected && (
+          <div className="p-4 space-y-3 flex-1">
+            <p className="text-sm text-ink">
+              להעביר את הטופס{" "}
+              <span className="font-bold">{form.formName || "ללא שם"}</span> מ-
+              <span className="font-bold">{ownerName}</span> ל-
+              <span className="font-bold">{selectedName}</span>?
+            </p>
+            <p className="text-xs text-ink-muted">
+              הטופס יירשם על שם {selectedName} ויופיע אצלו, ויוסר מ-{ownerName}.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={saving}
+                className="btn-duo btn-duo-primary flex-1 disabled:opacity-50"
+              >
+                {saving ? "מעביר..." : "העבר בעלות"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                disabled={saving}
+                className="btn-duo btn-duo-ghost flex-1 disabled:opacity-50"
+              >
+                חזרה
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="p-3 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="w-full py-2 text-sm text-ink-muted bg-bg-soft rounded-xl disabled:opacity-50"
+          >
+            סגור
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminFormsTab({ users, allPredictions }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingId, setEditingId] = useState(null);
+  const [transferId, setTransferId] = useState(null);
   const showToast = useToast();
   const confirm = useConfirm();
 
@@ -406,6 +550,14 @@ export default function AdminFormsTab({ users, allPredictions }) {
               >
                 עריכה
               </button>
+              <button
+                type="button"
+                onClick={() => setTransferId(r.formId)}
+                className="btn-duo-flat"
+                style={{ background: "var(--color-secondary-soft, #E0F2FE)", color: "var(--color-secondary-dark)" }}
+              >
+                העבר בעלות
+              </button>
               {r.status === "pending" && (
                 <button
                   type="button"
@@ -479,6 +631,15 @@ export default function AdminFormsTab({ users, allPredictions }) {
           formId={editingId}
           form={allPredictions[editingId]}
           onClose={() => setEditingId(null)}
+        />
+      )}
+
+      {transferId && allPredictions[transferId] && (
+        <TransferOwnerModal
+          formId={transferId}
+          form={allPredictions[transferId]}
+          users={users}
+          onClose={() => setTransferId(null)}
         />
       )}
     </div>

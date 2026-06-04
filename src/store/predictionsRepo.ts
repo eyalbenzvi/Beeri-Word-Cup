@@ -15,11 +15,13 @@
 import {
   deleteDoc,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { captureClientError } from "../sentry";
 import { generateDefaultFormName } from "../utils/formNameGenerator";
 import { MAX_FORMS_PER_USER as FORMS_LIMIT } from "../utils/constants";
 import {
+  db,
   formDocRef,
   withTimeout,
   safeClone,
@@ -33,7 +35,7 @@ import {
   emitWriteError,
 } from "./cache";
 import { writeAuditLog } from "./audit";
-import { getUser, requireAdmin } from "./usersRepo";
+import { getUser, getUsers, requireAdmin } from "./usersRepo";
 
 // ============ FORM INDEX ============
 //
@@ -457,4 +459,91 @@ export function adminSaveMatchPrediction(formId: string, matchId: string, predic
     matches: { ...form.matches, [matchId]: prediction },
     updatedAt: new Date().toISOString(),
   });
+}
+
+// Transfer ownership of ONE form from its current owner to `targetUid`.
+//
+// Ownership is determined SOLELY by the `userId` field (userFormIndex,
+// leaderboard, "my forms" all key off it — nothing parses the formId
+// prefix). But changing `userId` in place is blocked by both firestore.rules
+// (update requires userId stay equal) and adminUpdateForm. So we DELETE the
+// old doc and CREATE a fresh one under a B-prefixed formId with userId=B —
+// the admin branch of `allow create`/`allow delete` permits this with no
+// rules change, even while the tournament is locked.
+//
+// The whole form body travels verbatim (status / submittedAt / approvedAt /
+// matches / topScorer / adminNote / …) so scoring + lifecycle continuity is
+// preserved; only `userId` is overridden. This is a MOVE — A loses the form.
+//
+// Returns { ok, newFormId? , error? }.
+export async function adminTransferForm(oldFormId: string, targetUid: string) {
+  if (!requireAdmin()) return { ok: false, error: "not-admin" };
+  // Re-read the form from the live cache (the caller passes only an id, so a
+  // double-click after the first transfer safely no-ops here on null).
+  const form = getForm(oldFormId) as any;
+  if (!form) return { ok: false, error: "form-not-found" };
+  // Validate the target against the SAME map the picker renders from
+  // (cache.users), not getUser() — which would also accept a stale
+  // directory-only entry with no real account.
+  if (!getUsers()[targetUid]) return { ok: false, error: "target-not-found" };
+  const fromUid = form.userId;
+  if (targetUid === fromUid) return { ok: true, newFormId: oldFormId };
+
+  // Kill any pending debounced write for the old form so a late timer can't
+  // resurrect the doc after we delete it. (Debounced writes already mirror
+  // into cache.predictions, so `form` above holds the latest edits.)
+  clearPendingWritesForForm(oldFormId);
+
+  // Collision-safe, fixed-width formId: 13-digit epoch + 3 random digits = 16
+  // digits, which also stays within the create-rule's ^uid__\d{10,16}$ bound.
+  const suffix = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+  const newFormId = `${targetUid}__${Date.now()}${suffix}`;
+  const newData = { ...form, userId: targetUid };
+
+  emitSaving("predictions");
+  const batch = writeBatch(db);
+  batch.set(formDocRef(newFormId), safeClone(newData));
+  batch.delete(formDocRef(oldFormId));
+  try {
+    await withTimeout(batch.commit(), 10000);
+  } catch (err: any) {
+    console.error(`adminTransferForm failed (${oldFormId} -> ${targetUid}):`, err);
+    emitWriteError("predictions", err);
+    captureClientError(err, {
+      source: "adminTransferForm",
+      oldFormId,
+      newFormId,
+      code: err?.code,
+    });
+    await maybeRefreshToken(err);
+    return { ok: false, error: err?.code || "commit-failed" };
+  }
+
+  // Commit succeeded — mutate off the LIVE cache reference (a showAll
+  // listener snapshot may have fired during the await; don't clobber it with
+  // a pre-commit copy). Mirror adminDeleteForm's post-await pattern.
+  const next = { ...cache.predictions };
+  delete next[oldFormId];
+  next[newFormId] = newData;
+  cache.predictions = next;
+  rebuildUserFormIndex();
+  emitSaved("predictions");
+  notifyAndEmit("predictions");
+
+  writeAuditLog("transfer-form", {
+    fromUid,
+    toUid: targetUid,
+    oldFormId,
+    newFormId,
+  });
+
+  // Clear a stale active-form pointer on THIS device (the owner's other
+  // devices self-heal: the filtered listener drops the old doc and Predict
+  // clears the pointer when it no longer maps to an owned form).
+  if (getActiveFormId() === oldFormId) {
+    localStorage.removeItem(ACTIVE_FORM_KEY);
+    notifyAndEmit("activeForm");
+  }
+
+  return { ok: true, newFormId };
 }
