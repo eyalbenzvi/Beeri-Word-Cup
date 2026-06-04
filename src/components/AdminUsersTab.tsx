@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { deleteUser, setAdminClaim } from "../store";
+import { deleteUser, setAdminClaim, updateUserProfile } from "../store";
 import { useCurrentUser } from "../hooks/useStore";
 import { useConfirm } from "./ConfirmModal";
 import { useToast } from "./Toast";
@@ -9,6 +9,59 @@ export default function AdminUsersTab({ users, allPredictions }) {
   const confirm = useConfirm();
   const showToast = useToast();
   const [pendingClaim, setPendingClaim] = useState(null);
+
+  // Identity-edit feature (admin-only). Scoped DELIBERATELY tight: the only
+  // mutation is updateUserProfile() with exactly {firstName, lastName,
+  // displayName} — the SAME call Profile.tsx uses for self-edit. It never
+  // touches isAdmin / email / status / forms / profileCompleted. One row is
+  // editable at a time (editingUid) so we render 3 inputs, not 150. Editing
+  // displayName changes the leaderboard nickname globally — that is the
+  // intended "edit like the user can" behaviour, not a leak.
+  const [editingUid, setEditingUid] = useState<string | null>(null);
+  const [editFirst, setEditFirst] = useState("");
+  const [editLast, setEditLast] = useState("");
+  const [editNick, setEditNick] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  function startEdit(uid: string, u: any) {
+    setEditingUid(uid);
+    setEditFirst(u.firstName || "");
+    setEditLast(u.lastName || "");
+    setEditNick(u.displayName || "");
+  }
+
+  function cancelEdit() {
+    setEditingUid(null);
+    setEditFirst("");
+    setEditLast("");
+    setEditNick("");
+  }
+
+  async function saveEdit(uid: string, u: any) {
+    if (savingEdit) return;
+    // Defense-in-depth: the tab is admin-gated upstream and Firestore rules
+    // are the real guard, but mirror the codebase's client-side admin check.
+    if (!currentUser?.isAdmin) return;
+    setSavingEdit(true);
+    // Trim so an admin can't push leading/trailing whitespace into another
+    // user's PUBLIC leaderboard name. Mirror Profile.tsx: never persist an
+    // empty nickname — a whitespace-only nickname now correctly falls back.
+    const first = editFirst.trim();
+    const last = editLast.trim();
+    const nick = editNick.trim();
+    const ok = await updateUserProfile(uid, {
+      firstName: first,
+      lastName: last,
+      displayName: nick || first || u.displayName,
+    });
+    setSavingEdit(false);
+    if (ok) {
+      showToast("פרטי המשתמש עודכנו");
+      cancelEdit();
+    } else {
+      showToast("שגיאה בעדכון פרטי המשתמש", "error");
+    }
+  }
 
   async function handleAdminToggle(uid, displayName, action) {
     const title = action === "promote" ? "קידום למנהל" : "הסרת הרשאות מנהל";
@@ -80,6 +133,11 @@ export default function AdminUsersTab({ users, allPredictions }) {
                 }
                 return null;
               })()}
+              <div className="text-xs text-ink-muted break-words">
+                כינוי: {u.displayName || "—"}
+                {(u.firstName || u.lastName) &&
+                  ` · שם: ${[u.firstName, u.lastName].filter(Boolean).join(" ")}`}
+              </div>
               <div className="text-xs text-ink-muted">
                 {userForms.length} טפסים
                 {submittedCount > 0 && ` • ${submittedCount} הוגשו`}
@@ -134,6 +192,15 @@ export default function AdminUsersTab({ users, allPredictions }) {
             )}
             <button
               type="button"
+              onClick={() =>
+                editingUid === uid ? cancelEdit() : startEdit(uid, u)
+              }
+              className="text-xs text-secondary-dark px-2 py-1 font-bold"
+            >
+              {editingUid === uid ? "סגור" : "ערוך פרטים"}
+            </button>
+            <button
+              type="button"
               onClick={async () => {
                 if (uid === currentUser?.id) {
                   showToast("לא ניתן למחוק את המשתמש הנוכחי", "error");
@@ -151,6 +218,79 @@ export default function AdminUsersTab({ users, allPredictions }) {
             >
               מחק משתמש
             </button>
+
+            {editingUid === uid && (
+              <div className="basis-full w-full mt-2 border-t border-border pt-3 space-y-2 text-right">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label
+                      htmlFor={`edit-first-${uid}`}
+                      className="block text-[10px] font-extrabold text-ink mb-1"
+                    >
+                      שם פרטי
+                    </label>
+                    <input
+                      id={`edit-first-${uid}`}
+                      type="text"
+                      value={editFirst}
+                      onChange={(e) => setEditFirst(e.target.value)}
+                      maxLength={30}
+                      className="input-duo"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor={`edit-last-${uid}`}
+                      className="block text-[10px] font-extrabold text-ink mb-1"
+                    >
+                      שם משפחה
+                    </label>
+                    <input
+                      id={`edit-last-${uid}`}
+                      type="text"
+                      value={editLast}
+                      onChange={(e) => setEditLast(e.target.value)}
+                      maxLength={30}
+                      className="input-duo"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor={`edit-nick-${uid}`}
+                      className="block text-[10px] font-extrabold text-ink mb-1"
+                    >
+                      כינוי
+                    </label>
+                    <input
+                      id={`edit-nick-${uid}`}
+                      type="text"
+                      value={editNick}
+                      onChange={(e) => setEditNick(e.target.value)}
+                      maxLength={20}
+                      className="input-duo"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => saveEdit(uid, u)}
+                    disabled={savingEdit}
+                    className="btn-duo btn-duo-primary flex-1 disabled:opacity-50"
+                  >
+                    {savingEdit ? "שומר..." : "שמור"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    disabled={savingEdit}
+                    className="btn-duo btn-duo-ghost flex-1 disabled:opacity-50"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
