@@ -141,6 +141,7 @@ run_test "75. Leaderboard Search (form/user/champion/top-scorer filter)" "ui/tes
 run_test "76. Offline Mode Tabs (guest navigation + LoginPrompt + FormsHub)" "ui/test-offline-tabs.mjs" "no"
 run_test "77. Guest Home Shell (welcome screen inside AppShell + responsive)" "ui/test-guest-home-shell.mjs" "no"
 run_test "78. Pending Approval Tab (filter logic, badge, sort, action buttons)" "ui/test-pending-approval-tab.mjs" "no"
+run_test "79. Admin Users Edit (display + scoped identity edit)" "ui/test-admin-users-edit.mjs" "no"
 
 echo ""
 echo "==========================================="
