@@ -22,6 +22,7 @@ const THIRD_PLACE_QUALIFIERS = 8;
 const ROUND_PARENT = { R16: "R32", QF: "R16", SF: "QF", F: "SF" };
 
 import { isScoreValid } from "./helpers";
+import { triggerAutoFillCheck } from "./autoFillTrigger";
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -290,6 +291,10 @@ function getMatchWinner(matchId: string, matchPredictions: Record<string, any>, 
 }
 
 export function calcBracketTeams(matchPredictions: Record<string, any>) {
+  // Opportunistic auto-fill poke (no-op in the pure test harness). See
+  // src/utils/autoFillTrigger.ts.
+  triggerAutoFillCheck();
+
   const standings = calcGroupStandings(matchPredictions);
   const bracket: Record<string, any> = {};
 

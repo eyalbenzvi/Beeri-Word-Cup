@@ -303,5 +303,18 @@ service cloud.firestore {
     match /otpVerifyAttempts/{id} {
       allow read, write: if false;
     }
+
+    // Auto-fill (real match results) bookkeeping, written by the
+    // auto-fill-match-result Netlify Function via the Admin SDK (which bypasses
+    // these rules). Browser clients must never touch them directly — only
+    // admins may read for debugging; nobody writes from the client.
+    //   - autoFillLocks/{matchId}: short-lived per-match concurrency lock.
+    //   - autoFillLog/{autoId}:    append-only audit of every attempt.
+    match /autoFillLocks/{matchId} {
+      allow read, write: if isAdmin();
+    }
+    match /autoFillLog/{logId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

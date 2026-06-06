@@ -41,6 +41,7 @@ import {
 } from "./cache";
 import { rebuildUserFormIndex, flushPendingWrites } from "./predictionsRepo";
 import { teardownPublicReadonlyMode } from "./publicMode";
+import { maybeTriggerAutoFill } from "./autoFill";
 import {
   getLastEnsuredUid,
   clearLastEnsuredUid,
@@ -318,6 +319,13 @@ export function initRealtimeListeners(userId: string) {
             }
           }
           notifyAndEmit(key);
+          // After a matchResults (or settings/kill-switch) snapshot, opportunistically
+          // ask the server to fill the NEXT still-missing past match. The just-written
+          // match is now played, so this can't loop on the same id; maybeTriggerAutoFill
+          // additionally throttles + locks out per match, so this is safe.
+          if (key === "matchResults" || key === "settings") {
+            maybeTriggerAutoFill();
+          }
           // When settings or users load, check if we should upgrade to all predictions
           if (key === "settings" || key === "users") {
             maybeUpgradePredictionsListener();

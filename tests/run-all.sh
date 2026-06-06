@@ -143,6 +143,8 @@ run_test "77. Guest Home Shell (welcome screen inside AppShell + responsive)" "u
 run_test "78. Pending Approval Tab (filter logic, badge, sort, action buttons)" "ui/test-pending-approval-tab.mjs" "no"
 run_test "79. Admin Users Edit (display + scoped identity edit)" "ui/test-admin-users-edit.mjs" "no"
 run_test "80. Transfer Form Ownership (admin move A→B)" "store/test-transfer-form.mjs" "yes"
+run_test "81. Auto-Fill Consensus (two-source agreement logic)" "store/test-auto-fill-consensus.mjs" "no"
+run_test "82. Auto-Fill Trigger Wiring (client + function + rules)" "store/test-auto-fill-trigger.mjs" "yes"
 
 echo ""
 echo "==========================================="
