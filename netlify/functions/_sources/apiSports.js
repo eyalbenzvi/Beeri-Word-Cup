@@ -24,7 +24,8 @@
 
 const NAME = "api-sports";
 const BASE = "https://v3.football.api-sports.io";
-const TIMEOUT_MS = 8000;
+// See footballData.js: keep the fetch budget under the function timeout.
+const TIMEOUT_MS = 3500;
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN"]);
 
 function norm(s) {
@@ -71,14 +72,17 @@ function pickClosest(fixtures, kickoffIso) {
       best = f;
     }
   }
-  // Only accept a match within a 6-hour window of the expected kickoff.
-  return bestDelta <= 6 * 3600 * 1000 ? best : null;
+  // Only accept a match within 2h of the expected kickoff. Group days can have
+  // fixtures ~3h apart, so a wider window risks selecting an adjacent fixture;
+  // 2h comfortably covers a single match's duration without reaching the next.
+  return bestDelta <= 2 * 3600 * 1000 ? best : null;
 }
 
-// Best-effort 3-letter code from a team payload, else the expected fallback.
-function teamCode(team, fallback) {
+// Real 3-letter code from a team payload, or null if the API didn't provide
+// one (the fixtures endpoint usually omits it).
+function realCode(team) {
   const c = team?.code || team?.tla;
-  return c ? norm(c) : norm(fallback);
+  return c ? norm(c) : null;
 }
 
 export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
@@ -113,19 +117,34 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
 
   // score.fulltime = end of 90'. NOT goals.* (aggregate incl. ET).
   const ft = fixture?.score?.fulltime || {};
-  const home90 = typeof ft.home === "number" ? ft.home : null;
-  const away90 = typeof ft.away === "number" ? ft.away : null;
+  let home90 = typeof ft.home === "number" ? ft.home : null;
+  let away90 = typeof ft.away === "number" ? ft.away : null;
+
+  // Resolve codes. The fixtures endpoint usually omits a 3-letter code, in
+  // which case we fall back to the expected codes and ASSUME the provider used
+  // the same home/away designation as our schedule. If the provider listed the
+  // fixture in the opposite order, the score will disagree with the primary
+  // source and consensus will (safely) decline to write rather than record a
+  // reversed score. When real codes ARE present, we orient explicitly.
+  const apiHome = realCode(fixture?.teams?.home);
+  const apiAway = realCode(fixture?.teams?.away);
+  let homeWinner = fixture?.teams?.home?.winner === true;
+  let awayWinner = fixture?.teams?.away?.winner === true;
+  let homeCode = apiHome || norm(homeTeam);
+  let awayCode = apiAway || norm(awayTeam);
+  if (apiHome && apiAway && apiHome === norm(awayTeam) && apiAway === norm(homeTeam)) {
+    [home90, away90] = [away90, home90];
+    [homeCode, awayCode] = [awayCode, homeCode];
+    [homeWinner, awayWinner] = [awayWinner, homeWinner];
+  }
 
   const regulationAmbiguous = finished && (home90 == null || away90 == null);
-
-  const homeCode = teamCode(fixture?.teams?.home, homeTeam);
-  const awayCode = teamCode(fixture?.teams?.away, awayTeam);
 
   // Advancing team only for a knockout tie at 90'.
   let advancingTeam = null;
   if (finished && home90 != null && away90 != null && home90 === away90) {
-    if (fixture?.teams?.home?.winner === true) advancingTeam = homeCode;
-    else if (fixture?.teams?.away?.winner === true) advancingTeam = awayCode;
+    if (homeWinner) advancingTeam = homeCode;
+    else if (awayWinner) advancingTeam = awayCode;
   }
 
   return {

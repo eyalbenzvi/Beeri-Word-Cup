@@ -102,12 +102,17 @@ async function fireAutoFill(matchId: string) {
       },
       body: JSON.stringify({ matchId }),
     });
-    if (res.ok) {
-      // Success (200): the new result lands via the matchResults listener.
+    // NOTE: only 200 is "success". 202 is a 2xx (so res.ok would be true!) but
+    // signals pending/ambiguous/disagree and MUST back off per spec. Keying on
+    // res.ok here would clear the lockout on 202 and re-fire every throttle
+    // tick. So check the exact status.
+    if (res.status === 200) {
+      // Success (or already-filled): the new result lands via the matchResults
+      // listener. Clear the lockout.
       clearLockout(matchId);
     } else {
-      // 202 (pending/ambiguous), 409 (locked), 425 (too early), 429 (rate
-      // limit), 5xx — single 5-minute lockout, no escalation.
+      // 202 (pending/ambiguous/disagree), 409 (locked), 425 (too early),
+      // 429 (rate limit), 5xx — single 5-minute lockout, no escalation.
       setLockout(matchId);
     }
   } catch {

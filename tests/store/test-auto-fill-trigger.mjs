@@ -73,6 +73,11 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(af.includes("autoFillEnabled === false"), "honours the kill switch client-side");
   assert(/Bearer\s*\$\{idToken\}/.test(af), "sends a Firebase ID token");
   assert(!/homeScore|awayScore|advancingTeam/.test(af), "client never sends scores/advancing");
+  // Regression: 202 is a 2xx, so res.ok would (wrongly) treat pending as
+  // success and clear the lockout, re-firing every throttle tick. Success must
+  // be keyed on the exact 200 status.
+  assert(af.includes("res.status === 200"), "success keyed on status 200 (not res.ok)");
+  assert(!/if\s*\(\s*res\.ok\s*\)/.test(af), "does not branch success on res.ok");
 
   const results = read("src/store/resultsRepo.ts");
   assert(results.includes("export function approveAutoFill"), "resultsRepo exports approveAutoFill");
@@ -96,6 +101,22 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(fn.includes('sourcesUsed: ["football-data", "api-sports"]'), "records sourcesUsed");
   assert(/source === "admin"/.test(fn), "never overwrites an admin-owned result");
   assert(fn.includes("computeConsensus"), "function uses two-source consensus");
+  // PII: never write a raw (possibly phone_05XXXXXXXX) uid into the
+  // auth-readable matchResults doc.
+  assert(fn.includes('uid.startsWith("phone_") ? "phone_user" : uid'), "redacts phone uid in matchResults");
+  assert(!/autoFilledBy:\s*uid,/.test(fn), "does not write the raw uid as autoFilledBy");
+}
+
+// --- 4b. Source clients orient to our schedule + use the 90' score ---
+{
+  const fd = read("netlify/functions/_sources/footballData.js");
+  assert(fd.includes("score.fullTime") || fd.includes("fullTime"), "FD uses fullTime (90') score");
+  assert(/\[home90, away90\] = \[away90, home90\]/.test(fd), "FD normalizes orientation (swaps score)");
+
+  const asrc = read("netlify/functions/_sources/apiSports.js");
+  assert(asrc.includes("score?.fulltime") || asrc.includes("fulltime"), "AS uses fulltime (90') score");
+  assert(/goals\.\*/.test(asrc) || asrc.includes("NOT goals"), "AS documents NOT using goals/aggregate");
+  assert(/\[home90, away90\] = \[away90, home90\]/.test(asrc), "AS normalizes orientation when codes present");
 }
 
 // --- 5. Firestore rules ---

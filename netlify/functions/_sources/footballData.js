@@ -16,7 +16,11 @@
 
 const NAME = "football-data";
 const BASE = "https://api.football-data.org/v4";
-const TIMEOUT_MS = 8000;
+// Keep the fetch budget small enough that one retry across both sources (run
+// in parallel) stays under a typical 10s Netlify function timeout: 3.5s x 2
+// sequential attempts = 7s worst case per source. A killed function would
+// otherwise leave the per-match lock held until it expires.
+const TIMEOUT_MS = 3500;
 
 function dayBounds(kickoffIso) {
   // Query a +/-1 day window around the kickoff to absorb timezone skew.
@@ -95,14 +99,26 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
 
   const finished = match.status === "FINISHED";
   const ft = match?.score?.fullTime || {};
-  const home90 = typeof ft.home === "number" ? ft.home : null;
-  const away90 = typeof ft.away === "number" ? ft.away : null;
+  let home90 = typeof ft.home === "number" ? ft.home : null;
+  let away90 = typeof ft.away === "number" ? ft.away : null;
+  let homeCode = match?.homeTeam?.tla || null;
+  let awayCode = match?.awayTeam?.tla || null;
   const duration = match?.score?.duration || null;
+
+  // Orient to OUR schedule's home/away. football-data may list the fixture in
+  // the opposite order (nominal "home" is arbitrary for neutral-venue and
+  // knockout games); if so, swap both the score and the codes so downstream
+  // consensus compares like-for-like and never records a reversed score.
+  if (norm(homeCode) === norm(awayTeam) && norm(awayCode) === norm(homeTeam)) {
+    [home90, away90] = [away90, home90];
+    [homeCode, awayCode] = [awayCode, homeCode];
+  }
 
   // FINISHED but no clean 90' score -> can't isolate regulation.
   const regulationAmbiguous = finished && (home90 == null || away90 == null);
 
-  // Advancing team only matters for a knockout level at 90'.
+  // Advancing team only matters for a knockout level at 90'. tlaWinner returns
+  // the overall winner's code, which is orientation-independent.
   const advancingTeam =
     finished && home90 != null && away90 != null && home90 === away90
       ? tlaWinner(match)
@@ -114,8 +130,8 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     finished,
     home90,
     away90,
-    homeCode: match?.homeTeam?.tla || null,
-    awayCode: match?.awayTeam?.tla || null,
+    homeCode,
+    awayCode,
     advancingTeam,
     duration,
     regulationAmbiguous,

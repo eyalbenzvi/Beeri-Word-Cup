@@ -301,7 +301,12 @@ async function autoFillHandler(event) {
       // corrupt a Firestore Timestamp object. The rest of the codebase stores
       // ISO timestamps too.
       autoFilledAt: nowIso,
-      autoFilledBy: uid,
+      // PII: gameData/matchResults is readable by every authenticated user.
+      // A phone user's uid is "phone_05XXXXXXXX" (a phone number), so writing
+      // the raw uid here would leak PII to all users — exactly the class of
+      // leak the project's PII migration is closing. Redact phone uids; the
+      // full uid is still recorded in the admin-only autoFillLog audit.
+      autoFilledBy: uid.startsWith("phone_") ? "phone_user" : uid,
       sourcesUsed: ["football-data", "api-sports"],
       verifiedBy: null,
       updatedAt: nowIso,
