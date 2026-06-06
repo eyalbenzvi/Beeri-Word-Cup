@@ -80,9 +80,10 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(!/if\s*\(\s*res\.ok\s*\)/.test(af), "does not branch success on res.ok");
 
   const results = read("src/store/resultsRepo.ts");
-  assert(results.includes("export function approveAutoFill"), "resultsRepo exports approveAutoFill");
   assert(/source:\s*"admin"/.test(results), "manual admin writes stamp source=admin");
-  assert(results.includes("verifiedBy"), "manual admin writes stamp verifiedBy");
+  // Fully automatic: there must be NO admin approval flow.
+  assert(!results.includes("approveAutoFill"), "no approveAutoFill (auto-fill is fully automatic)");
+  assert(!results.includes("verifiedBy"), "no verifiedBy approval field");
 }
 
 // --- 4. Netlify function security + write shape ---
@@ -97,7 +98,7 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(fn.includes("autoFillLocks"), "function uses the per-match lock collection");
   assert(fn.includes("autoFillLog"), "function writes the audit log");
   assert(fn.includes('source: "auto"'), "write shape uses source=auto");
-  assert(fn.includes("verifiedBy: null"), "write shape sets verifiedBy=null");
+  assert(!fn.includes("verifiedBy"), "no verifiedBy approval field in write shape");
   assert(fn.includes('sourcesUsed: ["football-data", "api-sports"]'), "records sourcesUsed");
   assert(/source === "admin"/.test(fn), "never overwrites an admin-owned result");
   assert(fn.includes("computeConsensus"), "function uses two-source consensus");
@@ -129,12 +130,11 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
     "matchResults write rule unchanged (admin-only)");
 }
 
-// --- 6. Admin UI ---
+// --- 6. Admin UI: fully automatic, NO approval flow ---
 {
   const ui = read("src/components/AdminResultsTab.tsx");
-  assert(ui.includes("approveAutoFill"), "admin tab wires approveAutoFill");
-  assert(ui.includes("מולא אוטומטית — לאישור"), "admin tab shows the auto-fill badge");
-  assert(ui.includes('result.source === "auto"'), "admin tab detects auto-filled rows");
+  assert(!ui.includes("approveAutoFill"), "admin tab has no approve action");
+  assert(!ui.includes("לאישור"), "admin tab has no approval badge");
 }
 
 console.log("");

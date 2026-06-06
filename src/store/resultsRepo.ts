@@ -9,7 +9,6 @@
 
 import { writeAuditLog } from "./audit";
 import { cache } from "./cache";
-import { auth } from "./firestoreClient";
 import { requireAdmin, writeGameDoc } from "./usersRepo";
 
 const EMPTY_OBJ: Record<string, any> = {};
@@ -31,37 +30,15 @@ export function getMatchResults() {
 export function saveMatchResult(matchId: string, result: any) {
   if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
-  // Any manual admin write is authoritative: it stamps source="admin" and
-  // marks the row verified by the acting admin. This is also the path that
-  // "implicitly verifies" an auto-filled row when an admin edits its score or
-  // picks the advancing team (the auto-fill function will then never overwrite
-  // a source==="admin" row again).
-  const adminUid = auth.currentUser?.uid || null;
+  // A manual admin write is authoritative and marks the row as admin-owned
+  // (source="admin"), so the auto-fill function will never overwrite a score
+  // an admin has set or corrected. No approval step exists — auto-fill is
+  // fully automatic; this only protects deliberate manual overrides.
   results[matchId] = {
     ...result,
     source: "admin",
-    verifiedBy: adminUid,
     updatedAt: new Date().toISOString(),
   };
-  writeGameDoc("matchResults", results);
-}
-
-// Admin "approve" action for an auto-filled row: flips source -> "admin" and
-// records who verified it, without touching the scores. Once a row is
-// source==="admin", the auto-fill function will never overwrite it.
-export function approveAutoFill(matchId: string) {
-  if (!requireAdmin()) return;
-  const results = { ...getMatchResults() };
-  const existing = results[matchId];
-  if (!existing) return;
-  const adminUid = auth.currentUser?.uid || null;
-  results[matchId] = {
-    ...existing,
-    source: "admin",
-    verifiedBy: adminUid,
-    updatedAt: new Date().toISOString(),
-  };
-  writeAuditLog("approve-auto-fill", { matchId });
   writeGameDoc("matchResults", results);
 }
 

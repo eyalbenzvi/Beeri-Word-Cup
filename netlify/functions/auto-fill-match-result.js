@@ -308,7 +308,6 @@ async function autoFillHandler(event) {
       // full uid is still recorded in the admin-only autoFillLog audit.
       autoFilledBy: uid.startsWith("phone_") ? "phone_user" : uid,
       sourcesUsed: ["football-data", "api-sports"],
-      verifiedBy: null,
       updatedAt: nowIso,
     };
 

@@ -118,7 +118,6 @@ export {
   clearMatchResults,
   getMatchResults,
   saveMatchResult,
-  approveAutoFill,
   deleteMatchResult,
   getActualBonuses,
   saveActualBonuses,

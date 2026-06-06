@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useMatchResults } from "../hooks/useStore";
-import { saveMatchResult, deleteMatchResult, approveAutoFill } from "../store";
+import { saveMatchResult, deleteMatchResult } from "../store";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
@@ -279,38 +279,14 @@ export default function AdminResultsTab() {
           const isEditing = editingMatch === match.id;
           const isKnockout = match.stage !== "group";
           const isTie = result && result.homeScore === result.awayScore;
-          // Auto-filled rows awaiting admin confirmation (source==="auto" and
-          // not yet verified) get a distinct badge + an "approve" action.
-          const isAutoUnverified =
-            !!result && result.source === "auto" && result.verifiedBy == null;
           return (
             <div
               key={match.id}
-              className={`bg-white rounded-xl p-3 border-2 ${
-                isAutoUnverified
-                  ? "border-accent/50"
-                  : result
-                    ? "border-primary/30"
-                    : "border-border"
-              }`}
+              className={`bg-white rounded-xl p-3 border-2 ${result ? "border-primary/30" : "border-border"}`}
               style={result ? { background: "var(--color-primary-soft)" } : undefined}
             >
-              <div className="flex justify-end items-center gap-2 mb-1">
-                {isAutoUnverified && (
-                  <button
-                    type="button"
-                    onClick={() => approveAutoFill(match.id)}
-                    className="btn-duo-flat text-xs px-3"
-                    style={{ background: "var(--color-primary)", color: "#FFFFFF" }}
-                  >
-                    אשר
-                  </button>
-                )}
-                {isAutoUnverified ? (
-                  <span className="badge-duo badge-duo-accent">
-                    מולא אוטומטית — לאישור
-                  </span>
-                ) : result ? (
+              <div className="flex justify-end mb-1">
+                {result ? (
                   <span className="badge-duo badge-duo-primary">הוזן</span>
                 ) : (
                   <span className="badge-duo badge-duo-accent">ממתין</span>
