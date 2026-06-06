@@ -28,9 +28,9 @@ export const GROUPS = {
   ],
   E: [
     { code: 'GER', name: 'גרמניה', flag: '🇩🇪' },
-    { code: 'ECU', name: 'אקוודור', flag: '🇪🇨' },
-    { code: 'CIV', name: 'חוף השנהב', flag: '🇨🇮' },
     { code: 'CUR', name: 'קוראסאו', flag: '🇨🇼' },
+    { code: 'CIV', name: 'חוף השנהב', flag: '🇨🇮' },
+    { code: 'ECU', name: 'אקוודור', flag: '🇪🇨' },
   ],
   F: [
     { code: 'NED', name: 'הולנד', flag: '🇳🇱' },
