@@ -66,7 +66,8 @@ export async function exportToExcel(form: any): Promise<void> {
     'תאריך',
     'שעה (ישראל)',
     'קבוצת בית',
-    'תוצאה',
+    'שערי בית',
+    'שערי חוץ',
     'קבוצת חוץ',
     'תוצאת המשחק',
   ];
@@ -76,7 +77,7 @@ export async function exportToExcel(form: any): Promise<void> {
   for (const group of groupKeys) {
     // blank separator row between groups (except before the first)
     if (group !== groupKeys[0]) {
-      sheet2Rows.push(['', '', '', '', '', '', '', '']);
+      sheet2Rows.push(['', '', '', '', '', '', '', '', '']);
     }
     const matches = groupMatches.filter((m: any) => m.group === group);
     for (const match of matches) {
@@ -91,7 +92,8 @@ export async function exportToExcel(form: any): Promise<void> {
         match.date || '',
         match.time || '',
         homeName,
-        scoreStr(pred?.homeScore, pred?.awayScore),
+        pred?.homeScore ?? '—',
+        pred?.awayScore ?? '—',
         awayName,
         outcome(pred?.homeScore, pred?.awayScore),
       ]);
@@ -105,7 +107,8 @@ export async function exportToExcel(form: any): Promise<void> {
     { wch: 10 },
     { wch: 12 },
     { wch: 20 },
-    { wch: 8 },
+    { wch: 7 },
+    { wch: 7 },
     { wch: 20 },
     { wch: 14 },
   ];
@@ -119,9 +122,10 @@ export async function exportToExcel(form: any): Promise<void> {
     'תאריך',
     'שעה',
     'קבוצה א׳',
-    'תוצאה',
+    'שערי א׳',
+    'שערי ב׳',
     'קבוצה ב׳',
-    'קבוצה מקדמת',
+    'עולה',
     'בעיטות הכרעה',
   ];
   const sheet3Rows: any[][] = [sheet3Header];
@@ -133,7 +137,7 @@ export async function exportToExcel(form: any): Promise<void> {
 
     // Stage separator row (skip before the very first stage)
     if (!firstKoStage) {
-      sheet3Rows.push(['', '', '', '', '', '', '', '']);
+      sheet3Rows.push(['', '', '', '', '', '', '', '', '']);
     }
     firstKoStage = false;
 
@@ -170,7 +174,8 @@ export async function exportToExcel(form: any): Promise<void> {
         match.date || '',
         match.time || '',
         homeName,
-        scoreStr(pred?.homeScore, pred?.awayScore),
+        pred?.homeScore ?? '—',
+        pred?.awayScore ?? '—',
         awayName,
         advancingName,
         isTie ? '✓' : '—',
@@ -184,7 +189,8 @@ export async function exportToExcel(form: any): Promise<void> {
     { wch: 10 },
     { wch: 8 },
     { wch: 20 },
-    { wch: 8 },
+    { wch: 7 },
+    { wch: 7 },
     { wch: 20 },
     { wch: 20 },
     { wch: 14 },

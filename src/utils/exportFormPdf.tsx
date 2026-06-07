@@ -10,13 +10,16 @@ import {
 import { getCachedBracket, getCachedChampion } from './bracketCache';
 import { groupMatches, knockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
+// @ts-ignore — Vite treats .woff as a static asset and returns a hashed URL
+import heeboRegularUrl from '@fontsource/heebo/files/heebo-hebrew-400-normal.woff';
+// @ts-ignore
+import heeboBoldUrl from '@fontsource/heebo/files/heebo-hebrew-700-normal.woff';
 
-// Register Hebrew font from public folder (served at runtime)
 Font.register({
   family: 'Heebo',
   fonts: [
-    { src: '/fonts/Heebo-Regular.woff', fontWeight: 'normal' },
-    { src: '/fonts/Heebo-Bold.woff', fontWeight: 'bold' },
+    { src: heeboRegularUrl, fontWeight: 'normal' },
+    { src: heeboBoldUrl, fontWeight: 'bold' },
   ],
 });
 

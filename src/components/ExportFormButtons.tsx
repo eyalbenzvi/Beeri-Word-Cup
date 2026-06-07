@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Download } from 'lucide-react';
+import * as Sentry from '@sentry/react';
 import { useToast } from './Toast';
 
 interface ExportFormButtonsProps {
@@ -30,6 +31,7 @@ export default function ExportFormButtons({
       showToast('הקובץ הורד בהצלחה');
     } catch (err) {
       console.error('Excel export failed:', err);
+      Sentry.captureException(err);
       showToast('שגיאה בהכנת קובץ האקסל');
     } finally {
       exportingRef.current = false;
@@ -47,6 +49,7 @@ export default function ExportFormButtons({
       showToast('הקובץ הורד בהצלחה');
     } catch (err) {
       console.error('PDF export failed:', err);
+      Sentry.captureException(err);
       showToast('שגיאה בהכנת קובץ ה-PDF');
     } finally {
       exportingRef.current = false;
