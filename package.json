@@ -17,6 +17,7 @@
   "dependencies": {
     "@fontsource/heebo": "^5.2.8",
     "@fontsource/rubik": "^5.2.8",
+    "@react-pdf/renderer": "^4.5.1",
     "@sentry/node": "^10.49.0",
     "@sentry/react": "^10.49.0",
     "@tailwindcss/vite": "^4.2.2",
@@ -27,7 +28,8 @@
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

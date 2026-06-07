@@ -9,6 +9,7 @@ import { useAllPredictions } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
+import ExportFormButtons from "./ExportFormButtons";
 import FormAvatar from "./FormAvatar";
 import FormSummaryLines from "./FormSummaryLines";
 import EmptyState from "./EmptyState";
@@ -180,7 +181,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
                   {formStatus === "submitted" ? "✅ הוגש" : form.status === "pending" ? "⏳ ממתין" : "טיוטה"}
                 </span>
               </div>
-              <div className="flex gap-2 mt-3 justify-end">
+              <div className="flex gap-2 mt-3 justify-end flex-wrap">
                 <button onClick={() => navigate("predict", { form: form.formId })} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
@@ -205,6 +206,9 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
                   >
                     מחק
                   </button>
+                )}
+                {formStatus === "submitted" && (
+                  <ExportFormButtons form={form} compact={true} />
                 )}
               </div>
             </div>
