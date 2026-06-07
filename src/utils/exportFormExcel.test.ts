@@ -148,6 +148,52 @@ describe("exportToExcel — sheet creation", () => {
     expect(matchRows.length).toBe(72);
   });
 
+  it("sheet 2 header has separate שערי בית and שערי חוץ columns (no combined תוצאה)", async () => {
+    const { exportToExcel } = await import("./exportFormExcel");
+    await exportToExcel(makeMinimalForm());
+    const groupSheet = appendSheetCalls.find((c) => c.name === "שלב הבתים");
+    const header = groupSheet!.data[0];
+    expect(header).toContain("שערי בית");
+    expect(header).toContain("שערי חוץ");
+    expect(header).not.toContain("תוצאה");
+  });
+
+  it("sheet 2 data rows contain separate numeric score cells when prediction exists", async () => {
+    const { exportToExcel } = await import("./exportFormExcel");
+    const form = makeMinimalForm({
+      matches: { "group-A-1": { homeScore: 3, awayScore: 1 } },
+    });
+    await exportToExcel(form);
+    const groupSheet = appendSheetCalls.find((c) => c.name === "שלב הבתים");
+    // Find the row for group-A-1 (first בית A row)
+    const matchRow = groupSheet!.data.find(
+      (r: any[]) => typeof r[0] === "string" && r[0] === "בית A",
+    );
+    expect(matchRow).toBeDefined();
+    // col index 5 = שערי בית, col index 6 = שערי חוץ
+    expect(matchRow![5]).toBe(3);
+    expect(matchRow![6]).toBe(1);
+  });
+
+  it("sheet 3 knockout header has עולה instead of קבוצה מקדמת", async () => {
+    const { exportToExcel } = await import("./exportFormExcel");
+    await exportToExcel(makeMinimalForm());
+    const koSheet = appendSheetCalls.find((c) => c.name === "שלב ההמשך");
+    expect(koSheet).toBeDefined();
+    const header = koSheet!.data[0];
+    expect(header).toContain("עולה");
+    expect(header).not.toContain("קבוצה מקדמת");
+  });
+
+  it("sheet 3 knockout header has separate שערי א׳ and שערי ב׳ columns", async () => {
+    const { exportToExcel } = await import("./exportFormExcel");
+    await exportToExcel(makeMinimalForm());
+    const koSheet = appendSheetCalls.find((c) => c.name === "שלב ההמשך");
+    const header = koSheet!.data[0];
+    expect(header).toContain("שערי א׳");
+    expect(header).toContain("שערי ב׳");
+  });
+
   it("includes the champion name in sheet 1 when no predictions are made", async () => {
     const { exportToExcel } = await import("./exportFormExcel");
     await exportToExcel(makeMinimalForm({ matches: {} }));
