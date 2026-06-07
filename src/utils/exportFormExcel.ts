@@ -323,7 +323,11 @@ export async function exportToExcel(form: any): Promise<void> {
     Views: [{ RTL: true }],
   };
 
-  // Download
-  const fileName = `ניחושים-${form.formId || 'form'}.xlsx`;
+  // Safari mangles non-ASCII a.download filenames — use ASCII fallback on WebKit.
+  const isSafari =
+    /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const fileName = isSafari
+    ? `predictions-${form.formId || 'form'}.xlsx`
+    : `ניחושים-${form.formId || 'form'}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }

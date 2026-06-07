@@ -32,6 +32,7 @@ const COLORS = {
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Heebo',
+    direction: 'rtl',
     paddingHorizontal: 30,
     paddingVertical: 24,
     backgroundColor: COLORS.white,
@@ -369,7 +370,7 @@ function PdfDocument({
                       <Text
                         style={[styles.matchAdvancing, { fontWeight: 'bold' }]}
                       >
-                        {advancingName ? `← ${advancingName}` : ''}
+                        {advancingName ? `עולה: ${advancingName}` : ''}
                       </Text>
                     </View>
                     {isTie ? (
@@ -405,6 +406,17 @@ export async function exportToPdf(
   ).toBlob();
 
   const url = URL.createObjectURL(blob);
+
+  // iOS Safari ignores a.download on blob URLs — open inline in PDF viewer instead.
+  // The user can then save via the system share sheet.
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  if (isIOS) {
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return;
+  }
+
   const a = document.createElement('a');
   a.href = url;
   a.download = `ניחושים-${form.formId || 'form'}.pdf`;
