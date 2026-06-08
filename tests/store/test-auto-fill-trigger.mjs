@@ -118,6 +118,17 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(asrc.includes("score?.fulltime") || asrc.includes("fulltime"), "AS uses fulltime (90') score");
   assert(/goals\.\*/.test(asrc) || asrc.includes("NOT goals"), "AS documents NOT using goals/aggregate");
   assert(/\[home90, away90\] = \[away90, home90\]/.test(asrc), "AS normalizes orientation when codes present");
+  // Simultaneous-kickoff safety: identify the fixture by TEAMS, not time.
+  assert(asrc.includes("matchTeamName"), "AS resolves team names to codes (teamCodes)");
+  assert(asrc.includes("findFixture"), "AS selects fixture by team identity");
+  assert(!asrc.includes("pickClosest"), "AS no longer selects by kickoff proximity (simultaneous-kickoff bug)");
+
+  const codes = read("netlify/functions/_sources/teamCodes.js");
+  assert(codes.includes("matchTeamName"), "teamCodes exports matchTeamName");
+  // All 48 tournament codes must be present in the alias table.
+  for (const c of ["MEX","RSA","KOR","CZE","CAN","BIH","QAT","SUI","BRA","MAR","HAI","SCO","USA","PAR","AUS","TUR","GER","CUR","CIV","ECU","NED","JPN","SWE","TUN","BEL","EGY","IRN","NZL","ESP","CPV","KSA","URU","FRA","SEN","IRQ","NOR","ARG","ALG","AUT","JOR","POR","COD","UZB","COL","ENG","CRO","GHA","PAN"]) {
+    assert(codes.includes(`${c}:`), `teamCodes has alias entry for ${c}`);
+  }
 }
 
 // --- 5. Firestore rules ---

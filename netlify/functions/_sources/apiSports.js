@@ -14,13 +14,14 @@
 // extra time). fixture.status.short of FT / AET / PEN means finished. For a
 // knockout level at 90', teams.{home,away}.winner identifies who went through.
 //
-// Team identity: the fixtures endpoint exposes team names + ids but not FIFA
-// 3-letter codes. We locate the fixture by kickoff proximity within the league
-// + season + date and, when an explicit code is present on the payload, report
-// it; otherwise we fall back to the server-authoritative expected codes (the
-// PRIMARY source enforces code identity, and both sources must agree on the
-// score). This single spot is the one most likely to need tuning against the
-// live API once real World Cup fixtures exist.
+// Team identity: the fixtures endpoint exposes team NAMES (and ids), not FIFA
+// codes. We CANNOT identify a fixture by kickoff time, because on the final
+// group matchday the two games in a group kick off SIMULTANEOUSLY. So we
+// identify the fixture by its two teams: resolve each team name to our FIFA
+// code (teamCodes.js) and match the expected pair. A date range narrows the
+// query; identity disambiguates within it.
+
+import { matchTeamName } from "./teamCodes.js";
 
 const NAME = "api-sports";
 const BASE = "https://v3.football.api-sports.io";
@@ -35,6 +36,15 @@ function norm(s) {
 function seasonFromKickoff(kickoffIso) {
   const y = new Date(kickoffIso).getUTCFullYear();
   return Number.isFinite(y) ? String(y) : "";
+}
+
+function dayBounds(kickoffIso) {
+  // +/-1 day window absorbs timezone skew (a late-night Israel kickoff can fall
+  // on the adjacent UTC day).
+  const t = new Date(kickoffIso).getTime();
+  const from = new Date(t - 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const to = new Date(t + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return { from, to };
 }
 
 async function getJson(url, key) {
@@ -52,37 +62,23 @@ async function getJson(url, key) {
   }
 }
 
-// Pick the fixture closest in kickoff time to the expected kickoff. With a
-// league+season+date query the result set is small (a handful of fixtures on
-// the day), so nearest-kickoff is a robust selector.
-function pickClosest(fixtures, kickoffIso) {
-  const target = new Date(kickoffIso).getTime();
-  let best = null;
-  let bestDelta = Infinity;
-  for (const f of fixtures || []) {
-    const ts = f?.fixture?.timestamp
-      ? f.fixture.timestamp * 1000
-      : f?.fixture?.date
-        ? new Date(f.fixture.date).getTime()
-        : NaN;
-    if (!Number.isFinite(ts)) continue;
-    const delta = Math.abs(ts - target);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = f;
-    }
-  }
-  // Only accept a match within 2h of the expected kickoff. Group days can have
-  // fixtures ~3h apart, so a wider window risks selecting an adjacent fixture;
-  // 2h comfortably covers a single match's duration without reaching the next.
-  return bestDelta <= 2 * 3600 * 1000 ? best : null;
+// Resolve an api-sports team payload to our FIFA code: prefer an explicit code
+// field if the API ever provides one, else map the team name via teamCodes.js.
+function resolveCode(team) {
+  const explicit = team?.code || team?.tla;
+  if (explicit) return norm(explicit);
+  return matchTeamName(team?.name); // FIFA code or null
 }
 
-// Real 3-letter code from a team payload, or null if the API didn't provide
-// one (the fixtures endpoint usually omits it).
-function realCode(team) {
-  const c = team?.code || team?.tla;
-  return c ? norm(c) : null;
+// Find the fixture whose two teams resolve to the expected pair (orientation-
+// independent). This is robust to simultaneous kickoffs.
+function findFixture(fixtures, homeTeam, awayTeam) {
+  const want = new Set([norm(homeTeam), norm(awayTeam)]);
+  return (fixtures || []).find((f) => {
+    const h = resolveCode(f?.teams?.home);
+    const a = resolveCode(f?.teams?.away);
+    return h && a && want.has(h) && want.has(a) && h !== a;
+  });
 }
 
 export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
@@ -93,8 +89,8 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     return { name: NAME, error: true, reason: "missing AS env config" };
   }
 
-  const date = new Date(kickoffIso).toISOString().slice(0, 10);
-  const url = `${BASE}/fixtures?league=${encodeURIComponent(league)}&season=${encodeURIComponent(season)}&date=${date}`;
+  const { from, to } = dayBounds(kickoffIso);
+  const url = `${BASE}/fixtures?league=${encodeURIComponent(league)}&season=${encodeURIComponent(season)}&from=${from}&to=${to}`;
 
   let data;
   try {
@@ -107,7 +103,7 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     }
   }
 
-  const fixture = pickClosest(data?.response, kickoffIso);
+  const fixture = findFixture(data?.response, homeTeam, awayTeam);
   if (!fixture) {
     return { name: NAME, error: false, finished: false, reason: "fixture not found" };
   }
@@ -120,19 +116,17 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
   let home90 = typeof ft.home === "number" ? ft.home : null;
   let away90 = typeof ft.away === "number" ? ft.away : null;
 
-  // Resolve codes. The fixtures endpoint usually omits a 3-letter code, in
-  // which case we fall back to the expected codes and ASSUME the provider used
-  // the same home/away designation as our schedule. If the provider listed the
-  // fixture in the opposite order, the score will disagree with the primary
-  // source and consensus will (safely) decline to write rather than record a
-  // reversed score. When real codes ARE present, we orient explicitly.
-  const apiHome = realCode(fixture?.teams?.home);
-  const apiAway = realCode(fixture?.teams?.away);
+  // Orient to OUR schedule's home/away. We matched the fixture by team
+  // identity, so resolveCode is reliable here; if the API lists the pair in the
+  // opposite order, swap score + codes + winner so downstream consensus
+  // compares like-for-like and never records a reversed score.
+  const apiHome = resolveCode(fixture?.teams?.home) || norm(homeTeam);
+  const apiAway = resolveCode(fixture?.teams?.away) || norm(awayTeam);
   let homeWinner = fixture?.teams?.home?.winner === true;
   let awayWinner = fixture?.teams?.away?.winner === true;
-  let homeCode = apiHome || norm(homeTeam);
-  let awayCode = apiAway || norm(awayTeam);
-  if (apiHome && apiAway && apiHome === norm(awayTeam) && apiAway === norm(homeTeam)) {
+  let homeCode = apiHome;
+  let awayCode = apiAway;
+  if (apiHome === norm(awayTeam) && apiAway === norm(homeTeam)) {
     [home90, away90] = [away90, home90];
     [homeCode, awayCode] = [awayCode, homeCode];
     [homeWinner, awayWinner] = [awayWinner, homeWinner];

@@ -6,6 +6,7 @@
 
 import { fetchMatchResult as fetchFD } from "../../netlify/functions/_sources/footballData.js";
 import { fetchMatchResult as fetchAS } from "../../netlify/functions/_sources/apiSports.js";
+import { matchTeamName } from "../../netlify/functions/_sources/teamCodes.js";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -159,15 +160,15 @@ const KICK_SEC = Math.floor(new Date(KICK).getTime() / 1000);
   eq(r.advancingTeam, "GER", "AS KO tie: advancing = winner flag (away)");
 }
 
-// --- AS 4. No fixture within window ---
+// --- AS 4. Teams that don't resolve to our codes -> fixture not found ---
 {
   mockFetchOnce({ response: [{
-    fixture: { timestamp: KICK_SEC + 5 * 3600, status: { short: "FT" } }, // 5h away
-    teams: { home: { name: "X" }, away: { name: "Y" } },
+    fixture: { timestamp: KICK_SEC, status: { short: "FT" } },
+    teams: { home: { name: "Atlantis" }, away: { name: "Wakanda" } },
     score: { fulltime: { home: 0, away: 0 } },
   }] });
   const r = await fetchAS({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
-  eq(r.finished, false, "AS far fixture: rejected (not finished)");
+  eq(r.finished, false, "AS unknown teams: fixture not found");
 }
 
 // --- AS 5. Missing env config -> error ---
@@ -177,6 +178,57 @@ const KICK_SEC = Math.floor(new Date(KICK).getTime() / 1000);
   const r = await fetchAS({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
   eq(r.error, true, "AS no key: error");
   process.env.API_SPORTS_KEY = saved;
+}
+
+// --- AS 6. Simultaneous kickoffs: identify by TEAMS, not by time ---
+// Final group matchday: two games kick off at the same instant. The client must
+// pick the fixture matching the expected teams, never the time-closest one.
+{
+  mockFetchOnce({ response: [
+    { // same timestamp, different match
+      fixture: { timestamp: KICK_SEC, status: { short: "FT" } },
+      teams: { home: { name: "Spain" }, away: { name: "Germany" } },
+      score: { fulltime: { home: 3, away: 0 } },
+    },
+    { // the one we actually want
+      fixture: { timestamp: KICK_SEC, status: { short: "FT" } },
+      teams: { home: { name: "Mexico" }, away: { name: "South Africa" } },
+      score: { fulltime: { home: 2, away: 1 } },
+    },
+  ] });
+  const r = await fetchAS({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.home90, 2, "AS simultaneous: selects by teams (MEX 2, not Spain 3)");
+  eq(r.away90, 1, "AS simultaneous: away RSA 1");
+  eq(r.homeCode, "MEX", "AS simultaneous: homeCode MEX");
+}
+
+// --- AS 7. Name resolution by teams, orientation normalized via names ---
+{
+  mockFetchOnce({ response: [{
+    fixture: { timestamp: KICK_SEC, status: { short: "FT" } },
+    teams: { home: { name: "South Africa" }, away: { name: "Mexico" } }, // reversed
+    score: { fulltime: { home: 1, away: 2 } },
+  }] });
+  const r = await fetchAS({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.home90, 2, "AS reversed-by-name: home normalized to MEX 2");
+  eq(r.away90, 1, "AS reversed-by-name: away normalized to RSA 1");
+  eq(r.homeCode, "MEX", "AS reversed-by-name: homeCode MEX");
+}
+
+// ============ team-name resolver ============
+{
+  eq(matchTeamName("Mexico"), "MEX", "resolve Mexico");
+  eq(matchTeamName("South Korea"), "KOR", "resolve South Korea");
+  eq(matchTeamName("Korea Republic"), "KOR", "resolve Korea Republic alias");
+  eq(matchTeamName("Türkiye"), "TUR", "resolve Turkiye (accent)");
+  eq(matchTeamName("Czechia"), "CZE", "resolve Czechia");
+  eq(matchTeamName("Côte d'Ivoire"), "CIV", "resolve Cote d'Ivoire (accent+punct)");
+  eq(matchTeamName("DR Congo"), "COD", "resolve DR Congo");
+  eq(matchTeamName("Bosnia & Herzegovina"), "BIH", "resolve Bosnia & Herzegovina");
+  eq(matchTeamName("United States"), "USA", "resolve United States");
+  eq(matchTeamName("Cape Verde"), "CPV", "resolve Cape Verde");
+  eq(matchTeamName("Unknownland"), null, "unknown name -> null");
+  eq(matchTeamName(null), null, "null name -> null");
 }
 
 console.log("");
