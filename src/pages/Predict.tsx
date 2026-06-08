@@ -551,7 +551,7 @@ export default function Predict() {
             </button>
           )}
           <div className="border-t border-primary/20 mt-3 pt-3 flex gap-2 justify-center">
-            <ExportFormButtons form={activeForm} userName={user?.displayName} />
+            <ExportFormButtons form={activeForm} />
           </div>
         </div>
       )}
