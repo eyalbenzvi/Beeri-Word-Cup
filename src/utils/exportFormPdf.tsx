@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // ── Section / group headers ────────────────────────────────────────────────
+  // ── Section header ─────────────────────────────────────────────────────────
   sectionHeader: {
     fontFamily: 'Heebo',
     fontSize: 13,
@@ -139,23 +139,30 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 14,
   },
-  groupHeader: {
-    fontFamily: 'Heebo',
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: C.white,
+
+  // ── Group / stage header badge ─────────────────────────────────────────────
+  // Container View — holds the green pill background/padding.
+  // row-reverse so parts render right-to-left (Hebrew part rightmost).
+  groupHeaderView: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
     backgroundColor: C.primary,
-    textAlign: 'right',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
     borderRadius: 4,
     marginTop: 8,
     marginBottom: 2,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  } as any,
+  // Text inside the badge — font is set per-part (Heebo vs HeeboLatin).
+  groupHeaderPart: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: C.white,
   },
 
   // ── Match rows ─────────────────────────────────────────────────────────────
   // row-reverse in LTR context: element[0] is rightmost, element[N-1] is leftmost
-  // Layout (right → left): date | homeTeam | scoreView | awayTeam
+  // Layout (right → left): date | homeTeam | scoreView | awayTeam [| advancing]
   matchRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -212,24 +219,39 @@ const styles = StyleSheet.create({
     width: 42,
   },
 
-  // ── Knockout advancing ─────────────────────────────────────────────────────
-  matchAdvancing: {
+  // ── Knockout advancing — always reserved so flex:1 team columns stay aligned ─
+  matchAdvancingView: {
+    width: 62,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+  } as any,
+  matchAdvancingPrefix: {
     fontFamily: 'Heebo',
     fontSize: 7,
     color: C.primary,
     fontWeight: 'bold',
+  },
+  matchAdvancingName: {
+    fontFamily: 'Heebo',
+    fontSize: 7,
+    color: C.primary,
+    fontWeight: 'bold',
+    flex: 1,
     textAlign: 'right',
-    width: 62,
   },
 
-  // ── Penalty note ───────────────────────────────────────────────────────────
-  penaltyNote: {
+  // ── Penalty note (tie-breaker) ─────────────────────────────────────────────
+  // Split into View+two Texts to avoid BiDi risk on mixed Hebrew+team-name string.
+  penaltyNoteView: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingRight: 44,
+    marginBottom: 1,
+  } as any,
+  penaltyNoteText: {
     fontFamily: 'Heebo',
     fontSize: 7,
     color: C.inkMuted,
-    textAlign: 'right',
-    paddingRight: 44,
-    marginBottom: 1,
   },
 
   // ── Footer ─────────────────────────────────────────────────────────────────
@@ -256,7 +278,58 @@ const styles = StyleSheet.create({
   },
 });
 
-const KO_ORDER = ['R32', 'R16', 'QF', 'SF', '3RD', 'F'] as const;
+// Knockout round groups for pagination.
+// R32 alone (16 matches) | R16+QF (12 matches) | SF+3RD+F (4 matches)
+type KoStage = 'R32' | 'R16' | 'QF' | 'SF' | '3RD' | 'F';
+const KO_PAGES: KoStage[][] = [
+  ['R32'],
+  ['R16', 'QF'],
+  ['SF', '3RD', 'F'],
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Split a label string into runs requiring Heebo (Hebrew) vs HeeboLatin (ASCII).
+// Prevents tofu boxes when ASCII letters/digits appear in a Hebrew-subset font —
+// e.g. "בית A" → ["בית ", Heebo] + ["A", HeeboLatin].
+function splitForFonts(text: string): Array<{ t: string; latin: boolean }> {
+  const result: Array<{ t: string; latin: boolean }> = [];
+  let cur = '';
+  let curLatin: boolean | null = null;
+  for (const ch of text) {
+    const latin = /[A-Za-z0-9\-/:]/.test(ch);
+    if (curLatin === null || latin === curLatin) {
+      cur += ch;
+      curLatin = latin;
+    } else {
+      result.push({ t: cur, latin: curLatin });
+      cur = ch;
+      curLatin = latin;
+    }
+  }
+  if (cur) result.push({ t: cur, latin: curLatin! });
+  return result;
+}
+
+// Green pill badge with correct font per character class (Hebrew vs Latin).
+function HeaderLabel({ label }: { label: string }) {
+  const parts = splitForFonts(label);
+  return (
+    <View style={styles.groupHeaderView}>
+      {parts.map((part, i) => (
+        <Text
+          key={i}
+          style={[
+            styles.groupHeaderPart,
+            { fontFamily: part.latin ? 'HeeboLatin' : 'Heebo' },
+          ]}
+        >
+          {part.t}
+        </Text>
+      ))}
+    </View>
+  );
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -270,7 +343,7 @@ function Score({ h, a }: { h: any; a: any }) {
   }
   // row-reverse match row: home is on the RIGHT, away on the LEFT.
   // scoreView uses flexDirection:'row' (LTR) so element[0]=leftmost.
-  // We place awayScore first (left side, near awayTeam) and homeScore last (right side, near homeTeam).
+  // awayScore first (left side, near awayTeam), homeScore last (right side, near homeTeam).
   return (
     <View style={styles.scoreView}>
       <Text style={styles.scoreNum}>{a}</Text>
@@ -368,7 +441,8 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
             const matches = groupMatches.filter((m: any) => m.group === group);
             return (
               <View key={group}>
-                <Text style={styles.groupHeader}>בית {group}</Text>
+                {/* "בית A" — group letter is ASCII; HeaderLabel uses HeeboLatin for it */}
+                <HeaderLabel label={`בית ${group}`} />
                 {matches.map((match: any) => {
                   const pred = matchPredictions[match.id];
                   const homeName =
@@ -386,7 +460,7 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
                     !!pred?.advancingTeam;
                   return (
                     <View key={match.id}>
-                      <View style={styles.matchRow}>
+                      <View wrap={false} style={styles.matchRow}>
                         {/* row-reverse: element[0]=rightmost */}
                         <Text style={styles.matchDate}>{match.date || ''}</Text>
                         <Text style={styles.matchTeam}>{homeName}</Text>
@@ -394,14 +468,16 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
                         <Text style={styles.matchTeam}>{awayName}</Text>
                       </View>
                       {isTie ? (
-                        <Text style={styles.penaltyNote}>
-                          {`בעיטות הכרעה: ${
-                            pred.advancingTeam
-                              ? getTeamByCode(pred.advancingTeam)?.name ||
-                                pred.advancingTeam
-                              : ''
-                          }`}
-                        </Text>
+                        // Split into two Text nodes to avoid BiDi reordering of the
+                        // colon when the team name is a Latin fallback code.
+                        <View style={styles.penaltyNoteView}>
+                          <Text style={styles.penaltyNoteText}>בעיטות הכרעה: </Text>
+                          <Text style={styles.penaltyNoteText}>
+                            {pred.advancingTeam
+                              ? getTeamByCode(pred.advancingTeam)?.name || ''
+                              : ''}
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                   );
@@ -414,62 +490,69 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
         </Page>
       ))}
 
-      {/* ── KNOCKOUT STAGE PAGE ──────────────────────────────────────────── */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.sectionHeader}>שלב ההמשך</Text>
-        {KO_ORDER.map((stage) => {
-          const stageMatches = knockoutMatches.filter(
-            (m: any) => m.stage === stage,
-          );
-          if (stageMatches.length === 0) return null;
-          return (
-            <View key={stage}>
-              <Text style={styles.groupHeader}>
-                {STAGES[stage as keyof typeof STAGES] || stage}
-              </Text>
-              {stageMatches.map((match: any) => {
-                const pred = matchPredictions[match.id];
-                const entry = bracketTeams?.[match.id];
-                const homeName = entry?.home
-                  ? (getTeamByCode(entry.home)?.name || entry.home)
-                  : 'טרם נקבע';
-                const awayName = entry?.away
-                  ? (getTeamByCode(entry.away)?.name || entry.away)
-                  : 'טרם נקבע';
-                const isTie =
-                  pred?.homeScore != null &&
-                  pred?.awayScore != null &&
-                  Number(pred.homeScore) === Number(pred.awayScore) &&
-                  !!pred?.advancingTeam;
-                const advancingName = pred?.advancingTeam
-                  ? (getTeamByCode(pred.advancingTeam)?.name ||
-                      pred.advancingTeam)
-                  : '';
+      {/* ── KNOCKOUT STAGE PAGES — one page per round group ──────────────── */}
+      {KO_PAGES.map((pageRounds, pageIdx) => (
+        <Page key={`ko-${pageIdx}`} size="A4" style={styles.page}>
+          <Text style={styles.sectionHeader}>שלב ההמשך</Text>
+          {pageRounds.map((stage) => {
+            const stageMatches = knockoutMatches.filter(
+              (m: any) => m.stage === stage,
+            );
+            if (stageMatches.length === 0) return null;
+            return (
+              <View key={stage}>
+                {/* STAGES['R32'] = "שלב ה-32" — digits need HeeboLatin; HeaderLabel handles the split */}
+                <HeaderLabel label={STAGES[stage] || stage} />
+                {stageMatches.map((match: any) => {
+                  const pred = matchPredictions[match.id];
+                  const entry = bracketTeams?.[match.id];
+                  const homeName = entry?.home
+                    ? (getTeamByCode(entry.home)?.name || entry.home)
+                    : 'טרם נקבע';
+                  const awayName = entry?.away
+                    ? (getTeamByCode(entry.away)?.name || entry.away)
+                    : 'טרם נקבע';
+                  const isTie =
+                    pred?.homeScore != null &&
+                    pred?.awayScore != null &&
+                    Number(pred.homeScore) === Number(pred.awayScore) &&
+                    !!pred?.advancingTeam;
+                  // Drop Latin code fallback to avoid BiDi risk in "עולה: ARG" strings
+                  const advancingName = pred?.advancingTeam
+                    ? (getTeamByCode(pred.advancingTeam)?.name || '')
+                    : '';
 
-                return (
-                  <View key={match.id}>
-                    <View style={styles.matchRow}>
-                      <Text style={styles.matchDate}>{match.date || ''}</Text>
-                      <Text style={styles.matchTeam}>{homeName}</Text>
-                      <Score h={pred?.homeScore} a={pred?.awayScore} />
-                      <Text style={styles.matchTeam}>{awayName}</Text>
-                      {advancingName ? (
-                        <Text style={styles.matchAdvancing}>
-                          {`עולה: ${advancingName}`}
-                        </Text>
+                  return (
+                    <View key={match.id}>
+                      <View wrap={false} style={styles.matchRow}>
+                        <Text style={styles.matchDate}>{match.date || ''}</Text>
+                        <Text style={styles.matchTeam}>{homeName}</Text>
+                        <Score h={pred?.homeScore} a={pred?.awayScore} />
+                        <Text style={styles.matchTeam}>{awayName}</Text>
+                        {/* Always reserve the advancing slot — keeps team columns aligned */}
+                        <View style={styles.matchAdvancingView}>
+                          {advancingName ? (
+                            <>
+                              <Text style={styles.matchAdvancingPrefix}>עולה: </Text>
+                              <Text style={styles.matchAdvancingName}>{advancingName}</Text>
+                            </>
+                          ) : null}
+                        </View>
+                      </View>
+                      {isTie ? (
+                        <View style={styles.penaltyNoteView}>
+                          <Text style={styles.penaltyNoteText}>בעיטות הכרעה</Text>
+                        </View>
                       ) : null}
                     </View>
-                    {isTie ? (
-                      <Text style={styles.penaltyNote}>בעיטות הכרעה</Text>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
-          );
-        })}
-        <PageFooter formName={formName} />
-      </Page>
+                  );
+                })}
+              </View>
+            );
+          })}
+          <PageFooter formName={formName} />
+        </Page>
+      ))}
 
     </Document>
   );
