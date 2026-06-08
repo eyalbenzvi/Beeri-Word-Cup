@@ -270,24 +270,17 @@ const styles = StyleSheet.create({
     width: 56,
   },
 
-  // ── Knockout advancing — width fixed so team columns stay aligned ──────────
+  // ── Knockout advancing — single Text node avoids two-paragraph BiDi garbling.
+  // Width 85pt fits the longest Hebrew team names at 7pt bold.
   matchAdvancingView: {
-    width: 62,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
+    width: 85,
+    alignItems: 'flex-end',
   } as any,
-  matchAdvancingPrefix: {
+  matchAdvancingLabel: {
     fontFamily: 'Heebo',
     fontSize: 7,
     color: C.primary,
     fontWeight: 'bold',
-  },
-  matchAdvancingName: {
-    fontFamily: 'Heebo',
-    fontSize: 7,
-    color: C.primary,
-    fontWeight: 'bold',
-    flex: 1,
     textAlign: 'right',
   },
 
@@ -400,7 +393,7 @@ function Score({ h, a }: { h: any; a: any }) {
   if (h == null || a == null) {
     return (
       <View style={styles.scoreView}>
-        <Text style={styles.scoreDash}>–</Text>
+        <Text style={styles.scoreDash}>-</Text>
       </View>
     );
   }
@@ -430,8 +423,8 @@ function PageFooter({ formName }: { formName: string }) {
 
 // ── Main document ─────────────────────────────────────────────────────────────
 
-// 3 groups per page — matchday sub-headers add vertical space vs old layout of 4.
-const GROUPS_PER_PAGE = 3;
+// 2 groups per page — 3 groups overflow A4 with matchday sub-headers included.
+const GROUPS_PER_PAGE = 2;
 
 function PdfDocument({ form, userName }: { form: any; userName?: string }) {
   const matchPredictions = form.matches || {};
@@ -537,9 +530,11 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
                             <Text style={styles.matchMetaTime}>{match.time}</Text>
                           ) : null}
                         </View>
-                        <Text style={styles.matchTeam}>{homeName}</Text>
+                        {/* U+200F (RLM) forces RTL paragraph direction, preventing
+                            apostrophe in "צ'כיה" etc. from splitting the RTL run */}
+                        <Text style={styles.matchTeam}>{'‏' + homeName}</Text>
                         <Score h={pred?.homeScore} a={pred?.awayScore} />
-                        <Text style={styles.matchTeam}>{awayName}</Text>
+                        <Text style={styles.matchTeam}>{'‏' + awayName}</Text>
                       </View>
                       {isTie ? (
                         <View style={styles.penaltyNoteView}>
@@ -605,16 +600,17 @@ function PdfDocument({ form, userName }: { form: any; userName?: string }) {
                             <Text style={styles.matchMetaTime}>{match.time}</Text>
                           ) : null}
                         </View>
-                        <Text style={styles.matchTeam}>{homeName}</Text>
+                        {/* U+200F (RLM) forces RTL paragraph direction */}
+                        <Text style={styles.matchTeam}>{'‏' + homeName}</Text>
                         <Score h={pred?.homeScore} a={pred?.awayScore} />
-                        <Text style={styles.matchTeam}>{awayName}</Text>
-                        {/* Always reserve advancing slot — keeps team columns aligned */}
+                        <Text style={styles.matchTeam}>{'‏' + awayName}</Text>
+                        {/* Single Text "עולה: name" avoids two-paragraph BiDi garbling.
+                            85pt width fits longest team name at 7pt bold Heebo. */}
                         <View style={styles.matchAdvancingView}>
                           {advancingName ? (
-                            <>
-                              <Text style={styles.matchAdvancingPrefix}>עולה: </Text>
-                              <Text style={styles.matchAdvancingName}>{advancingName}</Text>
-                            </>
+                            <Text style={styles.matchAdvancingLabel}>
+                              {'‏' + 'עולה: ' + advancingName}
+                            </Text>
                           ) : null}
                         </View>
                       </View>
