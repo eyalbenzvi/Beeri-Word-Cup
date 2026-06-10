@@ -29,7 +29,7 @@ GROUPS = {
     "B": ["CAN","BIH","QAT","SUI"],
     "C": ["BRA","MAR","HAI","SCO"],
     "D": ["USA","PAR","AUS","TUR"],
-    "E": ["GER","ECU","CIV","CUR"],
+    "E": ["GER","CUR","CIV","ECU"],
     "F": ["NED","JPN","SWE","TUN"],
     "G": ["BEL","EGY","IRN","NZL"],
     "H": ["ESP","CPV","KSA","URU"],
