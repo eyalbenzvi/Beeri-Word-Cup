@@ -75,22 +75,15 @@ assert(
   "remaining counter subtracts showCount from filteredLeaderboard.length",
 );
 
-// --- Auto-scroll-to-my-form must NOT fire while the user is searching
-// (otherwise typing a query yanks the page to a row that isn't visible).
-// The effect guards against this AND marks the one-shot ref as consumed
-// while searching, so clearing the query later doesn't re-arm the scroll.
+// --- The entry auto-scroll was removed entirely (the page always opens at
+// the top), which also retires the old "searching must consume the
+// auto-scroll one-shot" guards that used to live here. Keep a negative
+// lock so the auto-scroll doesn't quietly come back and reintroduce the
+// search/scroll interplay. Full scroll contract:
+// tests/ui/test-leaderboard-scroll.mjs.
 assert(
-  /if\s*\(\s*isSearching\s*\)\s*\{[\s\S]*?autoScrolledRef\.current\s*=\s*true/.test(src) ||
-  /if\s*\(\s*isSearching\s*\)\s*return;?/.test(src),
-  "auto-scroll effect bails when isSearching (and ideally marks the one-shot ref as consumed)",
-);
-// Specific regression lock for the "clearing search re-arms the scroll" bug:
-// once we've seen `isSearching` the ref must be flipped, not just an early
-// return. If a future change reverts to `if (isSearching) return;`, this
-// assertion documents the expected stronger guarantee.
-assert(
-  /if\s*\(\s*isSearching\s*\)\s*\{[\s\S]*?autoScrolledRef\.current\s*=\s*true/.test(src),
-  "auto-scroll one-shot ref is consumed when isSearching, preventing re-arm on clear",
+  !/autoScrolledRef/.test(src),
+  "no entry auto-scroll exists to conflict with the search box",
 );
 
 // --- Empty-state for "no matches" exists (so a typo doesn't drop the user

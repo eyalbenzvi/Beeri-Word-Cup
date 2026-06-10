@@ -127,8 +127,8 @@ assert(/isDirty/.test(profile), "Profile uses isDirty pattern");
 assert(/navigate\("predict",\s*\{\s*form:\s*form\.formId\s*\}\)/.test(profile), "Profile form cards navigate to /predict with form id");
 assert(/<button[\s\S]*?form\.formId[\s\S]*?navigate\("predict"/.test(profile), "Profile form cards rendered as buttons");
 
-// ---------- Phase 8: Onboarding + auto-scroll ----------
-console.log("--- Phase 8: Onboarding + auto-scroll ---");
+// ---------- Phase 8: Onboarding + jump chips ----------
+console.log("--- Phase 8: Onboarding + jump chips ---");
 let onboardingExists = true;
 try {
   const onboarding = readMigratedSrc("src/components/StatusOnboarding.jsx");
@@ -145,7 +145,11 @@ assert(/myForms/.test(leaderboard), "Leaderboard computes myForms list");
 assert(/jumpToForm/.test(leaderboard), "Leaderboard exposes jumpToForm helper");
 assert(/lb-form-\$\{/.test(leaderboard), "Leaderboard cards have lb-form-{id} anchor ids");
 assert(/הטפסים שלך:/.test(leaderboard), "Leaderboard shows 'your forms:' jump banner");
-assert(/autoScrolledRef/.test(leaderboard), "Leaderboard guards against double auto-scroll");
+// The entry auto-scroll (and its autoScrolledRef one-shot guard) was
+// deliberately removed: the page now always opens at the top and jumping
+// to your own row is user-initiated only. Full contract is locked in
+// tests/ui/test-leaderboard-scroll.mjs.
+assert(!/autoScrolledRef/.test(leaderboard), "Leaderboard no longer auto-scrolls on entry (page opens at top)");
 
 // ---------- Phase 9: dead-code references in Predict ----------
 // PR #153 removed the activeTab/setActiveTab state from Predict but left a
