@@ -316,6 +316,33 @@ const results = readMigratedSrc("src/pages/Results.jsx");
 assert(/!user\s*&&[\s\S]{0,200}<LoginPrompt/.test(results),
   "Results renders LoginPrompt for guest visitors");
 
+// ============================================================
+// 11. Guest auth observer must NOT wipe the public-mode cache
+// ============================================================
+// Regression for "blog shows 'אין עדיין סיכומים' for logged-out visitors":
+// onAuthStateChanged fires every newly-registered observer immediately with
+// the current state, so useCurrentUser's null branch runs on EVERY guest
+// page mount. An unconditional store.logoutUser() there wiped cache.summaries
+// + cache._ready on every guest navigation; the public-mode watchdog then
+// flipped readiness over an empty cache and the blog rendered its empty
+// state despite published posts. logoutUser must be gated on a genuine
+// signed-in → signed-out transition.
+console.log("\n--- 11. useCurrentUser guest branch keeps public cache ---");
+const useStoreSrc = readMigratedSrc("src/hooks/useStore.js");
+
+assert(/let\s+sawFirebaseUser\s*=\s*false/.test(useStoreSrc),
+  "useStore tracks sawFirebaseUser at module level");
+assert(/sawFirebaseUser\s*=\s*true/.test(useStoreSrc),
+  "Flag is set when a Firebase user appears");
+assert(/else\s+if\s*\(sawFirebaseUser\)\s*\{[\s\S]{0,200}store\.logoutUser\(\)/.test(useStoreSrc),
+  "Full logoutUser teardown only runs on a real signed-in → signed-out transition");
+assert(!/\}\s*else\s*\{\s*store\.logoutUser\(\)/.test(useStoreSrc),
+  "No unconditional store.logoutUser() in the null-auth branch");
+// The never-signed-in branch must still clear stale identity keys without
+// touching the cache (remote revocation between visits).
+assert(/wc2026_currentUser/.test(useStoreSrc) && /wc2026_activeForm/.test(useStoreSrc),
+  "Guest branch clears stale localStorage identity keys");
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error("\nFAILURES:");

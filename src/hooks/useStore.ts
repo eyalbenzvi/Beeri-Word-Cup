@@ -20,6 +20,16 @@ const READY_WATCHDOG_MS = 15000;
 const STORE_WATCHDOG_MS = READY_WATCHDOG_MS;
 const USER_WATCHDOG_MS = READY_WATCHDOG_MS;
 
+// onAuthStateChanged invokes every newly-registered observer immediately
+// with the CURRENT auth state — not only on transitions. useCurrentUser
+// registers one observer per consumer (every page component does), so while
+// logged out the `null` branch fires on every guest page navigation. The
+// full logoutUser() teardown wipes the public-readonly cache (summaries +
+// readiness flags), which made the blog look unpublished for guests mid-
+// session. Track whether a Firebase user was actually seen in this tab so
+// the teardown only runs on a genuine signed-in → signed-out transition.
+let sawFirebaseUser = false;
+
 function connectionInfo() {
   try {
     // navigator.connection is non-standard (Network Information API);
@@ -75,6 +85,7 @@ export function useCurrentUser() {
       setFirebaseUser(fbUser);
       setAuthReady(true);
       if (fbUser) {
+        sawFirebaseUser = true;
         // (Re-)init Firestore listeners now that we have auth
         initRealtimeListeners(fbUser.uid);
         store.setCurrentUser(fbUser.uid);
@@ -82,8 +93,17 @@ export function useCurrentUser() {
           id: fbUser.uid,
           displayName: fbUser.displayName || fbUser.phoneNumber || null,
         });
-      } else {
+      } else if (sawFirebaseUser) {
+        // Genuine signed-in → signed-out transition: full teardown.
+        sawFirebaseUser = false;
         store.logoutUser();
+        setSentryUser(null);
+      } else {
+        // Guest who was never signed in this tab — do NOT wipe the cache
+        // (it may hold public-mode data). Only clear stale identity keys a
+        // previous session could have left if Firebase revoked it remotely.
+        try { localStorage.removeItem("wc2026_currentUser"); } catch { /* ignore */ }
+        try { localStorage.removeItem("wc2026_activeForm"); } catch { /* ignore */ }
         setSentryUser(null);
       }
     });
@@ -144,6 +164,10 @@ export function useCurrentUser() {
     try {
       await firebaseSignOut();
     } finally {
+      // Reset the transition flag here as well — the auth observer may have
+      // already consumed it, but if signOut threw before the observer fired
+      // we still want the explicit teardown to leave a consistent state.
+      sawFirebaseUser = false;
       store.logoutUser();
     }
   }, []);
