@@ -113,6 +113,29 @@ assert(/teardownPublicReadonlyMode[\s\S]*?clearTimeout\(\s*publicReadinessWatchd
     "fetchPublicSummariesOnce does not early-return on non-ok response (would skip failsafe)");
   assert(/if\s*\(\s*!succeeded\s*&&\s*publicModeInitialized\s*\)\s*\{[\s\S]*?cache\._ready\.summaries\s*=\s*true/.test(body),
     "fetchPublicSummariesOnce failsafe marks summaries ready on failure");
+  // Second transport: when the Netlify function fails, guests fall back to
+  // a one-shot direct Firestore read of the published set (allowed unauth
+  // by firestore.rules) BEFORE giving up and flipping readiness over an
+  // empty cache. Without this, any function outage / missing deploy renders
+  // a false "אין עדיין סיכומים" to every logged-out visitor.
+  assert(/fetchSummariesDirectFallback\(\)/.test(body),
+    "fetchPublicSummariesOnce failure path tries the direct Firestore fallback");
+}
+
+// The direct fallback itself: published-only query (matches the rules'
+// provably-safe filter) wrapped in withTimeout so a hung unauth transport
+// resolves into a rejection instead of trapping the viewer.
+{
+  const fbFn = storeSrc.match(/async function fetchSummariesDirectFallback\(\)[\s\S]*?\n\}/)?.[0] || "";
+  assert(fbFn.length > 0, "fetchSummariesDirectFallback exists in publicMode");
+  assert(/where\("status",\s*"==",\s*"published"\)/.test(fbFn),
+    "direct fallback queries published summaries only");
+  assert(/withTimeout\(/.test(fbFn),
+    "direct fallback is wrapped in withTimeout (cannot hang forever)");
+  assert(/if\s*\(!publicModeInitialized\)\s*return/.test(fbFn),
+    "direct fallback re-checks public-mode teardown after the await");
+  assert(/cache\.summaries\s*=\s*map[\s\S]*?cache\._ready\.summaries\s*=\s*true[\s\S]*?notifyAndEmit\("summaries"\)/.test(fbFn),
+    "direct fallback populates cache, flips readiness, and notifies");
 }
 
 // Defense against a synchronous throw inside the settings success handler —
