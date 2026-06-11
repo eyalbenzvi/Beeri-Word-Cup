@@ -70,6 +70,17 @@ async function discoverFootballData() {
     if (s) out.sampleMatch = {
       home: s.homeTeam?.tla, away: s.awayTeam?.tla, status: s.status,
       fullTime: s.score?.fullTime, duration: s.score?.duration, winner: s.score?.winner,
+      // Full raw score object so we can confirm the exact v4 schema (does it
+      // expose score.regularTime / halfTime / extraTime / penalties?). This is
+      // how we verify the 90'-vs-extra-time handling against live data.
+      rawScore: s.score,
+    };
+    // Prefer a finished extra-time/penalty match if any exists — that's the one
+    // that reveals how the 90' score is represented when ET was played.
+    const etMatch = finished.find((m) => m.score?.duration && m.score.duration !== "REGULAR");
+    if (etMatch) out.sampleExtraTimeMatch = {
+      home: etMatch.homeTeam?.tla, away: etMatch.awayTeam?.tla,
+      duration: etMatch.score?.duration, rawScore: etMatch.score,
     };
   }
   return out;

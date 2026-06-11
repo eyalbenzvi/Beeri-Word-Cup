@@ -113,7 +113,7 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
 // --- 4b. Source clients orient to our schedule + use the 90' score ---
 {
   const fd = read("netlify/functions/_sources/footballData.js");
-  assert(fd.includes("score.fullTime") || fd.includes("fullTime"), "FD uses fullTime (90') score");
+  assert(fd.includes("regularTime"), "FD reads regularTime for the 90' score (not ET-inclusive fullTime)");
   assert(/\[home90, away90\] = \[away90, home90\]/.test(fd), "FD normalizes orientation (swaps score)");
   // Live-data fix: football-data uses CUW/URY where we use CUR/URU.
   assert(fd.includes("FD_TO_OURS"), "FD maps differing codes (CUW->CUR, URY->URU) to ours");

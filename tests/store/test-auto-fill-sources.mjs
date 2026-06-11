@@ -60,17 +60,36 @@ process.env.AUTO_FILL_COMPETITION_ID_FD = "WC";
   eq(r.awayCode, "RSA", "FD swapped: awayCode normalized");
 }
 
-// --- FD 3. Knockout tie at 90', went to ET -> advancing = overall winner ---
+// --- FD 3. Knockout to ET: records the 90' score (regularTime), NOT the ET
+// final (fullTime). Advancing = overall winner. ---
 {
   mockFetchOnce({ matches: [{
     status: "FINISHED",
     homeTeam: { tla: "ESP" }, awayTeam: { tla: "GER" },
-    score: { fullTime: { home: 1, away: 1 }, duration: "EXTRA_TIME", winner: "HOME_TEAM" },
+    score: {
+      regularTime: { home: 1, away: 1 }, // 90' = 1-1
+      fullTime: { home: 2, away: 1 },    // final incl. ET = 2-1 (must NOT be used as 90')
+      duration: "EXTRA_TIME", winner: "HOME_TEAM",
+    },
   }] });
   const r = await fetchFD({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
-  eq(r.home90, 1, "FD KO tie: records 90' home");
-  eq(r.away90, 1, "FD KO tie: records 90' away");
-  eq(r.advancingTeam, "ESP", "FD KO tie: advancing = overall winner");
+  eq(r.home90, 1, "FD KO ET: records regularTime home (1), not fullTime (2)");
+  eq(r.away90, 1, "FD KO ET: records regularTime away (1)");
+  eq(r.advancingTeam, "ESP", "FD KO ET: advancing = overall winner");
+}
+
+// --- FD 3a. ET match WITHOUT a regularTime field -> cannot isolate 90' ->
+// regulationAmbiguous (declines to write; admin enters manually). ---
+{
+  mockFetchOnce({ matches: [{
+    status: "FINISHED",
+    homeTeam: { tla: "ESP" }, awayTeam: { tla: "GER" },
+    score: { fullTime: { home: 2, away: 1 }, duration: "EXTRA_TIME", winner: "HOME_TEAM" },
+  }] });
+  const r = await fetchFD({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.finished, true, "FD ET no-regularTime: finished");
+  eq(r.home90, null, "FD ET no-regularTime: 90' score unknown (null)");
+  eq(r.regulationAmbiguous, true, "FD ET no-regularTime: regulationAmbiguous -> no write");
 }
 
 // --- FD 3b. football-data code aliases (CUW->CUR, URY->URU) ---
@@ -93,7 +112,10 @@ process.env.AUTO_FILL_COMPETITION_ID_FD = "WC";
   mockFetchOnce({ matches: [{
     status: "FINISHED",
     homeTeam: { tla: "URY" }, awayTeam: { tla: "ESP" }, // FD code for Uruguay
-    score: { fullTime: { home: 1, away: 1 }, duration: "PENALTY_SHOOTOUT", winner: "HOME_TEAM" },
+    score: {
+      regularTime: { home: 1, away: 1 }, fullTime: { home: 1, away: 1 },
+      duration: "PENALTY_SHOOTOUT", winner: "HOME_TEAM",
+    },
   }] });
   const r = await fetchFD({ fifaMatch: 90, homeTeam: "URU", awayTeam: "ESP", kickoffIso: KICK });
   eq(r.finished, true, "FD alias: fixture found via URY->URU");
