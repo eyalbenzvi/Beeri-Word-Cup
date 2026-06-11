@@ -1,7 +1,7 @@
 // Unit tests for the two-source auto-fill consensus logic.
 // Pure module (no network, no firebase) — imported directly.
 
-import { computeConsensus } from "../../netlify/functions/_sources/consensus.js";
+import { computeConsensus, decideSingleSource } from "../../netlify/functions/_sources/consensus.js";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -148,6 +148,51 @@ function as(over = {}) {
 {
   const r = computeConsensus(groupExpected, [fd()]);
   eq(r.decision, "error", "single source array -> error");
+}
+
+// --- 10. Single-source mode (football-data only) ---
+{
+  // Happy path: one finished, valid source -> agreed.
+  const r = decideSingleSource(groupExpected, fd());
+  eq(r.decision, "agreed", "single source finished+valid -> agreed");
+  eq(r.homeScore, 2, "single source home score");
+  eq(r.awayScore, 1, "single source away score");
+
+  // Not finished.
+  eq(decideSingleSource(groupExpected, fd({ finished: false })).decision, "not-finished", "single not finished");
+
+  // Source error.
+  eq(decideSingleSource(groupExpected, { name: "football-data", error: true }).decision, "error", "single source error");
+
+  // Bad score.
+  eq(decideSingleSource(groupExpected, fd({ home90: 99 })).decision, "ambiguous", "single out-of-range score");
+  eq(decideSingleSource(groupExpected, fd({ home90: null })).decision, "ambiguous", "single missing score");
+
+  // Team mismatch.
+  eq(decideSingleSource(groupExpected, fd({ homeCode: "FRA" })).decision, "ambiguous", "single team mismatch");
+
+  // regulation ambiguous.
+  eq(decideSingleSource(groupExpected, fd({ regulationAmbiguous: true })).decision, "ambiguous", "single regulation ambiguous");
+
+  // Knockout tie at 90' WITH advancing -> agreed; records 90' + advancing.
+  const ko = decideSingleSource(koExpected, fd({
+    homeCode: "ESP", awayCode: "GER", home90: 1, away90: 1, advancingTeam: "ESP", duration: "AET",
+  }));
+  eq(ko.decision, "agreed", "single KO tie + advancing -> agreed");
+  eq(ko.homeScore, 1, "single KO records 90' home");
+  eq(ko.advancingTeam, "ESP", "single KO advancing recorded");
+
+  // Knockout tie WITHOUT advancing -> ambiguous.
+  eq(decideSingleSource(koExpected, fd({
+    homeCode: "ESP", awayCode: "GER", home90: 1, away90: 1, advancingTeam: null,
+  })).decision, "ambiguous", "single KO tie missing advancing -> ambiguous");
+
+  // Knockout decided in 90' -> agreed, no advancing needed.
+  const koDec = decideSingleSource(koExpected, fd({
+    homeCode: "ESP", awayCode: "GER", home90: 2, away90: 1, advancingTeam: null,
+  }));
+  eq(koDec.decision, "agreed", "single KO decided in 90' -> agreed");
+  eq(koDec.advancingTeam, null, "single KO decided in 90' -> advancing null");
 }
 
 console.log("");

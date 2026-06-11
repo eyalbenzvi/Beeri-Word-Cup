@@ -39,113 +39,105 @@ function normCode(c) {
   return typeof c === "string" ? c.trim().toUpperCase() : "";
 }
 
+// Evaluate ONE source against the expected fixture. Returns the same decision
+// shape used by callers. "agreed" here means: this source alone is finished,
+// has a valid 90' score, the teams match, and (for a knockout tie) names a
+// valid advancing team. computeConsensus then additionally requires two such
+// sources to agree; decideSingleSource trusts this one source.
+function evaluateOne(expected, s) {
+  if (!s || s.error) {
+    return { decision: "error", reason: `source unreachable: ${s?.name || "unknown"}` };
+  }
+  if (!s.finished) {
+    return { decision: "not-finished", reason: `${s.name} not FINISHED` };
+  }
+  if (s.regulationAmbiguous) {
+    return { decision: "ambiguous", reason: `${s.name} could not isolate the 90' score` };
+  }
+  if (!isValidScore(s.home90) || !isValidScore(s.away90)) {
+    return { decision: "ambiguous", reason: `${s.name} missing/out-of-range 90' score` };
+  }
+  const expHome = normCode(expected?.homeTeam);
+  const expAway = normCode(expected?.awayTeam);
+  if (expHome && expAway) {
+    if (normCode(s.homeCode) !== expHome || normCode(s.awayCode) !== expAway) {
+      return { decision: "ambiguous", reason: `${s.name} team codes do not match expected` };
+    }
+  }
+  let advancingTeam = null;
+  if (expected?.isKnockout && s.home90 === s.away90) {
+    const adv = normCode(s.advancingTeam);
+    if (!adv) {
+      return { decision: "ambiguous", reason: `${s.name} knockout tie without advancing team` };
+    }
+    if (expHome && expAway && adv !== expHome && adv !== expAway) {
+      return { decision: "ambiguous", reason: `${s.name} advancing team not a participant` };
+    }
+    advancingTeam = s.advancingTeam;
+  }
+  return {
+    decision: "agreed",
+    homeScore: s.home90,
+    awayScore: s.away90,
+    advancingTeam,
+    reason: `${s.name} finished with a valid 90' score`,
+  };
+}
+
 /**
+ * Single-source decision (used in football-data-only mode). Trusts one source,
+ * applying the same per-source validity rules used by the two-source path.
+ * @param {{matchId:string,isKnockout:boolean,homeTeam:string,awayTeam:string}} expected
+ * @param {object} source - one normalized source result
+ */
+export function decideSingleSource(expected, source) {
+  return evaluateOne(expected, source);
+}
+
+/**
+ * Two-source consensus. Both sources must individually be valid AND agree on
+ * the 90' score (and advancing team for knockout ties).
  * @param {{matchId:string,isKnockout:boolean,homeTeam:string,awayTeam:string}} expected
  * @param {Array} sources - exactly two normalized source results
- * @returns {{decision:string,homeScore?:number,awayScore?:number,advancingTeam?:string|null,reason:string}}
  */
 export function computeConsensus(expected, sources) {
   if (!Array.isArray(sources) || sources.length !== 2) {
     return { decision: "error", reason: "expected exactly two sources" };
   }
   const [a, b] = sources;
+  const ra = evaluateOne(expected, a);
+  const rb = evaluateOne(expected, b);
 
-  // 1. Source reachability.
-  if (a?.error || b?.error) {
-    const which = [a?.error && a?.name, b?.error && b?.name]
-      .filter(Boolean)
-      .join(", ");
-    return { decision: "error", reason: `source unreachable: ${which}` };
+  // Precedence: error > not-finished > ambiguous before we can compare.
+  for (const stage of ["error", "not-finished", "ambiguous"]) {
+    if (ra.decision === stage || rb.decision === stage) {
+      const bad = ra.decision === stage ? ra : rb;
+      return { decision: stage, reason: bad.reason };
+    }
   }
 
-  // 2. Both must report the match as finished.
-  if (!a.finished || !b.finished) {
-    return { decision: "not-finished", reason: "one or both sources not FINISHED" };
-  }
-
-  // 3. Neither source may be unable to separate regulation from extra time.
-  if (a.regulationAmbiguous || b.regulationAmbiguous) {
-    return {
-      decision: "ambiguous",
-      reason: "a source could not isolate the 90-minute score",
-    };
-  }
-
-  // 4. Scores must be present + valid integers on both.
-  if (
-    !isValidScore(a.home90) ||
-    !isValidScore(a.away90) ||
-    !isValidScore(b.home90) ||
-    !isValidScore(b.away90)
-  ) {
-    return { decision: "ambiguous", reason: "missing or out-of-range 90' scores" };
-  }
-
-  // 5. The two sources must agree on the 90-minute score.
-  if (a.home90 !== b.home90 || a.away90 !== b.away90) {
+  // Both are individually "agreed" — now require cross-source agreement.
+  if (ra.homeScore !== rb.homeScore || ra.awayScore !== rb.awayScore) {
     return {
       decision: "disagree",
-      reason: `90' score mismatch: ${a.name} ${a.home90}-${a.away90} vs ${b.name} ${b.home90}-${b.away90}`,
+      reason: `90' score mismatch: ${a.name} ${ra.homeScore}-${ra.awayScore} vs ${b.name} ${rb.homeScore}-${rb.awayScore}`,
     };
   }
-
-  // 6. Team codes from BOTH sources must match the expected (server) codes.
-  const expHome = normCode(expected?.homeTeam);
-  const expAway = normCode(expected?.awayTeam);
-  if (expHome && expAway) {
-    const aHome = normCode(a.homeCode);
-    const aAway = normCode(a.awayCode);
-    const bHome = normCode(b.homeCode);
-    const bAway = normCode(b.awayCode);
-    const aOk = aHome === expHome && aAway === expAway;
-    const bOk = bHome === expHome && bAway === expAway;
-    if (!aOk || !bOk) {
-      return {
-        decision: "ambiguous",
-        reason: "team codes do not match expected fixture",
-      };
-    }
-  }
-
-  const homeScore = a.home90;
-  const awayScore = a.away90;
-
-  // 7. Knockout tie at 90' -> need an agreed advancing team.
-  let advancingTeam = null;
-  if (expected?.isKnockout && homeScore === awayScore) {
-    const advA = normCode(a.advancingTeam);
-    const advB = normCode(b.advancingTeam);
-    if (!advA || !advB) {
-      return {
-        decision: "ambiguous",
-        reason: "knockout tie at 90' without an advancing team from both sources",
-      };
-    }
-    if (advA !== advB) {
-      return {
-        decision: "disagree",
-        reason: `advancing-team mismatch: ${a.advancingTeam} vs ${b.advancingTeam}`,
-      };
-    }
-    // Must be one of the two participating teams.
-    if (expHome && expAway && advA !== expHome && advA !== expAway) {
-      return {
-        decision: "ambiguous",
-        reason: "advancing team is not one of the two participants",
-      };
-    }
-    // Preserve original casing from the source.
-    advancingTeam = a.advancingTeam;
+  if (normCode(ra.advancingTeam) !== normCode(rb.advancingTeam)) {
+    return {
+      decision: "disagree",
+      reason: `advancing-team mismatch: ${ra.advancingTeam} vs ${rb.advancingTeam}`,
+    };
   }
 
   return {
     decision: "agreed",
-    homeScore,
-    awayScore,
-    advancingTeam,
+    homeScore: ra.homeScore,
+    awayScore: ra.awayScore,
+    advancingTeam: ra.advancingTeam,
     reason: "both sources finished and agree on 90' score" +
-      (advancingTeam ? " and advancing team" : ""),
+      (ra.advancingTeam ? " and advancing team" : ""),
   };
 }
 
-export const __test__ = { isValidScore, normCode, MIN_SCORE, MAX_SCORE };
+export const __test__ = { isValidScore, normCode, MIN_SCORE, MAX_SCORE, evaluateOne };

@@ -99,9 +99,11 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(fn.includes("autoFillLog"), "function writes the audit log");
   assert(fn.includes('source: "auto"'), "write shape uses source=auto");
   assert(!fn.includes("verifiedBy"), "no verifiedBy approval field in write shape");
-  assert(fn.includes('sourcesUsed: ["football-data", "api-sports"]'), "records sourcesUsed");
+  assert(fn.includes('sourcesUsed: ["football-data"]'), "records sourcesUsed (single source)");
   assert(/source === "admin"/.test(fn), "never overwrites an admin-owned result");
-  assert(fn.includes("computeConsensus"), "function uses two-source consensus");
+  // Single-source mode: football-data only.
+  assert(fn.includes("decideSingleSource"), "function uses single-source decision");
+  assert(!fn.includes("fetchApiSports"), "function does not call api-sports");
   // PII: never write a raw (possibly phone_05XXXXXXXX) uid into the
   // auth-readable matchResults doc.
   assert(fn.includes('uid.startsWith("phone_") ? "phone_user" : uid'), "redacts phone uid in matchResults");
@@ -113,6 +115,8 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   const fd = read("netlify/functions/_sources/footballData.js");
   assert(fd.includes("score.fullTime") || fd.includes("fullTime"), "FD uses fullTime (90') score");
   assert(/\[home90, away90\] = \[away90, home90\]/.test(fd), "FD normalizes orientation (swaps score)");
+  // Live-data fix: football-data uses CUW/URY where we use CUR/URU.
+  assert(fd.includes("FD_TO_OURS"), "FD maps differing codes (CUW->CUR, URY->URU) to ours");
 
   const asrc = read("netlify/functions/_sources/apiSports.js");
   assert(asrc.includes("score?.fulltime") || asrc.includes("fulltime"), "AS uses fulltime (90') score");
