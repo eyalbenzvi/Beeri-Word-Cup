@@ -15,9 +15,8 @@
 
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
-import { computeConsensus } from "./_sources/consensus.js";
+import { decideSingleSource } from "./_sources/consensus.js";
 import { fetchMatchResult as fetchFootballData } from "./_sources/footballData.js";
-import { fetchMatchResult as fetchApiSports } from "./_sources/apiSports.js";
 import { getMatchById } from "../../src/data/matches.js";
 import { getMatchKickoffUTC } from "../../src/utils/matchTime.js";
 import { calcBracketTeams } from "../../src/utils/bracket.js";
@@ -249,16 +248,14 @@ async function autoFillHandler(event) {
 
   try {
     const fetchArgs = { fifaMatch: match.fifaMatch, homeTeam, awayTeam, kickoffIso };
-    // Independent sources, in parallel. Each handles its own single retry and
-    // never throws (returns { error:true }).
-    const [fd, as] = await Promise.all([
-      fetchFootballData(fetchArgs).catch((e) => ({ name: "football-data", error: true, reason: e?.message })),
-      fetchApiSports(fetchArgs).catch((e) => ({ name: "api-sports", error: true, reason: e?.message })),
-    ]);
+    // Single-source mode: football-data only. It handles its own single retry
+    // and never throws (returns { error:true }).
+    const fd = await fetchFootballData(fetchArgs)
+      .catch((e) => ({ name: "football-data", error: true, reason: e?.message }));
 
     const expected = { matchId, isKnockout, homeTeam, awayTeam };
-    const consensus = computeConsensus(expected, [fd, as]);
-    const sources = [sourceSummary(fd), sourceSummary(as)];
+    const consensus = decideSingleSource(expected, fd);
+    const sources = [sourceSummary(fd)];
 
     if (consensus.decision !== "agreed") {
       await writeAuditLog(db, {
@@ -307,7 +304,7 @@ async function autoFillHandler(event) {
       // leak the project's PII migration is closing. Redact phone uids; the
       // full uid is still recorded in the admin-only autoFillLog audit.
       autoFilledBy: uid.startsWith("phone_") ? "phone_user" : uid,
-      sourcesUsed: ["football-data", "api-sports"],
+      sourcesUsed: ["football-data"],
       updatedAt: nowIso,
     };
 

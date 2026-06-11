@@ -73,6 +73,34 @@ process.env.AUTO_FILL_COMPETITION_ID_FD = "WC";
   eq(r.advancingTeam, "ESP", "FD KO tie: advancing = overall winner");
 }
 
+// --- FD 3b. football-data code aliases (CUW->CUR, URY->URU) ---
+// Live data showed FD uses CUW for Curacao and URY for Uruguay; our codes are
+// CUR / URU. The client must translate so those fixtures are found + reported
+// in our code space.
+{
+  mockFetchOnce({ matches: [{
+    status: "FINISHED",
+    homeTeam: { tla: "CUW" }, awayTeam: { tla: "MEX" }, // FD code for Curacao
+    score: { fullTime: { home: 0, away: 2 }, duration: "REGULAR", winner: "AWAY_TEAM" },
+  }] });
+  const r = await fetchFD({ fifaMatch: 1, homeTeam: "CUR", awayTeam: "MEX", kickoffIso: KICK });
+  eq(r.finished, true, "FD alias: fixture found via CUW->CUR");
+  eq(r.homeCode, "CUR", "FD alias: homeCode mapped to our CUR");
+  eq(r.home90, 0, "FD alias: home score");
+  eq(r.away90, 2, "FD alias: away score");
+}
+{
+  mockFetchOnce({ matches: [{
+    status: "FINISHED",
+    homeTeam: { tla: "URY" }, awayTeam: { tla: "ESP" }, // FD code for Uruguay
+    score: { fullTime: { home: 1, away: 1 }, duration: "PENALTY_SHOOTOUT", winner: "HOME_TEAM" },
+  }] });
+  const r = await fetchFD({ fifaMatch: 90, homeTeam: "URU", awayTeam: "ESP", kickoffIso: KICK });
+  eq(r.finished, true, "FD alias: fixture found via URY->URU");
+  eq(r.homeCode, "URU", "FD alias: homeCode mapped to our URU");
+  eq(r.advancingTeam, "URU", "FD alias: advancing mapped to our URU");
+}
+
 // --- FD 4. Not finished ---
 {
   mockFetchOnce({ matches: [{

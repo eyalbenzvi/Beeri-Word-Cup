@@ -49,14 +49,22 @@ async function getJson(url, token) {
   }
 }
 
-// Find the fixture whose two teams' TLA codes are exactly the expected pair
-// (orientation-independent). football-data TLAs are FIFA-aligned, so this is a
-// reliable identity match.
+// football-data uses a handful of TLAs that differ from our FIFA codes
+// (verified against the live WC squad list). Map FD's code -> ours so every
+// comparison below happens in our code space.
+const FD_TO_OURS = { CUW: "CUR", URY: "URU" };
+function ourCode(tla) {
+  const c = norm(tla);
+  return FD_TO_OURS[c] || c;
+}
+
+// Find the fixture whose two teams' codes are exactly the expected pair
+// (orientation-independent), comparing in OUR code space.
 function findFixture(matches, homeTeam, awayTeam) {
   const want = new Set([norm(homeTeam), norm(awayTeam)]);
   return (matches || []).find((m) => {
-    const h = norm(m?.homeTeam?.tla);
-    const a = norm(m?.awayTeam?.tla);
+    const h = ourCode(m?.homeTeam?.tla);
+    const a = ourCode(m?.awayTeam?.tla);
     return h && a && want.has(h) && want.has(a) && h !== a;
   });
 }
@@ -64,8 +72,8 @@ function findFixture(matches, homeTeam, awayTeam) {
 function tlaWinner(match) {
   // score.winner is "HOME_TEAM" | "AWAY_TEAM" | "DRAW" for the overall result.
   const w = match?.score?.winner;
-  if (w === "HOME_TEAM") return match?.homeTeam?.tla || null;
-  if (w === "AWAY_TEAM") return match?.awayTeam?.tla || null;
+  if (w === "HOME_TEAM") return ourCode(match?.homeTeam?.tla) || null;
+  if (w === "AWAY_TEAM") return ourCode(match?.awayTeam?.tla) || null;
   return null;
 }
 
@@ -101,8 +109,8 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
   const ft = match?.score?.fullTime || {};
   let home90 = typeof ft.home === "number" ? ft.home : null;
   let away90 = typeof ft.away === "number" ? ft.away : null;
-  let homeCode = match?.homeTeam?.tla || null;
-  let awayCode = match?.awayTeam?.tla || null;
+  let homeCode = ourCode(match?.homeTeam?.tla) || null;
+  let awayCode = ourCode(match?.awayTeam?.tla) || null;
   const duration = match?.score?.duration || null;
 
   // Orient to OUR schedule's home/away. football-data may list the fixture in
