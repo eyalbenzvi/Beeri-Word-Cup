@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { BestCaseResult } from "../utils/bestCase";
+import { isBestCaseAvailable } from "../utils/bestCase";
 import { useAllPredictions, useMatchResults } from "./useStore";
 
 type Phase =
@@ -36,9 +37,15 @@ export function useBestCase(formId: string | null): {
   state: BestCaseState;
   compute: () => void;
   reset: () => void;
+  available: boolean;
 } {
   const allForms = useAllPredictions();
   const matchResults = useMatchResults();
+  // Gate: optimizer is only available once the group stage is complete
+  // (all R32 qualifiers determined). Before the results listener loads,
+  // matchResults is {} → unavailable, which is the safe default (no flash
+  // of an enabled button while data is still in flight).
+  const available = isBestCaseAvailable(matchResults);
   const workerRef = useRef<Worker | null>(null);
   // Tracks whether the component is still mounted — guards every async
   // setState inside the worker handlers against post-unmount calls
@@ -84,7 +91,9 @@ export function useBestCase(formId: string | null): {
   }, [safeSetState]);
 
   const compute = useCallback(() => {
-    if (!formId) return;
+    // `available` is re-checked here (not just at the button) so any other
+    // caller — e.g. the error-state retry — is equally gated.
+    if (!formId || !available) return;
 
     // Terminate any prior worker
     workerRef.current?.terminate();
@@ -157,7 +166,7 @@ export function useBestCase(formId: string | null): {
       allForms,
       playedResults: matchResults,
     });
-  }, [formId, allForms, matchResults, safeSetState]);
+  }, [formId, available, allForms, matchResults, safeSetState]);
 
-  return { state, compute, reset };
+  return { state, compute, reset, available };
 }

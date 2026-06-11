@@ -23,18 +23,32 @@ const allMatches = [...groupMatches, ...knockoutMatches];
 
 function Bar({ label, count, total, color = "bg-primary" }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
+  const width = count > 0 ? Math.max(pct, 8) : 0;
+  // A narrow fill can't contain the count label without clipping it —
+  // below this width the count renders on the track, past the fill's tip.
+  const countFitsInside = width >= 25;
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-24 text-right text-ink font-bold truncate">
         {label}
       </span>
-      <div className="flex-1 bg-bg-soft rounded-full h-6 overflow-hidden border border-border">
+      <div className="relative flex-1 bg-bg-soft rounded-full h-6 overflow-hidden border border-border">
         <div
           className={`${color} h-full rounded-full transition-all duration-500 flex items-center justify-end px-2`}
-          style={{ width: `${count > 0 ? Math.max(pct, 8) : 0}%` }}
+          style={{ width: `${width}%` }}
         >
-          <span className="text-white text-xs font-extrabold">{count}</span>
+          {countFitsInside && (
+            <span className="text-white text-xs font-extrabold">{count}</span>
+          )}
         </div>
+        {!countFitsInside && count > 0 && (
+          <span
+            className="absolute inset-y-0 flex items-center px-2 text-ink text-xs font-extrabold"
+            style={{ insetInlineStart: `${width}%` }}
+          >
+            {count}
+          </span>
+        )}
       </div>
       <span className="w-10 text-left text-ink-muted text-xs font-bold">
         {pct.toFixed(0)}%

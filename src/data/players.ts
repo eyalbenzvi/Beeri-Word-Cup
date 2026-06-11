@@ -1196,6 +1196,7 @@ export const TOP_SCORER_PLAYERS = [
   { team: "COL", name: "Luis Sinisterra", nameHe: "לואיס סיניסטרה" },
   { team: "COL", name: "Miguel Borja", nameHe: "מיגל בורחה" },
   { team: "COL", name: "Yaser Asprilla", nameHe: "יאסר אספרייה" },
+  { team: "COL", name: "Luis Javier Suarez", nameHe: "לואיס חאבייר סוארס", striker: true },
 
   // Group L — ENG, CRO, GHA, PAN
   { team: "ENG", name: "Jordan Pickford", nameHe: "ג'ורדן פיקפורד" },

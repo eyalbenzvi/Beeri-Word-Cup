@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowRight, TrendingUp, TrendingDown, Search, X } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import {
@@ -19,8 +19,10 @@ import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
+import { preferredScrollBehavior } from "../utils/helpers";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
+import BackToTopButton from "../components/BackToTopButton";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -30,11 +32,11 @@ const allMatchesMap = Object.fromEntries(
 // the same again each time the user clicks "show more".
 const PAGE_SIZE = 20;
 
-// Auto-scroll grace period: enough for `content-visibility: auto` cards to
+// Scroll grace period: enough for `content-visibility: auto` cards to
 // finalise their intrinsic-size paint so getBoundingClientRect lands on the
 // actual element. Below ~120ms the scroll lands a few hundred pixels off on
 // long lists.
-const AUTO_SCROLL_DELAY_MS = 150;
+const SCROLL_DELAY_MS = 150;
 
 // Cap on the search query length. Matches AllForms' filter input so a user
 // who copies a string between the two pages doesn't get a different
@@ -71,14 +73,14 @@ export default function Leaderboard({
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState("");
-  const autoScrolledRef = useRef(false);
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
   // Find every form belonging to the current user, sorted by rank ascending
   // (best first). On the locked tournament view this powers the "your forms:
-  // #5, #23, #87" jump list and the auto-scroll to the user's best entry.
+  // #5, #23, #87" jump list. The page itself always opens at the top —
+  // jumping to your own row is a deliberate tap, never an auto-scroll.
   const myForms = useMemo(() => {
     if (!user?.id) return [];
     return rankedLeaderboard.filter((e) => e.userId === user.id);
@@ -144,8 +146,10 @@ export default function Leaderboard({
   }, [searchQuery, rankedLeaderboard, searchHaystacks]);
 
   // Smooth jump to a leaderboard row, expanding the page-size if the row
-  // would otherwise be clipped behind "show more". Used by both the
-  // auto-scroll effect below and the user-controlled "קפוץ" buttons.
+  // would otherwise be clipped behind "show more". Triggered ONLY by the
+  // user-controlled "הטפסים שלך" jump chips — the page never scrolls on
+  // its own (an entry auto-scroll used to live here and was removed:
+  // landing mid-table disoriented users more than it helped).
   const jumpToForm = (formId: string) => {
     const idx = rankedLeaderboard.findIndex((e) => e.formId === formId);
     if (idx < 0) return;
@@ -155,36 +159,9 @@ export default function Leaderboard({
     }
     setTimeout(() => {
       const el = document.getElementById(`lb-form-${formId}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, AUTO_SCROLL_DELAY_MS);
+      el?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
+    }, SCROLL_DELAY_MS);
   };
-
-  // Auto-scroll once per page entry to the user's best-ranked form, but only
-  // if it's outside the initial visible page (otherwise scrolling past
-  // pos #1-3 just to show the user their #5 is more annoying than helpful).
-  // Skipped in embedded admin preview, when a form is being inspected, or
-  // when the user has 0/1 forms — the latter is auto-pinned anyway.
-  //
-  // While the search box has a value we ALSO mark the auto-scroll as
-  // consumed: otherwise typing-then-clearing the query re-runs the effect
-  // mid-session and yanks the page to the user's best form unexpectedly.
-  // The auto-scroll is meant as a one-shot landing affordance on entry,
-  // not a behaviour that re-arms after every interaction.
-  useEffect(() => {
-    if (embedded || selectedForm || autoScrolledRef.current) return;
-    if (isSearching) {
-      autoScrolledRef.current = true;
-      return;
-    }
-    if (myForms.length === 0) return;
-    const best = myForms[0];
-    const idx = rankedLeaderboard.findIndex((e) => e.formId === best.formId);
-    if (idx < 0) return;
-    autoScrolledRef.current = true;
-    if (idx < PAGE_SIZE) return; // already on the first screen, no scroll needed
-    jumpToForm(best.formId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myForms, rankedLeaderboard, embedded, selectedForm, isSearching]);
 
   // When a form is opened from the leaderboard, jump to the top of the page
   // so the user starts reading from the form header instead of inheriting the
@@ -448,13 +425,16 @@ export default function Leaderboard({
         renderFormDetail()
       ) : (
         <>
-          {!embedded && myForms.length > 1 && (
+          {/* Shown from a single form up: with no auto-scroll the chip is
+              the only fast path to your own row, so a one-form user needs
+              it just as much as a ten-form user. */}
+          {!embedded && myForms.length >= 1 && (
             <div
               className="card-duo mb-3"
               style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
             >
               <div className="text-xs font-extrabold text-ink mb-2">
-                הטפסים שלך:
+                {myForms.length === 1 ? "הטופס שלך:" : "הטפסים שלך:"}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {myForms.map((f) => (
@@ -679,6 +659,11 @@ export default function Leaderboard({
           </div>
         </>
       )}
+
+      {/* Floating back-to-top — covers both the long ranked list and the
+          long form-detail view. Skipped in embedded admin preview, where
+          the leaderboard renders inside another page's scroll context. */}
+      {!embedded && <BackToTopButton />}
     </div>
   );
 }

@@ -64,7 +64,7 @@ function ScenarioOverlay({
 }
 
 export default function BestCasePanel({ formId, onReset }: Props) {
-  const { state, compute, reset } = useBestCase(formId);
+  const { state, compute, reset, available } = useBestCase(formId);
   const [scenarioOpen, setScenarioOpen] = useState(false);
 
   // Reset whenever formId changes (user navigates to a different form).
@@ -76,17 +76,25 @@ export default function BestCasePanel({ formId, onReset }: Props) {
     onReset?.();
   }, [formId, reset, onReset]);
 
-  // Not yet triggered
+  // Not yet triggered. Disabled until the group stage is complete (all
+  // R32 qualifiers determined) — before that the optimization is both
+  // meaningless and prohibitively slow.
   if (state.phase === "idle") {
     return (
       <div className="mt-3 pt-3 border-t border-border">
         <button
           onClick={compute}
+          disabled={!available}
           className="btn-duo btn-duo-ghost w-full flex items-center justify-center gap-2 text-sm font-extrabold"
         >
           <Sparkles size={15} aria-hidden="true" />
           חשב תרחיש מיטבי
         </button>
+        {!available && (
+          <p className="text-xs text-ink-light font-medium text-center mt-2">
+            החישוב יהיה זמין בתום שלב הבתים, כשכל העולות לשלב ה־32 ייקבעו
+          </p>
+        )}
       </div>
     );
   }
@@ -116,6 +124,7 @@ export default function BestCasePanel({ formId, onReset }: Props) {
         <p className="text-xs text-danger font-bold mb-2">שגיאה בחישוב התרחיש המיטבי.</p>
         <button
           onClick={compute}
+          disabled={!available}
           className="btn-duo btn-duo-ghost text-sm font-extrabold"
         >
           נסה שוב

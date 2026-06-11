@@ -10,8 +10,6 @@ import {
   useAllPredictions,
   useUserDirectory,
   useCurrentUser,
-  useSettings,
-  useSettingsReady,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { BLOG } from "../constants/messages";
@@ -36,8 +34,6 @@ export default function DailySummary() {
   const allPredictions = useAllPredictions();
   const users = useUserDirectory();
   const { user } = useCurrentUser();
-  const settings = useSettings();
-  const settingsReady = useSettingsReady();
   const summariesReady = useSummariesReady();
   const { params, navigate } = useNavigation();
 
@@ -91,18 +87,18 @@ export default function DailySummary() {
   }, [active, params?.n]);
 
   // For a guest hitting /blog directly, the store starts with default
-  // values (predictionsLocked: false, summaries: {}) until the public
-  // listeners resolve a moment later. Without readiness gates, the first
-  // render briefly shows "אין עדיין סיכומים" — wrongly — even when there
-  // IS a published post. We hold a loading state until BOTH:
-  //   1. settings is loaded (to know if predictionsLocked is true), AND
-  //   2. summaries listener has fired at least once (to know if there's
-  //      really nothing, vs. just not arrived yet).
+  // values (summaries: {}) until the public listeners resolve a moment
+  // later. Without a readiness gate, the first render briefly shows
+  // "אין עדיין סיכומים" — wrongly — even when there IS a published post.
+  // We hold a loading state until the summaries source has fired at least
+  // once (to know if there's really nothing, vs. just not arrived yet).
+  // Settings readiness is deliberately NOT a dependency anymore: the blog
+  // renders published posts regardless of predictionsLocked, so a settings
+  // outage must not block it.
   // Admins go through the full auth flow + App.jsx ready gate, so by the
   // time they see this component the store is already populated; the
-  // readiness checks below are no-ops for them.
-  const predictionsLocked = !!settings?.predictionsLocked;
-  const blogDataReady = settingsReady && summariesReady;
+  // readiness check below is a no-op for them.
+  const blogDataReady = summariesReady;
   if (!user?.isAdmin && !blogDataReady) {
     return (
       <div className="text-center py-8 text-ink-muted font-bold">
@@ -111,20 +107,14 @@ export default function DailySummary() {
     );
   }
 
-  // Pre-tournament: hide the blog from logged-out guests. Logged-in users
-  // (including admins) keep access — they see published summaries or an
-  // empty state.
-  if (!user && !predictionsLocked) {
-    return (
-      <div>
-        <PageHeader eyebrow={BLOG.pageTitle} title="סיכומים יומיים" />
-        <EmptyState
-          icon="📰"
-          title={BLOG.public.emptyTitle}
-        />
-      </div>
-    );
-  }
+  // No pre-tournament gate for guests anymore. The old `!user &&
+  // !predictionsLocked` branch rendered the same "אין עדיין סיכומים" empty
+  // state as the no-summaries case below, which meant a guest whose client
+  // failed to learn predictionsLocked (settings fetch outage, hung unauth
+  // listener) saw a false "nothing published" even when summaries HAD
+  // loaded. Published posts are public by definition — if they're in the
+  // cache, show them; if there are none, the generic empty state below
+  // covers the pre-tournament case with the exact same UI.
 
   // No summaries at all (now safe to evaluate — the summaries listener has
   // either resolved with data or genuinely returned an empty set).

@@ -196,25 +196,30 @@ assert(/\.local/.test(shareBtn), "share button detects .local mDNS");
 //   (c) store + hooks expose isSettingsReady / isSummariesReady symbols.
 console.log("--- REGRESSION: guest blog readiness race ---");
 
-// (a) DailySummary checks both readiness flags before either empty state.
-assert(/useSettingsReady/.test(dailyPage),
-  "DailySummary imports useSettingsReady");
+// (a) DailySummary gates the empty state on summaries readiness ONLY.
+// Settings readiness was deliberately dropped as a dependency: the blog
+// renders published posts regardless of predictionsLocked, so a settings
+// outage must not block it (it used to produce a false "אין עדיין
+// סיכומים" for guests whose client never learned the lock state).
 assert(/useSummariesReady/.test(dailyPage),
   "DailySummary imports useSummariesReady");
-assert(/const\s+settingsReady\s*=\s*useSettingsReady\(\)/.test(dailyPage),
-  "DailySummary calls useSettingsReady()");
 assert(/const\s+summariesReady\s*=\s*useSummariesReady\(\)/.test(dailyPage),
   "DailySummary calls useSummariesReady()");
-// Combined readiness gate — non-admins see "טוען..." until both flags are true.
-assert(/blogDataReady\s*=\s*settingsReady\s*&&\s*summariesReady/.test(dailyPage),
-  "DailySummary combines settings + summaries readiness");
+assert(/blogDataReady\s*=\s*summariesReady/.test(dailyPage),
+  "DailySummary readiness gate depends on summaries only");
+assert(!/blogDataReady\s*=\s*settingsReady\s*&&/.test(dailyPage),
+  "DailySummary no longer blocks the blog on settings readiness");
 assert(/if\s*\(!user\?\.isAdmin\s*&&\s*!blogDataReady\)/.test(dailyPage),
-  "DailySummary holds loading state for non-admins until both flags are ready");
-// Empty-state gates still exist (for after data has loaded).
-// Pre-tournament gate now only applies to logged-out guests — any signed-in
-// user (admin or not) sees the blog regardless of tournament-locked state.
-assert(/if\s*\(!user\s*&&\s*!predictionsLocked\)/.test(dailyPage),
-  "Pre-tournament gate fires for guests only");
+  "DailySummary holds loading state for non-admins until summaries are ready");
+// The pre-tournament guest gate is GONE: it rendered the exact same
+// "אין עדיין סיכומים" empty state as the no-summaries case, turning any
+// failure to learn predictionsLocked into a false "nothing published".
+// Published posts are public by definition — if they're in the cache they
+// render, for guests and signed-in users alike.
+assert(!/if\s*\(!user\s*&&\s*!predictionsLocked\)/.test(dailyPage),
+  "Pre-tournament guest gate removed — published posts always render");
+assert(!/useSettings\b/.test(dailyPage.replace(/useSettingsReady/g, "")),
+  "DailySummary no longer reads settings at all");
 assert(/if\s*\(visibleSummaries\.length\s*===\s*0\)/.test(dailyPage),
   "no-summaries gate still exists for the actually-empty case");
 

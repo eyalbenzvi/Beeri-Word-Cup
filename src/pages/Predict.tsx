@@ -49,6 +49,7 @@ import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import AIFillOverlay from "../components/AIFillOverlay";
 import FinalistsPickerModal from "../components/FinalistsPickerModal";
 import InlineError from "../components/InlineError";
+import ExportFormButtons from "../components/ExportFormButtons";
 import { TOP_SCORER_PLAYERS } from "../data/players";
 import { validateForm } from "../utils/formValidation";
 import { LABELS } from "../constants/messages";
@@ -549,6 +550,9 @@ export default function Predict() {
               פתח לעריכה
             </button>
           )}
+          <div className="border-t border-primary/20 mt-3 pt-3 flex gap-2 justify-center">
+            <ExportFormButtons form={activeForm} />
+          </div>
         </div>
       )}
 

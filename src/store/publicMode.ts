@@ -19,9 +19,9 @@
 //   - fetchPublicSettingsOnce / fetchPublicSummariesOnce — periodic fetchers.
 //   - initPublicReadonlyMode / teardownPublicReadonlyMode — entry / exit.
 
-import { onSnapshot } from "firebase/firestore";
+import { getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { captureClientError, captureClientMessage } from "../sentry";
-import { gameDocRef } from "./firestoreClient";
+import { gameDocRef, summariesCollectionRef, withTimeout } from "./firestoreClient";
 import { cache, notifyAndEmit } from "./cache";
 
 let publicModeInitialized = false;
@@ -144,11 +144,46 @@ async function fetchPublicSettingsOnce() {
   }
 }
 
+// Direct-Firestore fallback for summaries, used only when the Netlify
+// function fails (non-ok response, network error, or a deploy where the
+// function doesn't exist). firestore.rules allows unauthenticated reads of
+// published summaries — the `status == 'published'` filter makes the query
+// provably safe — and a one-shot getDocs wrapped in withTimeout cannot trap
+// the viewer the way the unauth onSnapshot listener was observed to: a hang
+// resolves into a rejection and we keep whatever the cache already holds.
+async function fetchSummariesDirectFallback() {
+  try {
+    const snap = await withTimeout(
+      getDocs(query(summariesCollectionRef, where("status", "==", "published"))),
+      8000,
+    );
+    if (!publicModeInitialized) return false;
+    const map: Record<string, any> = {};
+    snap.forEach((d: any) => {
+      map[d.id] = { id: d.id, ...d.data() };
+    });
+    cache.summaries = map;
+    cache._ready.summaries = true;
+    notifyAndEmit("summaries");
+    captureClientMessage("public-summaries-direct-fallback-ok", {
+      count: Object.keys(map).length,
+    }, "info");
+    return true;
+  } catch (err: any) {
+    captureClientMessage("public-summaries-direct-fallback-threw", {
+      message: err?.message || "unknown",
+    }, "warning");
+    return false;
+  }
+}
+
 // Mirrors fetchPublicSettingsOnce. We use a Netlify function (Admin SDK
 // server-side) instead of a browser-side Firestore collection-query
 // listener because the unauth onSnapshot path was observed to hang
 // indefinitely in incognito (no success, no error fired), trapping guest
 // viewers on the empty state. A plain HTTPS GET has no such failure mode.
+// If the function itself fails, fetchSummariesDirectFallback above reads
+// the published set straight from Firestore so the blog still renders.
 async function fetchPublicSummariesOnce() {
   if (!publicModeInitialized) return;
   let succeeded = false;
@@ -182,8 +217,14 @@ async function fetchPublicSummariesOnce() {
     }, "warning");
   }
   if (!succeeded && publicModeInitialized) {
-    cache._ready.summaries = true;
-    notifyAndEmit("summaries");
+    // Second transport: read published summaries straight from Firestore.
+    // Only if that ALSO fails do we flip readiness over the existing cache
+    // so the UI exits the loading state (30s retry may still recover).
+    const recovered = await fetchSummariesDirectFallback();
+    if (!recovered && publicModeInitialized) {
+      cache._ready.summaries = true;
+      notifyAndEmit("summaries");
+    }
   }
 }
 
