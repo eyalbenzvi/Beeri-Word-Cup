@@ -194,7 +194,7 @@ export default function UpcomingMatches({ matchResultsOverride }: { matchResults
     );
   }
 
-  // The 25-hour window can span two Israel calendar days — show a range.
+  // The 24-hour window can span two Israel calendar days — show a range.
   const firstDate = formatIsraelDateLabel(matches[0]);
   const lastDate = formatIsraelDateLabel(matches[matches.length - 1]);
   const headingDate =

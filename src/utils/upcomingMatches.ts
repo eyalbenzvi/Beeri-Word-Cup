@@ -1,15 +1,14 @@
 import { getMatchKickoffUTC } from "./matchTime";
 
-// Window size for the home-page widget: 25 hours, so a match that kicks off
-// "tomorrow at the same hour" is still included (24h + 1h buffer).
-export const UPCOMING_WINDOW_MS = 25 * 3600000;
+// Window size for the home-page widget: matches kicking off in the next 24h.
+export const UPCOMING_WINDOW_MS = 24 * 3600000;
 
 /**
  * Pure selector for the home-page upcoming-matches widget.
  *
  * Returns the list of matches to show:
  *   - kickoff time strictly in the future
- *   - kickoff within the next 25 hours
+ *   - kickoff within the next 24 hours
  *   - no recorded result yet
  *
  * @param {Array} allMatches Array of match objects (from src/data/matches).

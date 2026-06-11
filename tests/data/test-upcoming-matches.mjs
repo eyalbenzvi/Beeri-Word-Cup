@@ -1,6 +1,6 @@
 // Tests for src/utils/upcomingMatches.js (pure selector).
 // Verifies the home-page widget's rule: show all yet-to-happen matches
-// whose kickoff falls within the next 25 hours.
+// whose kickoff falls within the next 24 hours.
 
 import {
   selectUpcomingMatches,
@@ -21,7 +21,7 @@ console.log("=== UPCOMING MATCHES SELECTOR TESTS ===\n");
 
 // ---- 0. Window constant ----
 console.log("--- 0. Window constant ---");
-assert(UPCOMING_WINDOW_MS === 25 * 3600000, "Window is 25 hours");
+assert(UPCOMING_WINDOW_MS === 24 * 3600000, "Window is 24 hours");
 
 // ---- 1. Empty/invalid inputs ----
 console.log("--- 1. Empty / invalid inputs ---");
@@ -42,23 +42,23 @@ assert(
   "Matches without date/time ignored"
 );
 
-// ---- 2. Long before tournament: nothing within 25 hours ----
+// ---- 2. Long before tournament: nothing within 24 hours ----
 console.log("--- 2. Before tournament ---");
 {
   const now = Date.UTC(2026, 5, 1, 0, 0); // Jun 1, way before kickoff
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 0, `No matches within 25h on Jun 1, got ${result.length}`);
+  assert(result.length === 0, `No matches within 24h on Jun 1, got ${result.length}`);
 }
 {
-  // Jun 11 00:00 Israel (= Jun 10 21:00 UTC): window ends Jun 12 01:00 Israel,
+  // Jun 11 00:00 Israel (= Jun 10 21:00 UTC): window ends Jun 12 00:00 Israel,
   // covering only match 1 (Jun 11 22:00 Israel).
   const now = Date.UTC(2026, 5, 10, 21, 0);
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 1, `Only opening match within 25h, got ${result.length}`);
+  assert(result.length === 1, `Only opening match within 24h, got ${result.length}`);
   assert(result[0].id === "group-A-1", `First upcoming is opener, got ${result[0]?.id}`);
 }
 
-// ---- 3. After first match starts: next 25h of matches shown ----
+// ---- 3. After first match starts: next 24h of matches shown ----
 console.log("--- 3. After first match kicks off ---");
 {
   const firstMatch = groupMatches.find(m => m.date === "Jun 11");
@@ -66,7 +66,7 @@ console.log("--- 3. After first match kicks off ---");
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
   // Window ends Jun 12 22:01 Israel. Covers match 2 (Jun 12 05:00) and
   // match 3 (Jun 12 22:00) but not Jun 13 04:00.
-  assert(result.length === 2, `Two matches within 25h, got ${result.length}`);
+  assert(result.length === 2, `Two matches within 24h, got ${result.length}`);
   const dates = new Set(result.map(m => m.date));
   assert(dates.size === 1 && dates.has("Jun 12"), `Both on Jun 12, got ${[...dates].join(",")}`);
 }
@@ -75,11 +75,11 @@ console.log("--- 3. After first match kicks off ---");
 console.log("--- 4. Busy day within window ---");
 {
   // Jun 14 has 01:00, 04:00, 07:00, 20:00, 23:00 Israel.
-  // Now = Jun 14 00:30 Israel -> window ends Jun 15 01:30 Israel.
+  // Now = Jun 14 00:30 Israel -> window ends Jun 15 00:30 Israel.
   // All five Jun 14 matches are inside; Jun 15 02:00 is not.
   const now = Date.UTC(2026, 5, 13, 21, 30, 0); // Jun 14 00:30 Israel
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 5, `Five Jun 14 matches within 25h, got ${result.length}`);
+  assert(result.length === 5, `Five Jun 14 matches within 24h, got ${result.length}`);
   const dates = new Set(result.map(m => m.date));
   assert(dates.size === 1 && dates.has("Jun 14"), `All Jun 14, got ${[...dates].join(",")}`);
 }
@@ -87,11 +87,11 @@ console.log("--- 4. Busy day within window ---");
 // ---- 5. Window spans two Israel calendar days ----
 console.log("--- 5. Window spans two days ---");
 {
-  // Now = Jun 14 12:00 Israel (= Jun 14 09:00 UTC) -> window ends Jun 15 13:00.
+  // Now = Jun 14 12:00 Israel (= Jun 14 09:00 UTC) -> window ends Jun 15 12:00.
   // Inside: Jun 14 20:00 + 23:00, Jun 15 02:00 + 05:00. Outside: Jun 15 19:00.
   const now = Date.UTC(2026, 5, 14, 9, 0, 0);
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 4, `Four matches within 25h, got ${result.length}`);
+  assert(result.length === 4, `Four matches within 24h, got ${result.length}`);
   const dates = new Set(result.map(m => m.date));
   assert(dates.has("Jun 14") && dates.has("Jun 15"), `Spans Jun 14+15, got ${[...dates].join(",")}`);
   for (const m of result) {
@@ -103,14 +103,13 @@ console.log("--- 5. Window spans two days ---");
 // ---- 6. Late evening: rolls into the next day's matches ----
 console.log("--- 6. Late-evening rollover ---");
 {
-  // Now = Jun 14 23:30 Israel (= Jun 14 20:30 UTC) -> window ends Jun 16 00:30.
+  // Now = Jun 14 23:30 Israel (= Jun 14 20:30 UTC) -> window ends Jun 15 23:30.
   // Jun 14 23:00 already kicked off. Inside: Jun 15 02:00, 05:00, 19:00, 22:00.
-  // Outside: Jun 16 01:00 (kickoff Jun 15 22:00 UTC is exactly... no — Jun 16
-  // 01:00 Israel = Jun 15 22:00 UTC <= window end Jun 15 21:30+25h? window end
-  // = Jun 15 21:30 UTC. 22:00 UTC > 21:30 UTC -> outside.)
+  // Outside: Jun 16 01:00 Israel (= Jun 15 22:00 UTC > window end Jun 15
+  // 20:30 UTC).
   const now = Date.UTC(2026, 5, 14, 20, 30, 0);
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 4, `Four matches within 25h, got ${result.length}`);
+  assert(result.length === 4, `Four matches within 24h, got ${result.length}`);
   assert(result[0].date === "Jun 15", `First upcoming is Jun 15, got ${result[0]?.date}`);
   const dates = new Set(result.map(m => m.date));
   assert(dates.size === 1 && dates.has("Jun 15"), `All Jun 15, got ${[...dates].join(",")}`);
@@ -175,12 +174,12 @@ console.log("--- 11. Boundaries ---");
   // One millisecond before kickoff -> included.
   const justBefore = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - 1);
   assert(justBefore.some(m => m.id === firstMatch.id), "Included one ms before kickoff");
-  // Exactly 25 hours before kickoff -> included (window is inclusive).
+  // Exactly 24 hours before kickoff -> included (window is inclusive).
   const atEdge = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - UPCOMING_WINDOW_MS);
-  assert(atEdge.some(m => m.id === firstMatch.id), "Included exactly 25h before kickoff");
-  // 25 hours + 1ms before kickoff -> excluded.
+  assert(atEdge.some(m => m.id === firstMatch.id), "Included exactly 24h before kickoff");
+  // 24 hours + 1ms before kickoff -> excluded.
   const pastEdge = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - UPCOMING_WINDOW_MS - 1);
-  assert(!pastEdge.some(m => m.id === firstMatch.id), "Excluded just outside 25h window");
+  assert(!pastEdge.some(m => m.id === firstMatch.id), "Excluded just outside 24h window");
 }
 
 // ---- 12. Knockout matches appear in schedule ----
@@ -199,7 +198,7 @@ console.log("--- 12. Knockout matches participate ---");
   assert(result.some(m => m.id === "R32-1"), "Includes first R32 match");
   for (const m of result) {
     const k = getMatchKickoffUTC(m);
-    assert(k > now && k <= now + UPCOMING_WINDOW_MS, `${m.id} inside 25h window`);
+    assert(k > now && k <= now + UPCOMING_WINDOW_MS, `${m.id} inside 24h window`);
   }
 }
 
@@ -208,7 +207,7 @@ console.log("--- 13. Final day ---");
 {
   // 3rd place: Jul 19 00:00 Israel (= Jul 18 21:00 UTC).
   // Final:     Jul 19 22:00 Israel (= Jul 19 19:00 UTC).
-  // Now = Jul 18 23:00 Israel (= Jul 18 20:00 UTC): both within 25h.
+  // Now = Jul 18 23:00 Israel (= Jul 18 20:00 UTC): both within 24h.
   const now = Date.UTC(2026, 6, 18, 20, 0);
   const allExceptFinal = {};
   for (const m of ALL_MATCHES) {
@@ -216,15 +215,15 @@ console.log("--- 13. Final day ---");
     allExceptFinal[m.id] = { homeScore: 0, awayScore: 0 };
   }
   const result = selectUpcomingMatches(ALL_MATCHES, allExceptFinal, now);
-  assert(result.length === 2, `3rd place + final within 25h, got ${result.length}`);
+  assert(result.length === 2, `3rd place + final within 24h, got ${result.length}`);
   for (const m of result) {
     assert(m.date === "Jul 19", `All Jul 19: ${m.id} has ${m.date}`);
   }
-  // Earlier in the day (Jul 18 18:00 Israel) the final is >25h away — only
+  // Earlier in the day (Jul 18 18:00 Israel) the final is >24h away — only
   // the 3rd-place match shows.
   const earlier = Date.UTC(2026, 6, 18, 15, 0);
   const result2 = selectUpcomingMatches(ALL_MATCHES, allExceptFinal, earlier);
-  assert(result2.length === 1, `Only 3rd place within 25h, got ${result2.length}`);
+  assert(result2.length === 1, `Only 3rd place within 24h, got ${result2.length}`);
   assert(result2[0].id === "3RD-1", `Expected 3RD-1, got ${result2[0]?.id}`);
   // After 3rd place kicked off — only the final remains.
   const afterThird = Date.UTC(2026, 6, 18, 22, 0); // Jul 19 01:00 Israel
