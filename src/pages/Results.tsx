@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { CalendarDays, LayoutGrid } from "lucide-react";
 import { useMatchResults, useCurrentUser } from "../hooks/useStore";
-import { groupMatches, knockoutMatches } from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
+import { CHRONOLOGICAL_DAYS } from "../utils/chronologicalSchedule";
 import { getCachedBracket } from "../utils/bracketCache";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
@@ -10,9 +12,103 @@ import StageSelector from "../components/StageSelector";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 
+function getStageContextLabel(match) {
+  return match.stage === "group" ? `בית ${match.group}` : STAGES[match.stage];
+}
+
+function ResultMatchCard({ match, result, bracketTeams, chronological }) {
+  const isKnockout = match.stage !== "group";
+  const derived = isKnockout
+    ? {
+        home: result?.homeTeam || bracketTeams[match.id]?.home || null,
+        away: result?.awayTeam || bracketTeams[match.id]?.away || null,
+      }
+    : { home: match.homeTeam, away: match.awayTeam };
+  const homeTeam = derived.home ? getTeamByCode(derived.home) : null;
+  const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
+
+  // In chronological mode the day header already carries the date, so the
+  // meta row shows stage context instead, plus time · venue.
+  const metaLeft = chronological
+    ? getStageContextLabel(match)
+    : isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label)
+      ? match.label
+      : null;
+  const metaRight = (chronological
+    ? [match.time, match.venue]
+    : [match.date, match.time, match.venue]
+  )
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div
+      className={`bg-white rounded-2xl p-4 ${
+        result ? "border-2 border-primary/50" : "border border-border"
+      }`}
+    >
+      {(metaLeft || metaRight) && (
+        <div className="flex justify-between items-center mb-1.5">
+          {metaLeft ? (
+            <span className="text-xs text-secondary font-bold">{metaLeft}</span>
+          ) : (
+            <span />
+          )}
+          <span className="text-xs text-ink-muted">{metaRight}</span>
+        </div>
+      )}
+      {result ? (
+        <div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
+              {homeTeam?.name || "טרם נקבע"}
+            </span>
+            <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
+              {result.homeScore}
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-t border-border">
+            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
+              {awayTeam?.name || "טרם נקבע"}
+            </span>
+            <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
+              {result.awayScore}
+            </span>
+          </div>
+          {isKnockout &&
+            result.homeScore === result.awayScore &&
+            result.advancingTeam && (
+              <div className="text-xs text-ink-muted text-center mt-2 pt-2 border-t border-border font-bold">
+                בעיטות הכרעה:{" "}
+                {getTeamByCode(result.advancingTeam)?.name ||
+                  result.advancingTeam}
+              </div>
+            )}
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
+              {homeTeam?.name || "טרם נקבע"}
+            </span>
+            <span className="text-sm text-ink-light">–</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-t border-border">
+            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
+              {awayTeam?.name || "טרם נקבע"}
+            </span>
+            <span className="text-sm text-ink-light">–</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Results() {
   const results = useMatchResults();
   const { user } = useCurrentUser();
+  const [viewMode, setViewMode] = useState("stages");
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
 
@@ -46,109 +142,91 @@ export default function Results() {
         </div>
       </div>
 
-      <StageSelector
-        selectedStage={selectedStage}
-        onSelect={setSelectedStage}
-      />
-
-      {selectedStage === "group" && (
-        <GroupSelector
-          groups={Object.keys(GROUPS)}
-          selectedGroup={selectedGroup}
-          onSelect={setSelectedGroup}
-        />
-      )}
-
-      {selectedStage === "group" && (
-        <GroupTable matchData={results} group={selectedGroup} />
-      )}
-
-      <div className="space-y-2 md:grid md:grid-cols-2 xl:grid-cols-2 md:gap-3 md:space-y-0">
-        {filteredMatches.map((match) => {
-          const isKnockout = match.stage !== "group";
-          const result = results[match.id];
-          const derived = isKnockout
-            ? {
-                home:
-                  result?.homeTeam ||
-                  bracketTeams[match.id]?.home ||
-                  null,
-                away:
-                  result?.awayTeam ||
-                  bracketTeams[match.id]?.away ||
-                  null,
-              }
-            : { home: match.homeTeam, away: match.awayTeam };
-          const homeTeam = derived.home ? getTeamByCode(derived.home) : null;
-          const awayTeam = derived.away ? getTeamByCode(derived.away) : null;
-
-          return (
-            <div
-              key={match.id}
-              className={`bg-white rounded-2xl p-4 ${
-                result ? "border-2 border-primary/50" : "border border-border"
-              }`}
-            >
-              {match.date && (
-                <div className="flex justify-between items-center mb-1.5">
-                  {isKnockout && match.label && !/^W\d+\s+vs\s+W\d+$/.test(match.label) ? (
-                    <span className="text-xs text-secondary font-bold">
-                      {match.label}
-                    </span>
-                  ) : <span />}
-                  <span className="text-xs text-ink-muted">
-                    {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
-                  </span>
-                </div>
-              )}
-              {result ? (
-                <div>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-                      {homeTeam?.name || "טרם נקבע"}
-                    </span>
-                    <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
-                      {result.homeScore}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-t border-border">
-                    <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-                      {awayTeam?.name || "טרם נקבע"}
-                    </span>
-                    <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
-                      {result.awayScore}
-                    </span>
-                  </div>
-                  {isKnockout &&
-                    result.homeScore === result.awayScore &&
-                    result.advancingTeam && (
-                      <div className="text-xs text-ink-muted text-center mt-2 pt-2 border-t border-border font-bold">
-                        בעיטות הכרעה:{" "}
-                        {getTeamByCode(result.advancingTeam)?.name ||
-                          result.advancingTeam}
-                      </div>
-                    )}
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-                      {homeTeam?.name || "טרם נקבע"}
-                    </span>
-                    <span className="text-sm text-ink-light">–</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-t border-border">
-                    <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-                      {awayTeam?.name || "טרם נקבע"}
-                    </span>
-                    <span className="text-sm text-ink-light">–</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="flex gap-1 mb-3 bg-bg-soft rounded-xl p-1 border-2 border-border">
+        <button
+          type="button"
+          onClick={() => setViewMode("stages")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "stages"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "stages"}
+        >
+          <LayoutGrid size={14} />
+          לפי שלבים
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("chronological")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "chronological"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "chronological"}
+        >
+          <CalendarDays size={14} />
+          סדר כרונולוגי
+        </button>
       </div>
+
+      {viewMode === "stages" ? (
+        <>
+          <StageSelector
+            selectedStage={selectedStage}
+            onSelect={setSelectedStage}
+          />
+
+          {selectedStage === "group" && (
+            <GroupSelector
+              groups={Object.keys(GROUPS)}
+              selectedGroup={selectedGroup}
+              onSelect={setSelectedGroup}
+            />
+          )}
+
+          {selectedStage === "group" && (
+            <GroupTable matchData={results} group={selectedGroup} />
+          )}
+
+          <div className="space-y-2 md:grid md:grid-cols-2 xl:grid-cols-2 md:gap-3 md:space-y-0">
+            {filteredMatches.map((match) => (
+              <ResultMatchCard
+                key={match.id}
+                match={match}
+                result={results[match.id]}
+                bracketTeams={bracketTeams}
+                chronological={false}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <div>
+          {CHRONOLOGICAL_DAYS.map((day) => (
+            <div key={day.key}>
+              <div className="flex items-center gap-3 mt-5 mb-2 first:mt-0">
+                <span className="text-sm font-extrabold text-ink whitespace-nowrap">
+                  {day.label}
+                </span>
+                <div className="flex-1 border-t-2 border-border" />
+              </div>
+              <div className="space-y-2 md:grid md:grid-cols-2 xl:grid-cols-2 md:gap-3 md:space-y-0">
+                {day.matches.map((match) => (
+                  <ResultMatchCard
+                    key={match.id}
+                    match={match}
+                    result={results[match.id]}
+                    bracketTeams={bracketTeams}
+                    chronological
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {playedCount === 0 && (
         <div className="text-center py-12 card-duo-lg mt-4">
