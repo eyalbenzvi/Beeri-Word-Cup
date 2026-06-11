@@ -194,13 +194,19 @@ export default function UpcomingMatches({ matchResultsOverride }: { matchResults
     );
   }
 
-  const headingDate = formatIsraelDateLabel(matches[0]);
+  // The 25-hour window can span two Israel calendar days — show a range.
+  const firstDate = formatIsraelDateLabel(matches[0]);
+  const lastDate = formatIsraelDateLabel(matches[matches.length - 1]);
+  const headingDate =
+    firstDate && lastDate && firstDate !== lastDate
+      ? `${firstDate}–${lastDate}`
+      : firstDate;
 
   return (
     <div className="card-duo text-right">
       <div className="text-xs font-extrabold text-ink-muted mb-3 text-center">
         המשחקים הבאים
-        {headingDate ? ` · ${headingDate}` : ""} ({matches.length})
+        {headingDate ? <> · <bdi>{headingDate}</bdi></> : ""} ({matches.length})
       </div>
       <div
         className={

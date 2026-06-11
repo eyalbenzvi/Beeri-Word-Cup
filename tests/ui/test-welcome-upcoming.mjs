@@ -146,10 +146,15 @@ console.log("--- 4. selectUpcomingMatches with empty matchResults ---");
   assert(Array.isArray(matches), "Returns an array");
   assert(matches.length >= 1, "At least one upcoming match after kickoff");
 
-  // Well before kickoff — should still return upcoming matches (first day)
-  const nowBefore = Date.UTC(2026, 5, 1, 0, 0);
+  // Shortly before kickoff (within the 25h window) — opener is returned
+  const nowBefore = Date.UTC(2026, 5, 11, 9, 0); // Jun 11 12:00 Israel
   const matchesBefore = selectUpcomingMatches(ALL_MATCHES, {}, nowBefore);
-  assert(matchesBefore.length >= 1, "Upcoming matches available pre-kickoff");
+  assert(matchesBefore.length >= 1, "Upcoming matches available pre-kickoff (within 25h)");
+
+  // Long before kickoff — nothing within 25 hours, empty list
+  const wayBefore = Date.UTC(2026, 5, 1, 0, 0);
+  const matchesWayBefore = selectUpcomingMatches(ALL_MATCHES, {}, wayBefore);
+  assert(matchesWayBefore.length === 0, "No matches outside the 25h window");
 
   // Deep into tournament — still returns upcoming matches
   const mid = Date.UTC(2026, 5, 20, 0, 0);
@@ -474,9 +479,9 @@ console.log("--- 11. Logged-out upcoming matches filter ---");
   // logged-out user without the public override, matchResults is {} so
   // match #1 is still shown — which is exactly what the user reported.
 
-  // Simulate "now" before kickoff so kickoff-time filtering doesn't mask
-  // the results-based filter. The bug is about the result check failing.
-  const preKickoff = Date.UTC(2026, 3, 24, 12, 0); // Apr 24 2026, matches CLAUDE.md currentDate
+  // Simulate "now" before kickoff (but inside the 25h display window) so
+  // kickoff-time filtering doesn't mask the results-based filter.
+  const preKickoff = Date.UTC(2026, 5, 11, 9, 0); // Jun 11 12:00 Israel
 
   // Find whichever match is selected as the "first upcoming" at that time
   // without any results, then mark it as played in the override and verify
