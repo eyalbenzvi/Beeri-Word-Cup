@@ -40,7 +40,8 @@ function buildFullGroupPredictions(tweak = {}) {
 // ---- 1. User with no forms: widget shows matches only ----
 console.log("--- 1. No forms ---");
 {
-  const matches = selectUpcomingMatches(ALL_MATCHES, {}, Date.UTC(2026, 5, 1, 0, 0));
+  // Jun 11 12:00 Israel — opener (Jun 11 22:00) is within the 24h window.
+  const matches = selectUpcomingMatches(ALL_MATCHES, {}, Date.UTC(2026, 5, 11, 9, 0));
   assert(matches.length >= 1, "Matches returned");
   // simulate "no user" -> PredictionsList not rendered, matches still shown
   // (the selector itself is indifferent to user; this is a sanity check)
@@ -212,9 +213,9 @@ console.log("--- 11. Full simulation: transition to knockout ---");
   for (const m of groupMatches) {
     allGroupResults[m.id] = { homeScore: 1, awayScore: 0 };
   }
-  const now = Date.UTC(2026, 5, 27, 12, 0, 0); // Jun 27 15:00 Israel, near end of groups
+  const now = Date.UTC(2026, 5, 28, 0, 0, 0); // Jun 28 03:00 Israel, groups done
   const result = selectUpcomingMatches(ALL_MATCHES, allGroupResults, now);
-  // Should be R32 matches (first R32 is Jun 28)
+  // Should be R32 matches (first R32 is Jun 28 22:00 Israel, inside 24h window)
   assert(result.length > 0, "Returns matches");
   assert(result.every((m) => m.stage !== "group"), "All returned are knockout");
 }
