@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:legacy": "./tests/run-all.sh",
+    "export:forms": "esbuild scripts/export-all-forms.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=node_modules/.cache/export-all-forms.mjs && node node_modules/.cache/export-all-forms.mjs",
     "test:all": "tsc --noEmit && vitest run && ./tests/run-all.sh"
   },
   "dependencies": {
