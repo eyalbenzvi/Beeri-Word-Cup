@@ -66,6 +66,15 @@ function ownerName(directory: Record<string, any>, userId: string | undefined): 
   return full || "משתמש";
 }
 
+// The gameData/userDirectory doc nests its uid map under a `data` field
+// ({ data: { uid: {...} } } — see usersRepo's `data.${uid}` writes). Accept
+// both the raw doc and an already-flat map.
+export function unwrapDirectory(raw: Record<string, any> | null | undefined): Record<string, any> {
+  if (!raw) return {};
+  if (raw.data && typeof raw.data === "object") return raw.data;
+  return raw;
+}
+
 export function buildAllFormsWorkbook(
   formsById: Record<string, any>,
   directory: Record<string, any>,

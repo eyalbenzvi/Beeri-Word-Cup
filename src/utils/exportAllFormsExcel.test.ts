@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAllFormsWorkbook } from "./exportAllFormsExcel";
+import { buildAllFormsWorkbook, unwrapDirectory } from "./exportAllFormsExcel";
 import { groupMatches, ALL_MATCHES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 
@@ -116,6 +116,19 @@ describe("buildAllFormsWorkbook", () => {
       directory,
     );
     expect(sheets[3].rows).toHaveLength(1 + 2 * ALL_MATCHES.length);
+  });
+
+  it("unwraps the userDirectory `data` envelope (real Firestore doc shape)", () => {
+    // The live gameData/userDirectory doc is { data: { uid: {...} } } —
+    // without unwrapping, every owner silently falls back to "משתמש".
+    expect(unwrapDirectory({ data: directory })).toEqual(directory);
+    expect(unwrapDirectory(directory)).toEqual(directory);
+    expect(unwrapDirectory(null)).toEqual({});
+    const sheets = buildAllFormsWorkbook(
+      { "uid1__1": makeForm() },
+      unwrapDirectory({ data: directory }),
+    );
+    expect(sheets[0].rows[1][1]).toBe("אייל");
   });
 
   it("sorts forms by name", () => {

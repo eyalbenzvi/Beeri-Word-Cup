@@ -18,7 +18,7 @@
 import { readFileSync } from "fs";
 import admin from "firebase-admin";
 import XLSX from "xlsx";
-import { buildAllFormsWorkbook } from "../src/utils/exportAllFormsExcel";
+import { buildAllFormsWorkbook, unwrapDirectory } from "../src/utils/exportAllFormsExcel";
 import { normalizeStatus } from "../src/utils/helpers";
 
 function loadServiceAccount(): Record<string, any> {
@@ -48,7 +48,7 @@ async function main() {
   formsSnap.forEach((doc) => {
     formsById[doc.id] = doc.data();
   });
-  const directory = dirSnap.exists ? dirSnap.data() || {} : {};
+  const directory = unwrapDirectory(dirSnap.exists ? dirSnap.data() : null);
 
   const total = Object.keys(formsById).length;
   const submitted = Object.values(formsById).filter(
