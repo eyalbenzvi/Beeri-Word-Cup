@@ -1,4 +1,5 @@
 import { isSamePlayer } from "./playerSearch.js";
+import { triggerAutoFillCheck } from "./autoFillTrigger";
 
 export const POINTS = {
   group: {
@@ -149,6 +150,11 @@ export function calculateFullScore(
   predBracket?: Record<string, any>,
   actualBracket?: Record<string, any>,
 ) {
+  // Opportunistic: notice + ask the server to auto-fill any overdue match
+  // result. No-op unless the store registered the real trigger (i.e. not in
+  // the pure test harness). Cheap and never throws.
+  triggerAutoFillCheck();
+
   let totalPoints = 0;
   let exactScoreCount = 0;
   let outcomeCount = 0;

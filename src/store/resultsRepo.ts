@@ -30,7 +30,15 @@ export function getMatchResults() {
 export function saveMatchResult(matchId: string, result: any) {
   if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
-  results[matchId] = { ...result, updatedAt: new Date().toISOString() };
+  // A manual admin write is authoritative and marks the row as admin-owned
+  // (source="admin"), so the auto-fill function will never overwrite a score
+  // an admin has set or corrected. No approval step exists — auto-fill is
+  // fully automatic; this only protects deliberate manual overrides.
+  results[matchId] = {
+    ...result,
+    source: "admin",
+    updatedAt: new Date().toISOString(),
+  };
   writeGameDoc("matchResults", results);
 }
 

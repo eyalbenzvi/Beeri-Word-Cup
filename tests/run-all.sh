@@ -146,6 +146,9 @@ run_test "80. Transfer Form Ownership (admin move A→B)" "store/test-transfer-f
 run_test "81. Leaderboard Scroll (no auto-scroll + back-to-top)" "ui/test-leaderboard-scroll.mjs" "no"
 run_test "82. Stats Bar Readability (count label not clipped on narrow bars)" "ui/test-stats-bar-readability.mjs" "no"
 run_test "83. Results Chronological View (kickoff order + day grouping + toggle)" "ui/test-results-chronological.mjs" "yes"
+run_test "84. Auto-Fill Consensus (two-source agreement logic)" "store/test-auto-fill-consensus.mjs" "no"
+run_test "85. Auto-Fill Trigger Wiring (client + function + rules)" "store/test-auto-fill-trigger.mjs" "yes"
+run_test "86. Auto-Fill Source Clients (orientation, 90' score, retry)" "store/test-auto-fill-sources.mjs" "no"
 
 echo ""
 echo "==========================================="

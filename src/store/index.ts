@@ -36,6 +36,16 @@ import {
   flushPendingWrites,
 } from "./predictionsRepo";
 import { teardownListeners } from "./listeners";
+import { maybeTriggerAutoFill } from "./autoFill";
+import { registerAutoFillTrigger } from "../utils/autoFillTrigger";
+
+// Register the real (Firebase-backed) auto-fill trigger so that the pure
+// compute utilities (scoring.ts, bracket.ts) can poke it via the
+// dependency-free indirection without importing Firebase. Loading the store
+// barrel (which the app does at init) performs this wiring; the test harness
+// imports the pure utils directly and never registers, so the trigger stays a
+// no-op there.
+registerAutoFillTrigger(maybeTriggerAutoFill);
 
 // Public API re-exports.
 export { commitInBatches } from "./firestoreClient";
@@ -115,6 +125,7 @@ export {
   isSettingsReady,
   updateSettings,
 } from "./resultsRepo";
+export { maybeTriggerAutoFill } from "./autoFill";
 export {
   BACKUP_SCHEMA_VERSION,
   exportAllData,
