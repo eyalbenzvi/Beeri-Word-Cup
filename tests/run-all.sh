@@ -145,6 +145,7 @@ run_test "79. Admin Users Edit (display + scoped identity edit)" "ui/test-admin-
 run_test "80. Transfer Form Ownership (admin move A→B)" "store/test-transfer-form.mjs" "yes"
 run_test "81. Leaderboard Scroll (no auto-scroll + back-to-top)" "ui/test-leaderboard-scroll.mjs" "no"
 run_test "82. Stats Bar Readability (count label not clipped on narrow bars)" "ui/test-stats-bar-readability.mjs" "no"
+run_test "83. Results Chronological View (kickoff order + day grouping + toggle)" "ui/test-results-chronological.mjs" "yes"
 
 echo ""
 echo "==========================================="
