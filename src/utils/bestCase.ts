@@ -39,6 +39,20 @@ export type BestCaseResult = {
 
 export type ProgressCallback = (phase: string, percent: number) => void;
 
+// ─── Availability gate ────────────────────────────────────────────
+// The optimizer is only offered once the group stage is fully played:
+// all 32 R32 qualifiers (winners, runners-up, best thirds) are determined
+// only when ALL 12 groups are complete — best-third qualification compares
+// across groups, so partial completion is not enough. Before that point the
+// search space (72 group matches × refine) is also prohibitively large
+// (minutes of worker time with a real form population).
+
+export function isBestCaseAvailable(
+  playedResults: Record<string, any> | null | undefined,
+): boolean {
+  return groupMatches.every((m) => isScoreValid(playedResults?.[m.id]));
+}
+
 // ─── Per-form precomputed predictions (stable across all trials) ──
 // Computing each form's bracket / advancing / champion is the heaviest
 // derivation in the inner loop. They depend ONLY on the form's own
