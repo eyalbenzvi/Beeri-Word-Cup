@@ -106,12 +106,32 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
   }
 
   const finished = match.status === "FINISHED";
+  const duration = match?.score?.duration || null;
+
+  // END-OF-90-MINUTES score only. In football-data v4, score.fullTime is the
+  // FINAL result and, for a knockout that went to extra time, INCLUDES extra
+  // time (e.g. 2-1 even though it was 1-1 at 90'). The 90' score, when the API
+  // exposes it, lives in score.regularTime. Strategy that is correct no matter
+  // the exact field name:
+  //   - regularTime present            -> use it (the true 90' score);
+  //   - else duration === "REGULAR"    -> fullTime IS the 90' score (no ET);
+  //   - else (ET/PEN, no regularTime)  -> we cannot isolate 90' -> leave null,
+  //     which sets regulationAmbiguous below and declines to write (the match
+  //     is then entered manually). Group-stage matches are always REGULAR, so
+  //     they are unaffected.
   const ft = match?.score?.fullTime || {};
-  let home90 = typeof ft.home === "number" ? ft.home : null;
-  let away90 = typeof ft.away === "number" ? ft.away : null;
+  const reg = match?.score?.regularTime || null;
+  let home90 = null;
+  let away90 = null;
+  if (reg && typeof reg.home === "number" && typeof reg.away === "number") {
+    home90 = reg.home;
+    away90 = reg.away;
+  } else if (duration === "REGULAR") {
+    home90 = typeof ft.home === "number" ? ft.home : null;
+    away90 = typeof ft.away === "number" ? ft.away : null;
+  }
   let homeCode = ourCode(match?.homeTeam?.tla) || null;
   let awayCode = ourCode(match?.awayTeam?.tla) || null;
-  const duration = match?.score?.duration || null;
 
   // Orient to OUR schedule's home/away. football-data may list the fixture in
   // the opposite order (nominal "home" is arbitrary for neutral-venue and
