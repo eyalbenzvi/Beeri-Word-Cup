@@ -56,8 +56,12 @@ export default function PhoneSignIn() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: cleanPhone }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "שגיאה בשליחת SMS");
+      // A gateway timeout (504) or proxy error returns an HTML page, not JSON.
+      // res.json() would throw a cryptic SyntaxError that replaces the
+      // friendly Hebrew message — parse defensively instead.
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "שגיאה בשליחת SMS. נסה שוב בעוד רגע");
+      if (!data?.verificationToken) throw new Error("שגיאה בשליחת SMS. נסה שוב בעוד רגע");
       setOtpData({ verificationToken: data.verificationToken, expiresAt: data.expiresAt });
       setStep("code");
       setCooldown(60);
@@ -94,8 +98,11 @@ export default function PhoneSignIn() {
           expiresAt: otpData.expiresAt,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "אימות נכשל");
+      // Same defensive parse as send-otp: non-JSON gateway errors must not
+      // surface as a SyntaxError.
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "אימות נכשל. נסה שוב");
+      if (!data?.customToken) throw new Error("אימות נכשל. נסה שוב");
       await signInWithPhoneOtp(data.customToken);
       showToast("ברוך הבא! 📱");
     } catch (err) {

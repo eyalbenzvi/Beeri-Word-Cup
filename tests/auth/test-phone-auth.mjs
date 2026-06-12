@@ -530,6 +530,22 @@ console.log("--- 20. HMAC consistency across input formats ---");
   assert(t1 !== t5, "HMAC differs for different phone");
 }
 
+// ============ 21. PhoneSignIn: defensive JSON parsing (504-HTML regression) ============
+// A Netlify gateway timeout (504) returns an HTML page, not JSON. res.json()
+// then throws a cryptic SyntaxError ("The string did not match the expected
+// pattern" on Safari) that replaced the friendly Hebrew error. The component
+// must parse defensively and validate the payload before using it.
+console.log("--- 21. PhoneSignIn defensive JSON parsing ---");
+{
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../src/components/PhoneSignIn.tsx", import.meta.url), "utf8");
+  const defensiveParses = (src.match(/res\.json\(\)\.catch\(\(\) => null\)/g) || []).length;
+  assert(defensiveParses >= 2, "send-otp + verify-otp both parse JSON defensively (.catch(() => null))");
+  assert(!/const data = await res\.json\(\);/.test(src), "no bare res.json() left in PhoneSignIn");
+  assert(src.includes("data?.verificationToken"), "send-otp validates verificationToken before use");
+  assert(src.includes("data?.customToken"), "verify-otp validates customToken before use");
+}
+
 // ============ Summary ============
 console.log(`\n=== PHONE AUTH RESULTS: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach(f => console.log("  - " + f)); }
