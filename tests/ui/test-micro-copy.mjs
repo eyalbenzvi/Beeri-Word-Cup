@@ -13,15 +13,21 @@ const homeSrc = readMigratedSrc("src/pages/Home.jsx", "utf8");
 const lockMessagesSrc = readMigratedSrc("src/constants/messages.js", "utf8");
 
 // --- LOCKED STRINGS (per CLAUDE.md) ---
-// The canonical copy now lives in constants/messages.js; Home consumes it via
-// LOCK_MESSAGES.tournamentStarted. Both conditions must hold.
+// The canonical copy lives in constants/messages.js. Home intentionally no
+// longer shows the "submission closed" banner once predictions are locked
+// (removed by request — the locked home page shows live/upcoming matches
+// instead), so it must NOT reference the lock message anymore.
 assert(
   lockMessagesSrc.includes("המשחקים התחילו — ההגשה נסגרה"),
   "LOCK_MESSAGES.tournamentStarted contains the canonical lock-state string"
 );
 assert(
-  homeSrc.includes("LOCK_MESSAGES.tournamentStarted"),
-  "Home references LOCK_MESSAGES.tournamentStarted"
+  !homeSrc.includes("LOCK_MESSAGES.tournamentStarted"),
+  "Home no longer shows the tournamentStarted lock banner"
+);
+assert(
+  !homeSrc.includes("ההגשה נסגרה"),
+  "Home does not hard-code the lock-state string either"
 );
 
 // --- NEW COPY in place ---

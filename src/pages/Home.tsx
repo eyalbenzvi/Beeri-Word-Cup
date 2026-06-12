@@ -6,7 +6,7 @@ import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import MatchdayHero from "../components/MatchdayHero";
 import { useToast } from "../components/Toast";
-import { LOCK_MESSAGES, BRAND } from "../constants/messages";
+import { BRAND } from "../constants/messages";
 
 export default function Home() {
   const settings = useSettings();
@@ -70,31 +70,27 @@ export default function Home() {
         </div>
       )}
 
-      <div
-        className="rounded-2xl border-2 p-2.5"
-        style={settings.predictionsLocked
-          ? { background: "var(--color-accent-soft-2)", borderColor: "var(--color-accent)" }
-          : { background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
-      >
-        <div className="flex items-center justify-center gap-2">
-          <span
-            className="w-3 h-3 rounded-full animate-pulse"
-            style={{ background: settings.predictionsLocked ? "var(--color-accent)" : "var(--color-primary)" }}
-            aria-hidden="true"
-          />
-          <span className="sr-only">
-            {settings.predictionsLocked ? `סטטוס: ${LOCK_MESSAGES.tournamentStarted}` : "סטטוס: ניתן להגיש ולערוך טפסים"}
-          </span>
-          <span
-            className="text-sm font-extrabold"
-            style={{ color: settings.predictionsLocked ? "var(--color-accent-text)" : "var(--color-primary-dark)" }}
-          >
-            {settings.predictionsLocked
-              ? LOCK_MESSAGES.tournamentStarted
-              : "ניתן להגיש ולערוך טפסים"}
-          </span>
+      {!settings.predictionsLocked && (
+        <div
+          className="rounded-2xl border-2 p-2.5"
+          style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span
+              className="w-3 h-3 rounded-full animate-pulse"
+              style={{ background: "var(--color-primary)" }}
+              aria-hidden="true"
+            />
+            <span className="sr-only">סטטוס: ניתן להגיש ולערוך טפסים</span>
+            <span
+              className="text-sm font-extrabold"
+              style={{ color: "var(--color-primary-dark)" }}
+            >
+              ניתן להגיש ולערוך טפסים
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

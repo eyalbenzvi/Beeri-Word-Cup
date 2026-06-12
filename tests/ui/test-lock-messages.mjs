@@ -1,5 +1,8 @@
 // Verifies lock-state messages are centralised in constants/messages.js
-// and consumed by Home, FormList, and AllForms (avoids drift between pages).
+// and consumed by FormList and AllForms (avoids drift between pages).
+// Home no longer shows a lock banner — removed by request: once locked,
+// the home page shows live/upcoming matches without a "submission closed"
+// message at the bottom.
 import fs from "node:fs";
 import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
@@ -33,9 +36,12 @@ assert(
 );
 
 // --- Consumers reference the constant by name (not a duplicated string) ---
-assert(/LOCK_MESSAGES/.test(home), "Home.jsx references LOCK_MESSAGES");
 assert(/LOCK_MESSAGES/.test(formList), "FormList.jsx references LOCK_MESSAGES");
 assert(/LOCK_MESSAGES/.test(allForms), "AllForms.jsx references LOCK_MESSAGES");
+
+// --- Home dropped its lock banner (intentional) ---
+assert(!/LOCK_MESSAGES/.test(home), "Home.jsx no longer renders a lock banner");
+assert(!/ההגשה נסגרה/.test(home), "Home.jsx does not duplicate the lock string");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
