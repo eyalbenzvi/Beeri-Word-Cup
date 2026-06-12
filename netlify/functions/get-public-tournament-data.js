@@ -50,6 +50,9 @@ function initAdmin() {
     );
   }
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  // Force Firestore REST transport (firebase-admin gRPC hangs on Netlify cold
+  // starts -> 504s under load). try/catch so a re-init can never throw.
+  try { admin.firestore().settings({ preferRest: true }); } catch { /* already set */ }
   adminInitialized = true;
 }
 
