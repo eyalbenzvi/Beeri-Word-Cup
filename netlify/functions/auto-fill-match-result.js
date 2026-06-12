@@ -131,6 +131,12 @@ async function autoFillHandler(event) {
   if (event.httpMethod !== "POST") {
     return json(405, headers, { error: "Method Not Allowed" });
   }
+  // Hard kill switch: set AUTO_FILL_DISABLED=true in Netlify to neutralize the
+  // feature instantly, BEFORE any Firebase/Firestore work. Costs nothing and
+  // guarantees auto-fill cannot touch Firestore (use during an incident).
+  if (process.env.AUTO_FILL_DISABLED === "true") {
+    return json(503, headers, { error: "Auto-fill disabled" });
+  }
   if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
     return json(500, headers, { error: "Missing server configuration" });
   }
@@ -258,10 +264,15 @@ async function autoFillHandler(event) {
     const sources = [sourceSummary(fd)];
 
     if (consensus.decision !== "agreed") {
-      await writeAuditLog(db, {
-        matchId, uid, decision: consensus.decision, sources,
-        errorMessage: consensus.reason || null,
-      });
+      // Don't log the common, benign "not-finished" case — before a match ends
+      // every trigger would otherwise write an audit doc and burn Firestore
+      // write quota. Only record outcomes worth investigating.
+      if (consensus.decision !== "not-finished") {
+        await writeAuditLog(db, {
+          matchId, uid, decision: consensus.decision, sources,
+          errorMessage: consensus.reason || null,
+        });
+      }
       // Source unreachable -> 502; otherwise 202 (pending/ambiguous/disagree).
       const code = consensus.decision === "error" ? 502 : 202;
       return json(code, headers, { ok: false, decision: consensus.decision });
