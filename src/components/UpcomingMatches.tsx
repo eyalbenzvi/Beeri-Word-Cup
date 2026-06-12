@@ -154,8 +154,23 @@ function MatchRow({ match, actualTeams }) {
           </div>
         </div>
       </div>
-      {meta && (
-        <div className="text-xs text-ink-muted text-center mt-1">{meta}</div>
+      {match.isLive ? (
+        <div className="flex items-center justify-center gap-1.5 mt-1">
+          <span
+            className="w-2 h-2 rounded-full bg-danger animate-pulse"
+            aria-hidden="true"
+          />
+          <span className="text-xs font-extrabold text-danger">
+            משוחק עכשיו
+          </span>
+          {match.venue && (
+            <span className="text-xs text-ink-muted">· {match.venue}</span>
+          )}
+        </div>
+      ) : (
+        meta && (
+          <div className="text-xs text-ink-muted text-center mt-1">{meta}</div>
+        )
       )}
     </>
   );

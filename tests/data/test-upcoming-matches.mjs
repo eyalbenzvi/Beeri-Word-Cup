@@ -1,10 +1,12 @@
 // Tests for src/utils/upcomingMatches.js (pure selector).
 // Verifies the home-page widget's rule: show all yet-to-happen matches
-// whose kickoff falls within the next 24 hours.
+// whose kickoff falls within the next 24 hours, plus kicked-off matches
+// without a recorded result (marked isLive) for up to LIVE_WINDOW_MS.
 
 import {
   selectUpcomingMatches,
   UPCOMING_WINDOW_MS,
+  LIVE_WINDOW_MS,
 } from "/home/user/Beeri-World-Cup/src/utils/upcomingMatches.js";
 import {
   groupMatches,
@@ -58,17 +60,25 @@ console.log("--- 2. Before tournament ---");
   assert(result[0].id === "group-A-1", `First upcoming is opener, got ${result[0]?.id}`);
 }
 
-// ---- 3. After first match starts: next 24h of matches shown ----
+// ---- 3. After first match starts: shown as live + next 24h of matches ----
 console.log("--- 3. After first match kicks off ---");
 {
   const firstMatch = groupMatches.find(m => m.date === "Jun 11");
   const now = getMatchKickoffUTC(firstMatch) + 60_000; // 1 min after kickoff
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  // Window ends Jun 12 22:01 Israel. Covers match 2 (Jun 12 05:00) and
-  // match 3 (Jun 12 22:00) but not Jun 13 04:00.
-  assert(result.length === 2, `Two matches within 24h, got ${result.length}`);
-  const dates = new Set(result.map(m => m.date));
-  assert(dates.size === 1 && dates.has("Jun 12"), `Both on Jun 12, got ${[...dates].join(",")}`);
+  // Opener has no result yet -> stays visible as live. Window ends
+  // Jun 12 22:01 Israel: covers match 2 (Jun 12 05:00) and match 3
+  // (Jun 12 22:00) but not Jun 13 04:00.
+  assert(result.length === 3, `Live opener + two upcoming, got ${result.length}`);
+  assert(result[0].id === firstMatch.id, `Opener first, got ${result[0]?.id}`);
+  assert(result[0].isLive === true, "Opener marked isLive");
+  assert(result.slice(1).every(m => m.date === "Jun 12" && !m.isLive),
+    "Remaining are Jun 12 upcoming (not live)");
+  // Once a result is recorded the opener drops off.
+  const withResult = selectUpcomingMatches(
+    ALL_MATCHES, { [firstMatch.id]: { homeScore: 1, awayScore: 0 } }, now);
+  assert(withResult.length === 2 && !withResult.some(m => m.id === firstMatch.id),
+    "Opener removed once result recorded");
 }
 
 // ---- 4. Busy day: all of its matches inside the window ----
@@ -77,11 +87,16 @@ console.log("--- 4. Busy day within window ---");
   // Jun 14 has 01:00, 04:00, 07:00, 20:00, 23:00 Israel.
   // Now = Jun 14 00:30 Israel -> window ends Jun 15 00:30 Israel.
   // All five Jun 14 matches are inside; Jun 15 02:00 is not.
+  // Jun 13 22:00 kicked off 2.5h ago with no result -> shows as live.
   const now = Date.UTC(2026, 5, 13, 21, 30, 0); // Jun 14 00:30 Israel
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 5, `Five Jun 14 matches within 24h, got ${result.length}`);
-  const dates = new Set(result.map(m => m.date));
-  assert(dates.size === 1 && dates.has("Jun 14"), `All Jun 14, got ${[...dates].join(",")}`);
+  assert(result.length === 6, `Live Jun 13 match + five Jun 14, got ${result.length}`);
+  assert(result[0].date === "Jun 13" && result[0].isLive === true,
+    "Jun 13 22:00 still listed as live (no result yet)");
+  const upcoming = result.filter(m => !m.isLive);
+  assert(upcoming.length === 5, `Five upcoming Jun 14 matches, got ${upcoming.length}`);
+  const dates = new Set(upcoming.map(m => m.date));
+  assert(dates.size === 1 && dates.has("Jun 14"), `All upcoming Jun 14, got ${[...dates].join(",")}`);
 }
 
 // ---- 5. Window spans two Israel calendar days ----
@@ -104,15 +119,25 @@ console.log("--- 5. Window spans two days ---");
 console.log("--- 6. Late-evening rollover ---");
 {
   // Now = Jun 14 23:30 Israel (= Jun 14 20:30 UTC) -> window ends Jun 15 23:30.
-  // Jun 14 23:00 already kicked off. Inside: Jun 15 02:00, 05:00, 19:00, 22:00.
-  // Outside: Jun 16 01:00 Israel (= Jun 15 22:00 UTC > window end Jun 15
-  // 20:30 UTC).
+  // Jun 14 20:00 + 23:00 kicked off without results -> live. Upcoming inside:
+  // Jun 15 02:00, 05:00, 19:00, 22:00. Outside: Jun 16 01:00 Israel
+  // (= Jun 15 22:00 UTC > window end Jun 15 20:30 UTC).
   const now = Date.UTC(2026, 5, 14, 20, 30, 0);
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
-  assert(result.length === 4, `Four matches within 24h, got ${result.length}`);
-  assert(result[0].date === "Jun 15", `First upcoming is Jun 15, got ${result[0]?.date}`);
-  const dates = new Set(result.map(m => m.date));
-  assert(dates.size === 1 && dates.has("Jun 15"), `All Jun 15, got ${[...dates].join(",")}`);
+  assert(result.length === 6, `Two live + four upcoming, got ${result.length}`);
+  const live = result.filter(m => m.isLive);
+  assert(live.length === 2 && live.every(m => m.date === "Jun 14"),
+    `Jun 14 20:00 + 23:00 shown as live, got ${live.map(m => m.id).join(",")}`);
+  const upcoming = result.filter(m => !m.isLive);
+  assert(upcoming.length === 4, `Four upcoming, got ${upcoming.length}`);
+  const dates = new Set(upcoming.map(m => m.date));
+  assert(dates.size === 1 && dates.has("Jun 15"), `All upcoming Jun 15, got ${[...dates].join(",")}`);
+  // With results recorded for the kicked-off matches, only upcoming remain.
+  const results = {};
+  for (const m of live) results[m.id] = { homeScore: 0, awayScore: 0 };
+  const afterResults = selectUpcomingMatches(ALL_MATCHES, results, now);
+  assert(afterResults.length === 4 && afterResults[0].date === "Jun 15",
+    `Live matches drop once results recorded, got ${afterResults.length}`);
 }
 
 // ---- 7. matchResults excludes matches ----
@@ -168,18 +193,31 @@ console.log("--- 11. Boundaries ---");
 {
   const firstMatch = groupMatches[0]; // Jun 11 22:00 Israel
   const kickoff = getMatchKickoffUTC(firstMatch);
-  // At exact kickoff, the match is considered started -> excluded.
+  // At exact kickoff, the match is considered started -> shown as live.
   const atKickoff = selectUpcomingMatches(ALL_MATCHES, {}, kickoff);
-  assert(!atKickoff.some(m => m.id === firstMatch.id), "Match excluded at exact kickoff");
-  // One millisecond before kickoff -> included.
+  const liveEntry = atKickoff.find(m => m.id === firstMatch.id);
+  assert(liveEntry && liveEntry.isLive === true, "Match live at exact kickoff");
+  // One millisecond before kickoff -> included as upcoming (not live).
   const justBefore = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - 1);
-  assert(justBefore.some(m => m.id === firstMatch.id), "Included one ms before kickoff");
+  const upcomingEntry = justBefore.find(m => m.id === firstMatch.id);
+  assert(upcomingEntry && !upcomingEntry.isLive, "Included (not live) one ms before kickoff");
   // Exactly 24 hours before kickoff -> included (window is inclusive).
   const atEdge = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - UPCOMING_WINDOW_MS);
   assert(atEdge.some(m => m.id === firstMatch.id), "Included exactly 24h before kickoff");
   // 24 hours + 1ms before kickoff -> excluded.
   const pastEdge = selectUpcomingMatches(ALL_MATCHES, {}, kickoff - UPCOMING_WINDOW_MS - 1);
   assert(!pastEdge.some(m => m.id === firstMatch.id), "Excluded just outside 24h window");
+  // Just inside the live window -> still live; at/after its edge -> dropped.
+  const lateButLive = selectUpcomingMatches(ALL_MATCHES, {}, kickoff + LIVE_WINDOW_MS - 1);
+  assert(lateButLive.some(m => m.id === firstMatch.id && m.isLive),
+    "Still live just inside LIVE_WINDOW_MS");
+  const liveExpired = selectUpcomingMatches(ALL_MATCHES, {}, kickoff + LIVE_WINDOW_MS);
+  assert(!liveExpired.some(m => m.id === firstMatch.id),
+    "Dropped at LIVE_WINDOW_MS even without a result");
+  // A recorded result removes the match immediately, even mid-game.
+  const midGame = selectUpcomingMatches(
+    ALL_MATCHES, { [firstMatch.id]: { homeScore: 2, awayScore: 0 } }, kickoff + 60_000);
+  assert(!midGame.some(m => m.id === firstMatch.id), "Result recorded -> removed even while live");
 }
 
 // ---- 12. Knockout matches appear in schedule ----
@@ -225,11 +263,19 @@ console.log("--- 13. Final day ---");
   const result2 = selectUpcomingMatches(ALL_MATCHES, allExceptFinal, earlier);
   assert(result2.length === 1, `Only 3rd place within 24h, got ${result2.length}`);
   assert(result2[0].id === "3RD-1", `Expected 3RD-1, got ${result2[0]?.id}`);
-  // After 3rd place kicked off — only the final remains.
+  // After 3rd place kicked off (no result yet) — it shows as live, plus the final.
   const afterThird = Date.UTC(2026, 6, 18, 22, 0); // Jul 19 01:00 Israel
   const result3 = selectUpcomingMatches(ALL_MATCHES, allExceptFinal, afterThird);
-  assert(result3.length === 1, `Only final upcoming, got ${result3.length}`);
-  assert(result3[0].id === "F-1", `Expected F-1, got ${result3[0]?.id}`);
+  assert(result3.length === 2, `Live 3rd place + final, got ${result3.length}`);
+  assert(result3[0].id === "3RD-1" && result3[0].isLive === true,
+    `Expected live 3RD-1 first, got ${result3[0]?.id}`);
+  assert(result3[1].id === "F-1" && !result3[1].isLive,
+    `Expected upcoming F-1 second, got ${result3[1]?.id}`);
+  // Once the 3rd-place result is in, only the final remains.
+  const withThird = { ...allExceptFinal, "3RD-1": { homeScore: 1, awayScore: 0 } };
+  const result4 = selectUpcomingMatches(ALL_MATCHES, withThird, afterThird);
+  assert(result4.length === 1 && result4[0].id === "F-1",
+    `Only final once 3rd-place result recorded, got ${result4.map(m => m.id).join(",")}`);
 }
 
 // ---- 14. Stability: idempotent across repeated calls ----
@@ -255,17 +301,44 @@ console.log("--- 15. Match missing time ignored ---");
   assert(result.length === 1 && result[0].id === "ok", "Broken entry filtered");
 }
 
-// ---- 16. Past-kickoff matches never returned, even inside the day ----
-console.log("--- 16. Past-kickoff matches excluded ---");
+// ---- 16. Matches past the live window never returned, even without results ----
+console.log("--- 16. Matches beyond live window excluded ---");
 {
   // "Now" = Jun 14 12:00 Israel (= Jun 14 09:00 UTC).
-  // Past same-day matches: Jun 14 01:00, 04:00, 07:00 Israel.
+  // Past same-day matches: Jun 14 01:00, 04:00, 07:00 Israel — all kicked
+  // off more than LIVE_WINDOW_MS ago, so even with no recorded result they
+  // must not appear (no stale "live" entries).
   const now = Date.UTC(2026, 5, 14, 9, 0, 0);
   const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
   for (const m of result) {
     assert(getMatchKickoffUTC(m) > now, `Kickoff in future: ${m.id}`);
+    assert(!m.isLive, `Not marked live: ${m.id}`);
   }
   assert(result.length >= 2, `Jun 14 afternoon+: expected >=2 matches, got ${result.length}`);
+}
+
+// ---- 17. Live matches: marked, sorted first, source objects untouched ----
+console.log("--- 17. Live match invariants ---");
+{
+  // Now = Jun 14 21:00 Israel (= Jun 14 18:00 UTC): the 20:00 match is live.
+  const now = Date.UTC(2026, 5, 14, 18, 0, 0);
+  const result = selectUpcomingMatches(ALL_MATCHES, {}, now);
+  const live = result.filter(m => m.isLive);
+  assert(live.length === 1, `One live match at Jun 14 21:00, got ${live.length}`);
+  assert(live[0].date === "Jun 14" && live[0].time === "20:00",
+    `Live match is Jun 14 20:00, got ${live[0]?.date} ${live[0]?.time}`);
+  // Live entries sort before upcoming ones (ascending kickoff covers it).
+  assert(result[0].isLive === true, "Live match listed first");
+  for (let i = 1; i < result.length; i++) {
+    assert(!result[i].isLive, `Only first entry live, ${result[i].id} is not`);
+  }
+  // The selector must not mutate the canonical match objects.
+  const source = ALL_MATCHES.find(m => m.id === live[0].id);
+  assert(source && source.isLive === undefined,
+    "Source match object not mutated with isLive");
+  // Upcoming (future) entries keep reference identity with the source data.
+  const future = result.find(m => !m.isLive);
+  assert(ALL_MATCHES.includes(future), "Future matches returned by reference");
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);

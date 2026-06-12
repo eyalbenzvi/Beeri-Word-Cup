@@ -245,7 +245,9 @@ console.log("--- 13. All matches have unique ids ---");
 console.log("--- 14. Heading date label ---");
 {
   const { formatIsraelDateLabel } = await import("/home/user/Beeri-World-Cup/src/utils/matchTime.js");
-  const matches = selectUpcomingMatches(ALL_MATCHES, {}, Date.UTC(2026, 5, 13, 21, 0));
+  // Jun 14 12:00 Israel — no live matches at this hour, first upcoming is
+  // Jun 14 20:00 (the Jun 13 22:00 live entry would otherwise lead the list).
+  const matches = selectUpcomingMatches(ALL_MATCHES, {}, Date.UTC(2026, 5, 14, 9, 0));
   assert(matches.length > 0, "Matches found");
   const label = formatIsraelDateLabel(matches[0]);
   assert(label === "14.6", `Jun 14 -> "14.6", got "${label}"`);
