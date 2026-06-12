@@ -8,6 +8,11 @@ function initAdmin() {
   if (adminInitialized) return;
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  // Force Firestore REST transport. firebase-admin's default gRPC channel hangs
+  // on cold starts in Netlify functions, causing 504 timeouts under load (e.g.
+  // a tournament-launch traffic spike). REST avoids it. try/catch so a re-init
+  // can never throw.
+  try { admin.firestore().settings({ preferRest: true }); } catch { /* already set */ }
   adminInitialized = true;
 }
 
