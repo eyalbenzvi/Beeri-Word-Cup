@@ -27,13 +27,19 @@ import { useLiveScores } from "../hooks/useLiveScores";
 import { getTeamByCode } from "../data/teams";
 import { ALL_MATCHES, STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
-import { getMatchKickoffUTC, getMatchIsraelDateKey, formatIsraelDateLabel } from "../utils/matchTime";
+import { getMatchKickoffUTC } from "../utils/matchTime";
+import {
+  getMatchDateKey,
+  formatMatchDateNumeric,
+  formatMatchClock,
+  dateKeyForNow,
+  getUserTimeZone,
+} from "../utils/userTime";
 import {
   computeLiveVerdict,
   summarizeVerdicts,
   FD_FINISHED_STATUS,
 } from "../utils/liveScores";
-import { israelDateKeyForNow } from "../utils/dailyPoints";
 import {
   alignPredictionToActual,
   resolveMatchTeams,
@@ -472,13 +478,14 @@ function NextMatchStrip({ results, now }) {
   if (!next) return null;
   const { match, kickoff } = next;
   const teams = resolveMatchTeams(match, getCachedBracket(results || {}));
-  const todayKey = israelDateKeyForNow(now);
-  const isToday = getMatchIsraelDateKey(match) === todayKey;
+  const tz = getUserTimeZone();
+  const todayKey = dateKeyForNow(now, tz);
+  const isToday = getMatchDateKey(match, tz) === todayKey;
   const remainingToday = isToday
     ? ALL_MATCHES.filter(
         (m) =>
           !results?.[m.id] &&
-          getMatchIsraelDateKey(m) === todayKey &&
+          getMatchDateKey(m, tz) === todayKey &&
           (getMatchKickoffUTC(m) ?? 0) > now &&
           m.id !== match.id,
       ).length
@@ -496,10 +503,10 @@ function NextMatchStrip({ results, now }) {
       </div>
       <div className="text-sm font-bold text-ink-muted mt-0.5">
         {isToday ? (
-          <>{LIVE.todayAt(match.time)}{match.venue ? ` · ${match.venue}` : ""}</>
+          <>{LIVE.todayAt(formatMatchClock(match, tz))}{match.venue ? ` · ${match.venue}` : ""}</>
         ) : (
           <>
-            <bdi>{formatIsraelDateLabel(match)}</bdi> · <bdi>{match.time}</bdi>
+            <bdi>{formatMatchDateNumeric(match, tz)}</bdi> · <bdi>{formatMatchClock(match, tz)}</bdi>
             {match.venue ? ` · ${match.venue}` : ""}
           </>
         )}

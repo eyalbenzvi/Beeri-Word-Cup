@@ -22,6 +22,14 @@ export const BRAND = {
   countdownHeader: "הזמן שנותר לפתיחה",
 };
 
+// Match times across the site render in the VIEWER's own timezone
+// (auto-detected). These notes clarify which clock the user is looking at —
+// "שעון ישראל" for users physically in Israel, "שעון מקומי" for everyone else.
+export const TIME = {
+  israelClock: "שעון ישראל",
+  localClock: "שעון מקומי",
+};
+
 // Canonical Hebrew labels for the bonus/leaderboard vocabulary. Used everywhere
 // a form, row, card, or CSV needs one of these terms — prevents the historical
 // drift between "מלך שערים" / "מלך השערים" and "מדויקים" / "מדויקות".

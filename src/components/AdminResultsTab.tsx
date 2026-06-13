@@ -5,6 +5,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import { randomScore, flipMatchLabelForRtl } from "../utils/helpers";
+import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { KNOCKOUT_STAGE_ORDER } from "../utils/constants";
 import GroupTable from "./GroupTable";
 import GroupSelector from "./GroupSelector";
@@ -300,7 +301,9 @@ export default function AdminResultsTab() {
                     </span>
                   ) : <span />}
                   <span className="text-xs text-ink-light">
-                    {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
+                    {[formatMatchDateShort(match), formatMatchClock(match), match.venue]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </div>
               )}

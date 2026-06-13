@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers";
+import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import MatchAnalysis from "./MatchAnalysis";
 import Score from "./Score";
 
@@ -189,7 +190,9 @@ function MatchCard({
             </span>
           ) : <span />}
           <span className="text-xs text-ink-muted">
-            {[match.date, match.time, match.venue].filter(Boolean).join(" · ")}
+            {[formatMatchDateShort(match), formatMatchClock(match), match.venue]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
       )}

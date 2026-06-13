@@ -1,6 +1,7 @@
 import { getCachedBracket, getCachedChampion } from './bracketCache';
 import { groupMatches, knockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
+import { formatMatchDateShort, formatMatchClock, getUserTimeZone } from './userTime';
 
 // XLSX RTL note: this version of xlsx applies rightToLeft at workbook level via
 // wb.Workbook.Views[0].RTL. Since all content is Hebrew we set all sheets RTL.
@@ -12,6 +13,9 @@ export async function exportToExcel(form: any): Promise<void> {
   wb.Props = { Title: form.formName || 'ניחושים' };
 
   const matchPredictions = form.matches || {};
+  // Match date/time columns render in the viewer's timezone, matching what
+  // the same user sees on screen.
+  const tz = getUserTimeZone();
   const bracketTeams = getCachedBracket(matchPredictions);
   const championCode = getCachedChampion(matchPredictions);
 
@@ -89,8 +93,8 @@ export async function exportToExcel(form: any): Promise<void> {
       sheet2Rows.push([
         `בית ${group}`,
         match.matchday ?? '',
-        match.date || '',
-        match.time || '',
+        formatMatchDateShort(match, tz),
+        formatMatchClock(match, tz),
         homeName,
         pred?.homeScore ?? '—',
         pred?.awayScore ?? '—',
@@ -171,8 +175,8 @@ export async function exportToExcel(form: any): Promise<void> {
 
       sheet3Rows.push([
         STAGES[stage as keyof typeof STAGES] || stage,
-        match.date || '',
-        match.time || '',
+        formatMatchDateShort(match, tz),
+        formatMatchClock(match, tz),
         homeName,
         pred?.homeScore ?? '—',
         pred?.awayScore ?? '—',
