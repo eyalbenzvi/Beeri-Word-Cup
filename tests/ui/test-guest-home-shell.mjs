@@ -61,8 +61,8 @@ assert(/TournamentCountdown/.test(welcome),
   "WelcomeScreen still imports TournamentCountdown (panel preserved)");
 assert(/UpcomingMatches/.test(welcome),
   "WelcomeScreen still imports UpcomingMatches (post-kickoff panel)");
-assert(/MatchdayHero/.test(welcome),
-  "WelcomeScreen still imports MatchdayHero (post-kickoff panel)");
+assert(/LiveNowCard/.test(welcome),
+  "WelcomeScreen still imports LiveNowCard (post-kickoff panel)");
 
 // ============================================================
 // 2. App.tsx routes guest home through AppShell

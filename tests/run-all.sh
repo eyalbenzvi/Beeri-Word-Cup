@@ -149,6 +149,9 @@ run_test "83. Results Chronological View (kickoff order + day grouping + toggle)
 run_test "84. Auto-Fill Consensus (two-source agreement logic)" "store/test-auto-fill-consensus.mjs" "no"
 run_test "85. Auto-Fill Trigger Wiring (client + function + rules)" "store/test-auto-fill-trigger.mjs" "yes"
 run_test "86. Auto-Fill Source Clients (orientation, 90' score, retry)" "store/test-auto-fill-sources.mjs" "no"
+run_test "87. Live Verdict Engine (points parity, mapping, debounce, daily)" "scoring/test-live-verdict.mjs" "yes"
+run_test "88. Live Scores Endpoint (normalize, caching, soft-failure)" "store/test-live-scores-endpoint.mjs" "no"
+run_test "89. LiveNow Hero + Home Redesign (RTL, multi-form, polling, wiring)" "ui/test-live-now-hero.mjs" "no"
 
 echo ""
 echo "==========================================="

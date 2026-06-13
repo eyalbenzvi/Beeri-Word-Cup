@@ -9,7 +9,7 @@ import { useCountdown } from "../hooks/useCountdown";
 import { usePublicSettings } from "../hooks/usePublicSettings";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
-import MatchdayHero from "../components/MatchdayHero";
+import LiveNowCard from "../components/LiveNowCard";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import { Phone, ArrowRight } from "lucide-react";
@@ -35,9 +35,9 @@ export default function WelcomeScreen() {
   const lockStateKnown = publicSettings.loaded || countdown.started;
 
   // Parity with Home: when the tournament is running, show the same
-  // MatchdayHero (featured today's match) above the upcoming-matches list
-  // so logged-in and logged-out users see the same current match.
-  // MatchdayHero carries its own mb-4 — no wrapper spacing needed.
+  // LiveNowCard (real-time scores; guests have no forms so no verdict
+  // lines) above the upcoming-matches list. The card excludes its own
+  // matches from the list below via excludeLive.
   const countdownPanel = !lockStateKnown ? (
     <div className="card-duo opacity-0" aria-hidden="true">
       <TournamentCountdown
@@ -53,8 +53,8 @@ export default function WelcomeScreen() {
     </div>
   ) : tournamentStarted ? (
     <>
-      <MatchdayHero results={results} />
-      <UpcomingMatches matchResultsOverride={results} />
+      <LiveNowCard matchResultsOverride={results} />
+      <UpcomingMatches matchResultsOverride={results} excludeLive />
     </>
   ) : (
     <div className="card-duo">

@@ -115,8 +115,12 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   const fd = read("netlify/functions/_sources/footballData.js");
   assert(fd.includes("regularTime"), "FD reads regularTime for the 90' score (not ET-inclusive fullTime)");
   assert(/\[home90, away90\] = \[away90, home90\]/.test(fd), "FD normalizes orientation (swaps score)");
-  // Live-data fix: football-data uses CUW/URY where we use CUR/URU.
-  assert(fd.includes("FD_TO_OURS"), "FD maps differing codes (CUW->CUR, URY->URU) to ours");
+  // Live-data fix: football-data uses CUW/URY where we use CUR/URU. The map
+  // moved to the shared _sources/fdCodes.js (also used by the live-scores
+  // endpoint) — assert the mapping still exists AND footballData consumes it.
+  const fdCodes = read("netlify/functions/_sources/fdCodes.js");
+  assert(fdCodes.includes("FD_TO_OURS"), "FD maps differing codes (CUW->CUR, URY->URU) to ours");
+  assert(fd.includes('from "./fdCodes.js"'), "footballData imports the shared code map");
 
   const asrc = read("netlify/functions/_sources/apiSports.js");
   assert(asrc.includes("score?.fulltime") || asrc.includes("fulltime"), "AS uses fulltime (90') score");

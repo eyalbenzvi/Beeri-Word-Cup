@@ -46,6 +46,64 @@ export const LABELS = {
   championAria: (name) => `${CHAMPION}: ${name}`,
 };
 
+// Copy for the home-page LiveNow card + "הניקוד שלך" strip. Centralised so
+// the live vocabulary stays consistent ("כרגע" = provisional/live, "לפי
+// משחקים שנגמרו" = official) and tests can lock the contract down.
+// Verdict POINT VALUES are never embedded here — they arrive as arguments
+// straight from the scoring engine (see src/utils/liveScores.ts).
+export const LIVE = {
+  liveChip: "לייב",
+  todayChip: "היום",
+  halftime: "מחצית",
+  extraTime: "הארכה",
+  finished: "נגמר",
+  playingNow: "משוחק עכשיו",
+  minuteMark: (m) => `${m}׳`,
+  // Verdicts — always prefixed "כרגע" (live, provisional), never red.
+  // ‎ (LRM) keeps "+4" reading left-to-right inside the RTL sentence —
+  // without it the plus sign visually flips to the wrong side of the digits.
+  exactNow: "כרגע מדויק!",
+  exactWorth: (pts) => `שווה ‎+${pts} נק׳ אם זה יישאר`,
+  outcomeNow: (pts) => `הכרעה נכונה כרגע — ‎+${pts} נק׳`,
+  noneNow: "כרגע בלי נקודות",
+  // Past-tense verdicts for the just-finished state.
+  finishedExact: (pts) => `פגיעה מדויקת — ‎+${pts} נק׳`,
+  finishedOutcome: (pts) => `הכרעה נכונה — ‎+${pts} נק׳`,
+  finishedNone: "הפעם בלי נקודות",
+  extraTimeNote: "הניקוד ייקבע לפי 90 הדקות",
+  differentTeams: "קבוצות שונות בטופס",
+  // Multi-form rollup — exhaustive count, always sums to the form total.
+  formsScoringNow: (scoring, total) =>
+    `צוברים נקודות כרגע: ${scoring} מתוך ${total} טפסים`,
+  yourPrediction: "הניחוש שלך",
+  yourForms: (n) => `הטפסים שלך (${n})`,
+  // Pre-match / rest-day
+  nextMatchLabel: "המשחק הבא",
+  todayAt: (time) => `היום ב־${time}`,
+  startsIn: (txt) => `בעוד ${txt}`,
+  moreToday: (n) => (n === 1 ? "ועוד משחק אחד היום" : `ועוד ${n} משחקים היום`),
+  // Freshness honesty
+  refreshNote: "מתעדכן בכל דקה בערך",
+  staleNote: (mins) => `עודכן לפני ${mins} דק׳`,
+  apiDownNote: "אין לנו תוצאה חיה כרגע — ננסה שוב בעוד דקה",
+  versus: "מול",
+};
+
+export const SCORE_STRIP = {
+  header: "הניקוד שלך",
+  officialOnly: "לפי משחקים שנגמרו",
+  todayPoints: (pts) => `היום: ‎+${pts} נק׳`,
+  yesterdayPoints: (pts) => `אתמול: ‎+${pts} נק׳`,
+  rankOf: (rank, total) => `מקום ${rank} מתוך ${total}`,
+  leadingForm: "הטופס המוביל שלך",
+  toLeaderboard: "לטבלת הדירוג",
+};
+
+export const SUMMARY_TEASER = {
+  readCta: "לקריאה",
+  title: (n) => `סיכום יום ${n} עלה`,
+};
+
 // Copy for the daily-summary blog feature. Kept together so tone/wording
 // stays consistent between the admin editor and the public page, and so a
 // future retype is a one-file change.
