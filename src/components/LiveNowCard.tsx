@@ -583,14 +583,11 @@ export default function LiveNowCard({ matchResultsOverride }: { matchResultsOver
       className="card-duo-lg mb-3 text-right"
       style={{ borderColor: "var(--color-primary)" }}
     >
-      <div className="flex items-center justify-center gap-1.5 mb-2.5">
-        <LiveDot />
-        <span className="text-xs font-extrabold text-danger uppercase tracking-wider">
-          {LIVE.liveChip}
-        </span>
-      </div>
-      {/* aria-live region: a goal announces as one sentence (atomic), and
-          only politely — downgrades stay silent visually anyway. */}
+      {/* No card-level "לייב" banner: each match block carries its own
+          StatusChip (live + minute / halftime / ET / finished), so a single
+          live match would otherwise show "לייב" twice. The green border is
+          the card's live identity. aria-live region: a goal announces as one
+          sentence (atomic), and only politely — downgrades stay silent. */}
       <div aria-live="polite" aria-atomic="true" className="space-y-2.5">
         {liveMatches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
