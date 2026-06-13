@@ -199,8 +199,10 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
 }
 
 // === 7. Stats page: most-common score key uses {away}-{home} ===
+// The aggregation (incl. the RTL score key) lives in the shared helper
+// matchPredictionStats.ts, which Stats.jsx delegates to.
 {
-  const src = readMigratedSrc("src/pages/Stats.jsx", "utf8");
+  const src = readMigratedSrc("src/utils/matchPredictionStats.js", "utf8");
   assert(
     /\$\{p\.awayScore\}-\$\{p\.homeScore\}/.test(src),
     "Stats topScores key: ${away}-${home}",

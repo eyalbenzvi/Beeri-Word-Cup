@@ -1,10 +1,10 @@
 // Regression tests for the Stats ("נתונים") → match-predictions detail feature.
 //
-// Feature: in the per-match prediction breakdown, users can now click a
-// popular result (e.g. 1-1) OR a 1/X/2 outcome card to expand an accordion
-// listing the form names that predicted it. This requires the match-stats
-// memo to retain form names per result/outcome (not just counts), plus
-// clickable, accordion-toggling UI.
+// Feature: in the per-match prediction breakdown, users can click a popular
+// result (e.g. 1-1) OR a 1/X/2 outcome card to expand an accordion listing
+// the form names that predicted it. This file asserts the UI WIRING; the
+// aggregation logic itself is unit-tested in
+// data/test-match-prediction-stats.mjs.
 
 import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 
@@ -15,27 +15,18 @@ function assert(c, m) {
   else { failed++; failures.push(m); console.error("  FAIL: " + m); }
 }
 
-console.log("=== STATS GUESS DETAIL REGRESSION TESTS ===\n");
+console.log("=== STATS GUESS DETAIL (UI WIRING) REGRESSION TESTS ===\n");
 
 const stats = readMigratedSrc("src/pages/Stats.jsx", "utf8");
 
-// The memo must retain form names per outcome (1/X/2), not just counts.
+// Aggregation is delegated to the shared, unit-tested helper.
 assert(
-  /outcomeVoters\s*=\s*\{\s*home:\s*\[\]\s*,\s*draw:\s*\[\]\s*,\s*away:\s*\[\]/.test(stats),
-  "outcomeVoters tracks form names for home/draw/away outcomes",
+  /import \{ aggregateMatchPredictions \} from "\.\.\/utils\/matchPredictionStats"/.test(stats),
+  "Stats imports the aggregateMatchPredictions helper",
 );
-
-// The memo must retain voters per score key (who predicted each score).
 assert(
-  /scoreVoters/.test(stats),
-  "scoreVoters map retains the list of form names per predicted score",
-);
-
-// Counts must derive from the voter lists so they stay consistent.
-assert(
-  /outcomeVoters\.home\.length/.test(stats) &&
-    /\(voters as string\[\]\)\.length/.test(stats),
-  "counts derive from voter-list lengths (single source of truth)",
+  /aggregateMatchPredictions\(forms, selectedMatch\)/.test(stats),
+  "match-stats memo delegates to aggregateMatchPredictions",
 );
 
 // Accordion state: a single expanded id, reset when the match changes.
@@ -50,8 +41,12 @@ assert(
   /function VoterList/.test(stats) && /max-h-48 overflow-y-auto/.test(stats),
   "VoterList renders a scrollable list of form names",
 );
+assert(
+  /אין נתונים/.test(stats),
+  "VoterList has an empty-state fallback",
+);
 
-// Outcome cards are real buttons that toggle their accordion.
+// Outcome cards are real buttons that toggle their accordion + render voters.
 assert(
   /setExpanded\(expanded === "outcome:home" \? null : "outcome:home"\)/.test(stats),
   "home-win card toggles its voter accordion",
@@ -60,6 +55,10 @@ assert(
   /expanded === "outcome:draw"[\s\S]{0,200}?VoterList names=\{matchStats\.outcomeVoters\.draw\}/.test(stats),
   "draw accordion panel renders the draw voters",
 );
+assert(
+  /expanded === "outcome:away"[\s\S]{0,200}?VoterList names=\{matchStats\.outcomeVoters\.away\}/.test(stats),
+  "away accordion panel renders the away voters",
+);
 
 // Popular-score bars are clickable and render their voter list when open.
 assert(
@@ -67,7 +66,7 @@ assert(
   "popular-score rows expand to the voters who predicted that score",
 );
 
-// aria-expanded for accessibility on the toggles.
+// aria-expanded for accessibility on every toggle (3 outcomes + scores).
 assert(
   (stats.match(/aria-expanded=/g) || []).length >= 4,
   "toggles expose aria-expanded for accessibility",

@@ -16,6 +16,7 @@ import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
+import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
@@ -112,55 +113,7 @@ function MatchPredictions({ forms }) {
     if (!selectedMatch) return null;
     const match = allMatches.find((m) => m.id === selectedMatch);
     if (!match) return null;
-
-    // Keep the form name alongside each prediction so we can list WHO
-    // predicted each result/outcome, not just the counts.
-    const entries = forms
-      .map((f) => ({ formName: f.formName, p: f.matches?.[selectedMatch] }))
-      .filter((e) => e.p);
-    const preds = entries.map((e) => e.p);
-
-    const outcomeVoters = { home: [], draw: [], away: [] };
-    entries.forEach(({ formName, p }) => {
-      if (p.homeScore > p.awayScore) outcomeVoters.home.push(formName);
-      else if (p.homeScore === p.awayScore) outcomeVoters.draw.push(formName);
-      else outcomeVoters.away.push(formName);
-    });
-    const homeWin = outcomeVoters.home.length;
-    const draw = outcomeVoters.draw.length;
-    const awayWin = outcomeVoters.away.length;
-
-    // Most common scores — track the voters per score, not just the count.
-    const scoreVoters = {};
-    entries.forEach(({ formName, p }) => {
-      // RTL display: away first so the home digit is read first by Hebrew readers (right side).
-      const key = `${p.awayScore}-${p.homeScore}`;
-      (scoreVoters[key] ||= []).push(formName);
-    });
-    const topScores = Object.entries(scoreVoters)
-      .map(([key, voters]) => [key, (voters as string[]).length] as [string, number])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    // Average goals
-    const totalGoals = preds.reduce(
-      (s, p) => s + (p.homeScore || 0) + (p.awayScore || 0),
-      0,
-    );
-    const avgGoals =
-      preds.length > 0 ? (totalGoals / preds.length).toFixed(1) : "0";
-
-    return {
-      match,
-      preds: preds.length,
-      homeWin,
-      draw,
-      awayWin,
-      outcomeVoters,
-      topScores,
-      scoreVoters,
-      avgGoals,
-    };
+    return { match, ...aggregateMatchPredictions(forms, selectedMatch) };
   }, [selectedMatch, forms]);
 
   const home = matchStats?.match
