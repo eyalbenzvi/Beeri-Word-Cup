@@ -867,7 +867,11 @@ console.log('\n--- Category 5: Resource issues ---');
   assert(true, '5d: 50 rapid override churn iterations all coherent');
 }
 
-// 5e. SimulatorPanel source is a single file, bounded size (< 20KB).
+// 5e. SimulatorPanel source is a single file, bounded size (< 24KB).
+// The guard's intent is "no re-inlined bracket/scoring logic" (see 4b), not a
+// hard line budget. Bumped from 20KB when the score-check mode added a second
+// UI mode (mode toggle, banner, scoped leaderboard) — pure UI/wiring, no
+// duplicated calc.
 {
   const fs = await import('node:fs');
   // .jsx -> .tsx during the TypeScript migration; try both.
@@ -875,7 +879,7 @@ console.log('\n--- Category 5: Resource issues ---');
   try { stat = fs.statSync('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.jsx'); }
   catch { stat = fs.statSync('/home/user/Beeri-World-Cup/src/components/SimulatorPanel.tsx'); }
   assert(
-    stat.size < 20000,
+    stat.size < 24000,
     `5e: SimulatorPanel size bounded (${stat.size} bytes)`,
   );
 }

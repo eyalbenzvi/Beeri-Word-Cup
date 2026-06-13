@@ -11,8 +11,16 @@ import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import GroupSelector from "./GroupSelector";
 
+// Stable empty base for "score check" mode — see scoreCheckMode below.
+const EMPTY_RESULTS = Object.freeze({});
+
 // Shared simulator: used by AdminToolsTab (admin) and Stats (users).
 // No writes to the store/Firestore — all overrides are in-memory only.
+//
+// Modes: normal simulation (base = real results + overrides) and score-check
+// (scoreCheckMode: base = empty, only entered matches scored, knockout matchups
+// resolved from real results, advancing/bonus points excluded). See the hook
+// call and scoreCheckMode usage below.
 export default function SimulatorPanel({
   leaderboardLimit = 5,
   highlightUserId = null,
@@ -25,6 +33,7 @@ export default function SimulatorPanel({
   const actualBonuses = useActualBonuses();
 
   const [override, setOverride] = useState({});
+  const [scoreCheckMode, setScoreCheckMode] = useState(false);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [editingMatch, setEditingMatch] = useState(null);
@@ -33,30 +42,46 @@ export default function SimulatorPanel({
     awayScore: "",
   });
 
-  // Defensive merge: spread both objects into a new container so neither
-  // realResults (store ref) nor override (local state) is mutated downstream.
+  // In score-check mode every match starts blank; otherwise the real results
+  // are the base. Defensive merge: spread into a new container so neither the
+  // base (store ref / frozen empty) nor override (local state) is mutated.
+  const displayBase = scoreCheckMode ? EMPTY_RESULTS : realResults;
   const effectiveResults = useMemo(() => {
-    const merged = { ...realResults };
+    const merged = { ...displayBase };
     for (const [id, r] of Object.entries(override)) {
       merged[id] = r;
     }
     return merged;
-  }, [realResults, override]);
+  }, [displayBase, override]);
 
   // Use the dense-rank list so simulator ranks match Leaderboard / Profile.
   // Earlier this used `leaderboard` and rendered `i + 1` inline, which made
   // ties (e.g. tied 1st) read as 1, 2, 3 in the simulator while the real page
   // showed 1, 1, 3 — confusing users about whether their what-if scenario
   // moved them up.
+  // Normal: merged real+sim results, full bonuses (unchanged). Score-check:
+  // only entered matches, matchups from real results, no advancing/bonus.
   const { rankedLeaderboard: simLeaderboard } = useLeaderboardComputed(
-    effectiveResults,
+    scoreCheckMode ? override : effectiveResults,
     allPredictions,
     users,
     actualBonuses,
+    scoreCheckMode
+      ? { bracketResults: realResults, matchPointsOnly: true }
+      : undefined,
   );
 
   const setOverrideResult = useCallback((matchId, result) => {
     setOverride((o) => ({ ...o, [matchId]: result }));
+  }, []);
+
+  // Clear entered results on mode switch: a knockout override's team metadata
+  // is derived from the active mode's bracket backbone and would be stale.
+  const switchMode = useCallback((checkMode) => {
+    setScoreCheckMode(checkMode);
+    setOverride({});
+    setEditingMatch(null);
+    setEditScores({ homeScore: "", awayScore: "" });
   }, []);
 
   const clearOne = useCallback((matchId) => {
@@ -80,19 +105,23 @@ export default function SimulatorPanel({
     return knockoutMatches.filter((m) => m.stage === selectedStage);
   }, [selectedStage, selectedGroup]);
 
+  // Team-resolution backbone. Score-check resolves knockout matchups (and R32
+  // qualification) from the real results, so only matches with a resolved real
+  // matchup can be entered — keeping the matchup check meaningful.
+  const bracketSource = scoreCheckMode ? realResults : effectiveResults;
   const bracketTeams = useMemo(
-    () => calcBracketTeams(effectiveResults),
-    [effectiveResults],
+    () => calcBracketTeams(bracketSource),
+    [bracketSource],
   );
 
   const completedGroupCount = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const matchId of Object.keys(effectiveResults)) {
+    for (const matchId of Object.keys(bracketSource)) {
       const m = matchId.match(/^group-([A-L])-/);
       if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
     }
     return Object.values(counts).filter((c) => c >= 6).length;
-  }, [effectiveResults]);
+  }, [bracketSource]);
   const allGroupsComplete = completedGroupCount >= 12;
 
   const handleSaveResult = (match) => {
@@ -172,7 +201,13 @@ export default function SimulatorPanel({
             ? { background: "#F0F4FF", borderColor: "var(--color-secondary)", color: "#1E3A8A" }
             : { background: "var(--color-accent-soft)", borderColor: "var(--color-accent)", color: "var(--color-accent-text)" }}
         >
-          {userMode ? (
+          {scoreCheckMode ? (
+            <>
+              🎯 מצב בדיקת ניקוד — כל המשחקים ריקים פרט לאלה שתזין. הדירוג מציג
+              את הנקודות שכל טופס צבר על המשחקים שהוזנו בלבד (ללא בונוסים
+              והעפלה). השינויים <strong>לא נשמרים</strong>.
+            </>
+          ) : userMode ? (
             <>
               🎮 מצב סימולציה — מלא תוצאות כדי לראות איך תיראה טבלת הדירוג.
               השינויים <strong>לא נשמרים</strong> ונמחקים ברענון הדף.
@@ -185,6 +220,22 @@ export default function SimulatorPanel({
           )}
         </div>
       )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => switchMode(false)}
+          className={`chip-duo flex-1 ${!scoreCheckMode ? "active" : ""}`}
+        >
+          סימולציה רגילה
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode(true)}
+          className={`chip-duo flex-1 ${scoreCheckMode ? "active" : ""}`}
+        >
+          בדיקת ניקוד
+        </button>
+      </div>
       <div className="flex gap-2 items-center">
         <button
           type="button"
@@ -237,8 +288,14 @@ export default function SimulatorPanel({
           const isKnockout = match.stage !== "group";
           const isTie = result && result.homeScore === result.awayScore;
           const isSimmed = Object.hasOwn(override, match.id);
+          // In score-check mode the advancing team is irrelevant (advancing
+          // points are excluded), so don't demand a tie-breaker selection.
           const needsTeam =
-            isKnockout && isTie && !result?.advancingTeam && isSimmed;
+            !scoreCheckMode &&
+            isKnockout &&
+            isTie &&
+            !result?.advancingTeam &&
+            isSimmed;
 
           return (
             <div
@@ -373,7 +430,8 @@ export default function SimulatorPanel({
                   )}
                 </div>
               </div>
-              {isKnockout &&
+              {!scoreCheckMode &&
+                isKnockout &&
                 isTie &&
                 derived.home &&
                 derived.away &&
@@ -428,10 +486,20 @@ export default function SimulatorPanel({
       </div>
       <div className="bg-white rounded-2xl p-3 border-2 border-border">
         <h4 className="text-sm font-extrabold text-ink mb-2">
-          {leaderboardLimit > 0 && leaderboardLimit < simLeaderboard.length
-            ? `דירוג על פי סימולציה (${leaderboardLimit} ראשונים)`
-            : "דירוג על פי סימולציה"}
+          {scoreCheckMode
+            ? leaderboardLimit > 0 && leaderboardLimit < simLeaderboard.length
+              ? `ניקוד למשחקים שהוזנו (${leaderboardLimit} ראשונים)`
+              : "ניקוד למשחקים שהוזנו"
+            : leaderboardLimit > 0 && leaderboardLimit < simLeaderboard.length
+              ? `דירוג על פי סימולציה (${leaderboardLimit} ראשונים)`
+              : "דירוג על פי סימולציה"}
         </h4>
+        {scoreCheckMode && overrideCount === 0 ? (
+          <div className="text-xs text-ink-muted font-medium text-center py-2">
+            הזן תוצאות במשחקים כדי לראות מי קיבל ניקוד
+          </div>
+        ) : (
+          <>
         {highlightUserId && userRank && userRank.rank > leaderboardLimit && (
           <div className="mb-2 text-xs border-2 border-secondary/40 rounded-xl px-2 py-1 font-bold" style={{ background: "#F0F9FF", color: "var(--color-secondary-dark)" }}>
             המקום שלך: <strong>{userRank.rank}</strong> —{" "}
@@ -460,6 +528,8 @@ export default function SimulatorPanel({
           <div className="text-xs text-ink-muted font-medium text-center py-2">
             אין טפסים מאושרים לדירוג
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
