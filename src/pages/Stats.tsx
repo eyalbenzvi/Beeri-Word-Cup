@@ -94,6 +94,52 @@ function VoterList({ names }: { names: string[] }) {
   );
 }
 
+// A list of clickable distribution bars; tapping one expands an accordion
+// listing the form names behind it. Shared by the champion and top-scorer
+// breakdowns so "who predicted this?" works identically across the page.
+// `items` is pre-sorted: [{ key, label, voters, color }, ...].
+function VoterBarList({
+  items,
+  total,
+}: {
+  items: { key: string; label: string; voters: string[]; color?: string }[];
+  total: number;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <div className="space-y-1.5">
+      {items.map((item) => {
+        const open = expanded === item.key;
+        return (
+          <div key={item.key}>
+            <button
+              type="button"
+              onClick={() => setExpanded(open ? null : item.key)}
+              aria-expanded={open}
+              className="w-full flex items-center gap-1.5 cursor-pointer"
+            >
+              <span
+                className={`text-ink-muted text-xs transition-transform ${open ? "rotate-180" : ""}`}
+              >
+                ▾
+              </span>
+              <div className="flex-1">
+                <Bar
+                  label={item.label}
+                  count={item.voters.length}
+                  total={total}
+                  color={item.color}
+                />
+              </div>
+            </button>
+            {open && <VoterList names={item.voters} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ============ MATCH PREDICTIONS SECTION ============
 function MatchPredictions({ forms }) {
   const [selectedStage, setSelectedStage] = useState("group");
@@ -301,71 +347,68 @@ function MatchPredictions({ forms }) {
 
 // ============ CHAMPION DISTRIBUTION ============
 function ChampionStats({ forms }) {
-  const distribution = useMemo(() => {
-    const counts = {};
+  const items = useMemo(() => {
+    // Track the voters per champion so each bar can reveal who predicted it.
+    const voters: Record<string, string[]> = {};
     forms.forEach((f) => {
-      const predictions = f.matches || {};
-      const champ = getCachedChampion(predictions);
+      const champ = getCachedChampion(f.matches || {});
       if (champ) {
         const name = getTeamByCode(champ)?.name || champ;
-        counts[name] = (counts[name] || 0) + 1;
+        (voters[name] ||= []).push(f.formName || "טופס ללא שם");
       }
     });
-    return Object.entries(counts).sort((a, b) => (b[1] as number) - (a[1] as number));
+    return Object.entries(voters)
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([name, vts], i) => ({
+        key: name,
+        label: `${i === 0 ? "👑 " : ""}${name}`,
+        voters: vts,
+        color: i === 0 ? "bg-accent" : i < 3 ? "bg-primary" : "bg-ink-muted",
+      }));
   }, [forms]);
 
-  if (distribution.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <StatCard title="מי תהיה האלופה?" icon="🏆">
-      <div className="space-y-1.5">
-        {distribution.map(([name, count], i) => (
-          <Bar
-            key={name}
-            label={`${i === 0 ? "👑 " : ""}${name}`}
-            count={count}
-            total={forms.length}
-            color={
-              i === 0 ? "bg-accent" : i < 3 ? "bg-primary" : "bg-ink-muted"
-            }
-          />
-        ))}
-      </div>
+      <p className="text-xs text-ink-muted font-bold mb-2">
+        לחצו על קבוצה כדי לראות מי ניחש אותה
+      </p>
+      <VoterBarList items={items} total={forms.length} />
     </StatCard>
   );
 }
 
 // ============ TOP SCORER DISTRIBUTION ============
 function TopScorerStats({ forms, playerList }) {
-  const distribution = useMemo(() => {
-    // Group by canonical Hebrew label so legacy English values merge with new Hebrew ones.
-    const counts = {};
+  const items = useMemo(() => {
+    // Group by canonical Hebrew label so legacy English values merge with new
+    // Hebrew ones, and track the voters so each bar can reveal who predicted it.
+    const voters: Record<string, string[]> = {};
     forms.forEach((f) => {
       const ts = f.topScorer?.trim();
       if (!ts) return;
       const display = getPlayerDisplayName(ts, playerList) || ts;
-      counts[display] = (counts[display] || 0) + 1;
+      (voters[display] ||= []).push(f.formName || "טופס ללא שם");
     });
-    return Object.entries(counts)
-      .sort((a, b) => (b[1] as number) - (a[1] as number))
-      .slice(0, 10);
+    return Object.entries(voters)
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([name, vts], i) => ({
+        key: name,
+        label: name,
+        voters: vts,
+        color: i === 0 ? "bg-accent" : "bg-primary",
+      }));
   }, [forms, playerList]);
 
-  if (distribution.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <StatCard title="מי יהיה מלך השערים?" icon="⚽">
-      <div className="space-y-1.5">
-        {distribution.map(([name, count], i) => (
-          <Bar
-            key={name}
-            label={name}
-            count={count}
-            total={forms.length}
-            color={i === 0 ? "bg-accent" : "bg-primary"}
-          />
-        ))}
-      </div>
+      <p className="text-xs text-ink-muted font-bold mb-2">
+        לחצו על שחקן כדי לראות מי ניחש אותו
+      </p>
+      <VoterBarList items={items} total={forms.length} />
     </StatCard>
   );
 }
