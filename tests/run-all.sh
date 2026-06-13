@@ -153,6 +153,7 @@ run_test "87. Live Verdict Engine (points parity, mapping, debounce, daily)" "sc
 run_test "88. Live Scores Endpoint (normalize, caching, soft-failure)" "store/test-live-scores-endpoint.mjs" "no"
 run_test "89. LiveNow Hero + Home Redesign (RTL, multi-form, polling, wiring)" "ui/test-live-now-hero.mjs" "no"
 run_test "90. Simulator Score-Check Mode (scoped per-match scoring)" "scoring/test-score-check-mode.mjs" "yes"
+run_test "91. Stats Guess Detail (who predicted each result/outcome)" "ui/test-stats-guess-detail.mjs" "no"
 
 echo ""
 echo "==========================================="
