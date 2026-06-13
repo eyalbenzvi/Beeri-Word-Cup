@@ -6,6 +6,7 @@ import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
 import { formatIsraelDateLabel } from "../utils/matchTime";
 import { isScoreValid } from "../utils/helpers";
+import { LIVE } from "../constants/messages";
 import Score from "./Score";
 import {
   alignPredictionToActual,
@@ -161,7 +162,7 @@ function MatchRow({ match, actualTeams }) {
             aria-hidden="true"
           />
           <span className="text-xs font-extrabold text-danger">
-            משוחק עכשיו
+            {LIVE.playingNow}
           </span>
           {match.venue && (
             <span className="text-xs text-ink-muted">· {match.venue}</span>
@@ -181,10 +182,19 @@ function MatchRow({ match, actualTeams }) {
 // sprawling vertically.
 // `matchResultsOverride` is used by the logged-out WelcomeScreen path, which
 // has no Firestore listeners and must get results from the public endpoint.
-export default function UpcomingMatches({ matchResultsOverride }: { matchResultsOverride?: Record<string, any> } = {}) {
+// `excludeLive` removes in-window (isLive) matches — they're rendered by the
+// LiveNowCard hero above, and showing them twice was the redundancy that
+// killed the old MatchdayHero. The hero renders EVERY isLive match (with a
+// schedule fallback when no live score is available), so exclusion here can
+// never lose a match from the page.
+export default function UpcomingMatches({ matchResultsOverride, excludeLive = false }: { matchResultsOverride?: Record<string, any>; excludeLive?: boolean } = {}) {
   const { user } = useCurrentUser();
   const userForms = useUserForms(user?.id || null);
-  const matches = useUpcomingMatches(matchResultsOverride);
+  const allUpcoming = useUpcomingMatches(matchResultsOverride);
+  const matches = useMemo(
+    () => (excludeLive ? allUpcoming.filter((m) => !m.isLive) : allUpcoming),
+    [allUpcoming, excludeLive],
+  );
   const storeResults = useMatchResults();
   const matchResults = matchResultsOverride ?? storeResults;
 
@@ -202,6 +212,11 @@ export default function UpcomingMatches({ matchResultsOverride }: { matchResults
   }, [userForms]);
 
   if (matches.length === 0) {
+    // When live matches were excluded (the hero above is showing them), an
+    // empty remainder just means "nothing ELSE coming up" — the standalone
+    // empty-state card would read as a contradiction right under a live
+    // scoreboard, so render nothing.
+    if (excludeLive && allUpcoming.length > 0) return null;
     return (
       <div className="card-duo-lg text-center text-sm text-ink-muted font-medium">
         אין משחקים קרובים להצגה כרגע

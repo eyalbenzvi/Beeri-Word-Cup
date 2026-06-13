@@ -14,6 +14,8 @@
 // overall winner (score.winner) to report the advancing team. We never use the
 // aggregate/ET total as the recorded score.
 
+import { norm, ourCode } from "./fdCodes.js";
+
 const NAME = "football-data";
 const BASE = "https://api.football-data.org/v4";
 // Keep the fetch budget small enough that one retry across both sources (run
@@ -30,10 +32,6 @@ function dayBounds(kickoffIso) {
   return { from, to };
 }
 
-function norm(s) {
-  return typeof s === "string" ? s.trim().toUpperCase() : "";
-}
-
 async function getJson(url, token) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -47,15 +45,6 @@ async function getJson(url, token) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-// football-data uses a handful of TLAs that differ from our FIFA codes
-// (verified against the live WC squad list). Map FD's code -> ours so every
-// comparison below happens in our code space.
-const FD_TO_OURS = { CUW: "CUR", URY: "URU" };
-function ourCode(tla) {
-  const c = norm(tla);
-  return FD_TO_OURS[c] || c;
 }
 
 // Find the fixture whose two teams' codes are exactly the expected pair

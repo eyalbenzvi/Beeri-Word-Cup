@@ -57,8 +57,8 @@ assert(/--font-heading/.test(cssSrc), "--font-heading token defined");
 // --- PageHeader exists ---
 assert(existsMigratedSrc("src/components/PageHeader.jsx"), "PageHeader.jsx exists");
 
-// --- MatchdayHero exists ---
-assert(existsMigratedSrc("src/components/MatchdayHero.jsx"), "MatchdayHero.jsx exists");
+// --- LiveNowCard exists (replaced MatchdayHero in the home redesign) ---
+assert(existsMigratedSrc("src/components/LiveNowCard.jsx"), "LiveNowCard.jsx exists");
 
 // --- DesktopSideNav exists and exposes info drawer ---
 assert(existsMigratedSrc("src/components/DesktopSideNav.jsx"), "DesktopSideNav.jsx exists");

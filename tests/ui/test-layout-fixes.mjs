@@ -9,9 +9,10 @@
 // 3. Desktop logged-out UpcomingMatches: MatchRow is centered/stacked rather
 //    than split with flex justify-between (which pushed stage + meta apart
 //    and broke centering in narrow cards).
-// 4. Logged-out Welcome screen must render MatchdayHero when the tournament
+// 4. Logged-out Welcome screen must render the live hero when the tournament
 //    is running, matching Home — so both user states see the same featured
-//    match.
+//    match. (Originally MatchdayHero; replaced by LiveNowCard in the home
+//    redesign — same parity requirement, richer card.)
 
 import fs from "node:fs";
 import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
@@ -28,7 +29,7 @@ console.log("=== LAYOUT FIXES REGRESSION TESTS ===\n");
 const home = readMigratedSrc("src/pages/Home.jsx", "utf8");
 const welcome = readMigratedSrc("src/pages/WelcomeScreen.jsx", "utf8");
 const upcoming = readMigratedSrc("src/components/UpcomingMatches.jsx", "utf8");
-const matchdayHero = readMigratedSrc("src/components/MatchdayHero.jsx", "utf8");
+const liveNowCard = readMigratedSrc("src/components/LiveNowCard.jsx", "utf8");
 
 // ============================================================
 // ISSUE #2: UpcomingMatches lives in the main column on Home,
@@ -46,8 +47,8 @@ assert(
   "Home no longer imports from useRail",
 );
 assert(
-  /<UpcomingMatches\s*\/>/.test(home),
-  "Home renders UpcomingMatches inline (no dense/prop needed)",
+  /<UpcomingMatches excludeLive \/>/.test(home),
+  "Home renders UpcomingMatches inline (live matches excluded — hero shows them)",
 );
 assert(
   !/xl:hidden[^"'`]*>\s*<UpcomingMatches/.test(home),
@@ -63,22 +64,22 @@ assert(
 // ISSUE #4: WelcomeScreen renders MatchdayHero when the
 // tournament is running (parity with Home).
 // ============================================================
-console.log("--- Issue #4: MatchdayHero on WelcomeScreen ---");
+console.log("--- Issue #4: LiveNowCard on WelcomeScreen ---");
 
 assert(
-  /import\s+MatchdayHero/.test(welcome),
-  "WelcomeScreen imports MatchdayHero",
+  /import\s+LiveNowCard/.test(welcome),
+  "WelcomeScreen imports LiveNowCard",
 );
 assert(
-  /<MatchdayHero\s+results=\{results\}\s*\/>/.test(welcome),
-  "WelcomeScreen renders MatchdayHero (with results) when tournamentStarted",
+  /<LiveNowCard\s+matchResultsOverride=\{results\}\s*\/>/.test(welcome),
+  "WelcomeScreen renders LiveNowCard (with public results) when tournamentStarted",
 );
 // Logged-out visitors have no Firestore listeners, so the store's
 // useMatchResults would be empty. WelcomeScreen must source match results
 // from the public endpoint via usePublicSettings instead.
 assert(
   /usePublicSettings/.test(welcome),
-  "WelcomeScreen uses usePublicSettings (also carries matchResults) for MatchdayHero",
+  "WelcomeScreen uses usePublicSettings (also carries matchResults) for LiveNowCard",
 );
 assert(
   !/from\s+["']\.\.\/hooks\/useStore["'][^;]*useMatchResults/.test(welcome),
@@ -89,8 +90,8 @@ assert(
 {
   const heroMatch = welcome.match(/tournamentStarted\s*\?\s*\(([\s\S]*?)\)\s*:/);
   assert(
-    heroMatch && /<MatchdayHero/.test(heroMatch[1]),
-    "MatchdayHero is inside the tournamentStarted branch (not always rendered)",
+    heroMatch && /<LiveNowCard/.test(heroMatch[1]),
+    "LiveNowCard is inside the tournamentStarted branch (not always rendered)",
   );
   assert(
     heroMatch && /<UpcomingMatches/.test(heroMatch[1]),
@@ -177,23 +178,24 @@ assert(
 }
 
 // ============================================================
-// Sanity: MatchdayHero contract unchanged — still needs
-// `results` prop, still filters by today's Israel-date key.
+// Sanity: LiveNowCard contract — guest-compatible via the
+// matchResultsOverride prop, and never loses a live match
+// (renders every isLive entry, mapped or fallback).
 // ============================================================
-console.log("--- Sanity: MatchdayHero contract ---");
+console.log("--- Sanity: LiveNowCard contract ---");
 
 assert(
-  /function\s+MatchdayHero\s*\(\s*\{\s*results\s*\}\s*\)/.test(matchdayHero),
-  "MatchdayHero still accepts { results } prop",
+  /matchResultsOverride/.test(liveNowCard),
+  "LiveNowCard accepts matchResultsOverride (logged-out path)",
 );
 assert(
-  /getMatchIsraelDateKey/.test(matchdayHero),
-  "MatchdayHero still filters by Israel-date key",
+  /matches\.filter\(\(m\) => m\.isLive\)/.test(liveNowCard),
+  "LiveNowCard derives its match set from the isLive selector",
 );
 
 // ============================================================
 // Sanity: Home + WelcomeScreen both import UpcomingMatches and
-// MatchdayHero from the same component modules (single source).
+// LiveNowCard from the same component modules (single source).
 // ============================================================
 console.log("--- Sanity: Shared component imports ---");
 
@@ -206,12 +208,12 @@ assert(
   "WelcomeScreen imports UpcomingMatches",
 );
 assert(
-  /import\s+MatchdayHero\s+from\s+["']\.\.\/components\/MatchdayHero["']/.test(home),
-  "Home imports MatchdayHero",
+  /import\s+LiveNowCard\s+from\s+["']\.\.\/components\/LiveNowCard["']/.test(home),
+  "Home imports LiveNowCard",
 );
 assert(
-  /import\s+MatchdayHero\s+from\s+["']\.\.\/components\/MatchdayHero["']/.test(welcome),
-  "WelcomeScreen imports MatchdayHero",
+  /import\s+LiveNowCard\s+from\s+["']\.\.\/components\/LiveNowCard["']/.test(welcome),
+  "WelcomeScreen imports LiveNowCard",
 );
 
 // ============================================================
