@@ -72,6 +72,38 @@ assert(
   "toggles expose aria-expanded for accessibility",
 );
 
+// --- Teams tab: champion + top scorer get the same click-to-detail bars ---
+
+// Shared clickable-bar component drives both team breakdowns.
+assert(
+  /function VoterBarList/.test(stats) && /<VoterList names=\{item\.voters\}/.test(stats),
+  "VoterBarList renders clickable bars that expand to their voters",
+);
+
+// Champion breakdown tracks voters and uses the shared component.
+assert(
+  /title="מי תהיה האלופה\?"[\s\S]{0,400}?<VoterBarList/.test(stats),
+  "ChampionStats renders via VoterBarList (clickable champion bars)",
+);
+assert(
+  /לחצו על קבוצה כדי לראות מי ניחש אותה/.test(stats),
+  "ChampionStats has a click-for-detail hint",
+);
+
+// Top-scorer breakdown tracks voters, uses the shared component, and is uncapped.
+assert(
+  /title="מי יהיה מלך השערים\?"[\s\S]{0,400}?<VoterBarList/.test(stats),
+  "TopScorerStats renders via VoterBarList (clickable scorer bars)",
+);
+assert(
+  /לחצו על שחקן כדי לראות מי ניחש אותו/.test(stats),
+  "TopScorerStats has a click-for-detail hint",
+);
+assert(
+  !/\.slice\(0, 10\)/.test(stats),
+  "TopScorerStats no longer caps the list at 10 — shows all predicted scorers",
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   failures.forEach((f) => console.error("FAILED: " + f));
