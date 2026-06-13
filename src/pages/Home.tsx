@@ -8,6 +8,7 @@ import LiveNowCard from "../components/LiveNowCard";
 import ScoreStrip from "../components/ScoreStrip";
 import SummaryTeaser from "../components/SummaryTeaser";
 import { useToast } from "../components/Toast";
+import KickoffFooter from "../components/KickoffFooter";
 import { BRAND } from "../constants/messages";
 
 export default function Home() {
@@ -82,7 +83,7 @@ export default function Home() {
             countdown={countdown}
             variant="compact"
             headerText={BRAND.countdownHeader}
-            footerText={<>11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}</>}
+            footerText={<KickoffFooter />}
           />
         )}
       </div>

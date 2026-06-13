@@ -5,6 +5,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import { CHRONOLOGICAL_DAYS } from "../utils/chronologicalSchedule";
+import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { getCachedBracket } from "../utils/bracketCache";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
@@ -35,8 +36,8 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
       ? match.label
       : null;
   const metaRight = (chronological
-    ? [match.time, match.venue]
-    : [match.date, match.time, match.venue]
+    ? [formatMatchClock(match), match.venue]
+    : [formatMatchDateShort(match), formatMatchClock(match), match.venue]
   )
     .filter(Boolean)
     .join(" · ");

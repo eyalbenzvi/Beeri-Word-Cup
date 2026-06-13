@@ -6,15 +6,16 @@
 // OFFICIAL results map and calls calculateMatchPoints with the exact same
 // arguments calculateFullScore uses (stage from the result, predTeams /
 // actualTeams from the form / actual brackets) — only filtered to matches
-// whose ISRAEL calendar date matches the requested key, so the 04:00 game
-// from the US night session lands on the right day.
+// whose calendar date (in the VIEWER's timezone) matches the requested key,
+// so the late-night US session lands on the day the viewer experienced it.
+// The caller must compute `dateKey` with the SAME `tz` it passes here.
 //
 // Advancing/champion/top-scorer bonuses are deliberately excluded: they are
 // not "earned on a day" in any way a user would recognize.
 
 import { calculateMatchPoints } from "./scoring";
 import { getMatchById } from "../data/matches";
-import { getMatchIsraelDateKey } from "./matchTime";
+import { getMatchDateKey, dateKeyForNow } from "./userTime";
 
 export function computeDailyFormPoints({
   formMatches,
@@ -22,12 +23,16 @@ export function computeDailyFormPoints({
   dateKey,
   predBracket,
   actualBracket,
+  tz,
 }: {
   formMatches: Record<string, any>;
   results: Record<string, any>;
   dateKey: string;
   predBracket?: Record<string, any>;
   actualBracket?: Record<string, any>;
+  // Required: must be the SAME timezone used to derive `dateKey`, so the
+  // day-key filter below can't silently disagree with the requested day.
+  tz: string;
 }) {
   let points = 0;
   let exactCount = 0;
@@ -40,7 +45,7 @@ export function computeDailyFormPoints({
     const actualAny = actual as any;
     if (!actualAny || actualAny.homeScore == null || actualAny.awayScore == null) continue;
     const match = getMatchById(matchId);
-    if (!match || getMatchIsraelDateKey(match) !== dateKey) continue;
+    if (!match || getMatchDateKey(match, tz) !== dateKey) continue;
     playedCount++;
     const stage = actualAny.stage || "group";
     const result = calculateMatchPoints(
@@ -58,9 +63,9 @@ export function computeDailyFormPoints({
 }
 
 // Israel-calendar date key for an arbitrary timestamp ("2026-06-12").
-// sv-SE gives ISO format; the timezone does the IDT conversion.
+// Retained as the Israel-anchored helper; app UI uses dateKeyForNow (viewer's
+// timezone) instead. Kept in terms of the generic helper so the two cannot
+// drift.
 export function israelDateKeyForNow(nowMs: number) {
-  return new Date(nowMs).toLocaleDateString("sv-SE", {
-    timeZone: "Asia/Jerusalem",
-  });
+  return dateKeyForNow(nowMs, "Asia/Jerusalem");
 }

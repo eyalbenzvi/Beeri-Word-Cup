@@ -26,7 +26,8 @@ import {
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useNavigation } from "../hooks/useNavigation";
-import { computeDailyFormPoints, israelDateKeyForNow } from "../utils/dailyPoints";
+import { computeDailyFormPoints } from "../utils/dailyPoints";
+import { dateKeyForNow, getUserTimeZone } from "../utils/userTime";
 import { SCORE_STRIP, LABELS } from "../constants/messages";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -53,12 +54,17 @@ export default function ScoreStrip() {
   // it's derived once, not inside the per-form loop.
   const dayLines = useMemo(() => {
     const now = Date.now();
-    const todayKey = israelDateKeyForNow(now);
-    const yesterdayKey = israelDateKeyForNow(now - DAY_MS);
+    // The viewer's timezone defines "today" for the day-points buckets, and
+    // the same tz is threaded into computeDailyFormPoints so the day filter
+    // and the day key can never disagree.
+    const tz = getUserTimeZone();
+    const todayKey = dateKeyForNow(now, tz);
+    const yesterdayKey = dateKeyForNow(now - DAY_MS, tz);
     const todayPlayed = computeDailyFormPoints({
       formMatches: {},
       results,
       dateKey: todayKey,
+      tz,
     }).playedCount;
     const lines = {};
     for (const entry of myForms) {
@@ -71,6 +77,7 @@ export default function ScoreStrip() {
         dateKey,
         predBracket,
         actualBracket,
+        tz,
       });
       lines[entry.formId] =
         todayPlayed > 0

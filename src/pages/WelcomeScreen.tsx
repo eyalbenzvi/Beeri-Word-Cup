@@ -12,6 +12,7 @@ import UpcomingMatches from "../components/UpcomingMatches";
 import LiveNowCard from "../components/LiveNowCard";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
+import KickoffFooter from "../components/KickoffFooter";
 import { Phone, ArrowRight } from "lucide-react";
 import { BRAND } from "../constants/messages";
 
@@ -44,11 +45,7 @@ export default function WelcomeScreen() {
         countdown={countdown}
         variant="large"
         headerText={BRAND.countdownHeader}
-        footerText={
-          <>
-            11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}
-          </>
-        }
+        footerText={<KickoffFooter />}
       />
     </div>
   ) : tournamentStarted ? (
@@ -62,11 +59,7 @@ export default function WelcomeScreen() {
         countdown={countdown}
         variant="large"
         headerText={BRAND.countdownHeader}
-        footerText={
-          <>
-            11 ביוני 2026 · <bdi>22:00</bdi> שעון ישראל · {BRAND.hosts}
-          </>
-        }
+        footerText={<KickoffFooter />}
       />
     </div>
   );

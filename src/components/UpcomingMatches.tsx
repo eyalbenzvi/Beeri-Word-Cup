@@ -4,7 +4,12 @@ import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
-import { formatIsraelDateLabel } from "../utils/matchTime";
+import {
+  formatMatchDateNumeric,
+  formatMatchDateShort,
+  formatMatchClock,
+  getUserTimeZone,
+} from "../utils/userTime";
 import { isScoreValid } from "../utils/helpers";
 import { LIVE } from "../constants/messages";
 import Score from "./Score";
@@ -123,7 +128,14 @@ function MatchRow({ match, actualTeams }) {
   const home = actualTeams.home ? getTeamByCode(actualTeams.home) : null;
   const away = actualTeams.away ? getTeamByCode(actualTeams.away) : null;
   const stageLabel = STAGE_LABELS[match.stage] || "";
-  const meta = [match.date, match.time, match.venue].filter(Boolean).join(" · ");
+  const tz = getUserTimeZone();
+  const meta = [
+    formatMatchDateShort(match, tz),
+    formatMatchClock(match, tz),
+    match.venue,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // Stacked + centered layout: stage label on top, teams in the middle,
   // date/time/venue on the bottom. Keeps everything visually balanced in
@@ -224,9 +236,9 @@ export default function UpcomingMatches({ matchResultsOverride, excludeLive = fa
     );
   }
 
-  // The 24-hour window can span two Israel calendar days — show a range.
-  const firstDate = formatIsraelDateLabel(matches[0]);
-  const lastDate = formatIsraelDateLabel(matches[matches.length - 1]);
+  // The 24-hour window can span two of the viewer's calendar days — show a range.
+  const firstDate = formatMatchDateNumeric(matches[0]);
+  const lastDate = formatMatchDateNumeric(matches[matches.length - 1]);
   const headingDate =
     firstDate && lastDate && firstDate !== lastDate
       ? `${firstDate}–${lastDate}`

@@ -296,9 +296,13 @@ console.log("--- 6. Score-decrease debounce ---");
   assert(!pending2.m2, "flicker back up clears pending decrease");
 }
 
-// ---- 7. Daily points: Israel-date filtering + engine parity ----
+// ---- 7. Daily points: viewer-timezone filtering + engine parity ----
 console.log("--- 7. computeDailyFormPoints ---");
 {
+  // computeDailyFormPoints groups by the viewer's timezone; the caller must
+  // pass the SAME tz used to derive dateKey. We pin Israel time so the test is
+  // deterministic on a UTC CI host and the day keys match getMatchIsraelDateKey.
+  const TZ = "Asia/Jerusalem";
   // Build a real two-matches-same-day fixture set from the schedule.
   const byDay = {};
   for (const m of groupMatches) {
@@ -320,16 +324,32 @@ console.log("--- 7. computeDailyFormPoints ---");
     [mB.id]: { homeScore: 1, awayScore: 1 }, // outcome: 1
     [mC.id]: { homeScore: 3, awayScore: 0 }, // exact but OTHER day — excluded
   };
-  const day = computeDailyFormPoints({ formMatches, results, dateKey: dayKey });
+  const day = computeDailyFormPoints({ formMatches, results, dateKey: dayKey, tz: TZ });
   assert(day.points === 5, `same-day points = 5 (got ${day.points})`);
   assert(day.exactCount === 1 && day.outcomeCount === 1, "exact/outcome counts");
   assert(day.playedCount === 2, "playedCount counts only that day's finished matches");
 
-  const other = computeDailyFormPoints({ formMatches, results, dateKey: otherDayKey });
+  const other = computeDailyFormPoints({ formMatches, results, dateKey: otherDayKey, tz: TZ });
   assert(other.points === 4 && other.playedCount === 1, "other-day match scores on ITS day");
 
-  const noDay = computeDailyFormPoints({ formMatches, results, dateKey: "1999-01-01" });
+  const noDay = computeDailyFormPoints({ formMatches, results, dateKey: "1999-01-01", tz: TZ });
   assert(noDay.points === 0 && noDay.playedCount === 0, "day without matches -> zeros");
+
+  // Timezone sensitivity: a late-Israel-evening match that crosses into the
+  // next UTC/eastern day is bucketed by the viewer's clock. Pick a match at
+  // 22:00+ Israel (already next-day-ish further east) and confirm a Tokyo
+  // viewer files it on the following calendar day.
+  const lateMatch = groupMatches.find((m) => m.time === "22:00");
+  if (lateMatch) {
+    const ilKey = getMatchIsraelDateKey(lateMatch);
+    const lateResults = { [lateMatch.id]: { homeScore: 1, awayScore: 0, stage: "group" } };
+    const lateForm = { [lateMatch.id]: { homeScore: 1, awayScore: 0 } };
+    const ilDay = computeDailyFormPoints({ formMatches: lateForm, results: lateResults, dateKey: ilKey, tz: TZ });
+    assert(ilDay.playedCount === 1, "late match counts on its Israel day for an Israel viewer");
+    // For a Tokyo viewer (UTC+9) a 22:00 Israel match is 04:00 next day.
+    const tokyoSameKey = computeDailyFormPoints({ formMatches: lateForm, results: lateResults, dateKey: ilKey, tz: "Asia/Tokyo" });
+    assert(tokyoSameKey.playedCount === 0, "Israel-day key matches nothing for a Tokyo viewer (day shifted)");
+  }
 }
 
 // ---- 8. israelDateKeyForNow: UTC evening crosses to next Israel day ----
