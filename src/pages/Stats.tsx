@@ -16,6 +16,7 @@ import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
+import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
@@ -68,11 +69,43 @@ function StatCard({ title, icon, children }) {
   );
 }
 
+// Scrollable list of form names behind a given result/outcome. Used by the
+// accordion panels in MatchPredictions so users can see WHO predicted each one.
+function VoterList({ names }: { names: string[] }) {
+  if (!names || names.length === 0) {
+    return (
+      <p className="text-xs text-ink-muted text-center py-2 font-bold">
+        אין נתונים
+      </p>
+    );
+  }
+  return (
+    <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pl-1">
+      {names.map((name, i) => (
+        <div
+          key={`${name}-${i}`}
+          className="text-xs rounded-lg px-3 py-1.5 border border-border text-right font-bold text-ink"
+          style={{ background: "var(--color-bg-soft)" }}
+        >
+          {name || "טופס ללא שם"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ============ MATCH PREDICTIONS SECTION ============
 function MatchPredictions({ forms }) {
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [selectedMatch, setSelectedMatch] = useState(null);
+  // Which result/outcome accordion is open. ids: `score:${key}` or
+  // `outcome:home|draw|away`. Reset whenever the selected match changes.
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExpanded(null);
+  }, [selectedMatch]);
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
 
@@ -80,40 +113,7 @@ function MatchPredictions({ forms }) {
     if (!selectedMatch) return null;
     const match = allMatches.find((m) => m.id === selectedMatch);
     if (!match) return null;
-
-    const preds = forms.map((f) => f.matches?.[selectedMatch]).filter(Boolean);
-    const homeWin = preds.filter((p) => p.homeScore > p.awayScore).length;
-    const draw = preds.filter((p) => p.homeScore === p.awayScore).length;
-    const awayWin = preds.filter((p) => p.homeScore < p.awayScore).length;
-
-    // Most common scores
-    const scoreCounts = {};
-    preds.forEach((p) => {
-      // RTL display: away first so the home digit is read first by Hebrew readers (right side).
-      const key = `${p.awayScore}-${p.homeScore}`;
-      scoreCounts[key] = (scoreCounts[key] || 0) + 1;
-    });
-    const topScores = Object.entries(scoreCounts)
-      .sort((a, b) => (b[1] as number) - (a[1] as number))
-      .slice(0, 5);
-
-    // Average goals
-    const totalGoals = preds.reduce(
-      (s, p) => s + (p.homeScore || 0) + (p.awayScore || 0),
-      0,
-    );
-    const avgGoals =
-      preds.length > 0 ? (totalGoals / preds.length).toFixed(1) : "0";
-
-    return {
-      match,
-      preds: preds.length,
-      homeWin,
-      draw,
-      awayWin,
-      topScores,
-      avgGoals,
-    };
+    return { match, ...aggregateMatchPredictions(forms, selectedMatch) };
   }, [selectedMatch, forms]);
 
   const home = matchStats?.match
@@ -191,33 +191,60 @@ function MatchPredictions({ forms }) {
             {matchStats.preds} ניחושים
           </p>
 
-          {/* 1/X/2 */}
+          {/* 1/X/2 — click a card to see who predicted that outcome */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl p-3 border-2 border-secondary/30" style={{ background: "#F0F9FF" }}>
+            <button
+              type="button"
+              onClick={() => setExpanded(expanded === "outcome:home" ? null : "outcome:home")}
+              aria-expanded={expanded === "outcome:home"}
+              className={`rounded-xl p-3 border-2 cursor-pointer transition-all ${expanded === "outcome:home" ? "border-secondary ring-2 ring-secondary/40" : "border-secondary/30"}`}
+              style={{ background: "#F0F9FF" }}
+            >
               <div className="text-xl font-extrabold text-secondary">
                 {matchStats.homeWin}
               </div>
               <div className="text-xs text-secondary font-bold">
                 1 {home?.name || ""}
               </div>
-            </div>
-            <div className="rounded-xl p-3 border-2 border-border" style={{ background: "var(--color-bg-soft)" }}>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpanded(expanded === "outcome:draw" ? null : "outcome:draw")}
+              aria-expanded={expanded === "outcome:draw"}
+              className={`rounded-xl p-3 border-2 cursor-pointer transition-all ${expanded === "outcome:draw" ? "border-border-strong ring-2 ring-border-strong/40" : "border-border"}`}
+              style={{ background: "var(--color-bg-soft)" }}
+            >
               <div className="text-xl font-extrabold text-ink-muted">
                 {matchStats.draw}
               </div>
               <div className="text-xs text-ink-muted font-bold">
                 X תיקו
               </div>
-            </div>
-            <div className="rounded-xl p-3 border-2 border-danger/30" style={{ background: "var(--color-danger-soft)" }}>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpanded(expanded === "outcome:away" ? null : "outcome:away")}
+              aria-expanded={expanded === "outcome:away"}
+              className={`rounded-xl p-3 border-2 cursor-pointer transition-all ${expanded === "outcome:away" ? "border-danger ring-2 ring-danger/40" : "border-danger/30"}`}
+              style={{ background: "var(--color-danger-soft)" }}
+            >
               <div className="text-xl font-extrabold text-danger">
                 {matchStats.awayWin}
               </div>
               <div className="text-xs text-danger font-bold">
                 2 {away?.name || ""}
               </div>
-            </div>
+            </button>
           </div>
+          {expanded === "outcome:home" && (
+            <VoterList names={matchStats.outcomeVoters.home} />
+          )}
+          {expanded === "outcome:draw" && (
+            <VoterList names={matchStats.outcomeVoters.draw} />
+          )}
+          {expanded === "outcome:away" && (
+            <VoterList names={matchStats.outcomeVoters.away} />
+          )}
 
           {/* Average goals */}
           <div className="text-center text-sm text-ink-muted font-bold">
@@ -227,20 +254,43 @@ function MatchPredictions({ forms }) {
             </span>
           </div>
 
-          {/* Top predictions */}
+          {/* Top predictions — click a result to see who predicted it */}
           <div>
-            <p className="text-sm font-extrabold text-ink mb-2">
+            <p className="text-sm font-extrabold text-ink mb-1">
               תוצאות פופולריות:
             </p>
+            <p className="text-xs text-ink-muted font-bold mb-2">
+              לחצו על תוצאה כדי לראות מי ניחש אותה
+            </p>
             <div className="space-y-1.5">
-              {matchStats.topScores.map(([score, count]) => (
-                <Bar
-                  key={score}
-                  label={score}
-                  count={count}
-                  total={matchStats.preds}
-                />
-              ))}
+              {matchStats.topScores.map(([score, count]) => {
+                const id = `score:${score}`;
+                const open = expanded === id;
+                return (
+                  <div key={score}>
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(open ? null : id)}
+                      aria-expanded={open}
+                      className="w-full flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span
+                        className={`text-ink-muted text-xs transition-transform ${open ? "rotate-180" : ""}`}
+                      >
+                        ▾
+                      </span>
+                      <div className="flex-1">
+                        <Bar
+                          label={score}
+                          count={count}
+                          total={matchStats.preds}
+                        />
+                      </div>
+                    </button>
+                    {open && <VoterList names={matchStats.scoreVoters[score] || []} />}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
