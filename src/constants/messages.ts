@@ -53,7 +53,6 @@ export const LABELS = {
 // straight from the scoring engine (see src/utils/liveScores.ts).
 export const LIVE = {
   liveChip: "לייב",
-  todayChip: "היום",
   halftime: "מחצית",
   extraTime: "הארכה",
   finished: "נגמר",

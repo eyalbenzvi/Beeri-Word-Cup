@@ -20,7 +20,10 @@ import {
   israelDateKeyForNow,
 } from "/home/user/Beeri-World-Cup/src/utils/dailyPoints.js";
 import { groupMatches } from "/home/user/Beeri-World-Cup/src/data/matches.js";
-import { getMatchIsraelDateKey } from "/home/user/Beeri-World-Cup/src/utils/matchTime.js";
+import {
+  getMatchIsraelDateKey,
+  getMatchKickoffUTC,
+} from "/home/user/Beeri-World-Cup/src/utils/matchTime.js";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -98,15 +101,36 @@ console.log("--- 2. Extra-time suppression ---");
   assert(groupStoppage.kind === "exact",
     "group minute>90 is stoppage time, NOT suppressed");
 
-  const etNullMinute = computeLiveVerdict({
+  // duration is the authoritative signal (minute is plan-dependent/null on
+  // the free tier): any non-REGULAR duration suppresses even with no minute.
+  for (const duration of ["EXTRA_TIME", "PENALTY_SHOOTOUT"]) {
+    const v = computeLiveVerdict({
+      prediction: { homeScore: 1, awayScore: 1 },
+      live: { homeScore: 1, awayScore: 1, status: "IN_PLAY", minute: null, duration },
+      stage: "R16",
+      predTeams: KNOCKOUT_TEAMS,
+      actualTeams: KNOCKOUT_TEAMS,
+    });
+    assert(v.kind === "suppressed", `knockout duration=${duration} -> suppressed (minute null)`);
+  }
+  const regularKo = computeLiveVerdict({
     prediction: { homeScore: 1, awayScore: 1 },
-    live: { homeScore: 1, awayScore: 1, status: "IN_PLAY", minute: null },
+    live: { homeScore: 1, awayScore: 1, status: "IN_PLAY", minute: 60, duration: "REGULAR" },
     stage: "R16",
     predTeams: KNOCKOUT_TEAMS,
     actualTeams: KNOCKOUT_TEAMS,
   });
-  assert(etNullMinute.kind === "exact",
-    "knockout with null minute keeps verdict (can't detect ET)");
+  assert(regularKo.kind === "exact", "knockout duration=REGULAR at 60' keeps verdict");
+
+  const etNullBoth = computeLiveVerdict({
+    prediction: { homeScore: 1, awayScore: 1 },
+    live: { homeScore: 1, awayScore: 1, status: "IN_PLAY", minute: null, duration: null },
+    stage: "R16",
+    predTeams: KNOCKOUT_TEAMS,
+    actualTeams: KNOCKOUT_TEAMS,
+  });
+  assert(etNullBoth.kind === "exact",
+    "knockout with BOTH signals absent keeps verdict (documented residual risk)");
 }
 
 // ---- 3. Edge kinds ----
@@ -184,6 +208,35 @@ console.log("--- 4. Entry-to-match mapping & orientation ---");
     {},
   );
   assert(!mapped.g1, "missing fixture -> unmapped (fallback UI)");
+
+  // duration passes through to the mapped entry (verdict suppression input)
+  mapped = mapLiveEntriesToMatches(
+    [{ homeCode: "FRA", awayCode: "SEN", status: "IN_PLAY", minute: 100, duration: "EXTRA_TIME", homeScore: 2, awayScore: 2 }],
+    [koMatch],
+    bracket,
+  );
+  assert(mapped.k1 && mapped.k1.duration === "EXTRA_TIME", "duration carried through mapping");
+
+  // Rematch within the ±24h feed window: same team pair appears twice
+  // (yesterday FINISHED + now IN_PLAY). The entry closest to OUR kickoff
+  // wins — pairing the live match to yesterday's fixture would show a
+  // wrong (possibly flipped) score. Uses a real scheduled match so
+  // getMatchKickoffUTC resolves.
+  const realMatch = groupMatches[0];
+  const realTeams = { home: realMatch.homeTeam, away: realMatch.awayTeam };
+  const realKickoff = getMatchKickoffUTC(realMatch);
+  const nearIso = new Date(realKickoff).toISOString();
+  const farIso = new Date(realKickoff - 23 * 3600 * 1000).toISOString();
+  mapped = mapLiveEntriesToMatches(
+    [
+      { homeCode: realTeams.home, awayCode: realTeams.away, status: "FINISHED", utcDate: farIso, homeScore: 9, awayScore: 9 },
+      { homeCode: realTeams.home, awayCode: realTeams.away, status: "IN_PLAY", utcDate: nearIso, homeScore: 1, awayScore: 0 },
+    ],
+    [realMatch],
+    {},
+  );
+  assert(mapped[realMatch.id]?.homeScore === 1 && mapped[realMatch.id]?.status === "IN_PLAY",
+    "duplicate team-pair entries: kickoff-closest fixture wins (rematch guard)");
 }
 
 // ---- 5. summarizeVerdicts: exhaustive partition ----

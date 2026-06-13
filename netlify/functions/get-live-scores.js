@@ -50,6 +50,9 @@ function getCorsHeaders(event) {
     // stale-while-revalidate keeps responses instant across the refresh.
     "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
     "Netlify-CDN-Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+    // The ACAO header above is per-origin while the response is CDN-cached —
+    // without Vary the first requester's origin would be served to everyone.
+    "Vary": "Origin",
     "Content-Type": "application/json",
   };
 }

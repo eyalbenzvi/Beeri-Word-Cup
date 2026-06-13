@@ -52,10 +52,22 @@ console.log("--- A2. normalizeFdMatches ---");
   assert(out[0].homeCode === "CUR", "TLA translated to our code space");
   assert(out[0].homeScore === 2 && out[0].awayScore === 1, "fullTime scores carried");
   assert(out[0].minute === 63, "integer minute carried");
+  assert(out[0].duration === null, "absent duration -> null");
   assert(out[1].homeScore === null && out[1].awayScore === null,
     "null scores stay null (never coerced to 0)");
   assert(out[1].minute === null, "non-integer minute -> null");
   assert(normalizeFdMatches(null).length === 0, "null input -> []");
+
+  // duration is the client's ET/pens suppression signal — must pass through.
+  const et = normalizeFdMatches([
+    {
+      homeTeam: { tla: "FRA" },
+      awayTeam: { tla: "BRA" },
+      status: "IN_PLAY",
+      score: { fullTime: { home: 2, away: 2 }, duration: "EXTRA_TIME" },
+    },
+  ]);
+  assert(et[0].duration === "EXTRA_TIME", "score.duration carried through");
 }
 
 // ---- B. Static contract of the endpoint ----
@@ -79,6 +91,8 @@ assert(/inFlight/.test(src) && /inFlight = null/.test(src),
 assert(/max-age=60/.test(src), "CDN Cache-Control max-age");
 assert(/Netlify-CDN-Cache-Control/.test(src), "Netlify CDN cache header");
 assert(/stale-while-revalidate/.test(src), "stale-while-revalidate for smooth refresh");
+assert(/"Vary":\s*"Origin"/.test(src),
+  "Vary: Origin (per-origin ACAO header is CDN-cached)");
 
 // Soft-failure stance: upstream errors degrade, never 500.
 assert(/available:\s*false/.test(src), "degrades to available:false");

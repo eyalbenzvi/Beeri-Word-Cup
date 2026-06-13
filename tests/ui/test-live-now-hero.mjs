@@ -93,9 +93,29 @@ assert(/liveScoresEnabled !== false/.test(hook), "settings kill switch gates the
 assert(/stabilizeScores/.test(hook), "decrease debounce applied to mapped scores");
 assert(/clearTimeout/.test(hook) && /removeEventListener/.test(hook),
   "effect cleans up timer + listener");
+// Review fixes (expert findings 1-3) — lock them in:
+assert(/if \(inFlight\) return;/.test(hook),
+  "tick re-entry guard (visibility flip during in-flight fetch can't fork a second poll chain)");
+assert(/const schedule = \(failures\) => \{\s*\n\s*if \(timer\) clearTimeout\(timer\);/.test(hook),
+  "schedule() is self-cleaning (always cancels the previously armed timeout)");
+assert(/failuresRef\.current \+= 1/.test(hook) && !/nextFailures/.test(hook),
+  "failure count lives in a ref, never smuggled out of a setState updater");
+assert(/lastEntriesRef\.current !== state\.entries/.test(hook),
+  "decrease debounce advances once per POLL, not per render (60s clock tick can't confirm a VAR hold)");
 // Degradation: no spinner, schedule fallback, quiet stale/down notes.
 assert(!/Spinner/.test(hero), "hero never renders a spinner");
 assert(/playingNow/.test(hero), "schedule fallback ('משוחק עכשיו') when no live data");
+// Review fix (expert finding 6): during a feed outage the live match is
+// gone from the UpcomingMatches list, so the single-form branch must still
+// show the prediction itself — only the verdict claim is omitted.
+assert(/verdict\.kind !== "no-data" && \(/.test(hero),
+  "single-form no-data: prediction stays visible, only the verdict line is omitted");
+// Review fix (expert finding 4): ET suppression keys on FD's score.duration
+// (authoritative) with minute>90 as fallback — minute alone is plan-dependent.
+assert(/duration && live\.duration !== "REGULAR"/.test(util),
+  "verdict suppression uses score.duration as the primary ET/pens signal");
+assert(/getMatchKickoffUTC/.test(util),
+  "duplicate team-pair entries disambiguated by kickoff proximity (rematch guard)");
 assert(/apiDownNote/.test(hero) && /staleNote/.test(hero) && /refreshNote/.test(hero),
   "freshness footer: refresh / stale / down states");
 assert(/failures >= 2/.test(hero), "quiet down-note after 2 consecutive failures");

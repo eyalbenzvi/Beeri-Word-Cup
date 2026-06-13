@@ -65,46 +65,64 @@ export function useLiveScores(liveMatches, actualBracket) {
     failures: 0,
   });
 
-  // Decrease-debounce memory (see stabilizeScores) and the previous mapped
-  // snapshot it compares against. Refs: poll bookkeeping, not render state.
+  // Poll bookkeeping, none of it render state:
+  //   failuresRef        — consecutive-failure count. NOT read back from a
+  //                        setState updater (updaters aren't guaranteed to
+  //                        run synchronously, which would silently skip the
+  //                        backoff exactly during a sustained outage).
+  //   pendingDecreaseRef — VAR-debounce memory (see stabilizeScores)
+  //   prevScoresRef      — last STABILIZED per-match snapshot
+  //   lastEntriesRef     — identity of the poll payload the debounce last
+  //                        consumed, so the protocol advances once per POLL,
+  //                        not once per render (liveMatches gets a fresh
+  //                        identity every 60s clock tick).
+  const failuresRef = useRef(0);
   const pendingDecreaseRef = useRef({});
   const prevScoresRef = useRef({});
+  const lastEntriesRef = useRef(null);
 
   useEffect(() => {
     if (!enabled) return undefined;
     let disposed = false;
     let timer = null;
+    let inFlight = false;
 
+    // Self-cleaning: always cancels the previously armed timeout, so a
+    // hidden->visible refetch can never leave two poll chains running.
     const schedule = (failures) => {
+      if (timer) clearTimeout(timer);
+      timer = null;
       if (disposed || document.visibilityState === "hidden") return;
       const base = failures >= FAILURES_BEFORE_SLOWDOWN ? SLOW_POLL_MS : POLL_MS;
       timer = setTimeout(tick, base + Math.random() * JITTER_MS);
     };
 
     const tick = async () => {
-      let nextFailures = 0;
+      // Re-entry guard: a visibility flip during an in-flight fetch must
+      // not start a concurrent tick (each would re-arm its own chain).
+      if (inFlight) return;
+      inFlight = true;
       try {
         const data = await fetchLiveScores();
         if (disposed) return;
         if (data) {
+          failuresRef.current = 0;
           const at = Date.parse(data.fetchedAt || "") || Date.now();
           setState({ entries: data.matches || [], fetchedAt: at, failures: 0 });
         } else {
           // Endpoint reachable but feature off/upstream down — count as a
           // soft failure so the UI can show its quiet note, keep old data.
-          setState((s) => {
-            nextFailures = s.failures + 1;
-            return { ...s, failures: nextFailures };
-          });
+          failuresRef.current += 1;
+          setState((s) => ({ ...s, failures: failuresRef.current }));
         }
       } catch {
         if (disposed) return;
-        setState((s) => {
-          nextFailures = s.failures + 1;
-          return { ...s, failures: nextFailures };
-        });
+        failuresRef.current += 1;
+        setState((s) => ({ ...s, failures: failuresRef.current }));
+      } finally {
+        inFlight = false;
       }
-      schedule(nextFailures);
+      schedule(failuresRef.current);
     };
 
     const onVisibility = () => {
@@ -114,8 +132,8 @@ export function useLiveScores(liveMatches, actualBracket) {
         timer = null;
       } else {
         // Back to foreground: refetch immediately so a stale "live" score
-        // is never asserted as current.
-        if (timer) clearTimeout(timer);
+        // is never asserted as current. tick() no-ops if one is in flight;
+        // schedule() inside it clears any timer the old chain armed.
         tick();
       }
     };
@@ -136,13 +154,28 @@ export function useLiveScores(liveMatches, actualBracket) {
       liveMatches,
       actualBracket,
     );
-    const stable = stabilizeScores(
-      prevScoresRef.current,
-      mapped,
-      pendingDecreaseRef.current,
-    );
-    prevScoresRef.current = stable;
-    return stable;
+    // The decrease-debounce must advance once per POLL. This memo also
+    // re-runs between polls (liveMatches/actualBracket get new identities
+    // on the 60s clock tick), and feeding those re-runs into the protocol
+    // would accept a held decrease after ~60s with no confirming poll.
+    // So: run the protocol only when a new payload arrived; otherwise
+    // reuse the stabilized snapshot, falling back to the fresh mapping for
+    // matches that just entered the live window mid-poll.
+    if (lastEntriesRef.current !== state.entries) {
+      lastEntriesRef.current = state.entries;
+      const stable = stabilizeScores(
+        prevScoresRef.current,
+        mapped,
+        pendingDecreaseRef.current,
+      );
+      prevScoresRef.current = stable;
+      return stable;
+    }
+    const out = {};
+    for (const [id, cur] of Object.entries(mapped)) {
+      out[id] = prevScoresRef.current[id] ?? cur;
+    }
+    return out;
   }, [enabled, state.entries, liveMatches, actualBracket]);
 
   return {

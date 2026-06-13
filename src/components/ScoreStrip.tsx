@@ -47,50 +47,46 @@ export default function ScoreStrip() {
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
 
-  const daily = useMemo(() => {
+  // Per-form "today: +N" (or, before any of today's matches finished,
+  // "yesterday: +N" — the number a morning visitor opens the app for).
+  // playedCount depends only on results+date (identical across forms), so
+  // it's derived once, not inside the per-form loop.
+  const dayLines = useMemo(() => {
     const now = Date.now();
     const todayKey = israelDateKeyForNow(now);
     const yesterdayKey = israelDateKeyForNow(now - DAY_MS);
-    const perForm = {};
-    let todayPlayed = 0;
+    const todayPlayed = computeDailyFormPoints({
+      formMatches: {},
+      results,
+      dateKey: todayKey,
+    }).playedCount;
+    const lines = {};
     for (const entry of myForms) {
       const formMatches = allPredictions[entry.formId]?.matches || {};
       const predBracket = formBracketMap[entry.formId]?.predBracket;
-      const today = computeDailyFormPoints({
+      const dateKey = todayPlayed > 0 ? todayKey : yesterdayKey;
+      const day = computeDailyFormPoints({
         formMatches,
         results,
-        dateKey: todayKey,
+        dateKey,
         predBracket,
         actualBracket,
       });
-      const yesterday = computeDailyFormPoints({
-        formMatches,
-        results,
-        dateKey: yesterdayKey,
-        predBracket,
-        actualBracket,
-      });
-      perForm[entry.formId] = { today, yesterday };
-      todayPlayed = today.playedCount;
+      lines[entry.formId] =
+        todayPlayed > 0
+          ? SCORE_STRIP.todayPoints(day.points)
+          : day.playedCount > 0
+            ? SCORE_STRIP.yesterdayPoints(day.points)
+            : null;
     }
-    return { perForm, todayPlayed };
+    return lines;
   }, [myForms, allPredictions, formBracketMap, actualBracket, results]);
 
   if (!user || myForms.length === 0) return null;
 
   const total = rankedLeaderboard.length;
   const best = myForms[0]; // rankedLeaderboard is sorted best-first
-
-  // Morning view: before any of today's matches finished, yesterday's haul
-  // is the number people open the app for.
-  const dayLine = (formId) => {
-    const d = daily.perForm[formId];
-    if (!d) return null;
-    if (daily.todayPlayed > 0) return SCORE_STRIP.todayPoints(d.today.points);
-    if (d.yesterday.playedCount > 0)
-      return SCORE_STRIP.yesterdayPoints(d.yesterday.points);
-    return null;
-  };
+  const dayLine = (formId) => dayLines[formId] || null;
 
   return (
     <button

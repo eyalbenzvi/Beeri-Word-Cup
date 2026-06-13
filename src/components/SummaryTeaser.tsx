@@ -7,22 +7,18 @@ import { useMemo } from "react";
 import { Newspaper, ChevronLeft } from "lucide-react";
 import { useSummaries, useSummariesReady } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
+import { getLatestPublishedSummary } from "../store";
 import { SUMMARY_TEASER, BLOG } from "../constants/messages";
 
 export default function SummaryTeaser() {
+  // useSummaries() subscribes this component to the summaries slice;
+  // getLatestPublishedSummary reads the same cache, so "latest" logic stays
+  // single-sourced in summariesRepo (status === "published", highest number).
   const summaries = useSummaries();
   const ready = useSummariesReady();
   const { navigate } = useNavigation();
 
-  const latest = useMemo(() => {
-    let best = null;
-    for (const s of Object.values(summaries || {})) {
-      const sum = s as any;
-      if (sum?.status !== "published") continue;
-      if (!best || (sum.number || 0) > (best.number || 0)) best = sum;
-    }
-    return best;
-  }, [summaries]);
+  const latest = useMemo(() => getLatestPublishedSummary(), [summaries]);
 
   if (!ready || !latest) return null;
 

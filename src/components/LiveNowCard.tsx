@@ -57,8 +57,14 @@ function liveStatusInfo(live, stage) {
   if (live.status === "PAUSED") return { kind: "half" };
   if (live.status === "IN_PLAY") {
     // ET only exists in knockout; a group-stage minute > 90 is stoppage
-    // time and must NOT be labelled "הארכה".
-    if (stage !== "group" && Number.isInteger(live.minute) && live.minute > 90) {
+    // time and must NOT be labelled "הארכה". Same dual signal as the
+    // verdict suppression in computeLiveVerdict: duration when present,
+    // minute > 90 as fallback.
+    if (
+      stage !== "group" &&
+      ((live.duration && live.duration !== "REGULAR") ||
+        (Number.isInteger(live.minute) && live.minute > 90))
+    ) {
       return { kind: "et" };
     }
     return { kind: "live", minute: live.minute };
@@ -179,7 +185,7 @@ function FormVerdictRow({ form, predDisplay, verdict, finished }) {
 // Centered "home — score — away" line. Mirrors UpcomingMatches' MatchRow
 // flex structure (home is the FIRST child = right side in RTL) with the
 // live score in the middle via <Score>.
-function TeamsScoreLine({ homeCode, awayCode, live, large }) {
+function TeamsScoreLine({ homeCode, awayCode, live, large = false }) {
   const home = homeCode ? getTeamByCode(homeCode) : null;
   const away = awayCode ? getTeamByCode(awayCode) : null;
   const hasScore = live && live.homeScore != null && live.awayScore != null;
@@ -247,20 +253,33 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets, finishe
 
   if (rows.length === 1) {
     const { verdict, predDisplay } = rows[0];
-    if (verdict.kind === "no-data") return null;
+    // no-data (feed down / unmapped fixture): still show the prediction —
+    // the live match was removed from the UpcomingMatches list below, so
+    // this line is the ONLY place the user sees what they predicted. Only
+    // the verdict claim is omitted (nothing honest to claim without a
+    // score). different-teams with nothing displayable is the one case
+    // with no prediction to show.
+    if (!predDisplay && verdict.kind !== "no-data") {
+      return verdict.kind === "different-teams" ? (
+        <div className="mt-2 pt-2 border-t border-border text-sm text-center">
+          <VerdictText verdict={verdict} finished={finished} />
+        </div>
+      ) : null;
+    }
+    if (!predDisplay) return null;
     return (
       <div className="mt-2 pt-2 border-t border-border text-sm text-center">
         <span className="text-xs text-ink-muted">{LIVE.yourPrediction} </span>
-        {predDisplay && (
-          <Score
-            home={predDisplay.homeScore}
-            away={predDisplay.awayScore}
-            className="tabular-nums font-bold"
-          />
+        <Score
+          home={predDisplay.homeScore}
+          away={predDisplay.awayScore}
+          className="tabular-nums font-bold"
+        />
+        {verdict.kind !== "no-data" && (
+          <div className="mt-0.5">
+            <VerdictText verdict={verdict} finished={finished} />
+          </div>
         )}
-        <div className="mt-0.5">
-          <VerdictText verdict={verdict} finished={finished} />
-        </div>
       </div>
     );
   }
@@ -307,15 +326,22 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets, finishe
 function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, expanded }) {
   const info = liveStatusInfo(live, match.stage || "group");
   const finished = info.kind === "finished";
-  const verdicts = forms.map((form) =>
-    computeLiveVerdict({
-      prediction: form.matches?.[match.id],
-      live,
-      stage: match.stage || "group",
-      predTeams:
-        match.stage !== "group" ? formBrackets[form.formId]?.[match.id] : null,
-      actualTeams: match.stage !== "group" ? actualTeams : null,
-    }),
+  // Memoized: compact mode exists exactly for busy days (4 live matches ×
+  // many forms), where recomputing every verdict on each 60s clock tick
+  // adds up. Recomputes only when a poll actually changes `live`.
+  const verdicts = useMemo(
+    () =>
+      forms.map((form) =>
+        computeLiveVerdict({
+          prediction: form.matches?.[match.id],
+          live,
+          stage: match.stage || "group",
+          predTeams:
+            match.stage !== "group" ? formBrackets[form.formId]?.[match.id] : null,
+          actualTeams: match.stage !== "group" ? actualTeams : null,
+        }),
+      ),
+    [forms, live, match, formBrackets, actualTeams],
   );
   const { scoring, total } = summarizeVerdicts(verdicts);
 

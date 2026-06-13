@@ -6,6 +6,7 @@ import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
 import { formatIsraelDateLabel } from "../utils/matchTime";
 import { isScoreValid } from "../utils/helpers";
+import { LIVE } from "../constants/messages";
 import Score from "./Score";
 import {
   alignPredictionToActual,
@@ -161,7 +162,7 @@ function MatchRow({ match, actualTeams }) {
             aria-hidden="true"
           />
           <span className="text-xs font-extrabold text-danger">
-            משוחק עכשיו
+            {LIVE.playingNow}
           </span>
           {match.venue && (
             <span className="text-xs text-ink-muted">· {match.venue}</span>

@@ -15,6 +15,7 @@
 
 import { calculateMatchPoints } from "./scoring";
 import { resolveMatchTeams } from "./predictionAlign";
+import { getMatchKickoffUTC } from "./matchTime";
 
 // FD statuses we treat as "the clock may still run".
 export const FD_LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
@@ -36,6 +37,12 @@ export const FD_FINISHED_STATUS = "FINISHED";
  *
  * Matches we can't pair (unresolved bracket slot, fixture missing from the
  * feed) are simply absent — the caller renders its schedule-based fallback.
+ *
+ * When MULTIPLE feed entries carry the same team pair (the endpoint window
+ * spans ±1 day, so yesterday's group fixture and today's knockout rematch
+ * between the same two teams can coexist), pick the one whose utcDate is
+ * closest to OUR match's kickoff — pairing the live match to yesterday's
+ * finished fixture would display a wrong (and possibly flipped) score.
  */
 export function mapLiveEntriesToMatches(entries, matches, actualBracket) {
   const out: Record<string, any> = {};
@@ -43,17 +50,33 @@ export function mapLiveEntriesToMatches(entries, matches, actualBracket) {
   for (const match of matches) {
     const teams = resolveMatchTeams(match, actualBracket);
     if (!teams.home || !teams.away) continue;
-    const entry = entries.find(
+    const candidates = entries.filter(
       (e) =>
         e &&
         ((e.homeCode === teams.home && e.awayCode === teams.away) ||
           (e.homeCode === teams.away && e.awayCode === teams.home)),
     );
-    if (!entry) continue;
+    if (candidates.length === 0) continue;
+    let entry = candidates[0];
+    if (candidates.length > 1) {
+      const kickoff = getMatchKickoffUTC(match);
+      if (kickoff != null) {
+        let bestDist = Infinity;
+        for (const c of candidates) {
+          const t = Date.parse(c.utcDate || "");
+          const dist = Number.isFinite(t) ? Math.abs(t - kickoff) : Infinity;
+          if (dist < bestDist) {
+            bestDist = dist;
+            entry = c;
+          }
+        }
+      }
+    }
     const flipped = entry.homeCode === teams.away;
     out[match.id] = {
       status: entry.status || null,
       minute: Number.isInteger(entry.minute) ? entry.minute : null,
+      duration: entry.duration || null,
       homeScore: flipped ? entry.awayScore : entry.homeScore,
       awayScore: flipped ? entry.homeScore : entry.awayScore,
     };
@@ -93,10 +116,17 @@ export function computeLiveVerdict({
   if (!live || live.homeScore == null || live.awayScore == null) {
     return { kind: "no-data", points: 0 };
   }
+  // Knockout beyond regulation: official scoring records the 90' score,
+  // but the live fullTime score keeps counting ET goals — asserting
+  // "+10 if it stays" against an ET-inclusive score would be a false
+  // promise. Two signals, either suffices: FD's score.duration (authoritative
+  // when present) and minute > 90 (fallback — minute is plan-dependent and
+  // may be null). Group matches never have ET; minute > 90 there is
+  // stoppage time and must not suppress.
   if (
     stage !== "group" &&
-    Number.isInteger(live.minute) &&
-    live.minute > 90
+    ((live.duration && live.duration !== "REGULAR") ||
+      (Number.isInteger(live.minute) && live.minute > 90))
   ) {
     return { kind: "suppressed", points: 0 };
   }
