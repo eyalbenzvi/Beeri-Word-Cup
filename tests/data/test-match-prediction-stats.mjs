@@ -64,7 +64,7 @@ const form = (name, home, away) => ({
   assert(total === s.preds, "score voter lists sum to total predictions");
 }
 
-// ---- 4. topScores is sorted desc and capped at 5 ----
+// ---- 4. scores lists EVERY distinct result, sorted desc, not capped ----
 {
   const forms = [];
   // 6 distinct scores with descending frequency 6,5,4,3,2,1
@@ -73,16 +73,28 @@ const form = (name, home, away) => ({
     for (let k = 0; k < n; k++) forms.push(form(`f${i}-${k}`, i, 0));
   });
   const s = aggregateMatchPredictions(forms, MID);
-  assert(s.topScores.length === 5, "topScores capped at 5 even with 6 distinct scores");
-  const counts = s.topScores.map(([, c]) => c);
+  assert(s.scores.length === 6, "scores includes ALL 6 distinct scores (not capped at 5)");
+  const counts = s.scores.map(([, c]) => c);
   assert(
-    counts.join() === "6,5,4,3,2",
-    "topScores sorted by descending count, least frequent dropped",
+    counts.join() === "6,5,4,3,2,1",
+    "scores sorted by descending count, nothing dropped",
   );
-  // Each topScores count matches its voter-list length.
+  // Each scores count matches its voter-list length.
   assert(
-    s.topScores.every(([key, c]) => s.scoreVoters[key].length === c),
-    "every topScores count equals its scoreVoters length",
+    s.scores.every(([key, c]) => s.scoreVoters[key].length === c),
+    "every scores count equals its scoreVoters length",
+  );
+}
+
+// ---- 4b. ties break deterministically by key (stable order) ----
+{
+  // Three scores each predicted once → tie-break by away-home key asc.
+  const forms = [form("A", 0, 2), form("B", 0, 1), form("C", 1, 0)];
+  const s = aggregateMatchPredictions(forms, MID);
+  // keys: "2-0", "1-0", "0-1" → sorted asc: "0-1","1-0","2-0"
+  assert(
+    s.scores.map(([k]) => k).join() === "0-1,1-0,2-0",
+    "equal-count scores ordered by key for a stable, deterministic list",
   );
 }
 

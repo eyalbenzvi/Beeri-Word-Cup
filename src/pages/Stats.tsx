@@ -254,16 +254,16 @@ function MatchPredictions({ forms }) {
             </span>
           </div>
 
-          {/* Top predictions — click a result to see who predicted it */}
+          {/* All predicted scores — click a result to see who predicted it */}
           <div>
             <p className="text-sm font-extrabold text-ink mb-1">
-              תוצאות פופולריות:
+              כל התוצאות שנוחשו ({matchStats.scores.length}):
             </p>
             <p className="text-xs text-ink-muted font-bold mb-2">
               לחצו על תוצאה כדי לראות מי ניחש אותה
             </p>
             <div className="space-y-1.5">
-              {matchStats.topScores.map(([score, count]) => {
+              {matchStats.scores.map(([score, count]) => {
                 const id = `score:${score}`;
                 const open = expanded === id;
                 return (
