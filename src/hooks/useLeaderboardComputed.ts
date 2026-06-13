@@ -7,21 +7,48 @@ import {
 } from "../utils/bracket";
 import { getCachedBracket } from "../utils/bracketCache";
 
+// Stable references so callers that don't opt into "match points only" mode
+// don't thrash the scoring memo, and so the excluded-bonuses path is identical
+// on every render.
+const EMPTY_ADVANCING = Object.freeze({});
+const EMPTY_BONUSES = Object.freeze({ champion: null, topScorers: [] });
+
 export function useLeaderboardComputed(
   results: Record<string, any>,
   allPredictions: Record<string, any>,
   users: Record<string, any>,
   actualBonuses: any,
+  options?: {
+    // Derive the knockout bracket / advancing teams / champion backbone from
+    // these results instead of `results`. The simulator's "score check" mode
+    // scores only a handful of entered matches (`results`) while still
+    // resolving real knockout matchups from the actual results, so a form that
+    // predicted the wrong teams in a slot still scores 0 (wrong matchup).
+    bracketResults?: Record<string, any>;
+    // Count only per-match points (outcome + exact). Advancing-team points and
+    // champion / top-scorer bonuses are excluded from the total. Used by the
+    // simulator's "score check" mode where the question is strictly "who got
+    // points on the entered matches".
+    matchPointsOnly?: boolean;
+  },
 ) {
-  const actualBracket = useMemo(() => getCachedBracket(results), [results]);
+  // Default to `results` so existing callers (Leaderboard, Profile, ScoreStrip,
+  // AdminToolsTab, normal simulator mode) behave exactly as before.
+  const bracketSource = options?.bracketResults ?? results;
+  const matchPointsOnly = options?.matchPointsOnly ?? false;
+
+  const actualBracket = useMemo(
+    () => getCachedBracket(bracketSource),
+    [bracketSource],
+  );
 
   const actualDerivedAdvancing = useMemo(
-    () => deriveActualAdvancing(actualBracket, results),
-    [actualBracket, results],
+    () => deriveActualAdvancing(actualBracket, bracketSource),
+    [actualBracket, bracketSource],
   );
   const actualDerivedChampion = useMemo(
-    () => deriveChampion(results, actualBracket),
-    [results, actualBracket],
+    () => deriveChampion(bracketSource, actualBracket),
+    [bracketSource, actualBracket],
   );
 
   const formBracketMap = useMemo(() => {
@@ -55,8 +82,10 @@ export function useLeaderboardComputed(
         const score = calculateFullScore(
           enrichedPredData,
           results,
-          actualDerivedAdvancing,
-          { ...actualBonuses, champion: actualDerivedChampion },
+          matchPointsOnly ? EMPTY_ADVANCING : actualDerivedAdvancing,
+          matchPointsOnly
+            ? EMPTY_BONUSES
+            : { ...actualBonuses, champion: actualDerivedChampion },
           predBracket,
           actualBracket,
         );
@@ -82,6 +111,7 @@ export function useLeaderboardComputed(
     actualDerivedAdvancing,
     actualDerivedChampion,
     actualBracket,
+    matchPointsOnly,
   ]);
 
   const leaderboard = useMemo(() => {
