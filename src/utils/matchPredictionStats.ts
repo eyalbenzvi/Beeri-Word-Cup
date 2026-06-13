@@ -14,7 +14,9 @@ export type MatchPredictionStats = {
   draw: number;
   awayWin: number;
   outcomeVoters: { home: string[]; draw: string[]; away: string[] };
-  topScores: [string, number][];
+  // Every distinct predicted score, sorted by frequency (desc), then by key
+  // for a stable order on ties. Not capped — the UI shows them all.
+  scores: [string, number][];
   scoreVoters: Record<string, string[]>;
   avgGoals: string;
 };
@@ -52,10 +54,11 @@ export function aggregateMatchPredictions(
     const key = `${p.awayScore}-${p.homeScore}`;
     (scoreVoters[key] ||= []).push(name);
   });
-  const topScores = Object.entries(scoreVoters)
+  // All distinct scores, most-predicted first. Stable tie-break by key so
+  // the order is deterministic (and unit-testable).
+  const scores = Object.entries(scoreVoters)
     .map(([key, voters]) => [key, voters.length] as [string, number])
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   const totalGoals = entries.reduce(
     (s, { p }) => s + (p.homeScore ?? 0) + (p.awayScore ?? 0),
@@ -70,7 +73,7 @@ export function aggregateMatchPredictions(
     draw: outcomeVoters.draw.length,
     awayWin: outcomeVoters.away.length,
     outcomeVoters,
-    topScores,
+    scores,
     scoreVoters,
     avgGoals,
   };
