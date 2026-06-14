@@ -156,6 +156,7 @@ run_test "89. LiveNow Hero + Home Redesign (RTL, multi-form, polling, wiring)" "
 run_test "90. Simulator Score-Check Mode (scoped per-match scoring)" "scoring/test-score-check-mode.mjs" "yes"
 run_test "91. Stats Guess Detail UI Wiring (clickable result/outcome accordions)" "ui/test-stats-guess-detail.mjs" "no"
 run_test "92. Match Prediction Stats Aggregator (voter lists + counts consistency)" "data/test-match-prediction-stats.mjs" "yes"
+run_test "93. Recently Finished Matches (4h-from-end window + home/welcome wiring)" "ui/test-recently-finished.mjs" "no"
 
 echo ""
 echo "==========================================="

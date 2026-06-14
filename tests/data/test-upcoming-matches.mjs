@@ -5,9 +5,15 @@
 
 import {
   selectUpcomingMatches,
+  selectRecentlyFinishedMatches,
+  finishedExpiryUTC,
   UPCOMING_WINDOW_MS,
   LIVE_WINDOW_MS,
+  MATCH_DURATION_MS,
+  FINISHED_WINDOW_MS,
+  MORNING_CUTOFF_HOUR,
 } from "/home/user/Beeri-World-Cup/src/utils/upcomingMatches.js";
+import { israelHour } from "/home/user/Beeri-World-Cup/src/utils/matchTime.js";
 import {
   groupMatches,
   knockoutMatches,
@@ -339,6 +345,163 @@ console.log("--- 17. Live match invariants ---");
   // Upcoming (future) entries keep reference identity with the source data.
   const future = result.find(m => !m.isLive);
   assert(ALL_MATCHES.includes(future), "Future matches returned by reference");
+}
+
+// ====================================================================
+//   RECENTLY-FINISHED SELECTOR (selectRecentlyFinishedMatches)
+// ====================================================================
+
+// ---- 18. Constants ----
+console.log("--- 18. Recently-finished constants ---");
+assert(FINISHED_WINDOW_MS === 4 * 3600000, "Finished window is 4 hours");
+assert(MATCH_DURATION_MS === 2.5 * 3600000,
+  "Estimated match duration is 2.5h (covers knockout ET + penalties)");
+
+// ---- 19. Invalid inputs ----
+console.log("--- 19. Recently-finished invalid inputs ---");
+assert(selectRecentlyFinishedMatches([], {}, 0).length === 0, "Empty matches -> []");
+assert(selectRecentlyFinishedMatches(null, {}, 0).length === 0, "Null matches -> []");
+assert(selectRecentlyFinishedMatches(ALL_MATCHES, null, 0).length === 0, "Null results -> []");
+assert(selectRecentlyFinishedMatches(ALL_MATCHES, {}, 0).length === 0, "No results -> []");
+
+// ---- 20. Only matches WITH a result appear ----
+console.log("--- 20. Requires a recorded result ---");
+{
+  const first = groupMatches[0]; // Jun 11 22:00 Israel
+  const kickoff = getMatchKickoffUTC(first);
+  const now = kickoff + 2 * 3600000; // 2h after kickoff (~full time)
+  // No result -> never appears as finished (it's "live" instead).
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, {}, now).length === 0,
+    "Match without result does not appear as finished");
+  // With a result -> appears.
+  const res = { [first.id]: { homeScore: 2, awayScore: 1 } };
+  const finished = selectRecentlyFinishedMatches(ALL_MATCHES, res, now);
+  assert(finished.length === 1 && finished[0].id === first.id,
+    "Match with result appears as finished");
+  assert(finished[0].isFinished === true, "Returned match flagged isFinished");
+  assert(finished[0].result && finished[0].result.homeScore === 2,
+    "Official result attached to the returned match");
+}
+
+// ---- 21. Window boundaries (via finishedExpiryUTC) ----
+console.log("--- 21. Finished window boundaries ---");
+{
+  const first = groupMatches[0];
+  const kickoff = getMatchKickoffUTC(first);
+  const res = { [first.id]: { homeScore: 0, awayScore: 0 } };
+  const expiresAt = finishedExpiryUTC(kickoff);
+  // Right at the result moment (mid-game write) it shows immediately.
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, res, kickoff + 60_000).length === 1,
+    "Shows from kickoff onward once a result exists (no gap with live card)");
+  // Just inside the window -> still shown.
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, res, expiresAt - 1).some(m => m.id === first.id),
+    "Still shown 1ms before window close");
+  // Exactly at the edge -> still shown (inclusive).
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, res, expiresAt).some(m => m.id === first.id),
+    "Shown exactly at window edge");
+  // Past the edge -> dropped.
+  assert(!selectRecentlyFinishedMatches(ALL_MATCHES, res, expiresAt + 1).some(m => m.id === first.id),
+    "Dropped just past the window");
+}
+
+// ---- 21b. Morning catch-up: overnight matches survive until noon ----
+console.log("--- 21b. Morning catch-up (overnight -> noon) ---");
+{
+  assert(MORNING_CUTOFF_HOUR === 12, "Morning cutoff is noon Israel");
+
+  // A match kicking off at 01:00 Israel (deep night). End ~03:00, plain 4h
+  // window would close ~07:00 — right as people wake. The rule keeps it to noon.
+  const nightKickoff = Date.UTC(2026, 5, 14, 1 - 3, 0); // Jun 14 01:00 Israel
+  const expiry = finishedExpiryUTC(nightKickoff);
+  assert(israelHour(expiry) === 12, `Overnight match expires at noon Israel, got hour ${israelHour(expiry)}`);
+  const plain4h = nightKickoff + MATCH_DURATION_MS + FINISHED_WINDOW_MS;
+  assert(expiry > plain4h, "Expiry extended beyond the plain 4h window");
+
+  const res = { ["night"]: { homeScore: 1, awayScore: 0 } };
+  const matches = [{ id: "night", date: "Jun 14", time: "01:00", stage: "group", homeTeam: "X", awayTeam: "Y" }];
+  // 08:00 Israel (morning riser): still visible.
+  const at8 = Date.UTC(2026, 5, 14, 8 - 3, 0);
+  assert(selectRecentlyFinishedMatches(matches, res, at8).length === 1,
+    "Overnight result still visible at 08:00 (morning riser)");
+  // 11:59 Israel: still visible.
+  const at1159 = Date.UTC(2026, 5, 14, 12 - 3, 0) - 60_000;
+  assert(selectRecentlyFinishedMatches(matches, res, at1159).length === 1,
+    "Overnight result visible just before noon");
+  // 12:01 Israel: gone.
+  const at1201 = Date.UTC(2026, 5, 14, 12 - 3, 0) + 60_000;
+  assert(selectRecentlyFinishedMatches(matches, res, at1201).length === 0,
+    "Overnight result drops off just after noon");
+}
+
+// ---- 21c. Daytime matches keep the plain 4h window (no morning push) ----
+console.log("--- 21c. Daytime matches: plain 4h ---");
+{
+  // Kickoff 14:00 Israel -> end ~16:00 -> 4h window closes ~20:00 (after noon),
+  // so no morning override; it must NOT be stretched to next-day noon.
+  const dayKickoff = Date.UTC(2026, 5, 14, 14 - 3, 0); // Jun 14 14:00 Israel
+  const expiry = finishedExpiryUTC(dayKickoff);
+  assert(expiry === dayKickoff + MATCH_DURATION_MS + FINISHED_WINDOW_MS,
+    "Daytime match uses the plain 4h window (no morning extension)");
+  assert(israelHour(expiry) === 20, `Daytime expiry stays at ~20:00, got ${israelHour(expiry)}`);
+}
+
+// ---- 22. Defensive: future match with a (stray) result is ignored ----
+console.log("--- 22. Future match ignored ---");
+{
+  const first = groupMatches[0];
+  const kickoff = getMatchKickoffUTC(first);
+  const res = { [first.id]: { homeScore: 1, awayScore: 0 } };
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, res, kickoff - 60_000).length === 0,
+    "Result on a not-yet-started match is not shown as finished");
+}
+
+// ---- 23. Most-recent-first ordering ----
+console.log("--- 23. Ordering (most recent first) ---");
+{
+  // Three Jun 14 matches with results; now just after the latest.
+  const early = ALL_MATCHES.find(m => m.date === "Jun 14" && m.time === "01:00");
+  const mid = ALL_MATCHES.find(m => m.date === "Jun 14" && m.time === "04:00");
+  const late = ALL_MATCHES.find(m => m.date === "Jun 14" && m.time === "07:00");
+  assert(early && mid && late, "Found three Jun 14 fixtures for ordering test");
+  const res = {
+    [early.id]: { homeScore: 1, awayScore: 0 },
+    [mid.id]: { homeScore: 2, awayScore: 2 },
+    [late.id]: { homeScore: 0, awayScore: 1 },
+  };
+  // At the latest kickoff: late just kicked off (kickoff <= now), and the
+  // earliest (01:00) is exactly at its 6h window edge (01:00 + 6h = 07:00),
+  // so all three are inclusive.
+  const now = getMatchKickoffUTC(late); // Jun 14 07:00 Israel
+  const finished = selectRecentlyFinishedMatches(ALL_MATCHES, res, now);
+  assert(finished.length === 3, `Three finished matches, got ${finished.length}`);
+  assert(finished[0].id === late.id && finished[2].id === early.id,
+    `Latest first, earliest last — got ${finished.map(m => m.time).join(",")}`);
+}
+
+// ---- 24. Source objects not mutated ----
+console.log("--- 24. No mutation of source data ---");
+{
+  const first = groupMatches[0];
+  const kickoff = getMatchKickoffUTC(first);
+  const res = { [first.id]: { homeScore: 1, awayScore: 1 } };
+  selectRecentlyFinishedMatches(ALL_MATCHES, res, kickoff + 3600000);
+  const source = ALL_MATCHES.find(m => m.id === first.id);
+  assert(source.isFinished === undefined && source.result === undefined,
+    "Canonical match object not mutated with isFinished/result");
+}
+
+// ---- 25. Live + finished are disjoint by construction ----
+console.log("--- 25. Live and finished are disjoint ---");
+{
+  // A match with a result is finished (not live); without a result it's live.
+  const first = groupMatches[0];
+  const kickoff = getMatchKickoffUTC(first);
+  const now = kickoff + 90 * 60000; // 90 min in
+  const res = { [first.id]: { homeScore: 3, awayScore: 1 } };
+  const live = selectUpcomingMatches(ALL_MATCHES, res, now);
+  const finished = selectRecentlyFinishedMatches(ALL_MATCHES, res, now);
+  assert(!live.some(m => m.id === first.id), "With result: absent from live selector");
+  assert(finished.some(m => m.id === first.id), "With result: present in finished selector");
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
