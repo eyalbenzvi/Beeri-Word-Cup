@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
+import type { Match } from "../data/matches";
 import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import MatchAnalysis from "./MatchAnalysis";
@@ -56,16 +57,19 @@ function MatchCard({
   isKnockout = false,
   importance = "group",
 }: {
-  match: any;
-  bracketEntry?: any;
+  match: Match;
+  bracketEntry?: BracketEntry | null;
+  // prediction/points stay `any`: predHome/predAway flow as number|"" into
+  // string-typed inputs and `points` carries a scoring `breakdown` — tightening
+  // them pulls in a wider input/Score typing change, out of scope here.
   prediction?: any;
-  actualResult?: any;
-  onPredictionChange?: any;
+  actualResult?: MatchResult | null;
+  onPredictionChange?: (prediction: any) => void;
   editable?: boolean;
   showPoints?: boolean;
   points?: any;
   isKnockout?: boolean;
-  importance?: string;
+  importance?: "group" | "knockout" | "showcase";
 }) {
   const homeInputRef = useRef(null);
   const awayInputRef = useRef(null);
