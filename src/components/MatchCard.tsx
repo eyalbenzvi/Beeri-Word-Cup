@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
+import type { Match } from "../data/matches";
 import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import MatchAnalysis from "./MatchAnalysis";
@@ -9,6 +10,10 @@ import Score from "./Score";
 // scoreline; the cap exists to defend against runaway typing / paste of giant
 // numbers that would break tabular layouts.
 const MAX_SCORE = 20;
+
+// Auto-advance to the next score field only when the user typed a single
+// digit (0–9). A two-digit score like "10" must not jump focus mid-entry.
+const SINGLE_DIGIT_MAX = 9;
 
 function focusNextInput(currentInput) {
   const card = currentInput.closest("[data-match-card]");
@@ -52,16 +57,19 @@ function MatchCard({
   isKnockout = false,
   importance = "group",
 }: {
-  match: any;
-  bracketEntry?: any;
+  match: Match;
+  bracketEntry?: BracketEntry | null;
+  // prediction/points stay `any`: predHome/predAway flow as number|"" into
+  // string-typed inputs and `points` carries a scoring `breakdown` — tightening
+  // them pulls in a wider input/Score typing change, out of scope here.
   prediction?: any;
-  actualResult?: any;
-  onPredictionChange?: any;
+  actualResult?: MatchResult | null;
+  onPredictionChange?: (prediction: any) => void;
   editable?: boolean;
   showPoints?: boolean;
   points?: any;
   isKnockout?: boolean;
-  importance?: string;
+  importance?: "group" | "knockout" | "showcase";
 }) {
   const homeInputRef = useRef(null);
   const awayInputRef = useRef(null);
@@ -139,7 +147,7 @@ function MatchCard({
       const raw = e.target.value;
       const v = clampScore(raw);
       onPredictionChange?.(buildPredictionUpdate("home", v));
-      if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
+      if (raw.length === 1 && v !== null && v >= 0 && v <= SINGLE_DIGIT_MAX) {
         setTimeout(() => {
           awayInputRef.current?.focus();
           awayInputRef.current?.select();
@@ -154,7 +162,7 @@ function MatchCard({
       const raw = e.target.value;
       const v = clampScore(raw);
       onPredictionChange?.(buildPredictionUpdate("away", v));
-      if (raw.length === 1 && v !== null && v >= 0 && v <= 9) {
+      if (raw.length === 1 && v !== null && v >= 0 && v <= SINGLE_DIGIT_MAX) {
         setTimeout(() => {
           if (awayInputRef.current) focusNextInput(awayInputRef.current);
         }, 0);
@@ -163,18 +171,20 @@ function MatchCard({
     [buildPredictionUpdate, onPredictionChange],
   );
 
+  // Card border reflects state precedence: just-saved flash → has an official
+  // result → has a locked-in prediction → default.
+  const borderClass = justSaved
+    ? "animate-save-flash border-primary"
+    : hasResult
+      ? "border-primary/60"
+      : hasPrediction && !editable
+        ? "border-primary/40"
+        : "border-border";
+
   return (
     <div
       data-match-card
-      className={`bg-white rounded-2xl border-2 mb-2 transition-all card-duo-hover ${importanceStyles[importance]} ${
-        justSaved
-          ? "animate-save-flash border-primary"
-          : hasResult
-            ? "border-primary/60"
-            : hasPrediction && !editable
-              ? "border-primary/40"
-              : "border-border"
-      }`}
+      className={`bg-white rounded-2xl border-2 mb-2 transition-all card-duo-hover ${importanceStyles[importance]} ${borderClass}`}
     >
       {importance === "showcase" && (
         <div className="h-1 w-full rounded-full bg-gradient-to-l from-secondary via-accent to-primary mb-3 -mt-1" />

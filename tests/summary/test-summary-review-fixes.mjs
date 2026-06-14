@@ -146,7 +146,9 @@ console.log("--- IMPL: AI token scaling & truncation ---");
 assert(/estimateMaxTokens/.test(aiFn), "AI scales max_tokens by input length");
 assert(/MAX_TOKENS_CAP/.test(aiFn), "AI has a hard cap");
 assert(/MIN_TOKENS_FLOOR/.test(aiFn), "AI has a floor");
-assert(/cleanedInput\.length\s*>\s*400\s*&&\s*polished\.length\s*<\s*cleanedInput\.length\s*\*\s*0\.7/.test(aiFn),
+assert(/MIN_POLISH_INPUT_LEN\s*=\s*400/.test(aiFn) && /MAX_POLISH_SHRINK_RATIO\s*=\s*0\.7/.test(aiFn),
+  "polish truncation thresholds are named constants (400 / 0.7)");
+assert(/cleanedInput\.length\s*>\s*MIN_POLISH_INPUT_LEN\s*&&\s*polished\.length\s*<\s*cleanedInput\.length\s*\*\s*MAX_POLISH_SHRINK_RATIO/.test(aiFn),
   "polish refuses to return dramatically-truncated output");
 
 // ============ IMPL. control-token handling preserves content ============

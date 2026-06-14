@@ -115,6 +115,26 @@ console.log("--- 6. dead exports / orphaned file removed ---");
     "adminQuery: orphaned promptBuilder.ts deleted");
 }
 
+// ============ 7. Second-batch quality fixes ============
+console.log("--- 7. second-batch fixes (VALID_MODALS, MatchCard, bestCase) ---");
+{
+  // VALID_MODALS is actually enforced in the URL read path (latent bug fixed).
+  const useNav = readMigratedSrc("src/hooks/useNavigation.jsx");
+  assert(/VALID_MODALS\.has\(/.test(useNav),
+    "useNavigation enforces VALID_MODALS (drops bogus ?modal=…)");
+
+  // MatchCard auto-advance uses a named single-digit bound, not a literal 9.
+  const matchCard = readMigratedSrc("src/components/MatchCard.jsx");
+  assert(/SINGLE_DIGIT_MAX\s*=\s*9/.test(matchCard), "MatchCard names SINGLE_DIGIT_MAX");
+  assert(!/v <= 9\b/.test(matchCard), "MatchCard has no inline `v <= 9` literal");
+
+  // bestCase shape-dedup indexes groupTeams by CODE (else shapeKey is always
+  // empty and every combo collapses into one bucket).
+  const bestCase = readMigratedSrc("src/utils/bestCase.js");
+  assert(/GROUPS\[[^\]]*\][^\n]*\|\|\s*\[\]\)[\s\S]{0,40}\.map\(\([^)]*\)\s*=>\s*[a-zA-Z]+\.code\)/.test(bestCase),
+    "bestCase builds groupTeams from team codes, not team objects");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error("\nFAILURES:");

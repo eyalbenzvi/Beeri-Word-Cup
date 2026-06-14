@@ -23,6 +23,9 @@ declare global {
   /** Form FSM. */
   type FormStatus = "draft" | "pending" | "submitted" | "approved";
 
+  /** Daily-summary (blog) FSM — independent of the form FSM. */
+  type SummaryStatus = "draft" | "published";
+
   /** A single match prediction. */
   interface Prediction {
     homeScore: number | null;

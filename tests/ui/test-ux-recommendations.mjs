@@ -24,6 +24,8 @@ assert(/KNOWN_PARAM_KEYS.*=\s*\[[^\]]*"tab"/s.test(useNav), "useNavigation track
 assert(/KNOWN_PARAM_KEYS.*=\s*\[[^\]]*"modal"/s.test(useNav), "useNavigation tracks ?modal param");
 assert(/setParamsPatch/.test(useNav), "useNavigation exposes setParamsPatch helper");
 assert(/VALID_MODALS/.test(useNav), "VALID_MODALS allowlist defined");
+assert(/VALID_MODALS\.has\(/.test(useNav),
+  "VALID_MODALS is actually enforced (bogus ?modal=… dropped, not just declared)");
 
 const predict = readMigratedSrc("src/pages/Predict.jsx");
 assert(/params\?\.form/.test(predict), "Predict reads activeFormId from params.form");

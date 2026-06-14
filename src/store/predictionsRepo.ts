@@ -272,7 +272,7 @@ export function createForm(userId: string, formName?: string) {
 }
 
 export async function deleteForm(formId: string) {
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || (form.status !== "draft" && form.status !== "pending")) return;
 
   clearPendingWritesForForm(formId);
@@ -292,7 +292,7 @@ export async function deleteForm(formId: string) {
 
 export function updateFormDetails(formId: string, fields: Record<string, any>) {
   if (predictionsLocked()) return;
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || form.status !== "draft") return;
   const updated = { ...form, ...fields };
   debouncedWriteForm(formId, updated);
@@ -300,7 +300,7 @@ export function updateFormDetails(formId: string, fields: Record<string, any>) {
 
 export function savePrediction(formId: string, matchId: string, prediction: any) {
   if (predictionsLocked()) return;
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || form.status !== "draft") return;
   const updated = {
     ...form,
@@ -312,7 +312,7 @@ export function savePrediction(formId: string, matchId: string, prediction: any)
 
 export function savePredictionsBatch(formId: string, matchPredictions: Record<string, any>) {
   if (predictionsLocked()) return;
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || form.status !== "draft") return;
   const updated = {
     ...form,
@@ -325,7 +325,7 @@ export function savePredictionsBatch(formId: string, matchPredictions: Record<st
 
 export function saveBonusPrediction(formId: string, field: string, value: any) {
   if (predictionsLocked()) return;
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || form.status !== "draft") return;
   const updated = {
     ...form,
@@ -338,7 +338,7 @@ export function saveBonusPrediction(formId: string, field: string, value: any) {
 export function submitPredictions(formId: string) {
   if (predictionsLocked()) return;
   flushPendingWrites();
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   const updated = {
     ...form,
@@ -350,7 +350,7 @@ export function submitPredictions(formId: string) {
 
 export function reopenForm(formId: string) {
   if (predictionsLocked()) return;
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   // Users may reopen their own pending or submitted forms back to draft as
   // long as the tournament isn't locked. Firestore rules enforce the same.
@@ -368,7 +368,7 @@ export function reopenForm(formId: string) {
 export function adminApprovePrediction(formId: string) {
   if (!requireAdmin()) return;
   writeAuditLog("approve-form", { formId });
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form || form.status !== "pending") return;
   writeFormDoc(formId, {
     ...form,
@@ -381,7 +381,7 @@ export function adminForceSubmitForm(formId: string) {
   if (!requireAdmin()) return;
   writeAuditLog("force-submit", { formId });
   flushPendingWrites();
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   const now = new Date().toISOString();
   writeFormDoc(formId, {
@@ -396,7 +396,7 @@ export function adminReopenForm(formId: string) {
   if (!requireAdmin()) return;
   writeAuditLog("reopen-form", { formId });
   flushPendingWrites();
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   const now = new Date().toISOString();
   writeFormDoc(formId, {
@@ -436,7 +436,7 @@ export async function adminDeleteForm(formId: string) {
 export function adminUpdateForm(formId: string, fields: Record<string, any>) {
   if (!requireAdmin()) return;
   flushPendingWrites();
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   // userId is immutable — never allow reassignment even by admin
   const { userId: _drop, ...safeFields } = fields;
@@ -454,7 +454,7 @@ export function adminUpdateForm(formId: string, fields: Record<string, any>) {
 export function adminSaveMatchPrediction(formId: string, matchId: string, prediction: any) {
   if (!requireAdmin()) return;
   flushPendingWrites();
-  const form = getForm(formId) as any;
+  const form = getForm(formId) as Form | null;
   if (!form) return;
   writeFormDoc(formId, {
     ...form,
@@ -484,7 +484,7 @@ export async function adminTransferForm(oldFormId: string, targetUid: string) {
   // double-click after the first transfer safely no-ops here on null). The
   // pure planner owns validation + formId generation + the field-preserving
   // copy (see transferPlan.ts) so that logic is unit-tested directly.
-  const form = getForm(oldFormId) as any;
+  const form = getForm(oldFormId) as Form | null;
   const plan = planFormTransfer(form, targetUid, getUsers());
   if ("error" in plan) return { ok: false, error: plan.error };
   if ("noop" in plan) return { ok: true, newFormId: oldFormId };

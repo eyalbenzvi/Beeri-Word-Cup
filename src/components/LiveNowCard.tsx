@@ -38,12 +38,12 @@ import {
 import {
   computeLiveVerdict,
   summarizeVerdicts,
-  FD_FINISHED_STATUS,
 } from "../utils/liveScores";
 import {
   alignPredictionToActual,
   resolveMatchTeams,
 } from "../utils/predictionAlign";
+import { liveStatusInfo, findNextMatch, formatTimeLeft } from "../utils/liveNow";
 import Score from "./Score";
 import { LIVE } from "../constants/messages";
 
@@ -53,30 +53,6 @@ const COMPACT_THRESHOLD = 3;
 function teamName(code) {
   if (!code) return "טרם נקבע";
   return getTeamByCode(code)?.name || code;
-}
-
-// Status chip descriptor for one match's live entry.
-//   kind: "live" | "half" | "et" | "finished" | "fallback"
-function liveStatusInfo(live, stage) {
-  if (!live || !live.status) return { kind: "fallback" };
-  if (live.status === FD_FINISHED_STATUS) return { kind: "finished" };
-  if (live.status === "PAUSED") return { kind: "half" };
-  if (live.status === "IN_PLAY") {
-    // ET only exists in knockout; a group-stage minute > 90 is stoppage
-    // time and must NOT be labelled "הארכה". Same dual signal as the
-    // verdict suppression in computeLiveVerdict: duration when present,
-    // minute > 90 as fallback.
-    if (
-      stage !== "group" &&
-      ((live.duration && live.duration !== "REGULAR") ||
-        (Number.isInteger(live.minute) && live.minute > 90))
-    ) {
-      return { kind: "et" };
-    }
-    return { kind: "live", minute: live.minute };
-  }
-  // SCHEDULED/TIMED (kickoff delayed) or POSTPONED/SUSPENDED — schedule UI.
-  return { kind: "fallback" };
 }
 
 function StatusChip({ info }) {
@@ -447,29 +423,6 @@ function MatchLiveBlock({ match, actualTeams, live, forms, formBrackets }) {
 
 // Next scheduled match with no recorded result, looking beyond the 24h
 // upcoming window (rest days between rounds).
-function findNextMatch(results, now) {
-  let best = null;
-  let bestKickoff = Infinity;
-  for (const match of ALL_MATCHES) {
-    if (results?.[match.id]) continue;
-    const kickoff = getMatchKickoffUTC(match);
-    if (kickoff == null || kickoff <= now) continue;
-    if (kickoff < bestKickoff) {
-      best = match;
-      bestKickoff = kickoff;
-    }
-  }
-  return best ? { match: best, kickoff: bestKickoff } : null;
-}
-
-function formatTimeLeft(ms) {
-  const totalMinutes = Math.max(1, Math.round(ms / 60000));
-  if (totalMinutes < 60) return `${totalMinutes} דקות`;
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return m > 0 ? `${h}:${m < 10 ? `0${m}` : m} שעות` : `${h} שעות`;
-}
-
 // Quiet pre-match / rest-day strip. Deliberately does NOT repeat the user's
 // predictions — the UpcomingMatches list right below shows them; repeating
 // here was exactly the redundancy that killed the old MatchdayHero.
