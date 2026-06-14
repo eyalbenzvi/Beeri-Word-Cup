@@ -191,10 +191,10 @@ export async function updateSummary(summaryId: string, fields: Record<string, an
     ...safeFields
   }: Record<string, any> = fields;
   // Sanity: status must stay on the allowed set if provided.
+  const SUMMARY_STATUSES: readonly SummaryStatus[] = ["draft", "published"];
   if (
     safeFields.status != null &&
-    safeFields.status !== "draft" &&
-    safeFields.status !== "published"
+    !SUMMARY_STATUSES.includes(safeFields.status)
   ) {
     console.warn(`Invalid summary status: ${safeFields.status}`);
     return false;
