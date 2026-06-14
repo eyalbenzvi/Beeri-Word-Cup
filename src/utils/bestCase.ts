@@ -347,7 +347,13 @@ function getTopKShapes(
   K: number,
 ): GroupCombo[] {
   const combos = enumerateGroupCombos(groupRem, trackedForms[targetId]);
-  const groupTeams = new Set(GROUPS[group as keyof typeof GROUPS] || []);
+  // GROUPS holds team objects; shapeKey compares against team CODES (the
+  // values deriveAdvancingTeams returns), so index by code — otherwise
+  // `groupTeams.has(code)` is always false and every combo collapses into a
+  // single empty shapeKey, defeating the per-shape dedup below.
+  const groupTeams = new Set(
+    (GROUPS[group as keyof typeof GROUPS] || []).map((team) => team.code),
+  );
 
   // Two combos that produce the same set of R32 entrants from this group
   // are merged — they yield the same downstream bracket structure for

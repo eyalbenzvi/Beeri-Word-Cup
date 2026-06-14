@@ -119,6 +119,12 @@ const CHARS_PER_TOKEN = 2;
 const MAX_TOKENS_CAP = 8192; // hard ceiling regardless of input length
 const MIN_TOKENS_FLOOR = 1024;
 
+// Polish truncation safety net: only guard inputs long enough that a big
+// shrink is suspicious, and treat output below this fraction of the input as
+// "dramatically truncated" (≥30% shorter) — return the original instead.
+const MIN_POLISH_INPUT_LEN = 400;
+const MAX_POLISH_SHRINK_RATIO = 0.7;
+
 function estimateMaxTokens(inputChars) {
   const estimated = Math.ceil((inputChars || 0) / CHARS_PER_TOKEN) + 256;
   return Math.max(MIN_TOKENS_FLOOR, Math.min(MAX_TOKENS_CAP, estimated));
@@ -241,7 +247,7 @@ ${cleanedInput}
   // Safety net: if the model returned dramatically shorter output than the
   // input (≥ 30% shorter), return the original so an admin can retry rather
   // than silently lose content.
-  if (cleanedInput.length > 400 && polished.length < cleanedInput.length * 0.7) {
+  if (cleanedInput.length > MIN_POLISH_INPUT_LEN && polished.length < cleanedInput.length * MAX_POLISH_SHRINK_RATIO) {
     const err = new Error("הפלט של ה-AI קצר מדי — לא עודכן. נסה שוב או ערוך ידנית.");
     err.code = "ai-truncated";
     throw err;

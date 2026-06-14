@@ -32,6 +32,10 @@ function readInitialFromURL() {
       const v = sp.get(key);
       if (v != null) params[key] = v;
     }
+    // Drop a bogus ?modal=… that isn't a real dialog, mirroring the page
+    // allowlist above — otherwise a stale/hand-edited URL would persist an
+    // unrenderable modal value in navigation state.
+    if (params.modal && !VALID_MODALS.has(params.modal)) delete params.modal;
     return { page, params };
   } catch {
     return { page: "home", params: {} as Record<string, string> };
