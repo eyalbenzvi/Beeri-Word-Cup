@@ -134,8 +134,7 @@ export {
   importAllData,
 } from "./backupRestore";
 
-const CURRENT_USER_KEY = "wc2026_currentUser";
-const ACTIVE_FORM_KEY = "wc2026_activeForm";
+import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "../constants/storageKeys";
 
 // Coordinates teardown across every store module after Firebase signs the
 // user out. Each module exposes a focused reset hook; this function calls

@@ -12,6 +12,7 @@ import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
 import { RailProvider, useRailContent } from "./hooks/useRail";
 import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
+import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "./constants/storageKeys";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 import { initPublicReadonlyMode } from "./store";
 
@@ -71,8 +72,8 @@ function Loading({ reason = "unknown", compact = false }) {
       durationMs: Date.now() - mountedAt.current,
     });
     try { await firebaseSignOut(); } catch { /* ignore */ }
-    try { localStorage.removeItem("wc2026_currentUser"); } catch { /* ignore */ }
-    try { localStorage.removeItem("wc2026_activeForm"); } catch { /* ignore */ }
+    try { localStorage.removeItem(CURRENT_USER_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(ACTIVE_FORM_KEY); } catch { /* ignore */ }
     window.location.reload();
   };
 

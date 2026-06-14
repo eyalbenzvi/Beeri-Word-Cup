@@ -45,8 +45,7 @@ import {
   getSettings,
 } from "./resultsRepo";
 
-const CURRENT_USER_KEY = "wc2026_currentUser";
-const ACTIVE_FORM_KEY = "wc2026_activeForm";
+import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "../constants/storageKeys";
 
 export const BACKUP_SCHEMA_VERSION = 1;
 

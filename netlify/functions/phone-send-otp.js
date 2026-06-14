@@ -156,7 +156,6 @@ async function phoneSendOtpHandler(event) {
     const inforuUrl = `https://api.inforu.co.il/SendMessageXml.ashx?InforuXML=${encodeURIComponent(xml)}`;
     const smsRes = await fetch(inforuUrl);
     const smsBody = await smsRes.text();
-    console.log("Inforu response:", smsRes.status, smsBody);
 
     // Inforu returns XML with Status=1 for success, negative for errors
     if (smsBody.includes("<Status>1</Status>") || smsBody.includes("<Status> 1 </Status>")) {

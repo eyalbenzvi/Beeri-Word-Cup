@@ -43,3 +43,18 @@ export const MAX_FORMS_PER_USER = 10;
 // Hard cap on raw phone-input length. The longest sane format is
 // "+972-50-123-4567" (17 chars); 20 leaves slack for whitespace.
 export const PHONE_MAX_INPUT_LEN = 20;
+
+// ============ Time units (milliseconds) ============
+// Named so callers stop scattering raw `3600000` / `86400000` literals
+// through time math (countdown, match-time conversion). Plain unit
+// multipliers — no timezone semantics.
+export const MINUTE_MS = 60 * 1000;
+export const HOUR_MS = 60 * MINUTE_MS;
+export const DAY_MS = 24 * HOUR_MS;
+
+// Israel is IDT (UTC+3) for the entire June–July 2026 tournament window;
+// no DST transition falls inside it, so a fixed offset is safe. This is the
+// project's most safety-critical constant — every one of the 104 match
+// kickoff timestamps is derived from it — so it lives alongside the other
+// domain constants rather than as a file-local literal in matchTime.
+export const ISRAEL_OFFSET_HOURS = 3;

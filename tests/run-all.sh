@@ -158,6 +158,7 @@ run_test "91. Stats Guess Detail UI Wiring (clickable result/outcome accordions)
 run_test "92. Match Prediction Stats Aggregator (voter lists + counts consistency)" "data/test-match-prediction-stats.mjs" "yes"
 run_test "93. Recently Finished Matches (4h-from-end window + home/welcome wiring)" "ui/test-recently-finished.mjs" "no"
 run_test "94. Leaderboard Jump-to-Bottom (floating button + show-all + wiring)" "ui/test-leaderboard-jump-bottom.mjs" "no"
+run_test "95. Code Quality Refactors (storage keys, phone prefix, time consts, dead code)" "store/test-code-quality-refactors.mjs" "no"
 
 echo ""
 echo "==========================================="

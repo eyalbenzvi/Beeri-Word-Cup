@@ -17,8 +17,6 @@ import { calculateMatchPoints } from "./scoring";
 import { resolveMatchTeams } from "./predictionAlign";
 import { getMatchKickoffUTC } from "./matchTime";
 
-// FD statuses we treat as "the clock may still run".
-export const FD_LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 export const FD_FINISHED_STATUS = "FINISHED";
 
 /**

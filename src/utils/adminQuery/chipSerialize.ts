@@ -6,13 +6,6 @@ import { ALL_TEAMS } from "../../data/teams";
 
 const CHIP_RE = /\[\[(team|stage|form):([A-Za-z0-9_\-]+)\]\]/g;
 
-export function encodeChips(text: string, chips: Chip[]): string {
-  // No-op: the editor already produces inline `[[k:CODE]]` markers; this
-  // helper exists for tests + programmatic construction.
-  void chips;
-  return text;
-}
-
 export function parseChipsFromText(
   text: string,
   resolveLabel: (kind: ChipKind, code: string) => string,

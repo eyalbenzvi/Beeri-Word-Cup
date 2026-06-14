@@ -61,10 +61,6 @@ let summariesUnsub: (() => void) | null = null;
 let userPrivateUnsub: (() => void) | null = null;
 const retryState: Record<string, { count: number; inProgress: boolean }> = {};
 
-export function getCurrentListenerUserId() {
-  return currentListenerUserId;
-}
-
 function getRetryState(key: string) {
   if (!retryState[key]) retryState[key] = { count: 0, inProgress: false };
   return retryState[key];
