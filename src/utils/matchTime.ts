@@ -57,6 +57,29 @@ export function getMatchIsraelDateKey(match) {
 }
 
 /**
+ * Israel local hour (0-23) for a UTC millisecond timestamp. Fixed +3 offset
+ * is valid for the whole June-July 2026 tournament window (no DST inside it).
+ */
+export function israelHour(utcMs) {
+  const local = utcMs + ISRAEL_OFFSET_HOURS * 3600000;
+  return Math.floor(local / 3600000) % 24;
+}
+
+/**
+ * UTC millisecond timestamp of the first `hour`:00 Israel time that is at or
+ * after `utcMs`. E.g. nextIsraelHourUTC(<03:00 Israel>, 12) -> that day's
+ * 12:00 Israel; nextIsraelHourUTC(<14:00 Israel>, 12) -> next day's 12:00.
+ */
+export function nextIsraelHourUTC(utcMs, hour) {
+  const offset = ISRAEL_OFFSET_HOURS * 3600000;
+  const local = utcMs + offset;
+  const localDayStart = Math.floor(local / 86400000) * 86400000;
+  let target = localDayStart + hour * 3600000;
+  if (target < local) target += 86400000;
+  return target - offset;
+}
+
+/**
  * Human-readable Israel date label from a match (Hebrew-friendly numeric form).
  * Example: { date: "Jun 14" } -> "14.6"
  */

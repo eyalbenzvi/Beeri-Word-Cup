@@ -10,6 +10,7 @@ import { usePublicSettings } from "../hooks/usePublicSettings";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import LiveNowCard from "../components/LiveNowCard";
+import RecentlyFinishedMatches from "../components/RecentlyFinishedMatches";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import PhoneSignIn from "../components/PhoneSignIn";
 import KickoffFooter from "../components/KickoffFooter";
@@ -51,6 +52,7 @@ export default function WelcomeScreen() {
   ) : tournamentStarted ? (
     <>
       <LiveNowCard matchResultsOverride={results} />
+      <RecentlyFinishedMatches matchResultsOverride={results} />
       <UpcomingMatches matchResultsOverride={results} excludeLive />
     </>
   ) : (

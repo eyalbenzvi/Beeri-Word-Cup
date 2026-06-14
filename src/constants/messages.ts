@@ -96,6 +96,18 @@ export const LIVE = {
   versus: "מול",
 };
 
+// Copy for the home-page "recent results" section — matches that finished
+// recently (and overnight matches kept until late morning for catch-up),
+// shown above the upcoming matches with their final score and earned points.
+// Header is results-framed (not "just finished") because an overnight match
+// surfaced at 09:00 didn't "just" end — it's a catch-up surface.
+export const FINISHED = {
+  header: "תוצאות אחרונות",
+  badge: "הסתיים",
+  finalScore: "תוצאה סופית",
+  showMore: (n) => `עוד ${n} תוצאות`,
+};
+
 export const SCORE_STRIP = {
   header: "הניקוד שלך",
   officialOnly: "לפי משחקים שנגמרו",

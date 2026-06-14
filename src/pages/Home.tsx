@@ -5,6 +5,7 @@ import { createForm } from "../store";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import LiveNowCard from "../components/LiveNowCard";
+import RecentlyFinishedMatches from "../components/RecentlyFinishedMatches";
 import ScoreStrip from "../components/ScoreStrip";
 import SummaryTeaser from "../components/SummaryTeaser";
 import { useToast } from "../components/Toast";
@@ -20,9 +21,11 @@ export default function Home() {
 
   // Locked (tournament running) home, top to bottom:
   //   1. LiveNowCard  — live scores + per-form verdicts / next-match strip
-  //   2. SummaryTeaser — latest daily recap (the morning visit's question)
-  //   3. ScoreStrip   — official rank + today's points
-  //   4. UpcomingMatches — next 24h, minus matches the hero already shows
+  //   2. RecentlyFinishedMatches — matches ended in the last ~4h (result +
+  //      points), placed above the upcoming list so a fresh result stays seen
+  //   3. SummaryTeaser — latest daily recap (the morning visit's question)
+  //   4. ScoreStrip   — official rank + today's points
+  //   5. UpcomingMatches — next 24h, minus matches the hero already shows
   if (settings.predictionsLocked) {
     return (
       <div className="text-center max-w-xl mx-auto">
@@ -35,6 +38,7 @@ export default function Home() {
           </p>
         </div>
         <LiveNowCard />
+        <RecentlyFinishedMatches />
         <SummaryTeaser />
         <ScoreStrip />
         <div className="mb-3">
