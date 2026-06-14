@@ -85,7 +85,7 @@ console.log("--- 5. Polling discipline ---");
 assert(/liveMatches\.length > 0/.test(hook), "polls only while a live-window match exists");
 assert(/visibilitychange/.test(hook), "pauses/resumes on tab visibility");
 assert(/visibilityState === "hidden"/.test(hook), "hidden tab stops the timer");
-assert(/POLL_MS = 75 \* 1000/.test(hook), "~75s cadence");
+assert(/POLL_MS = 20 \* 1000/.test(hook), "~20s cadence (CDN-collapsed, free vs upstream budget)");
 assert(/Math\.random\(\) \* JITTER_MS/.test(hook), "jitter de-synchronizes clients");
 assert(/SLOW_POLL_MS/.test(hook) && /FAILURES_BEFORE_SLOWDOWN/.test(hook),
   "backs off after consecutive failures");

@@ -9,12 +9,25 @@
 // Cost / rate-limit discipline (football-data free tier = 10 req/min):
 //   1. In-memory cache per warm instance (CACHE_TTL_MS) — concurrent
 //      invocations on the same instance share one upstream fetch via an
-//      in-flight promise.
+//      in-flight promise. THIS is the true upstream rate limiter: the
+//      instance calls football-data at most once per CACHE_TTL_MS, i.e.
+//      ~60/CACHE_TTL calls/min, no matter how many clients poll.
 //   2. Cache-Control headers let Netlify's CDN collapse the client polling
-//      fan-out (every client polls ~75s; the CDN serves one origin hit per
-//      max-age window regardless of user count).
+//      fan-out (clients poll ~20s; the CDN serves one origin hit per
+//      max-age window per edge POP regardless of user count). Because the
+//      CDN keeps origin traffic to ~1 hit / max-age, the function stays at
+//      ~1 warm instance per POP, so upstream load ≈ POPs × 60/CACHE_TTL.
 //   3. The client only polls at all while a match is inside its live
 //      window (src/hooks/useLiveScores.ts) — zero traffic on rest days.
+//
+// Latency budget (minimize delay WITHOUT leaving the free tier):
+//   With CACHE_TTL=25s and CDN max-age=30s, a small (1-2 POP) audience
+//   drives ~2-5 upstream req/min — comfortably under 10 with >2x margin —
+//   while cutting the server+CDN staleness from ~4 min to ~1 min. Client
+//   polling (see useLiveScores.ts) is CDN-collapsed, so polling faster is
+//   free against this budget and is tuned independently. The residual
+//   delay is football-data's own free-tier feed latency, which no amount
+//   of client/server tuning can beat.
 //
 // Failure stance: this endpoint powers a *nicety* (live score display).
 // Official scoring flows through Firestore auto-fill/admin entry and never
@@ -27,9 +40,10 @@ import { normalizeFdMatches } from "./_sources/liveNormalize.js";
 
 const BASE = "https://api.football-data.org/v4";
 const FETCH_TIMEOUT_MS = 3500;
-// Fresh-for window. Slightly under the CDN max-age so a warm instance
-// refreshes about once a minute at most.
-const CACHE_TTL_MS = 55 * 1000;
+// Fresh-for window. Kept just under the CDN max-age so that when the CDN
+// revalidates at its boundary the instance cache has already expired and
+// returns FRESH upstream data, rather than re-serving its own stale copy.
+const CACHE_TTL_MS = 25 * 1000;
 // How long a stale payload is still worth serving when upstream is down.
 const STALE_MAX_MS = 10 * 60 * 1000;
 
@@ -46,10 +60,14 @@ function getCorsHeaders(event) {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    // CDN-cacheable: collapses N polling clients into ~1 origin hit/min.
-    // stale-while-revalidate keeps responses instant across the refresh.
-    "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
-    "Netlify-CDN-Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+    // CDN-cacheable: collapses N polling clients into ~1 origin hit per
+    // max-age per POP. max-age is the freshness window; stale-while-
+    // revalidate is kept short (≈ one refresh cycle) so the CDN serves the
+    // background-refreshed payload almost immediately instead of trailing a
+    // long stale shadow — the SWR window was the single biggest avoidable
+    // contributor to the live-score delay.
+    "Cache-Control": "public, max-age=30, stale-while-revalidate=30",
+    "Netlify-CDN-Cache-Control": "public, max-age=30, stale-while-revalidate=30",
     // The ACAO header above is per-origin while the response is CDN-cached —
     // without Vary the first requester's origin would be served to everyone.
     "Vary": "Origin",

@@ -5,8 +5,12 @@
 //   - polls ONLY while at least one match is in its live window — the
 //     caller passes that list; empty list = zero requests (rest days);
 //   - one request per ~POLL_MS with random jitter so clients don't
-//     synchronize; the server adds its own 55s cache + CDN max-age=60,
-//     so upstream sees ~1 req/min no matter how many users are online;
+//     synchronize. These requests hit Netlify's CDN, NOT football-data:
+//     the CDN collapses every client's poll into ~1 origin hit per the
+//     server's max-age, so polling fast is free against the upstream
+//     10 req/min budget (the server cache + CDN are the real rate gate,
+//     see get-live-scores.js). We therefore poll on a short ~20s cadence
+//     to keep client-side delay minimal — the upstream cost is unchanged;
 //   - pauses entirely while the tab is hidden, refetches immediately on
 //     return to foreground (visibilitychange);
 //   - backs off to SLOW_POLL_MS after consecutive failures;
@@ -21,9 +25,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSettings } from "./useStore";
 import { mapLiveEntriesToMatches, stabilizeScores } from "../utils/liveScores";
 
-const POLL_MS = 75 * 1000;
-const JITTER_MS = 15 * 1000;
-const SLOW_POLL_MS = 150 * 1000;
+const POLL_MS = 20 * 1000;
+const JITTER_MS = 5 * 1000;
+const SLOW_POLL_MS = 60 * 1000;
 const FAILURES_BEFORE_SLOWDOWN = 3;
 const FETCH_TIMEOUT_MS = 8 * 1000;
 const ENDPOINT = "/.netlify/functions/get-live-scores";
