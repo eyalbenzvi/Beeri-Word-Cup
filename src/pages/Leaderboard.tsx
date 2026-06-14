@@ -23,6 +23,7 @@ import { preferredScrollBehavior } from "../utils/helpers";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 import BackToTopButton from "../components/BackToTopButton";
+import ScrollToBottomButton from "../components/ScrollToBottomButton";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -160,6 +161,25 @@ export default function Leaderboard({
     setTimeout(() => {
       const el = document.getElementById(`lb-form-${formId}`);
       el?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
+    }, SCROLL_DELAY_MS);
+  };
+
+  // One-tap path to last place: reveal the whole (possibly filtered) list —
+  // bypassing the "show more" pagination that otherwise buries the bottom
+  // behind many taps — then smooth-scroll the final row into view. Like
+  // jumpToForm, this only ever fires from a user gesture (the floating
+  // ScrollToBottomButton), never from an effect.
+  const jumpToBottom = () => {
+    if (filteredLeaderboard.length === 0) return;
+    setShowCount(filteredLeaderboard.length);
+    setTimeout(() => {
+      // Scroll to the last *rendered* row by querying the DOM rather than a
+      // formId captured at click time: a live Firestore update could reorder
+      // or drop rows during the render delay, and querying keeps the jump
+      // landing on whatever the real last row is.
+      const rows = document.querySelectorAll('[id^="lb-form-"]');
+      const last = rows[rows.length - 1];
+      last?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
     }, SCROLL_DELAY_MS);
   };
 
@@ -636,9 +656,20 @@ export default function Leaderboard({
             })}
 
             {showCount < filteredLeaderboard.length && (
-              <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta mt-2">
-                הצג {Math.min(PAGE_SIZE, filteredLeaderboard.length - showCount)} נוספים (נותרו {filteredLeaderboard.length - showCount})
-              </button>
+              <div className="mt-2 flex flex-col gap-2">
+                <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta">
+                  הצג {Math.min(PAGE_SIZE, filteredLeaderboard.length - showCount)} נוספים (נותרו {filteredLeaderboard.length - showCount})
+                </button>
+                {/* Load the entire remaining list in one tap — the
+                    convenient path for browsing the tail of the table
+                    instead of clicking "show more" repeatedly. */}
+                <button
+                  onClick={() => setShowCount(filteredLeaderboard.length)}
+                  className="btn-duo btn-duo-ghost text-sm"
+                >
+                  הצג את כולם ({filteredLeaderboard.length})
+                </button>
+              </div>
             )}
 
             {leaderboard.length === 0 && (
@@ -658,6 +689,15 @@ export default function Leaderboard({
             )}
           </div>
         </>
+      )}
+
+      {/* Floating jump-to-bottom — only on the ranked-list view (not the
+          form detail) and only when the list is long enough to be paginated,
+          so there's a real "bottom" worth a one-tap jump. Lives in the same
+          corner as BackToTopButton but shows at the opposite scroll
+          position, so the two are never visible together. */}
+      {!embedded && !selectedForm && filteredLeaderboard.length > PAGE_SIZE && (
+        <ScrollToBottomButton onClick={jumpToBottom} />
       )}
 
       {/* Floating back-to-top — covers both the long ranked list and the
