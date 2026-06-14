@@ -84,11 +84,31 @@ assert(/httpMethod !== "GET"/.test(src), "rejects non-GET");
 assert(/LIVE_SCORES_DISABLED/.test(src), "hard env kill switch present");
 
 // Layered caching — the many-concurrent-users requirement:
-assert(/CACHE_TTL_MS\s*=\s*55\s*\*\s*1000/.test(src), "in-memory cache TTL ~55s");
+assert(/CACHE_TTL_MS\s*=\s*25\s*\*\s*1000/.test(src), "in-memory cache TTL ~25s (low-latency, still under free-tier budget)");
 assert(/now - cached\.at < CACHE_TTL_MS/.test(src), "warm-instance cache consulted");
 assert(/inFlight/.test(src) && /inFlight = null/.test(src),
   "concurrent invocations share one upstream fetch (in-flight dedup)");
-assert(/max-age=60/.test(src), "CDN Cache-Control max-age");
+assert(/max-age=30/.test(src), "CDN Cache-Control max-age (30s)");
+// Latency invariants — lock in the delay reduction:
+//  - SWR must stay short (a long stale-while-revalidate shadow was the
+//    biggest avoidable contributor to the live delay).
+{
+  const ttlM = src.match(/CACHE_TTL_MS\s*=\s*(\d+)\s*\*\s*1000/);
+  const ageM = src.match(/max-age=(\d+)/);
+  const swrM = src.match(/stale-while-revalidate=(\d+)/);
+  const ttl = ttlM ? Number(ttlM[1]) : NaN;
+  const age = ageM ? Number(ageM[1]) : NaN;
+  const swr = swrM ? Number(swrM[1]) : NaN;
+  // Ordering invariant: cache TTL <= CDN max-age, so the instance cache is
+  // expired when the CDN revalidates and returns FRESH upstream data.
+  assert(ttl <= age, `CACHE_TTL (${ttl}s) <= CDN max-age (${age}s)`);
+  // Budget guard: with the CDN keeping origin to ~1 hit/max-age per POP,
+  // upstream load ~= POPs * 60/TTL; TTL >= 20s keeps a comfortable margin
+  // under the 10 req/min free tier even at a few POPs.
+  assert(ttl >= 20, `CACHE_TTL (${ttl}s) keeps upstream under free-tier budget`);
+  // Freshness guard: total CDN staleness (age + swr) stays ~<= 1 min.
+  assert(age + swr <= 60, `CDN staleness window age+swr (${age + swr}s) <= 60s`);
+}
 assert(/Netlify-CDN-Cache-Control/.test(src), "Netlify CDN cache header");
 assert(/stale-while-revalidate/.test(src), "stale-while-revalidate for smooth refresh");
 assert(/"Vary":\s*"Origin"/.test(src),
