@@ -3,6 +3,7 @@ import { deleteUser, setAdminClaim, updateUserProfile } from "../store";
 import { useCurrentUser } from "../hooks/useStore";
 import { useConfirm } from "./ConfirmModal";
 import { useToast } from "./Toast";
+import { PHONE_UID_PREFIX } from "../utils/uidHash";
 
 export default function AdminUsersTab({ users, allPredictions }) {
   const { user: currentUser } = useCurrentUser();
@@ -127,8 +128,8 @@ export default function AdminUsersTab({ users, allPredictions }) {
               </div>
               {(() => {
                 if (u.email) return <div className="text-xs text-ink-muted break-all">{u.email}</div>;
-                if (uid.startsWith("phone_")) {
-                  const phone = uid.replace("phone_", "");
+                if (uid.startsWith(PHONE_UID_PREFIX)) {
+                  const phone = uid.replace(PHONE_UID_PREFIX, "");
                   if (/^\d+$/.test(phone)) return <div className="text-xs text-ink-muted">{phone}</div>;
                 }
                 return null;

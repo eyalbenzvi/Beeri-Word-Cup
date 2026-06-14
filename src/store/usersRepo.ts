@@ -80,8 +80,9 @@ export function pickKnown(obj: any, allowed: string[]) {
   return out;
 }
 
+import { CURRENT_USER_KEY } from "../constants/storageKeys";
+
 const EMPTY_OBJ: Record<string, any> = {};
-const CURRENT_USER_KEY = "wc2026_currentUser";
 
 // ============ READ ACCESSORS ============
 

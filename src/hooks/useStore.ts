@@ -9,6 +9,8 @@ import * as store from "../store";
 import { initRealtimeListeners } from "../store";
 import { auth, firebaseSignOut, onAuthStateChanged } from "../firebase";
 import { setSentryUser, captureClientMessage } from "../sentry";
+import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "../constants/storageKeys";
+import { PHONE_UID_PREFIX } from "../utils/uidHash";
 
 // Watchdog thresholds — tuned so slow-3G users don't trip them prematurely.
 // auth-watchdog covers Firebase Auth init (Safari ITP class of bugs).
@@ -102,8 +104,8 @@ export function useCurrentUser() {
         // Guest who was never signed in this tab — do NOT wipe the cache
         // (it may hold public-mode data). Only clear stale identity keys a
         // previous session could have left if Firebase revoked it remotely.
-        try { localStorage.removeItem("wc2026_currentUser"); } catch { /* ignore */ }
-        try { localStorage.removeItem("wc2026_activeForm"); } catch { /* ignore */ }
+        try { localStorage.removeItem(CURRENT_USER_KEY); } catch { /* ignore */ }
+        try { localStorage.removeItem(ACTIVE_FORM_KEY); } catch { /* ignore */ }
         setSentryUser(null);
       }
     });
@@ -116,8 +118,8 @@ export function useCurrentUser() {
   // Single consolidated write when both auth and store are ready
   useEffect(() => {
     if (!storeReady || !firebaseUser) return;
-    const isPhoneUser = firebaseUser.uid.startsWith("phone_");
-    const phoneName = isPhoneUser ? firebaseUser.uid.replace("phone_", "") : null;
+    const isPhoneUser = firebaseUser.uid.startsWith(PHONE_UID_PREFIX);
+    const phoneName = isPhoneUser ? firebaseUser.uid.replace(PHONE_UID_PREFIX, "") : null;
     store.ensureUserInStore(
       firebaseUser.uid,
       firebaseUser.displayName || firebaseUser.phoneNumber || phoneName || "משתמש",

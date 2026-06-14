@@ -165,11 +165,6 @@ export function captureClientMessage(key: string, context: Record<string, any> =
   }
 }
 
-// Reset dedup keys — useful on explicit user action (reload) or logout.
-export function resetOnceKeys() {
-  emittedOnce.clear();
-}
-
 // Noise filter for global handlers: skip browser-extension / third-party
 // script errors we can't act on.
 function looksLikeExtensionNoise(msg) {

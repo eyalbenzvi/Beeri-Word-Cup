@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { KICKOFF_UTC } from "../utils/constants";
+import { KICKOFF_UTC, DAY_MS, HOUR_MS, MINUTE_MS } from "../utils/constants";
 
 export function useCountdown() {
   const [now, setNow] = useState(Date.now());
@@ -9,10 +9,10 @@ export function useCountdown() {
   }, []);
   const diff = Math.max(0, KICKOFF_UTC - now);
   return {
-    days: Math.floor(diff / 86400000),
-    hours: Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000),
+    days: Math.floor(diff / DAY_MS),
+    hours: Math.floor((diff % DAY_MS) / HOUR_MS),
+    minutes: Math.floor((diff % HOUR_MS) / MINUTE_MS),
+    seconds: Math.floor((diff % MINUTE_MS) / 1000),
     started: diff === 0,
   };
 }

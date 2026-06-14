@@ -339,9 +339,17 @@ assert(/else\s+if\s*\(sawFirebaseUser\)\s*\{[\s\S]{0,200}store\.logoutUser\(\)/.
 assert(!/\}\s*else\s*\{\s*store\.logoutUser\(\)/.test(useStoreSrc),
   "No unconditional store.logoutUser() in the null-auth branch");
 // The never-signed-in branch must still clear stale identity keys without
-// touching the cache (remote revocation between visits).
-assert(/wc2026_currentUser/.test(useStoreSrc) && /wc2026_activeForm/.test(useStoreSrc),
-  "Guest branch clears stale localStorage identity keys");
+// touching the cache (remote revocation between visits). The literal key
+// strings were centralised in src/constants/storageKeys.ts, so useStore now
+// references the imported CURRENT_USER_KEY / ACTIVE_FORM_KEY constants rather
+// than inline literals — assert the cleanup still targets both keys and that
+// the constants module remains their single source of truth.
+assert(/removeItem\(CURRENT_USER_KEY\)/.test(useStoreSrc) && /removeItem\(ACTIVE_FORM_KEY\)/.test(useStoreSrc),
+  "Guest branch clears stale localStorage identity keys (via storageKeys constants)");
+const storageKeysSrc = readMigratedSrc("src/constants/storageKeys.js");
+assert(/CURRENT_USER_KEY\s*=\s*"wc2026_currentUser"/.test(storageKeysSrc) &&
+  /ACTIVE_FORM_KEY\s*=\s*"wc2026_activeForm"/.test(storageKeysSrc),
+  "storageKeys.ts is the single source of truth for the identity keys");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

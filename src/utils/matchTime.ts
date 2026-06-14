@@ -8,8 +8,9 @@
 // All June/July 2026 match times are IDT (UTC+3). No DST transitions fall
 // inside the tournament window, so a fixed offset is safe.
 
+import { ISRAEL_OFFSET_HOURS, HOUR_MS, DAY_MS } from "./constants";
+
 const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
-const ISRAEL_OFFSET_HOURS = 3; // IDT during June-July
 const TOURNAMENT_YEAR = 2026;
 
 function pad2(n) {
@@ -61,8 +62,8 @@ export function getMatchIsraelDateKey(match) {
  * is valid for the whole June-July 2026 tournament window (no DST inside it).
  */
 export function israelHour(utcMs) {
-  const local = utcMs + ISRAEL_OFFSET_HOURS * 3600000;
-  return Math.floor(local / 3600000) % 24;
+  const local = utcMs + ISRAEL_OFFSET_HOURS * HOUR_MS;
+  return Math.floor(local / HOUR_MS) % 24;
 }
 
 /**
@@ -71,11 +72,11 @@ export function israelHour(utcMs) {
  * 12:00 Israel; nextIsraelHourUTC(<14:00 Israel>, 12) -> next day's 12:00.
  */
 export function nextIsraelHourUTC(utcMs, hour) {
-  const offset = ISRAEL_OFFSET_HOURS * 3600000;
+  const offset = ISRAEL_OFFSET_HOURS * HOUR_MS;
   const local = utcMs + offset;
-  const localDayStart = Math.floor(local / 86400000) * 86400000;
-  let target = localDayStart + hour * 3600000;
-  if (target < local) target += 86400000;
+  const localDayStart = Math.floor(local / DAY_MS) * DAY_MS;
+  let target = localDayStart + hour * HOUR_MS;
+  if (target < local) target += DAY_MS;
   return target - offset;
 }
 

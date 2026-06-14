@@ -35,10 +35,6 @@ let publicReadinessWatchdog: ReturnType<typeof setTimeout> | null = null;
 // "טוען..." spinner before we force-resolve the readiness flags.
 const PUBLIC_READINESS_WATCHDOG_MS = 6000;
 
-export function isPublicModeInitialized() {
-  return publicModeInitialized;
-}
-
 function markPublicReadinessForced() {
   if (!publicModeInitialized) return;
   let changed = false;

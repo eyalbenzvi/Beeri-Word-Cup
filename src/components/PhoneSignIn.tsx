@@ -3,6 +3,7 @@ import { useToast } from "./Toast";
 import { signInWithPhoneOtp } from "../firebase";
 import { captureClientError } from "../sentry";
 import { normalizeIsraeliMobile, sanitizePhoneInput } from "../utils/phone";
+import { PHONE_MAX_INPUT_LEN } from "../utils/constants";
 import InlineError from "./InlineError";
 
 export default function PhoneSignIn() {
@@ -126,7 +127,7 @@ export default function PhoneSignIn() {
             value={phone}
             onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
             placeholder="050-1234567"
-            maxLength={20}
+            maxLength={PHONE_MAX_INPUT_LEN}
             className="input-duo text-center"
             disabled={loading}
           />

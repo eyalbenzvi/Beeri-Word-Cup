@@ -103,7 +103,8 @@ export function getForm(formId: string) {
   return all[formId] || null;
 }
 
-const ACTIVE_FORM_KEY = "wc2026_activeForm";
+import { ACTIVE_FORM_KEY } from "../constants/storageKeys";
+
 function getActiveFormId() {
   try { return JSON.parse(localStorage.getItem(ACTIVE_FORM_KEY) || "null") || null; } catch { return null; }
 }
