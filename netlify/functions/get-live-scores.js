@@ -43,6 +43,7 @@
 // the client falls back to the schedule-derived "משוחק עכשיו" UI.
 
 import { withSentry } from "./_sentry.js";
+import { getJson, dayWindow } from "./_sources/http.js";
 import { normalizeFdMatches } from "./_sources/liveNormalize.js";
 import { normalizeEspnEvents } from "./_sources/espnLive.js";
 
@@ -51,7 +52,6 @@ const FD_BASE = "https://api.football-data.org/v4";
 // "fifa.world"; override via env if ESPN renames it for 2026.
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 const ESPN_LEAGUE = process.env.ESPN_SOCCER_LEAGUE || "fifa.world";
-const FETCH_TIMEOUT_MS = 3500;
 // Fresh-for window. Kept just under the CDN max-age so that when the CDN
 // revalidates at its boundary the instance cache has already expired and
 // returns FRESH upstream data, rather than re-serving its own stale copy.
@@ -89,25 +89,6 @@ function getCorsHeaders(event) {
 
 function json(statusCode, headers, payload) {
   return { statusCode, headers, body: JSON.stringify(payload) };
-}
-
-// football-data wants ISO dates (YYYY-MM-DD); ESPN wants compact (YYYYMMDD).
-function dayWindow(nowMs) {
-  const from = new Date(nowMs - 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const to = new Date(nowMs + 24 * 3600 * 1000).toISOString().slice(0, 10);
-  return { from, to };
-}
-
-async function getJson(url, headers) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { headers: headers || {}, signal: controller.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // Module-level state survives across invocations on a warm instance.

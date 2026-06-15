@@ -4,8 +4,10 @@
 // normalization, using the 90-minute score (NOT the aggregate), finished-status
 // parsing, knockout advancing-team extraction, and the single-retry behaviour.
 
+import fs from "node:fs";
 import { fetchMatchResult as fetchFD } from "../../netlify/functions/_sources/footballData.js";
 import { fetchMatchResult as fetchAS } from "../../netlify/functions/_sources/apiSports.js";
+import { fetchMatchResult as fetchESPN } from "../../netlify/functions/_sources/espnResult.js";
 import { matchTeamName } from "../../netlify/functions/_sources/teamCodes.js";
 
 let passed = 0, failed = 0;
@@ -263,6 +265,246 @@ const KICK_SEC = Math.floor(new Date(KICK).getTime() / 1000);
   eq(r.home90, 2, "AS reversed-by-name: home normalized to MEX 2");
   eq(r.away90, 1, "AS reversed-by-name: away normalized to RSA 1");
   eq(r.homeCode, "MEX", "AS reversed-by-name: homeCode MEX");
+}
+
+// ============ ESPN result client (PRIMARY) ============
+function espnEvent({ status, competitors }) {
+  return { events: [{ competitions: [{ date: KICK, status, competitors }] }] };
+}
+const POST = (name, detail, period) => ({
+  type: { state: "post", completed: true, name, detail }, period,
+});
+
+// --- ESPN 1. Normal orientation, group, decisive ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FULL_TIME", "FT", 2),
+    competitors: [
+      { homeAway: "home", score: "2", winner: true, team: { displayName: "Mexico", abbreviation: "MEX" } },
+      { homeAway: "away", score: "1", winner: false, team: { displayName: "South Africa", abbreviation: "RSA" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.finished, true, "ESPN normal: finished");
+  eq(r.home90, 2, "ESPN normal: home90 (regular -> final score)");
+  eq(r.away90, 1, "ESPN normal: away90");
+  eq(r.homeCode, "MEX", "ESPN normal: homeCode");
+  eq(r.awayCode, "RSA", "ESPN normal: awayCode");
+  eq(r.advancingTeam, null, "ESPN normal: no advancing (decisive)");
+  eq(r.regulationAmbiguous, false, "ESPN normal: not ambiguous");
+}
+
+// --- ESPN 2. Swapped orientation normalized to our schedule ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FULL_TIME", "FT", 2),
+    competitors: [
+      { homeAway: "home", score: "1", winner: false, team: { displayName: "South Africa", abbreviation: "RSA" } },
+      { homeAway: "away", score: "2", winner: true, team: { displayName: "Mexico", abbreviation: "MEX" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.home90, 2, "ESPN swapped: home90 normalized to MEX 2");
+  eq(r.away90, 1, "ESPN swapped: away90 normalized to RSA 1");
+  eq(r.homeCode, "MEX", "ESPN swapped: homeCode normalized");
+  eq(r.awayCode, "RSA", "ESPN swapped: awayCode normalized");
+}
+
+// --- ESPN 3. Knockout to ET: 90' reconstructed from 1st+2nd-half linescores,
+// NOT the ET-inclusive final score. Advancing = overall winner flag. ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FINAL", "AET", 4),
+    competitors: [
+      { homeAway: "home", score: "2", winner: true,
+        team: { displayName: "Spain", abbreviation: "ESP" },
+        linescores: [{ value: 1 }, { value: 0 }, { value: 1 }] }, // 90' = 1, ET +1
+      { homeAway: "away", score: "1", winner: false,
+        team: { displayName: "Germany", abbreviation: "GER" },
+        linescores: [{ value: 0 }, { value: 1 }, { value: 0 }] }, // 90' = 1
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.duration, "EXTRA_TIME", "ESPN KO ET: duration EXTRA_TIME");
+  eq(r.home90, 1, "ESPN KO ET: 90' home from linescores (1), not final (2)");
+  eq(r.away90, 1, "ESPN KO ET: 90' away from linescores (1)");
+  eq(r.advancingTeam, "ESP", "ESPN KO ET: advancing = overall winner");
+}
+
+// --- ESPN 3a. ET WITHOUT linescores -> cannot isolate 90' -> regulationAmbiguous
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FINAL", "AET", 4),
+    competitors: [
+      { homeAway: "home", score: "2", winner: true, team: { displayName: "Spain", abbreviation: "ESP" } },
+      { homeAway: "away", score: "1", winner: false, team: { displayName: "Germany", abbreviation: "GER" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.finished, true, "ESPN ET no-linescores: finished");
+  eq(r.home90, null, "ESPN ET no-linescores: 90' unknown (null)");
+  eq(r.regulationAmbiguous, true, "ESPN ET no-linescores: ambiguous -> no write (FD fallback)");
+}
+
+// --- ESPN 3b. Penalty shootout: 90' from linescores, advancing = pen winner ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FINAL_PEN", "FT (Pens)", 5),
+    competitors: [
+      { homeAway: "home", score: "1", winner: false,
+        team: { displayName: "Uruguay", abbreviation: "URU" },
+        linescores: [{ value: 0 }, { value: 1 }] }, // 90' = 1
+      { homeAway: "away", score: "1", winner: true,
+        team: { displayName: "Spain", abbreviation: "ESP" },
+        linescores: [{ value: 1 }, { value: 0 }] }, // 90' = 1
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 90, homeTeam: "URU", awayTeam: "ESP", kickoffIso: KICK });
+  eq(r.duration, "PENALTY_SHOOTOUT", "ESPN pens: duration PENALTY_SHOOTOUT");
+  eq(r.home90, 1, "ESPN pens: 90' home from linescores");
+  eq(r.away90, 1, "ESPN pens: 90' away from linescores (tie)");
+  eq(r.advancingTeam, "ESP", "ESPN pens: advancing = pen winner");
+}
+
+// --- ESPN 4. Not finished (in play) ---
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "in", name: "STATUS_SECOND_HALF" }, period: 2 },
+    competitors: [
+      { homeAway: "home", score: "1", team: { displayName: "Mexico", abbreviation: "MEX" } },
+      { homeAway: "away", score: "0", team: { displayName: "South Africa", abbreviation: "RSA" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN in-play: not finished");
+}
+
+// --- ESPN 5. Fixture not in feed -> not finished, not error ---
+{
+  mockFetchOnce({ events: [] });
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN missing fixture: not finished");
+  eq(r.error, false, "ESPN missing fixture: not an error");
+}
+
+// --- ESPN 6. Network failure retries once then gives up ---
+{
+  const calls = mockFetchThrow();
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.error, true, "ESPN network fail: error (-> FD fallback in handler)");
+  eq(calls(), 2, "ESPN network fail: one request + one retry");
+}
+
+// --- ESPN 7. Team resolved via abbreviation fallback when name is unknown ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FULL_TIME", "FT", 2),
+    competitors: [
+      { homeAway: "home", score: "0", winner: false, team: { displayName: "Deutschland", abbreviation: "GER" } },
+      { homeAway: "away", score: "0", winner: false, team: { displayName: "Spain", abbreviation: "ESP" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 50, homeTeam: "GER", awayTeam: "ESP", kickoffIso: KICK });
+  eq(r.homeCode, "GER", "ESPN abbr fallback: unknown name 'Deutschland' -> GER via abbreviation");
+  eq(r.awayCode, "ESP", "ESPN abbr fallback: away ESP");
+}
+
+// --- ESPN 8. Abandoned/cancelled match (also reported as state="post") is
+// NOT treated as finished -> no partial score written (review finding M7). ---
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "post", completed: true, name: "STATUS_ABANDONED", detail: "Abandoned" }, period: 2 },
+    competitors: [
+      { homeAway: "home", score: "1", team: { displayName: "Mexico", abbreviation: "MEX" } },
+      { homeAway: "away", score: "0", team: { displayName: "South Africa", abbreviation: "RSA" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN abandoned: NOT finished (no partial score written)");
+}
+
+// --- ESPN 9. Extra time signalled ONLY by an underscore-joined status token
+// (STATUS_FINAL_AET) with period <= 2 -> must still detect ET and take the 90'
+// score from linescores, not the ET-inclusive final (review finding H2/#1). ---
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "post", completed: true, name: "STATUS_FINAL_AET", detail: "STATUS_FINAL_AET" }, period: 2 },
+    competitors: [
+      { homeAway: "home", score: "2", winner: true,
+        team: { displayName: "Spain", abbreviation: "ESP" },
+        linescores: [{ value: 1, period: 1 }, { value: 0, period: 2 }, { value: 1, period: 3 }] },
+      { homeAway: "away", score: "1", winner: false,
+        team: { displayName: "Germany", abbreviation: "GER" },
+        linescores: [{ value: 1, period: 1 }, { value: 0, period: 2 }, { value: 0, period: 3 }] },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.duration, "EXTRA_TIME", "ESPN underscore-AET: ET detected despite period<=2");
+  eq(r.home90, 1, "ESPN underscore-AET: 90' home from linescores (1), not final (2)");
+  eq(r.away90, 1, "ESPN underscore-AET: 90' away (1)");
+  eq(r.advancingTeam, "ESP", "ESPN underscore-AET: advancing = winner");
+}
+
+// --- ESPN 10. linescore values as digit-STRINGS are parsed (review finding
+// C1: Number.isFinite('1') is false; must coerce). ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FINAL", "AET", 4),
+    competitors: [
+      { homeAway: "home", score: "2", winner: true,
+        team: { displayName: "Spain", abbreviation: "ESP" },
+        linescores: [{ value: "1" }, { value: "0" }, { value: "1" }] }, // strings -> 90' = 1
+      { homeAway: "away", score: "1", winner: false,
+        team: { displayName: "Germany", abbreviation: "GER" },
+        linescores: [{ displayValue: "0" }, { displayValue: "1" }] }, // displayValue only -> 90' = 1
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.home90, 1, "ESPN string linescores: home 90' = '1'+'0' = 1");
+  eq(r.away90, 1, "ESPN displayValue linescores: away 90' = 1 (level -> valid ET)");
+}
+
+// --- ESPN 11. ET match whose reconstructed 90' is NOT level is impossible (you
+// only play ET after a draw) -> decline as ambiguous rather than record a bogus
+// decisive score (review finding #5). ---
+{
+  mockFetchOnce(espnEvent({
+    status: POST("STATUS_FINAL", "AET", 4),
+    competitors: [
+      { homeAway: "home", score: "2", winner: true,
+        team: { displayName: "Spain", abbreviation: "ESP" },
+        linescores: [{ value: 1, period: 1 }, { value: 0, period: 2 }] }, // 90' = 1
+      { homeAway: "away", score: "1", winner: false,
+        team: { displayName: "Germany", abbreviation: "GER" },
+        linescores: [{ value: 0, period: 1 }, { value: 0, period: 2 }] }, // 90' = 0 -> NOT level
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.regulationAmbiguous, true, "ESPN ET non-level reconstruction: ambiguous (declines, FD fallback)");
+  eq(r.home90, null, "ESPN ET non-level: 90' nulled");
+}
+
+// --- ESPN 12. Fixture absent from the feed -> notFound flag so the handler
+// falls back to football-data (review finding: coverage gap, not 'live'). ---
+{
+  mockFetchOnce({ events: [] });
+  const r = await fetchESPN({ fifaMatch: 1, homeTeam: "MEX", awayTeam: "RSA", kickoffIso: KICK });
+  eq(r.notFound, true, "ESPN absent fixture: notFound -> FD fallback in handler");
+}
+
+// ============ de-duplication: every source shares http.js ============
+{
+  const fdSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/_sources/footballData.js", "utf8");
+  const asSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/_sources/apiSports.js", "utf8");
+  const espnSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/_sources/espnResult.js", "utf8");
+  const liveSrc = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/_sources/espnLive.js", "utf8");
+  for (const [name, s] of [["footballData", fdSrc], ["apiSports", asSrc], ["espnResult", espnSrc]]) {
+    assert(/from "\.\/http\.js"/.test(s), `${name}.js imports shared http.js`);
+    assert(!/new AbortController\(\)/.test(s), `${name}.js no longer hand-rolls fetch (dedup)`);
+  }
+  // ESPN team resolution shared between live + result clients.
+  assert(/from "\.\/espnTeams\.js"/.test(espnSrc) && /from "\.\/espnTeams\.js"/.test(liveSrc),
+    "espnResult.js + espnLive.js share espnTeams.js (no duplicate resolver)");
 }
 
 // ============ team-name resolver ============

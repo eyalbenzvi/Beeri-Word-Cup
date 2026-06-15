@@ -22,11 +22,10 @@
 // query; identity disambiguates within it.
 
 import { matchTeamName } from "./teamCodes.js";
+import { getJson, dayWindow } from "./http.js";
 
 const NAME = "api-sports";
 const BASE = "https://v3.football.api-sports.io";
-// See footballData.js: keep the fetch budget under the function timeout.
-const TIMEOUT_MS = 3500;
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN"]);
 
 function norm(s) {
@@ -36,30 +35,6 @@ function norm(s) {
 function seasonFromKickoff(kickoffIso) {
   const y = new Date(kickoffIso).getUTCFullYear();
   return Number.isFinite(y) ? String(y) : "";
-}
-
-function dayBounds(kickoffIso) {
-  // +/-1 day window absorbs timezone skew (a late-night Israel kickoff can fall
-  // on the adjacent UTC day).
-  const t = new Date(kickoffIso).getTime();
-  const from = new Date(t - 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const to = new Date(t + 24 * 3600 * 1000).toISOString().slice(0, 10);
-  return { from, to };
-}
-
-async function getJson(url, key) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      headers: { "x-apisports-key": key },
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`api-sports HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // Resolve an api-sports team payload to our FIFA code: prefer an explicit code
@@ -89,15 +64,16 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     return { name: NAME, error: true, reason: "missing AS env config" };
   }
 
-  const { from, to } = dayBounds(kickoffIso);
+  const { from, to } = dayWindow(Date.parse(kickoffIso));
   const url = `${BASE}/fixtures?league=${encodeURIComponent(league)}&season=${encodeURIComponent(season)}&from=${from}&to=${to}`;
+  const H = { "x-apisports-key": key };
 
   let data;
   try {
-    data = await getJson(url, key);
+    data = await getJson(url, H);
   } catch (err1) {
     try {
-      data = await getJson(url, key);
+      data = await getJson(url, H);
     } catch (err2) {
       return { name: NAME, error: true, reason: err2?.message || String(err2) };
     }

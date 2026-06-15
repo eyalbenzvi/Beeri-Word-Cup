@@ -15,37 +15,10 @@
 // aggregate/ET total as the recorded score.
 
 import { norm, ourCode } from "./fdCodes.js";
+import { getJson, dayWindow } from "./http.js";
 
 const NAME = "football-data";
 const BASE = "https://api.football-data.org/v4";
-// Keep the fetch budget small enough that one retry across both sources (run
-// in parallel) stays under a typical 10s Netlify function timeout: 3.5s x 2
-// sequential attempts = 7s worst case per source. A killed function would
-// otherwise leave the per-match lock held until it expires.
-const TIMEOUT_MS = 3500;
-
-function dayBounds(kickoffIso) {
-  // Query a +/-1 day window around the kickoff to absorb timezone skew.
-  const t = new Date(kickoffIso).getTime();
-  const from = new Date(t - 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const to = new Date(t + 24 * 3600 * 1000).toISOString().slice(0, 10);
-  return { from, to };
-}
-
-async function getJson(url, token) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      headers: { "X-Auth-Token": token },
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`football-data HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 // Find the fixture whose two teams' codes are exactly the expected pair
 // (orientation-independent), comparing in OUR code space.
@@ -73,16 +46,17 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     return { name: NAME, error: true, reason: "missing FD env config" };
   }
 
-  const { from, to } = dayBounds(kickoffIso);
+  const { from, to } = dayWindow(Date.parse(kickoffIso));
   const url = `${BASE}/competitions/${encodeURIComponent(comp)}/matches?dateFrom=${from}&dateTo=${to}`;
+  const H = { "X-Auth-Token": token };
 
   // One request + a single fallback retry on transient failure, then give up.
   let data;
   try {
-    data = await getJson(url, token);
+    data = await getJson(url, H);
   } catch (err1) {
     try {
-      data = await getJson(url, token);
+      data = await getJson(url, H);
     } catch (err2) {
       return { name: NAME, error: true, reason: err2?.message || String(err2) };
     }

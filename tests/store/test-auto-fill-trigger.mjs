@@ -68,8 +68,8 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   const af = read("src/store/autoFill.ts");
   assert(af.includes("/.netlify/functions/auto-fill-match-result"), "posts to the auto-fill function");
   assert(af.includes("autoFill:lockout:"), "uses sessionStorage lockout key");
-  assert(af.includes("2 * 60 * 60 * 1000"), "uses 2h kickoff threshold");
-  assert(af.includes("5 * 60 * 1000"), "uses 5-minute lockout (no escalation)");
+  assert(af.includes("115 * 60 * 1000"), "uses 1h55m kickoff threshold (MIN_MATCH_AGE_MS)");
+  assert(/LOCKOUT_MS = 60 \* 1000/.test(af), "uses 60-second retry lockout (no escalation)");
   assert(af.includes("autoFillEnabled === false"), "honours the kill switch client-side");
   assert(/Bearer\s*\$\{idToken\}/.test(af), "sends a Firebase ID token");
   assert(!/homeScore|awayScore|advancingTeam/.test(af), "client never sends scores/advancing");
@@ -99,10 +99,17 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(fn.includes("autoFillLog"), "function writes the audit log");
   assert(fn.includes('source: "auto"'), "write shape uses source=auto");
   assert(!fn.includes("verifiedBy"), "no verifiedBy approval field in write shape");
-  assert(fn.includes('sourcesUsed: ["football-data"]'), "records sourcesUsed (single source)");
+  assert(fn.includes("sourcesUsed: [result.name]"), "records the source that actually decided");
   assert(/source === "admin"/.test(fn), "never overwrites an admin-owned result");
-  // Single-source mode: football-data only.
-  assert(fn.includes("decideSingleSource"), "function uses single-source decision");
+  // ESPN (real-time) PRIMARY with football-data FALLBACK; each source is
+  // judged by the same single-source decision rules.
+  assert(fn.includes("decideSingleSource"), "function uses single-source decision per source");
+  assert(/fetchEspn/.test(fn) && /fetchFootballData/.test(fn),
+    "function tries ESPN then falls back to football-data");
+  assert(/notFound === true/.test(fn),
+    "ESPN coverage gap (notFound) also falls back to football-data (not retried forever)");
+  assert(/AUTO_FILL_SOURCE/.test(fn), "AUTO_FILL_SOURCE env can force a single source");
+  assert(/MIN_MATCH_AGE_MS = 115 \* 60 \* 1000/.test(fn), "server gate is 1h55m (lockstep with client)");
   assert(!fn.includes("fetchApiSports"), "function does not call api-sports");
   // PII: never write a raw (possibly phone_05XXXXXXXX) uid into the
   // auth-readable matchResults doc.
