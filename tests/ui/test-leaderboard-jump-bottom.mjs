@@ -100,8 +100,8 @@ assert(
 );
 // It must reveal the whole list (defeating pagination) before scrolling.
 assert(
-  /setShowCount\(list\.length\)/.test(lb) || /setShowCount\(filteredLeaderboard\.length\)/.test(lb),
-  "jumpToBottom expands showCount to the full list length",
+  /setShowCount\((displayed|filtered)Leaderboard\.length\)/.test(lb),
+  "jumpToBottom expands showCount to the full (displayed) list length",
 );
 assert(
   /preferredScrollBehavior\(\)/.test(lb),
@@ -134,14 +134,14 @@ assert(
 // Floating button only on the list view (not the form detail), not in the
 // embedded admin preview, and only when the list is actually paginated.
 assert(
-  /!embedded && !selectedForm && filteredLeaderboard\.length > PAGE_SIZE && \(\s*<ScrollToBottomButton onClick=\{jumpToBottom\} \/>/.test(lb),
+  /!embedded && !selectedForm && displayedLeaderboard\.length > PAGE_SIZE && \(\s*<ScrollToBottomButton onClick=\{jumpToBottom\} \/>/.test(lb),
   "ScrollToBottomButton renders only on the paginated list view (not embedded, not form detail)",
 );
 
 // --- 4. Inline "show all" button -----------------------------------------
 
 assert(
-  /setShowCount\(filteredLeaderboard\.length\)/.test(lb),
+  /setShowCount\(displayedLeaderboard\.length\)/.test(lb),
   "an inline button loads the entire list in one tap (setShowCount to full length)",
 );
 assert(

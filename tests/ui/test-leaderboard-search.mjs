@@ -58,21 +58,27 @@ assert(
 );
 
 // --- Filtered list is what's rendered (regression lock so the search isn't dead UI) ---
+// `displayedLeaderboard` is the search-filtered list with the sort/mine-only
+// controls applied on top (#7); it derives from filteredLeaderboard.
 assert(
-  /filteredLeaderboard\.slice\(0,\s*showCount\)\.map/.test(src),
-  "render path uses filteredLeaderboard, not rankedLeaderboard",
+  /displayedLeaderboard\.slice\(0,\s*showCount\)\.map/.test(src),
+  "render path uses the search-filtered (displayed) list, not rankedLeaderboard",
+);
+assert(
+  /const displayedLeaderboard[\s\S]{0,400}?filteredLeaderboard/.test(src),
+  "displayed list derives from the search-filtered list",
 );
 
-// --- The "show more" CTA + remaining counter must reference the FILTERED length,
-// not the full leaderboard, otherwise the user sees "show 20 more" while there
-// are 0 more matches in their query.
+// --- The "show more" CTA + remaining counter must reference the displayed
+// length, not the full leaderboard, otherwise the user sees "show 20 more"
+// while there are 0 more matches in their query.
 assert(
-  /showCount\s*<\s*filteredLeaderboard\.length/.test(src),
-  "show-more CTA gates on filteredLeaderboard.length",
+  /showCount\s*<\s*displayedLeaderboard\.length/.test(src),
+  "show-more CTA gates on the displayed-list length",
 );
 assert(
-  /filteredLeaderboard\.length\s*-\s*showCount/.test(src),
-  "remaining counter subtracts showCount from filteredLeaderboard.length",
+  /displayedLeaderboard\.length\s*-\s*showCount/.test(src),
+  "remaining counter subtracts showCount from the displayed-list length",
 );
 
 // --- The entry auto-scroll was removed entirely (the page always opens at
