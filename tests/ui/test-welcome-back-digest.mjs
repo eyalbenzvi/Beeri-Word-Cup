@@ -22,12 +22,16 @@ const d = readMigratedSrc("src/components/WelcomeBackDigest.jsx");
 assert(/beeri:home:lastSeen/.test(d), "uses its own home-visit snapshot key");
 assert(!/beeri:prevRanks/.test(d), "does NOT reuse the Leaderboard prevRanks snapshot");
 
-// Deltas
+// New-results delta since last visit.
 assert(/resultsCount\s*-\s*prev\.resultsCount/.test(d), "computes new-results delta since last visit");
-assert(/prev\.bestRank\s*-\s*bestRank|prev\.bestRank != null \? prev\.bestRank - bestRank/.test(d), "computes rank movement (prev - current)");
+
+// Rank movement is intentionally NOT shown here — ScoreStrip owns rank, so the
+// home page never stacks multiple rank numbers.
+assert(!/bestRank/.test(d), "does NOT show a rank delta (ScoreStrip is the single rank source)");
+assert(!/useLeaderboardComputed/.test(d), "no leaderboard computation needed (results count only)");
 
 // Hide when there's nothing to report / first visit / guest.
-assert(/if \(newResults === 0 && rankDelta === 0\) return null/.test(d), "renders nothing when no change");
+assert(/if \(newResults === 0\) return null/.test(d), "renders nothing when there are no new results");
 assert(/!prev/.test(d), "shows nothing on the very first visit (no snapshot to compare)");
 assert(/!user\?\.id/.test(d), "guests / form-less users see nothing");
 
