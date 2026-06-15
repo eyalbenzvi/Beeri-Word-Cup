@@ -2,20 +2,20 @@
 //
 // The client never sends scores. It only notices — during normal
 // computations (scoring, bracket, the matchResults listener) — that some
-// match kicked off >= 2h ago and still has no result, and asks the server to
-// go fetch + verify the real score from two independent public football APIs.
+// match kicked off >= 1h55m ago and still has no result, and asks the server
+// to go fetch + verify the real score (ESPN real-time, football-data fallback).
 // The server is the sole authority for kickoff time, expected teams, and the
 // score itself (see netlify/functions/auto-fill-match-result.js).
 //
 // Design (must stay cheap + non-blocking; returns immediately in the common
 // case):
 //   a. settings.autoFillEnabled === false  -> short-circuit (kill switch).
-//   b. pick the EARLIEST match with !played && now >= kickoff + 2h.
+//   b. pick the EARLIEST match with !played && now >= kickoff + 1h55m.
 //   c. none -> return.
-//   d. sessionStorage lockout "autoFill:lockout:<matchId>" within 5 min -> return.
+//   d. sessionStorage lockout "autoFill:lockout:<matchId>" within 60s -> return.
 //   e. module-level in-flight set already has this matchId -> return.
 //   f. POST { matchId } + Firebase ID token, fire-and-forget.
-//   g. any non-success -> set 5-minute sessionStorage lockout (no escalation).
+//   g. any non-success -> set 60-second sessionStorage lockout (no escalation).
 //   h. success -> clear the lockout; the Firestore listener propagates the row.
 
 import { cache } from "./cache";
@@ -23,11 +23,21 @@ import { auth } from "./firestoreClient";
 import { ALL_MATCHES } from "../data/matches";
 import { getMatchKickoffUTC } from "../utils/matchTime";
 
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-const LOCKOUT_MS = 5 * 60 * 1000;
+// Minimum age since kickoff before we ask the server to record a result.
+// 1h55m: opens right as a regular-time match ends (90' + HT + stoppage ≈
+// 1h50m). MUST match the server gate (MIN_MATCH_AGE_MS in
+// netlify/functions/auto-fill-match-result.js) — a looser client value just
+// gets 425 back.
+const MIN_MATCH_AGE_MS = 115 * 60 * 1000;
+// Per-match retry cooldown after a non-200 (pending/ambiguous/not-finished).
+// 60s: with the real-time ESPN source the final score exists within seconds of
+// the whistle, so retrying each minute caps "whistle -> result written" at
+// ~1 min. This is the knob that governs result freshness.
+const LOCKOUT_MS = 60 * 1000;
 // Coarse throttle so the scan doesn't run on every keystroke-driven recompute.
-// The sessionStorage lockout + in-flight set already prevent duplicate network
-// calls; this just keeps the (cheap) 104-match scan off the hot path.
+// NOT a freshness knob (the scan does no network/Firestore I/O); it only keeps
+// the cheap 104-match scan off the hot path. The lockout above is what bounds
+// latency, so this stays at 5s (lowering it costs CPU for no freshness gain).
 const SCAN_THROTTLE_MS = 5000;
 
 const inFlight = new Set<string>();
@@ -66,7 +76,7 @@ function clearLockout(matchId: string) {
 }
 
 // Find the earliest (by kickoff) match that has no recorded result yet and
-// whose kickoff was at least 2h ago.
+// whose kickoff was at least MIN_MATCH_AGE_MS (1h55m) ago.
 function findEarliestMissingPastMatch(now: number) {
   const results = cache.matchResults || {};
   let target: { id: string } | null = null;
@@ -76,7 +86,7 @@ function findEarliestMissingPastMatch(now: number) {
     if (existing?.played) continue;
     const kickoff = getMatchKickoffUTC(m);
     if (kickoff == null) continue; // placeholder knockout rows w/o date/time
-    if (now < kickoff + TWO_HOURS_MS) continue;
+    if (now < kickoff + MIN_MATCH_AGE_MS) continue;
     if (kickoff < targetKickoff) {
       targetKickoff = kickoff;
       target = m;
@@ -112,7 +122,7 @@ async function fireAutoFill(matchId: string) {
       clearLockout(matchId);
     } else {
       // 202 (pending/ambiguous/disagree), 409 (locked), 425 (too early),
-      // 429 (rate limit), 5xx — single 5-minute lockout, no escalation.
+      // 429 (rate limit), 5xx — single 60-second lockout, no escalation.
       setLockout(matchId);
     }
   } catch {

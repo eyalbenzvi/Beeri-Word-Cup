@@ -1,11 +1,12 @@
 // Auto-fill a real match result, server-side and authoritatively.
 //
 // The client only sends { matchId }. This function is the SOLE authority for:
-//   - kickoff time + the 2h-since-kickoff gate,
+//   - kickoff time + the 1h55m-since-kickoff gate,
 //   - the expected team codes (group: from the schedule; knockout: derived
 //     from the canonical bracket over the existing results),
 //   - whether a result already exists / is admin-owned,
-//   - the score values (fetched + cross-verified from two public APIs).
+//   - the score values: fetched from ESPN (real-time PRIMARY) with a
+//     football-data FALLBACK, always recording the END-OF-90-MINUTES score.
 //
 // It writes via firebase-admin (bypassing security rules); matchResults write
 // rules stay isAdmin-only. Every attempt is audited.
@@ -16,6 +17,7 @@
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
 import { decideSingleSource } from "./_sources/consensus.js";
+import { fetchMatchResult as fetchEspn } from "./_sources/espnResult.js";
 import { fetchMatchResult as fetchFootballData } from "./_sources/footballData.js";
 import { getMatchById } from "../../src/data/matches.js";
 import { getMatchKickoffUTC } from "../../src/utils/matchTime.js";
@@ -45,7 +47,12 @@ function getCorsHeaders(event) {
   };
 }
 
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+// Minimum age (since kickoff) before we attempt to record an official result.
+// 1h55m: a regular-time match is ~1h50m of wall-clock (90' + 15' HT + stoppage),
+// so this opens the gate right as a regular-time match ends without firing
+// while it is still live. Must stay in lockstep with the client gate in
+// src/store/autoFill.ts (a looser client gate just gets 425 here).
+const MIN_MATCH_AGE_MS = 115 * 60 * 1000;
 const LOCK_TTL_MS = 60 * 1000;
 
 // In-memory per-uid rate limit: 30 requests / minute. Approximate across warm
@@ -191,12 +198,12 @@ async function autoFillHandler(event) {
   const match = getMatchById(matchId);
   if (!match) return json(400, headers, { error: "Unknown matchId" });
 
-  // --- Kickoff + 2h gate (server-authoritative) ---
+  // --- Kickoff + 1h55m gate (server-authoritative) ---
   const kickoff = getMatchKickoffUTC(match);
   if (kickoff == null) {
     return json(400, headers, { error: "Cannot determine kickoff time" });
   }
-  if (Date.now() < kickoff + TWO_HOURS_MS) {
+  if (Date.now() < kickoff + MIN_MATCH_AGE_MS) {
     return json(425, headers, { error: "Too early" });
   }
   const kickoffIso = new Date(kickoff).toISOString();
@@ -257,14 +264,49 @@ async function autoFillHandler(event) {
 
   try {
     const fetchArgs = { fifaMatch: match.fifaMatch, homeTeam, awayTeam, kickoffIso };
-    // Single-source mode: football-data only. It handles its own single retry
-    // and never throws (returns { error:true }).
-    const fd = await fetchFootballData(fetchArgs)
-      .catch((e) => ({ name: "football-data", error: true, reason: e?.message }));
-
     const expected = { matchId, isKnockout, homeTeam, awayTeam };
-    const consensus = decideSingleSource(expected, fd);
-    const sources = [sourceSummary(fd)];
+    // PRIMARY = ESPN (real-time). FALLBACK = football-data (delayed free tier).
+    // AUTO_FILL_SOURCE env forces one: "espn" / "fd" / unset = ESPN then FD.
+    const srcEnv = process.env.AUTO_FILL_SOURCE;
+    const tryEspn = srcEnv !== "fd";
+    const tryFd = srcEnv !== "espn";
+
+    let result = null;
+    let consensus = null;
+    const sources = [];
+
+    if (tryEspn) {
+      result = await fetchEspn(fetchArgs)
+        .catch((e) => ({ name: "espn", error: true, reason: e?.message }));
+      consensus = decideSingleSource(expected, result);
+      sources.push(sourceSummary(result));
+    }
+    // Fall back to football-data when ESPN is unusable — UNREACHABLE (error),
+    // FINISHED-BUT-CANNOT-ISOLATE-90' (ambiguous; e.g. extra time without a
+    // per-period breakdown), or the fixture is ABSENT from ESPN's feed
+    // (notFound -> a coverage gap, e.g. a renamed league slug). A genuine
+    // "not-finished" verdict for a fixture ESPN *does* list is real-time truth
+    // and does NOT trigger the (slower) FD call. Also the sole path when
+    // AUTO_FILL_SOURCE === "fd".
+    if (
+      tryFd &&
+      (!consensus ||
+        consensus.decision === "error" ||
+        consensus.decision === "ambiguous" ||
+        result?.notFound === true)
+    ) {
+      const fd = await fetchFootballData(fetchArgs)
+        .catch((e) => ({ name: "football-data", error: true, reason: e?.message }));
+      const fdConsensus = decideSingleSource(expected, fd);
+      sources.push(sourceSummary(fd));
+      // Adopt FD when ESPN gave nothing usable, or FD actually resolved the
+      // result (e.g. isolated the 90' score ESPN couldn't). Otherwise keep
+      // ESPN's verdict (it's the real-time primary).
+      if (!result || consensus.decision === "error" || fdConsensus.decision === "agreed") {
+        result = fd;
+        consensus = fdConsensus;
+      }
+    }
 
     if (consensus.decision !== "agreed") {
       // Don't log the common, benign "not-finished" case — before a match ends
@@ -318,7 +360,7 @@ async function autoFillHandler(event) {
       // leak the project's PII migration is closing. Redact phone uids; the
       // full uid is still recorded in the admin-only autoFillLog audit.
       autoFilledBy: uid.startsWith("phone_") ? "phone_user" : uid,
-      sourcesUsed: ["football-data"],
+      sourcesUsed: [result.name],
       updatedAt: nowIso,
     };
 

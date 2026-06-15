@@ -237,9 +237,18 @@ assert(/available:\s*false/.test(src), "degrades to available:false");
 assert(/stale:\s*true/.test(src), "serves last payload flagged stale on upstream failure");
 assert(!/statusCode:\s*500/.test(src), "never returns 500 (nicety, not a dependency)");
 
-// Timeout discipline (Netlify 10s budget)
-assert(/FETCH_TIMEOUT_MS\s*=\s*3500/.test(src), "3.5s upstream timeout");
-assert(/AbortController/.test(src), "abortable fetch");
+// Timeout discipline (Netlify 10s budget) — now lives in the shared http.js,
+// reused by every source client (de-duplicated).
+{
+  const http = fs.readFileSync(
+    "/home/user/Beeri-World-Cup/netlify/functions/_sources/http.js", "utf8");
+  assert(/3500/.test(http), "shared http.js: 3.5s default timeout");
+  assert(/AbortController/.test(http), "shared http.js: abortable fetch");
+  assert(/from "\.\/_sources\/http\.js"/.test(src),
+    "endpoint imports the shared getJson/dayWindow (no duplicate copy)");
+  assert(!/new AbortController\(\)/.test(src),
+    "endpoint no longer hand-rolls its own fetch (dedup)");
+}
 
 // Honest freshness for clients (CDN hits still expose data age)
 assert(/fetchedAt/.test(src), "payload embeds fetchedAt");
