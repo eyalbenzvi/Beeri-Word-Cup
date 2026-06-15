@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmModal";
+import { TeamModalProvider } from "./components/TeamModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Spinner from "./components/Spinner";
 import Home from "./pages/Home";
@@ -217,7 +218,9 @@ function App() {
       <NavigationProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <AppContent />
+            <TeamModalProvider>
+              <AppContent />
+            </TeamModalProvider>
           </ConfirmProvider>
         </ToastProvider>
       </NavigationProvider>

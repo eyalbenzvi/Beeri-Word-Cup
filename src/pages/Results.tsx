@@ -9,12 +9,26 @@ import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { getCachedBracket } from "../utils/bracketCache";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
+import ClickableName from "../components/ClickableName";
+import { useTeamModal } from "../components/TeamModal";
 import StageSelector from "../components/StageSelector";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 
 function getStageContextLabel(match) {
   return match.stage === "group" ? `בית ${match.group}` : STAGES[match.stage];
+}
+
+function TeamNameCell({ team, code, className }: { team: any; code: string | null; className: string }) {
+  const openTeam = useTeamModal();
+  if (!team) {
+    return <span className={`${className} text-ink-light italic`}>טרם נקבע</span>;
+  }
+  return (
+    <ClickableName onClick={() => openTeam(code as string)} className={`${className} text-ink`} title={`פרטי ${team.name}`}>
+      {team.name}
+    </ClickableName>
+  );
 }
 
 function ResultMatchCard({ match, result, bracketTeams, chronological }) {
@@ -61,17 +75,13 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
       {result ? (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {homeTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
             <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
               {result.homeScore}
             </span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {awayTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
             <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
               {result.awayScore}
             </span>
@@ -89,15 +99,11 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
       ) : (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {homeTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
             <span className="text-sm text-ink-light">–</span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {awayTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
             <span className="text-sm text-ink-light">–</span>
           </div>
         </div>

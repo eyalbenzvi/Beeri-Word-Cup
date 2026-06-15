@@ -5,6 +5,8 @@ import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers"
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import MatchAnalysis from "./MatchAnalysis";
 import Score from "./Score";
+import ClickableName from "./ClickableName";
+import { useTeamModal } from "./TeamModal";
 
 // Upper bound on a score input. 20 is well above any realistic football
 // scoreline; the cap exists to defend against runaway typing / paste of giant
@@ -71,6 +73,7 @@ function MatchCard({
   isKnockout?: boolean;
   importance?: "group" | "knockout" | "showcase";
 }) {
+  const openTeam = useTeamModal();
   const homeInputRef = useRef(null);
   const awayInputRef = useRef(null);
   const [justSaved, setJustSaved] = useState(false);
@@ -227,7 +230,13 @@ function MatchCard({
           <div
             className={`${nameStyles[importance]} ${homeTeam ? "text-ink" : "text-ink-muted italic"}`}
           >
-            <bdi>{homeName}</bdi>
+            {homeTeam && !editable ? (
+              <ClickableName onClick={() => openTeam(homeCode)} title={`פרטי ${homeName}`}>
+                <bdi>{homeName}</bdi>
+              </ClickableName>
+            ) : (
+              <bdi>{homeName}</bdi>
+            )}
           </div>
         </div>
 
@@ -329,7 +338,13 @@ function MatchCard({
           <div
             className={`${nameStyles[importance]} ${awayTeam ? "text-ink" : "text-ink-muted italic"}`}
           >
-            <bdi>{awayName}</bdi>
+            {awayTeam && !editable ? (
+              <ClickableName onClick={() => openTeam(awayCode)} title={`פרטי ${awayName}`}>
+                <bdi>{awayName}</bdi>
+              </ClickableName>
+            ) : (
+              <bdi>{awayName}</bdi>
+            )}
           </div>
         </div>
       </div>

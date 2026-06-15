@@ -12,6 +12,7 @@ import { useConfirm } from "./ConfirmModal";
 import ExportFormButtons from "./ExportFormButtons";
 import FormAvatar from "./FormAvatar";
 import FormSummaryLines from "./FormSummaryLines";
+import ClickableName from "./ClickableName";
 import EmptyState from "./EmptyState";
 import StatusOnboarding from "./StatusOnboarding";
 import { LOCK_MESSAGES } from "../constants/messages";
@@ -164,7 +165,12 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
                 <FormAvatar form={form} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="font-extrabold text-base truncate text-ink">
-                    {form.formName || "טופס ללא שם"}
+                    <ClickableName
+                      onClick={() => navigate("predict", { form: form.formId })}
+                      title={`פתח את ${form.formName || "הטופס"}`}
+                    >
+                      {form.formName || "טופס ללא שם"}
+                    </ClickableName>
                   </div>
                   <FormSummaryLines championName={championName} topScorerName={topScorerName} />
                 </div>

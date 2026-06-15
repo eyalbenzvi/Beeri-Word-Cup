@@ -17,6 +17,8 @@ import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
+import type { Voter } from "../utils/matchPredictionStats";
+import ClickableName from "../components/ClickableName";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
@@ -69,10 +71,12 @@ function StatCard({ title, icon, children }) {
   );
 }
 
-// Scrollable list of form names behind a given result/outcome. Used by the
-// accordion panels in MatchPredictions so users can see WHO predicted each one.
-function VoterList({ names }: { names: string[] }) {
-  if (!names || names.length === 0) {
+// Scrollable list of the forms behind a given result/outcome. Used by the
+// accordion panels in MatchPredictions so users can see WHO predicted each one
+// — and tap a form to jump straight to its full view in the leaderboard.
+function VoterList({ voters }: { voters: Voter[] }) {
+  const { navigate } = useNavigation();
+  if (!voters || voters.length === 0) {
     return (
       <p className="text-xs text-ink-muted text-center py-2 font-bold">
         אין נתונים
@@ -81,13 +85,19 @@ function VoterList({ names }: { names: string[] }) {
   }
   return (
     <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pl-1">
-      {names.map((name, i) => (
+      {voters.map((v, i) => (
         <div
-          key={`${name}-${i}`}
+          key={`${v.formId}-${i}`}
           className="text-xs rounded-lg px-3 py-1.5 border border-border text-right font-bold text-ink"
           style={{ background: "var(--color-bg-soft)" }}
         >
-          {name || "טופס ללא שם"}
+          {v.formId ? (
+            <ClickableName onClick={() => navigate("leaderboard", { form: v.formId })}>
+              {v.name || "טופס ללא שם"}
+            </ClickableName>
+          ) : (
+            v.name || "טופס ללא שם"
+          )}
         </div>
       ))}
     </div>
@@ -102,7 +112,7 @@ function VoterBarList({
   items,
   total,
 }: {
-  items: { key: string; label: string; voters: string[]; color?: string }[];
+  items: { key: string; label: string; voters: Voter[]; color?: string }[];
   total: number;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -132,7 +142,7 @@ function VoterBarList({
                 />
               </div>
             </button>
-            {open && <VoterList names={item.voters} />}
+            {open && <VoterList voters={item.voters} />}
           </div>
         );
       })}
@@ -283,13 +293,13 @@ function MatchPredictions({ forms }) {
             </button>
           </div>
           {expanded === "outcome:home" && (
-            <VoterList names={matchStats.outcomeVoters.home} />
+            <VoterList voters={matchStats.outcomeVoters.home} />
           )}
           {expanded === "outcome:draw" && (
-            <VoterList names={matchStats.outcomeVoters.draw} />
+            <VoterList voters={matchStats.outcomeVoters.draw} />
           )}
           {expanded === "outcome:away" && (
-            <VoterList names={matchStats.outcomeVoters.away} />
+            <VoterList voters={matchStats.outcomeVoters.away} />
           )}
 
           {/* Average goals */}
@@ -333,7 +343,7 @@ function MatchPredictions({ forms }) {
                         />
                       </div>
                     </button>
-                    {open && <VoterList names={matchStats.scoreVoters[score] || []} />}
+                    {open && <VoterList voters={matchStats.scoreVoters[score] || []} />}
                   </div>
                 );
               })}
@@ -349,12 +359,12 @@ function MatchPredictions({ forms }) {
 function ChampionStats({ forms }) {
   const items = useMemo(() => {
     // Track the voters per champion so each bar can reveal who predicted it.
-    const voters: Record<string, string[]> = {};
+    const voters: Record<string, Voter[]> = {};
     forms.forEach((f) => {
       const champ = getCachedChampion(f.matches || {});
       if (champ) {
         const name = getTeamByCode(champ)?.name || champ;
-        (voters[name] ||= []).push(f.formName || "טופס ללא שם");
+        (voters[name] ||= []).push({ formId: f.formId || "", name: f.formName || "טופס ללא שם" });
       }
     });
     return Object.entries(voters)
@@ -384,12 +394,12 @@ function TopScorerStats({ forms, playerList }) {
   const items = useMemo(() => {
     // Group by canonical Hebrew label so legacy English values merge with new
     // Hebrew ones, and track the voters so each bar can reveal who predicted it.
-    const voters: Record<string, string[]> = {};
+    const voters: Record<string, Voter[]> = {};
     forms.forEach((f) => {
       const ts = f.topScorer?.trim();
       if (!ts) return;
       const display = getPlayerDisplayName(ts, playerList) || ts;
-      (voters[display] ||= []).push(f.formName || "טופס ללא שם");
+      (voters[display] ||= []).push({ formId: f.formId || "", name: f.formName || "טופס ללא שם" });
     });
     return Object.entries(voters)
       .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))

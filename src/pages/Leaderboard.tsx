@@ -10,6 +10,7 @@ import {
   useSettings,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
+import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
@@ -71,9 +72,27 @@ export default function Leaderboard({
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
-  const [selectedForm, setSelectedForm] = useState<string | null>(null);
+  const { params, setParamsPatch } = useNavigation();
+  const [selectedForm, setSelectedForm] = useState<string | null>(
+    embedded ? null : params?.form || null,
+  );
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Deep-link support: arriving with ?form=<id> (e.g. tapping a form name in
+  // the Stats voter lists) opens that form's detail view. Skipped in the
+  // embedded admin preview so an unrelated URL param can't hijack it.
+  useEffect(() => {
+    if (embedded) return;
+    if (params?.form) setSelectedForm(params.form);
+  }, [params?.form, embedded]);
+
+  // Closing the detail also clears the URL param, so Back/refresh return to
+  // the ranked list rather than re-opening the form.
+  const closeForm = () => {
+    setSelectedForm(null);
+    if (!embedded && params?.form) setParamsPatch({ form: null });
+  };
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
@@ -251,7 +270,7 @@ export default function Leaderboard({
     return (
       <div className="mt-4">
         <button
-          onClick={() => setSelectedForm(null)}
+          onClick={closeForm}
           className="text-sm text-secondary mb-3 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
         >
           <ArrowRight size={16} aria-hidden="true" />
