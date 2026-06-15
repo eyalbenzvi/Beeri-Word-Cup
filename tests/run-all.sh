@@ -164,6 +164,7 @@ run_test "97. Dark Mode (theme tokens, no-FOUC, toggle wiring)" "ui/test-dark-mo
 run_test "98. Leaderboard Sort & Filter (sort metrics + mine-only)" "ui/test-leaderboard-sort-filter.mjs" "no"
 run_test "99. Match Consensus (crowd line on Results, pre-lock guard)" "data/test-consensus-map.mjs" "yes"
 run_test "100. Welcome-Back Digest (since-last-visit deltas on Home)" "ui/test-welcome-back-digest.mjs" "no"
+run_test "101. Achievements (badge derivation + streak + wiring)" "scoring/test-achievements.mjs" "yes"
 
 echo ""
 echo "==========================================="

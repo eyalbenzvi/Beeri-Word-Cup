@@ -23,6 +23,7 @@ import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../uti
 import { preferredScrollBehavior } from "../utils/helpers";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
+import AchievementBadges from "../components/AchievementBadges";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
 
@@ -320,6 +321,8 @@ export default function Leaderboard({
             <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
         </div>
+
+        <AchievementBadges scored={scored} />
 
         {Object.values(score.advancingPoints).some((v) => v > 0) && (
           <div className="card-duo mb-4 text-sm">
