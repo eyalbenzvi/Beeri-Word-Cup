@@ -52,18 +52,24 @@ assert(
   "home-win card toggles its voter accordion",
 );
 assert(
-  /expanded === "outcome:draw"[\s\S]{0,200}?VoterList names=\{matchStats\.outcomeVoters\.draw\}/.test(stats),
+  /expanded === "outcome:draw"[\s\S]{0,200}?VoterList voters=\{matchStats\.outcomeVoters\.draw\}/.test(stats),
   "draw accordion panel renders the draw voters",
 );
 assert(
-  /expanded === "outcome:away"[\s\S]{0,200}?VoterList names=\{matchStats\.outcomeVoters\.away\}/.test(stats),
+  /expanded === "outcome:away"[\s\S]{0,200}?VoterList voters=\{matchStats\.outcomeVoters\.away\}/.test(stats),
   "away accordion panel renders the away voters",
 );
 
 // Popular-score bars are clickable and render their voter list when open.
 assert(
-  /VoterList names=\{matchStats\.scoreVoters\[score\]/.test(stats),
+  /VoterList voters=\{matchStats\.scoreVoters\[score\]/.test(stats),
   "popular-score rows expand to the voters who predicted that score",
+);
+
+// Voter form names deep-link to the form's view via ClickableName + navigate.
+assert(
+  /ClickableName[\s\S]{0,120}?navigate\("leaderboard", \{ form: v\.formId \}\)/.test(stats),
+  "voter form names link to that form in the leaderboard",
 );
 
 // aria-expanded for accessibility on every toggle (3 outcomes + scores).
@@ -76,7 +82,7 @@ assert(
 
 // Shared clickable-bar component drives both team breakdowns.
 assert(
-  /function VoterBarList/.test(stats) && /<VoterList names=\{item\.voters\}/.test(stats),
+  /function VoterBarList/.test(stats) && /<VoterList voters=\{item\.voters\}/.test(stats),
   "VoterBarList renders clickable bars that expand to their voters",
 );
 

@@ -501,7 +501,7 @@ export default function SimulatorPanel({
         ) : (
           <>
         {highlightUserId && userRank && userRank.rank > leaderboardLimit && (
-          <div className="mb-2 text-xs border-2 border-secondary/40 rounded-xl px-2 py-1 font-bold" style={{ background: "#F0F9FF", color: "var(--color-secondary-dark)" }}>
+          <div className="mb-2 text-xs border-2 border-secondary/40 rounded-xl px-2 py-1 font-bold" style={{ background: "var(--color-secondary-soft)", color: "var(--color-secondary-dark)" }}>
             המקום שלך: <strong>{userRank.rank}</strong> —{" "}
             {userRank.entry.formName} ({userRank.entry.totalPoints} נק׳)
           </div>

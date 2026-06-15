@@ -60,6 +60,7 @@
   --color-accent-soft: #FFF8E1;
   --color-accent-soft-2: #FFF3D6;
   --color-danger-soft: #FFF1F1;
+  --color-secondary-soft: #F0F9FF;
 
   /* Brand partners */
   --color-whatsapp: #25D366;
@@ -84,6 +85,55 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* --------- Dark mode ---------
+   Tailwind v4 colour utilities resolve to `var(--color-*)` at runtime, so
+   re-pointing the custom properties under `html.dark` re-themes the whole app
+   in one place. Brand hues (green/blue/orange/danger/medals) are kept — they
+   read well on dark — while surfaces, ink and the *-soft panels invert. The
+   handful of component classes that hard-code white (inputs, chips, ghost
+   buttons, header) are remapped to the card token just below, and Tailwind's
+   built-in `bg-white` utility (used as a surface across the app) is remapped
+   too. Activated by toggling the `dark` class on <html> (see useTheme). */
+html.dark {
+  color-scheme: dark;
+
+  --color-ink: #ECECEC;
+  --color-ink-muted: #B6B6B6;
+  --color-ink-light: #8C8C8C;
+
+  --color-bg: #16181C;
+  --color-bg-soft: #22252B;
+  --color-card: #1E2127;
+  --color-card-hover: #282C33;
+  --color-border: #363A42;
+  --color-border-strong: #4A4F59;
+
+  /* Soft accent panels: dark brand tints with lightened paired text so the
+     existing `text-accent-text` / `text-primary-dark` combos stay legible. */
+  --color-primary-soft: #16320E;
+  --color-accent-soft: #33260A;
+  --color-accent-soft-2: #2C2008;
+  --color-accent-text: #E8A33D;
+  --color-danger-soft: #3A1717;
+  --color-secondary-soft: #14283A;
+}
+
+/* Hard-coded white surfaces → card token in dark mode. Kept as explicit
+   overrides (rather than editing each rule to use the var unconditionally) so
+   light mode renders byte-for-byte as before. */
+html.dark .input-duo,
+html.dark .score-input-duo,
+html.dark .btn-duo-ghost,
+html.dark .btn-duo-ghost-raised,
+html.dark .chip-duo,
+html.dark .header-duo,
+html.dark .header-gradient,
+html.dark .bg-white {
+  background-color: var(--color-card);
+}
+html.dark .input-duo:focus,
+html.dark .score-input-duo:focus { background-color: #1B2A33; }
 
 /* Heebo is visually tighter in Hebrew — use only for display headings */
 .font-heading, h1.font-heading, h2.font-heading, h3.font-heading {

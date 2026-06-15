@@ -10,6 +10,7 @@ import {
   useSettings,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
+import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
@@ -22,6 +23,10 @@ import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../uti
 import { preferredScrollBehavior } from "../utils/helpers";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
+import AchievementBadges from "../components/AchievementBadges";
+import RankTrendSparkline from "../components/RankTrendSparkline";
+import FormComparison from "../components/FormComparison";
+import { recordRanks } from "../utils/rankHistory";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
 
@@ -71,9 +76,40 @@ export default function Leaderboard({
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
   );
-  const [selectedForm, setSelectedForm] = useState<string | null>(null);
+  const { params, setParamsPatch } = useNavigation();
+  const [selectedForm, setSelectedForm] = useState<string | null>(
+    embedded ? null : params?.form || null,
+  );
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState("");
+  // Exploration controls (#7). Sorting re-orders the visible list by a chosen
+  // metric while every row keeps its OFFICIAL rank badge — so you can ask
+  // "who has the most exact scores?" without losing the standings context.
+  // "mineOnly" narrows to the signed-in user's own forms.
+  const [sortBy, setSortBy] = useState<"rank" | "exact" | "outcome">("rank");
+  const [mineOnly, setMineOnly] = useState(false);
+
+  // Deep-link support: arriving with ?form=<id> (e.g. tapping a form name in
+  // the Stats voter lists) opens that form's detail view. Skipped in the
+  // embedded admin preview so an unrelated URL param can't hijack it.
+  useEffect(() => {
+    if (embedded) return;
+    if (params?.form) {
+      setSelectedForm(params.form);
+      setComparing(false);
+    }
+  }, [params?.form, embedded]);
+
+  // Head-to-head comparison (#3) toggle for the open form detail.
+  const [comparing, setComparing] = useState(false);
+
+  // Closing the detail also clears the URL param, so Back/refresh return to
+  // the ranked list rather than re-opening the form.
+  const closeForm = () => {
+    setSelectedForm(null);
+    setComparing(false);
+    if (!embedded && params?.form) setParamsPatch({ form: null });
+  };
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
@@ -86,6 +122,15 @@ export default function Leaderboard({
     if (!user?.id) return [];
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
+
+  // Accumulate a local rank time-series for the user's own forms (#6). The
+  // util dedupes (records only on movement, or once/day for a stable rank), so
+  // this is safe to fire on every leaderboard recompute. Skipped in embedded
+  // admin preview.
+  useEffect(() => {
+    if (embedded || myForms.length === 0) return;
+    recordRanks(myForms.map((f) => ({ formId: f.formId, rank: f.rank })));
+  }, [myForms, embedded]);
 
   // Precomputed search haystack per form — built once whenever the
   // underlying data (users / brackets / predictions / lock state) changes,
@@ -146,13 +191,26 @@ export default function Leaderboard({
     });
   }, [searchQuery, rankedLeaderboard, searchHaystacks]);
 
+  // The list actually rendered: search filter → "mine only" → chosen sort.
+  // Sorting clones the array (never mutate the memoized source) and always
+  // tie-breaks by official rank for a stable, deterministic order.
+  const displayedLeaderboard = useMemo(() => {
+    let list = filteredLeaderboard;
+    if (mineOnly && user?.id) list = list.filter((e) => e.userId === user.id);
+    if (sortBy === "rank") return list;
+    const metric = sortBy === "exact" ? "exactScoreCount" : "outcomeCount";
+    return [...list].sort((a, b) => (b[metric] || 0) - (a[metric] || 0) || a.rank - b.rank);
+  }, [filteredLeaderboard, mineOnly, sortBy, user?.id]);
+
   // Smooth jump to a leaderboard row, expanding the page-size if the row
   // would otherwise be clipped behind "show more". Triggered ONLY by the
   // user-controlled "הטפסים שלך" jump chips — the page never scrolls on
   // its own (an entry auto-scroll used to live here and was removed:
   // landing mid-table disoriented users more than it helped).
   const jumpToForm = (formId: string) => {
-    const idx = rankedLeaderboard.findIndex((e) => e.formId === formId);
+    // Index within the CURRENTLY DISPLAYED list (search/sort/filter aware) so
+    // the page-size grows enough to reveal the targeted row in its real spot.
+    const idx = displayedLeaderboard.findIndex((e) => e.formId === formId);
     if (idx < 0) return;
     if (idx + 1 > showCount) {
       const grow = Math.ceil((idx + 1) / PAGE_SIZE) * PAGE_SIZE;
@@ -170,8 +228,8 @@ export default function Leaderboard({
   // jumpToForm, this only ever fires from a user gesture (the floating
   // ScrollToBottomButton), never from an effect.
   const jumpToBottom = () => {
-    if (filteredLeaderboard.length === 0) return;
-    setShowCount(filteredLeaderboard.length);
+    if (displayedLeaderboard.length === 0) return;
+    setShowCount(displayedLeaderboard.length);
     setTimeout(() => {
       // Scroll to the last *rendered* row by querying the DOM rather than a
       // formId captured at click time: a live Firestore update could reorder
@@ -251,16 +309,31 @@ export default function Leaderboard({
     return (
       <div className="mt-4">
         <button
-          onClick={() => setSelectedForm(null)}
+          onClick={closeForm}
           className="text-sm text-secondary mb-3 flex items-center gap-1 bg-transparent border-none cursor-pointer font-extrabold p-0 hover:text-secondary-dark"
         >
           <ArrowRight size={16} aria-hidden="true" />
           חזרה לטבלת הדירוג
         </button>
 
-        <h2 className="text-xl font-extrabold text-ink mb-2">
-          {predData.formName || "טופס ללא שם"}
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-xl font-extrabold text-ink">
+            {predData.formName || "טופס ללא שם"}
+          </h2>
+          {settings.predictionsLocked && rankedLeaderboard.length > 1 && (
+            <button
+              onClick={() => setComparing((v) => !v)}
+              aria-pressed={comparing}
+              className={`chip-duo shrink-0 ${comparing ? "active-blue" : ""}`}
+            >
+              ⚔️ השווה
+            </button>
+          )}
+        </div>
+
+        {comparing && (
+          <FormComparison formAId={selectedForm} onClose={() => setComparing(false)} />
+        )}
 
         <div className="card-duo mb-4 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-bg-soft rounded-xl p-3">
@@ -282,6 +355,10 @@ export default function Leaderboard({
             <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
         </div>
+
+        <RankTrendSparkline formId={selectedForm} />
+
+        <AchievementBadges scored={scored} />
 
         {Object.values(score.advancingPoints).some((v) => v > 0) && (
           <div className="card-duo mb-4 text-sm">
@@ -377,7 +454,7 @@ export default function Leaderboard({
                           ? "text-danger"
                           : "text-secondary"
                       }`}
-                      style={{ background: pts.wrongMatchup ? "var(--color-danger-soft)" : "#F0F9FF" }}
+                      style={{ background: pts.wrongMatchup ? "var(--color-danger-soft)" : "var(--color-secondary-soft)" }}
                     >
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}
@@ -533,8 +610,44 @@ export default function Leaderboard({
             </div>
           )}
 
+          {!embedded && rankedLeaderboard.length > 1 && (
+            <div className="card-duo mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold text-ink-muted">מיון:</span>
+              {[
+                { id: "rank", label: "דירוג" },
+                { id: "exact", label: LABELS.exactCount },
+                { id: "outcome", label: LABELS.outcomeCount },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    setSortBy(opt.id as "rank" | "exact" | "outcome");
+                    setShowCount(PAGE_SIZE);
+                  }}
+                  aria-pressed={sortBy === opt.id}
+                  className={`chip-duo ${sortBy === opt.id ? "active" : ""}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              {myForms.length > 0 && (
+                <button
+                  onClick={() => {
+                    setMineOnly((v) => !v);
+                    setShowCount(PAGE_SIZE);
+                  }}
+                  aria-pressed={mineOnly}
+                  className={`chip-duo ${mineOnly ? "active-blue" : ""}`}
+                  style={{ marginInlineStart: "auto" }}
+                >
+                  שלי בלבד
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {filteredLeaderboard.slice(0, showCount).map((entry) => {
+            {displayedLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
               const isTop3 = currentRank <= 3;
               const canView =
@@ -655,19 +768,19 @@ export default function Leaderboard({
               );
             })}
 
-            {showCount < filteredLeaderboard.length && (
+            {showCount < displayedLeaderboard.length && (
               <div className="mt-2 flex flex-col gap-2">
                 <button onClick={() => setShowCount(s => s + PAGE_SIZE)} className="btn-duo btn-duo-ghost btn-duo-cta">
-                  הצג {Math.min(PAGE_SIZE, filteredLeaderboard.length - showCount)} נוספים (נותרו {filteredLeaderboard.length - showCount})
+                  הצג {Math.min(PAGE_SIZE, displayedLeaderboard.length - showCount)} נוספים (נותרו {displayedLeaderboard.length - showCount})
                 </button>
                 {/* Load the entire remaining list in one tap — the
                     convenient path for browsing the tail of the table
                     instead of clicking "show more" repeatedly. */}
                 <button
-                  onClick={() => setShowCount(filteredLeaderboard.length)}
+                  onClick={() => setShowCount(displayedLeaderboard.length)}
                   className="btn-duo btn-duo-ghost text-sm"
                 >
-                  הצג את כולם ({filteredLeaderboard.length})
+                  הצג את כולם ({displayedLeaderboard.length})
                 </button>
               </div>
             )}
@@ -680,11 +793,15 @@ export default function Leaderboard({
               />
             )}
 
-            {leaderboard.length > 0 && filteredLeaderboard.length === 0 && (
+            {leaderboard.length > 0 && displayedLeaderboard.length === 0 && (
               <EmptyState
                 icon="🔍"
-                title="לא נמצאו טפסים תואמים"
-                description={`נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`}
+                title={mineOnly && !isSearching ? "אין לך טפסים בדירוג" : "לא נמצאו טפסים תואמים"}
+                description={
+                  mineOnly && !isSearching
+                    ? "בטל את הסינון \"שלי בלבד\" כדי לראות את כל הטפסים"
+                    : `נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`
+                }
               />
             )}
           </div>
@@ -696,7 +813,7 @@ export default function Leaderboard({
           so there's a real "bottom" worth a one-tap jump. Lives in the same
           corner as BackToTopButton but shows at the opposite scroll
           position, so the two are never visible together. */}
-      {!embedded && !selectedForm && filteredLeaderboard.length > PAGE_SIZE && (
+      {!embedded && !selectedForm && displayedLeaderboard.length > PAGE_SIZE && (
         <ScrollToBottomButton onClick={jumpToBottom} />
       )}
 

@@ -17,9 +17,14 @@ console.log("=== MATCH PREDICTION STATS UNIT TESTS ===\n");
 
 const MID = "m1";
 const form = (name, home, away) => ({
+  formId: `id-${name}`,
   formName: name,
   matches: { [MID]: { homeScore: home, awayScore: away } },
 });
+
+// Voters are now { formId, name } objects (so the UI can deep-link to a form).
+// These helpers keep the assertions reading like the original name-based ones.
+const names = (voters) => voters.map((v) => v.name).join();
 
 // ---- 1. Outcome buckets capture the right voters ----
 {
@@ -31,9 +36,11 @@ const form = (name, home, away) => ({
   ];
   const s = aggregateMatchPredictions(forms, MID);
   assert(s.preds === 4, "counts all 4 predictions");
-  assert(s.homeWin === 1 && s.outcomeVoters.home.join() === "Alice", "home-win voter is Alice");
-  assert(s.draw === 2 && s.outcomeVoters.draw.join() === "Bob,Dave", "draw voters are Bob,Dave");
-  assert(s.awayWin === 1 && s.outcomeVoters.away.join() === "Carol", "away-win voter is Carol");
+  assert(s.homeWin === 1 && names(s.outcomeVoters.home) === "Alice", "home-win voter is Alice");
+  assert(s.draw === 2 && names(s.outcomeVoters.draw) === "Bob,Dave", "draw voters are Bob,Dave");
+  assert(s.awayWin === 1 && names(s.outcomeVoters.away) === "Carol", "away-win voter is Carol");
+  // Each voter carries the form id so the UI can deep-link to it.
+  assert(s.outcomeVoters.home[0].formId === "id-Alice", "voter carries formId for deep-linking");
 }
 
 // ---- 2. Outcome counts equal voter-list lengths (single source of truth) ----
@@ -57,8 +64,8 @@ const form = (name, home, away) => ({
     form("C", 1, 2), // key "2-1"
   ];
   const s = aggregateMatchPredictions(forms, MID);
-  assert(s.scoreVoters["1-2"].join() === "A,B", "score 2-1 (away-home key 1-2) voters are A,B");
-  assert(s.scoreVoters["2-1"].join() === "C", "score 1-2 (away-home key 2-1) voter is C");
+  assert(names(s.scoreVoters["1-2"]) === "A,B", "score 2-1 (away-home key 1-2) voters are A,B");
+  assert(names(s.scoreVoters["2-1"]) === "C", "score 1-2 (away-home key 2-1) voter is C");
   // Sum of all score-voter lists equals total predictions.
   const total = Object.values(s.scoreVoters).reduce((n, v) => n + v.length, 0);
   assert(total === s.preds, "score voter lists sum to total predictions");
@@ -112,16 +119,16 @@ const form = (name, home, away) => ({
   // Forms that didn't predict THIS match are ignored.
   const mixed = [form("A", 1, 0), { formName: "B", matches: { other: { homeScore: 1, awayScore: 1 } } }];
   const s = aggregateMatchPredictions(mixed, MID);
-  assert(s.preds === 1 && s.outcomeVoters.home.join() === "A", "forms without this match are skipped");
+  assert(s.preds === 1 && names(s.outcomeVoters.home) === "A", "forms without this match are skipped");
 }
 
 // ---- 7. Missing form name falls back, never undefined in the list ----
 {
   const forms = [{ matches: { [MID]: { homeScore: 1, awayScore: 0 } } }];
   const s = aggregateMatchPredictions(forms, MID);
-  assert(s.outcomeVoters.home[0] === "טופס ללא שם", "missing formName falls back to placeholder");
+  assert(s.outcomeVoters.home[0].name === "טופס ללא שם", "missing formName falls back to placeholder");
   assert(
-    s.scoreVoters["0-1"][0] === "טופס ללא שם",
+    s.scoreVoters["0-1"][0].name === "טופס ללא שם",
     "missing formName placeholder also in score voters",
   );
 }

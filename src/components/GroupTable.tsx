@@ -2,8 +2,11 @@ import { useMemo, useRef, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { calcGroupStandings } from "../utils/bracket";
 import { preferredScrollBehavior } from "../utils/helpers";
+import { useTeamModal } from "./TeamModal";
+import ClickableName from "./ClickableName";
 
 export default function GroupTable({ matchData, group }) {
+  const openTeam = useTeamModal();
   const standings = useMemo(() => calcGroupStandings(matchData), [matchData]);
   const groupStandings = standings[group];
 
@@ -64,9 +67,17 @@ export default function GroupTable({ matchData, group }) {
                   {i + 1}
                 </td>
                 <td className="py-1.5">
-                  <span className="font-bold text-ink">
-                    {info?.name || "טרם נקבע"}
-                  </span>
+                  {info ? (
+                    <ClickableName
+                      onClick={() => openTeam(team.code)}
+                      className="font-bold text-ink"
+                      title={`פרטי ${info.name}`}
+                    >
+                      {info.name}
+                    </ClickableName>
+                  ) : (
+                    <span className="font-bold text-ink">טרם נקבע</span>
+                  )}
                 </td>
                 <td className="text-center py-1.5 text-ink-muted">
                   {team.played}

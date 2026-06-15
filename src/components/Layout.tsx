@@ -3,6 +3,7 @@ import { useCurrentUser } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import MenuOverlay from "./MenuOverlay";
 import DesktopSideNav from "./DesktopSideNav";
+import ThemeToggle from "./ThemeToggle";
 import { Menu, Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Newspaper } from "lucide-react";
 import { BLOG } from "../constants/messages";
 
@@ -71,35 +72,38 @@ export default function Layout({ children, rightRail = null }) {
               "active" indicator in landscape iPads. Desktop (xl+) uses
               DesktopSideNav. */}
 
-          {user ? (
-            <div className="flex items-center gap-1.5 xl:hidden">
-              <button
-                onClick={() => navigate("profile")}
-                className="bg-transparent border-none cursor-pointer p-0 flex items-center gap-2"
-                aria-label="פרופיל"
-              >
-                <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-sm font-extrabold text-white border-2 border-primary-dark">
-                  {(user.firstName || user.displayName || "?").charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm font-bold hidden lg:inline text-ink max-w-[80px] truncate">
-                  {user.displayName || "משתמש"}
-                </span>
-              </button>
-            </div>
-          ) : (
-            // Hide the header "התחבר" CTA on the home tab — the welcome
-            // screen renders its own auth panel directly below the
-            // header, so a second button right above it is redundant
-            // and creates two competing primary CTAs in the same view.
-            page !== "home" && (
-              <button
-                onClick={() => navigate("home")}
-                className="btn-duo btn-duo-primary btn-duo-sm xl:hidden"
-              >
-                התחבר
-              </button>
-            )
-          )}
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            {user ? (
+              <div className="flex items-center gap-1.5 xl:hidden">
+                <button
+                  onClick={() => navigate("profile")}
+                  className="bg-transparent border-none cursor-pointer p-0 flex items-center gap-2"
+                  aria-label="פרופיל"
+                >
+                  <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-sm font-extrabold text-white border-2 border-primary-dark">
+                    {(user.firstName || user.displayName || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-bold hidden lg:inline text-ink max-w-[80px] truncate">
+                    {user.displayName || "משתמש"}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              // Hide the header "התחבר" CTA on the home tab — the welcome
+              // screen renders its own auth panel directly below the
+              // header, so a second button right above it is redundant
+              // and creates two competing primary CTAs in the same view.
+              page !== "home" && (
+                <button
+                  onClick={() => navigate("home")}
+                  className="btn-duo btn-duo-primary btn-duo-sm xl:hidden"
+                >
+                  התחבר
+                </button>
+              )
+            )}
+          </div>
         </div>
       </header>
 
@@ -127,7 +131,7 @@ export default function Layout({ children, rightRail = null }) {
       </div>
 
       {/* Bottom nav — mobile/tablet only */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-border z-50 safe-area-bottom xl:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border z-50 safe-area-bottom xl:hidden">
         <div className="max-w-lg mx-auto flex">
           {allNavItems.map((item) => {
             const { Icon } = item;

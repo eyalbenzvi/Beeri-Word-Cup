@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, LayoutGrid } from "lucide-react";
-import { useMatchResults, useCurrentUser } from "../hooks/useStore";
+import { CalendarDays, LayoutGrid, GitBranch } from "lucide-react";
+import { useMatchResults, useCurrentUser, useAllPredictions, useSettings } from "../hooks/useStore";
+import { computeConsensusMap } from "../utils/matchPredictionStats";
+import { normalizeStatus } from "../utils/helpers";
+import MatchConsensusLine from "../components/MatchConsensusLine";
+import BracketView from "../components/BracketView";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
@@ -9,6 +13,8 @@ import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { getCachedBracket } from "../utils/bracketCache";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
+import ClickableName from "../components/ClickableName";
+import { useTeamModal } from "../components/TeamModal";
 import StageSelector from "../components/StageSelector";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
@@ -17,7 +23,19 @@ function getStageContextLabel(match) {
   return match.stage === "group" ? `בית ${match.group}` : STAGES[match.stage];
 }
 
-function ResultMatchCard({ match, result, bracketTeams, chronological }) {
+function TeamNameCell({ team, code, className }: { team: any; code: string | null; className: string }) {
+  const openTeam = useTeamModal();
+  if (!team) {
+    return <span className={`${className} text-ink-light italic`}>טרם נקבע</span>;
+  }
+  return (
+    <ClickableName onClick={() => openTeam(code as string)} className={`${className} text-ink`} title={`פרטי ${team.name}`}>
+      {team.name}
+    </ClickableName>
+  );
+}
+
+function ResultMatchCard({ match, result, bracketTeams, chronological, consensus }) {
   const isKnockout = match.stage !== "group";
   const derived = isKnockout
     ? {
@@ -61,17 +79,13 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
       {result ? (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {homeTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
             <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
               {result.homeScore}
             </span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {awayTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
             <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
               {result.awayScore}
             </span>
@@ -89,19 +103,16 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
       ) : (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <span className={`text-sm font-bold ${homeTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {homeTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
             <span className="text-sm text-ink-light">–</span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <span className={`text-sm font-bold ${awayTeam ? "text-ink" : "text-ink-light italic"}`}>
-              {awayTeam?.name || "טרם נקבע"}
-            </span>
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
             <span className="text-sm text-ink-light">–</span>
           </div>
         </div>
       )}
+      <MatchConsensusLine consensus={consensus} />
     </div>
   );
 }
@@ -109,12 +120,25 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
 export default function Results() {
   const results = useMatchResults();
   const { user } = useCurrentUser();
+  const allPredictions = useAllPredictions();
+  const settings = useSettings();
   const [viewMode, setViewMode] = useState("stages");
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
   const bracketTeams = useMemo(() => getCachedBracket(results), [results]);
+
+  // Crowd consensus per match (#8). Only computed/shown once predictions are
+  // locked, so it never reveals picks before kickoff. Built once per data
+  // change in a single pass over the submitted forms.
+  const consensusMap = useMemo(() => {
+    if (!settings.predictionsLocked) return {};
+    const submitted = Object.entries(allPredictions)
+      .filter(([, f]) => normalizeStatus((f as any).status) === "submitted")
+      .map(([formId, f]) => ({ formId, ...(f as any) }));
+    return computeConsensusMap(submitted);
+  }, [allPredictions, settings.predictionsLocked]);
 
   const playedCount = Object.keys(results).length;
   const totalMatches = groupMatches.length + knockoutMatches.length;
@@ -170,9 +194,24 @@ export default function Results() {
           <CalendarDays size={14} />
           סדר כרונולוגי
         </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("bracket")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "bracket"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "bracket"}
+        >
+          <GitBranch size={14} />
+          עץ
+        </button>
       </div>
 
-      {viewMode === "stages" ? (
+      {viewMode === "bracket" ? (
+        <BracketView results={results} bracketTeams={bracketTeams} />
+      ) : viewMode === "stages" ? (
         <>
           <StageSelector
             selectedStage={selectedStage}
@@ -198,6 +237,7 @@ export default function Results() {
                 match={match}
                 result={results[match.id]}
                 bracketTeams={bracketTeams}
+                consensus={consensusMap[match.id]}
                 chronological={false}
               />
             ))}
@@ -220,6 +260,7 @@ export default function Results() {
                     match={match}
                     result={results[match.id]}
                     bracketTeams={bracketTeams}
+                    consensus={consensusMap[match.id]}
                     chronological
                   />
                 ))}
