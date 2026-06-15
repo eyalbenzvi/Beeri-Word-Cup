@@ -5,6 +5,7 @@ import { createForm } from "../store";
 import TournamentCountdown from "../components/TournamentCountdown";
 import UpcomingMatches from "../components/UpcomingMatches";
 import LiveNowCard from "../components/LiveNowCard";
+import LiveRankImpact from "../components/LiveRankImpact";
 import RecentlyFinishedMatches from "../components/RecentlyFinishedMatches";
 import ScoreStrip from "../components/ScoreStrip";
 import WelcomeBackDigest from "../components/WelcomeBackDigest";
@@ -40,6 +41,7 @@ export default function Home() {
         </div>
         <WelcomeBackDigest />
         <LiveNowCard />
+        <LiveRankImpact />
         <RecentlyFinishedMatches />
         <SummaryTeaser />
         <ScoreStrip />
