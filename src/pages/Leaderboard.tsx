@@ -25,6 +25,7 @@ import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 import AchievementBadges from "../components/AchievementBadges";
 import RankTrendSparkline from "../components/RankTrendSparkline";
+import FormComparison from "../components/FormComparison";
 import { recordRanks } from "../utils/rankHistory";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
@@ -93,13 +94,20 @@ export default function Leaderboard({
   // embedded admin preview so an unrelated URL param can't hijack it.
   useEffect(() => {
     if (embedded) return;
-    if (params?.form) setSelectedForm(params.form);
+    if (params?.form) {
+      setSelectedForm(params.form);
+      setComparing(false);
+    }
   }, [params?.form, embedded]);
+
+  // Head-to-head comparison (#3) toggle for the open form detail.
+  const [comparing, setComparing] = useState(false);
 
   // Closing the detail also clears the URL param, so Back/refresh return to
   // the ranked list rather than re-opening the form.
   const closeForm = () => {
     setSelectedForm(null);
+    setComparing(false);
     if (!embedded && params?.form) setParamsPatch({ form: null });
   };
 
@@ -308,9 +316,25 @@ export default function Leaderboard({
           חזרה לטבלת הדירוג
         </button>
 
-        <h2 className="text-xl font-extrabold text-ink mb-2">
-          {predData.formName || "טופס ללא שם"}
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-xl font-extrabold text-ink">
+            {predData.formName || "טופס ללא שם"}
+          </h2>
+          {settings.predictionsLocked && rankedLeaderboard.length > 1 && (
+            <button
+              onClick={() => setComparing((v) => !v)}
+              aria-pressed={comparing}
+              className={`btn-duo-flat shrink-0 ${comparing ? "" : ""}`}
+              style={comparing ? { background: "var(--color-secondary)", color: "white" } : undefined}
+            >
+              ⚔️ השווה
+            </button>
+          )}
+        </div>
+
+        {comparing && (
+          <FormComparison formAId={selectedForm} onClose={() => setComparing(false)} />
+        )}
 
         <div className="card-duo mb-4 grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-bg-soft rounded-xl p-3">
