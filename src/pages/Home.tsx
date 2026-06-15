@@ -7,6 +7,7 @@ import UpcomingMatches from "../components/UpcomingMatches";
 import LiveNowCard from "../components/LiveNowCard";
 import RecentlyFinishedMatches from "../components/RecentlyFinishedMatches";
 import ScoreStrip from "../components/ScoreStrip";
+import WelcomeBackDigest from "../components/WelcomeBackDigest";
 import SummaryTeaser from "../components/SummaryTeaser";
 import { useToast } from "../components/Toast";
 import KickoffFooter from "../components/KickoffFooter";
@@ -37,6 +38,7 @@ export default function Home() {
             {BRAND.subtitle}
           </p>
         </div>
+        <WelcomeBackDigest />
         <LiveNowCard />
         <RecentlyFinishedMatches />
         <SummaryTeaser />
