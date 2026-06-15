@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, LayoutGrid } from "lucide-react";
-import { useMatchResults, useCurrentUser } from "../hooks/useStore";
+import { useMatchResults, useCurrentUser, useAllPredictions, useSettings } from "../hooks/useStore";
+import { computeConsensusMap } from "../utils/matchPredictionStats";
+import { normalizeStatus } from "../utils/helpers";
+import MatchConsensusLine from "../components/MatchConsensusLine";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
@@ -31,7 +34,7 @@ function TeamNameCell({ team, code, className }: { team: any; code: string | nul
   );
 }
 
-function ResultMatchCard({ match, result, bracketTeams, chronological }) {
+function ResultMatchCard({ match, result, bracketTeams, chronological, consensus }) {
   const isKnockout = match.stage !== "group";
   const derived = isKnockout
     ? {
@@ -108,6 +111,7 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
           </div>
         </div>
       )}
+      <MatchConsensusLine consensus={consensus} />
     </div>
   );
 }
@@ -115,12 +119,25 @@ function ResultMatchCard({ match, result, bracketTeams, chronological }) {
 export default function Results() {
   const results = useMatchResults();
   const { user } = useCurrentUser();
+  const allPredictions = useAllPredictions();
+  const settings = useSettings();
   const [viewMode, setViewMode] = useState("stages");
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
   const bracketTeams = useMemo(() => getCachedBracket(results), [results]);
+
+  // Crowd consensus per match (#8). Only computed/shown once predictions are
+  // locked, so it never reveals picks before kickoff. Built once per data
+  // change in a single pass over the submitted forms.
+  const consensusMap = useMemo(() => {
+    if (!settings.predictionsLocked) return {};
+    const submitted = Object.entries(allPredictions)
+      .filter(([, f]) => normalizeStatus((f as any).status) === "submitted")
+      .map(([formId, f]) => ({ formId, ...(f as any) }));
+    return computeConsensusMap(submitted);
+  }, [allPredictions, settings.predictionsLocked]);
 
   const playedCount = Object.keys(results).length;
   const totalMatches = groupMatches.length + knockoutMatches.length;
@@ -204,6 +221,7 @@ export default function Results() {
                 match={match}
                 result={results[match.id]}
                 bracketTeams={bracketTeams}
+                consensus={consensusMap[match.id]}
                 chronological={false}
               />
             ))}
@@ -226,6 +244,7 @@ export default function Results() {
                     match={match}
                     result={results[match.id]}
                     bracketTeams={bracketTeams}
+                    consensus={consensusMap[match.id]}
                     chronological
                   />
                 ))}

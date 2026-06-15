@@ -26,6 +26,66 @@ export type MatchPredictionStats = {
   avgGoals: string;
 };
 
+// Lightweight crowd-consensus for EVERY match in a single pass over all forms,
+// for the "what did everyone predict?" line on the Results cards. Cheaper than
+// calling aggregateMatchPredictions per match (which re-scans all forms each
+// time) — one O(forms × predictions) sweep builds the whole map.
+export type MatchConsensus = {
+  preds: number;
+  homeWin: number;
+  draw: number;
+  awayWin: number;
+  // Most-predicted exact score (home/away kept separate so the UI can render
+  // it RTL-correctly). null when there are no predictions.
+  topHome: number | null;
+  topAway: number | null;
+  topCount: number;
+};
+
+export function computeConsensusMap(forms: Form[]): Record<string, MatchConsensus> {
+  const acc: Record<string, { preds: number; homeWin: number; draw: number; awayWin: number; scores: Record<string, number> }> = {};
+  for (const f of forms) {
+    const matches = f.matches || {};
+    for (const matchId in matches) {
+      const p = matches[matchId];
+      if (!p || p.homeScore == null || p.awayScore == null) continue;
+      const h = p.homeScore as number;
+      const a = p.awayScore as number;
+      const m = (acc[matchId] ||= { preds: 0, homeWin: 0, draw: 0, awayWin: 0, scores: {} });
+      m.preds++;
+      if (h > a) m.homeWin++;
+      else if (h === a) m.draw++;
+      else m.awayWin++;
+      const key = `${h}-${a}`;
+      m.scores[key] = (m.scores[key] || 0) + 1;
+    }
+  }
+  const out: Record<string, MatchConsensus> = {};
+  for (const matchId in acc) {
+    const m = acc[matchId];
+    let topKey: string | null = null;
+    let topCount = 0;
+    for (const key in m.scores) {
+      // Tie-break by key for determinism (testable, stable across renders).
+      if (m.scores[key] > topCount || (m.scores[key] === topCount && topKey != null && key < topKey)) {
+        topCount = m.scores[key];
+        topKey = key;
+      }
+    }
+    const [th, ta] = topKey ? topKey.split("-").map(Number) : [null, null];
+    out[matchId] = {
+      preds: m.preds,
+      homeWin: m.homeWin,
+      draw: m.draw,
+      awayWin: m.awayWin,
+      topHome: th,
+      topAway: ta,
+      topCount,
+    };
+  }
+  return out;
+}
+
 export function aggregateMatchPredictions(
   forms: Form[],
   matchId: string,
