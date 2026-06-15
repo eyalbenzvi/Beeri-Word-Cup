@@ -167,6 +167,7 @@ run_test "100. Welcome-Back Digest (since-last-visit deltas on Home)" "ui/test-w
 run_test "101. Achievements (badge derivation + streak + wiring)" "scoring/test-achievements.mjs" "yes"
 run_test "102. Rank Trend (history dedupe/cap + sparkline wiring)" "ui/test-rank-trend.mjs" "yes"
 run_test "103. Form Comparison (head-to-head wiring)" "ui/test-form-comparison.mjs" "no"
+run_test "104. Bracket View (knockout tree columns + wiring)" "ui/test-bracket-view.mjs" "no"
 
 echo ""
 echo "==========================================="

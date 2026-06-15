@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, LayoutGrid } from "lucide-react";
+import { CalendarDays, LayoutGrid, GitBranch } from "lucide-react";
 import { useMatchResults, useCurrentUser, useAllPredictions, useSettings } from "../hooks/useStore";
 import { computeConsensusMap } from "../utils/matchPredictionStats";
 import { normalizeStatus } from "../utils/helpers";
 import MatchConsensusLine from "../components/MatchConsensusLine";
+import BracketView from "../components/BracketView";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
@@ -193,9 +194,24 @@ export default function Results() {
           <CalendarDays size={14} />
           סדר כרונולוגי
         </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("bracket")}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold flex items-center justify-center gap-1.5 transition ${
+            viewMode === "bracket"
+              ? "bg-white text-ink shadow-sm"
+              : "bg-transparent text-ink-muted hover:text-ink"
+          }`}
+          aria-pressed={viewMode === "bracket"}
+        >
+          <GitBranch size={14} />
+          עץ
+        </button>
       </div>
 
-      {viewMode === "stages" ? (
+      {viewMode === "bracket" ? (
+        <BracketView results={results} bracketTeams={bracketTeams} />
+      ) : viewMode === "stages" ? (
         <>
           <StageSelector
             selectedStage={selectedStage}
