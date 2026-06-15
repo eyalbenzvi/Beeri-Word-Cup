@@ -115,7 +115,7 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
     out.push({
       id: "lone-1",
       label: `🎯 רק ${f.formName} קלע בדיוק`,
-      text: `רק ${f.formName} ראה את זה — ${result.awayScore}:${result.homeScore} בול.`,
+      text: `רק ${f.formName} ראה את זה — ${result.homeScore}:${result.awayScore} בול.`,
       kind: "lonePicks",
     });
   } else if (stats.lonePicks.length >= 2 && stats.lonePicks.length <= 3) {
@@ -123,7 +123,7 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
     out.push({
       id: "lone-few",
       label: `🎯 ${stats.lonePicks.length} קלעו בדיוק: ${stats.lonePicks.map((f) => f.formName).join(", ")}`,
-      text: `${stats.lonePicks.length} בלבד קלעו את ${result.awayScore}:${result.homeScore} בול: ${names}.`,
+      text: `${stats.lonePicks.length} בלבד קלעו את ${result.homeScore}:${result.awayScore} בול: ${names}.`,
       kind: "lonePicks",
     });
   }
@@ -167,8 +167,8 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
   if (stats.actualScorePct >= 40) {
     out.push({
       id: "consensus-right",
-      label: `✅ ${stats.actualScorePct}% קלעו ${result.awayScore}:${result.homeScore} בול`,
-      text: `${stats.actualScorePct}% קלעו את ${result.awayScore}:${result.homeScore} בול — היום לא הופתענו.`,
+      label: `✅ ${stats.actualScorePct}% קלעו ${result.homeScore}:${result.awayScore} בול`,
+      text: `${stats.actualScorePct}% קלעו את ${result.homeScore}:${result.awayScore} בול — היום לא הופתענו.`,
       kind: "actualConsensus",
     });
   }

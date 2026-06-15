@@ -65,7 +65,7 @@ function MatchRow({ match, result, selected, isAlreadyCovered, onToggle }) {
   const home = teamLabel(match.homeTeam);
   const away = teamLabel(match.awayTeam);
   const scoreText = result
-    ? `${result.awayScore}–${result.homeScore}`
+    ? `${result.homeScore}–${result.awayScore}`
     : "אין תוצאה";
   return (
     <label
