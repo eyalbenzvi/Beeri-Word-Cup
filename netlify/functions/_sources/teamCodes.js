@@ -96,4 +96,8 @@ export function matchTeamName(name) {
   return key ? NAME_TO_CODE[key] || null : null;
 }
 
+// The full set of our 48 FIFA codes — lets other source adapters validate a
+// raw abbreviation (e.g. ESPN's "BRA") before trusting it as a code.
+export const FIFA_CODES = Object.keys(ALIASES);
+
 export const __test__ = { ALIASES };

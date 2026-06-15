@@ -1,14 +1,17 @@
 // Live-scores endpoint tests.
 //
-// Part A: unit tests for the pure normalizer (_sources/liveNormalize.js)
-//         + the shared FD code map (_sources/fdCodes.js).
+// Part A: unit tests for the pure normalizers (_sources/liveNormalize.js for
+//         football-data, _sources/espnLive.js for ESPN) + the shared FD code
+//         map (_sources/fdCodes.js).
 // Part B: static contract audit of get-live-scores.js — the properties
 //         that keep the upstream API alive under a whole-kibbutz kickoff
-//         (caching layers, in-flight dedup) and the soft-failure stance
+//         (caching layers, in-flight dedup), the source strategy (ESPN
+//         primary, football-data fallback) and the soft-failure stance
 //         (a broken upstream must never 500 the home page's poll loop).
 
 import fs from "node:fs";
 import { normalizeFdMatches } from "../../netlify/functions/_sources/liveNormalize.js";
+import { normalizeEspnEvents } from "../../netlify/functions/_sources/espnLive.js";
 import { ourCode, FD_TO_OURS } from "../../netlify/functions/_sources/fdCodes.js";
 
 let passed = 0, failed = 0;
@@ -70,6 +73,105 @@ console.log("--- A2. normalizeFdMatches ---");
   assert(et[0].duration === "EXTRA_TIME", "score.duration carried through");
 }
 
+// ---- A3. ESPN normalization (primary source) ----
+console.log("--- A3. normalizeEspnEvents ---");
+{
+  const ev = (over) => ({
+    date: "2026-06-15T19:00:00Z",
+    competitions: [
+      {
+        date: "2026-06-15T19:00:00Z",
+        status: over.status,
+        competitors: over.competitors,
+      },
+    ],
+  });
+  const out = normalizeEspnEvents([
+    // in-play, 2nd half — minute parsed from displayClock, oriented home/away
+    ev({
+      status: { displayClock: "63'", period: 2, type: { name: "STATUS_SECOND_HALF", state: "in", completed: false } },
+      competitors: [
+        { homeAway: "home", score: "2", team: { displayName: "Mexico", abbreviation: "MEX" } },
+        { homeAway: "away", score: "1", team: { displayName: "Canada", abbreviation: "CAN" } },
+      ],
+    }),
+    // halftime -> PAUSED
+    ev({
+      status: { displayClock: "45'", period: 1, type: { name: "STATUS_HALFTIME", state: "in" } },
+      competitors: [
+        { homeAway: "home", score: "0", team: { displayName: "Brazil", abbreviation: "BRA" } },
+        { homeAway: "away", score: "0", team: { displayName: "Senegal", abbreviation: "SEN" } },
+      ],
+    }),
+    // pre-kickoff -> TIMED, empty scores stay null (never coerced to 0)
+    ev({
+      status: { displayClock: "0'", type: { name: "STATUS_SCHEDULED", state: "pre" } },
+      competitors: [
+        { homeAway: "home", score: "", team: { displayName: "France", abbreviation: "FRA" } },
+        { homeAway: "away", score: "", team: { displayName: "Uruguay", abbreviation: "URU" } },
+      ],
+    }),
+    // finished knockout that went to extra time -> FINISHED + EXTRA_TIME
+    ev({
+      status: { displayClock: "FT", period: 4, type: { name: "STATUS_FINAL", state: "post", completed: true } },
+      competitors: [
+        { homeAway: "home", score: "2", team: { displayName: "Argentina", abbreviation: "ARG" } },
+        { homeAway: "away", score: "1", team: { displayName: "Croatia", abbreviation: "CRO" } },
+      ],
+    }),
+    // name unknown to our alias table BUT abbreviation is one of our codes ->
+    // resolved via the abbreviation fallback
+    ev({
+      status: { displayClock: "10'", type: { name: "STATUS_FIRST_HALF", state: "in" } },
+      competitors: [
+        { homeAway: "home", score: "0", team: { displayName: "Deutschland", abbreviation: "GER" } },
+        { homeAway: "away", score: "0", team: { displayName: "Spain", abbreviation: "ESP" } },
+      ],
+    }),
+    // unmatchable both ways -> dropped (never shipped unpairable)
+    ev({
+      status: { type: { state: "in" } },
+      competitors: [
+        { homeAway: "home", score: "1", team: { displayName: "Atlantis", abbreviation: "ZZZ" } },
+        { homeAway: "away", score: "0", team: { displayName: "Wakanda", abbreviation: "WAK" } },
+      ],
+    }),
+  ]);
+  assert(out.length === 5, "5 pairable fixtures (unmatchable dropped)");
+  const mex = out[0];
+  assert(mex.homeCode === "MEX" && mex.awayCode === "CAN", "home/away oriented by ESPN homeAway");
+  assert(mex.status === "IN_PLAY", "STATUS_SECOND_HALF -> IN_PLAY");
+  assert(mex.minute === 63, "minute parsed from displayClock");
+  assert(mex.duration === "REGULAR", "regulation in-play -> REGULAR");
+  assert(mex.homeScore === 2 && mex.awayScore === 1, "string scores parsed to ints");
+  assert(out[1].status === "PAUSED", "STATUS_HALFTIME -> PAUSED");
+  assert(out[2].status === "TIMED", "pre-match -> TIMED");
+  assert(out[2].homeScore === null && out[2].awayScore === null,
+    "empty pre-match scores stay null (never 0)");
+  assert(out[2].duration === null, "pre-match duration null (mirrors FD)");
+  assert(out[3].status === "FINISHED", "completed -> FINISHED");
+  assert(out[3].duration === "EXTRA_TIME",
+    "finished knockout via ET still reports EXTRA_TIME (verdict suppression)");
+  assert(out[4].homeCode === "GER" && out[4].awayCode === "ESP",
+    "unknown name resolves via valid abbreviation fallback");
+  assert(normalizeEspnEvents(null).length === 0, "null input -> []");
+  assert(normalizeEspnEvents([{ competitions: [{ competitors: [] }] }]).length === 0,
+    "missing competitors -> dropped, no throw");
+
+  // homeAway omitted -> positional fallback (home first) still pairs.
+  const positional = normalizeEspnEvents([
+    ev({
+      status: { displayClock: "30'", type: { name: "STATUS_FIRST_HALF", state: "in" } },
+      competitors: [
+        { score: "1", team: { displayName: "Portugal", abbreviation: "POR" } },
+        { score: "0", team: { displayName: "Ghana", abbreviation: "GHA" } },
+      ],
+    }),
+  ]);
+  assert(positional.length === 1 && positional[0].homeCode === "POR" &&
+    positional[0].awayCode === "GHA", "missing homeAway -> positional pairing");
+}
+
 // ---- B. Static contract of the endpoint ----
 console.log("--- B. get-live-scores.js contract ---");
 const src = fs.readFileSync(
@@ -82,6 +184,22 @@ assert(!/FIREBASE_SERVICE_ACCOUNT/.test(src), "no service-account dependency");
 // Method discipline + kill switch
 assert(/httpMethod !== "GET"/.test(src), "rejects non-GET");
 assert(/LIVE_SCORES_DISABLED/.test(src), "hard env kill switch present");
+
+// Source strategy: ESPN (real-time) PRIMARY, football-data (delayed) FALLBACK.
+assert(/normalizeEspnEvents/.test(src), "uses the ESPN normalizer");
+assert(/site\.api\.espn\.com/.test(src), "ESPN scoreboard is wired");
+assert(/fifa\.world/.test(src), "default World Cup league slug present");
+assert(/LIVE_SOURCE/.test(src), "LIVE_SOURCE env override for source selection");
+assert(/source\s*===\s*"fd"/.test(src) && /source\s*===\s*"espn"/.test(src),
+  "explicit single-source overrides honored");
+// Default path must try ESPN first and fall back to FD only inside catch —
+// so a transient ESPN error degrades to the (delayed) FD feed, and an
+// ESPN rest-day empty result does NOT needlessly spend the FD budget.
+assert(/return await fetchEspn\(/.test(src), "default path awaits ESPN first");
+assert(/catch[\s\S]{0,160}fetchFootballData\(/.test(src),
+  "football-data fallback lives in the ESPN catch (error-only)");
+assert(/source:\s*"espn"|"espn",/.test(src) && /"fd"/.test(src),
+  "payload tags which source served the data");
 
 // Layered caching — the many-concurrent-users requirement:
 assert(/CACHE_TTL_MS\s*=\s*25\s*\*\s*1000/.test(src), "in-memory cache TTL ~25s (low-latency, still under free-tier budget)");

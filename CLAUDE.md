@@ -77,6 +77,19 @@ part of the development**, not after the fact:
 - `FIREBASE_SERVICE_ACCOUNT` — Firebase Admin SDK (JSON)
 - `OTP_SECRET` — HMAC signing for stateless OTP verification
 - `GROQ_API_KEY` — AI match analysis
+- `FOOTBALL_DATA_TOKEN`, `AUTO_FILL_COMPETITION_ID_FD` — football-data.org (auto-fill + live-scores FALLBACK)
+- `ESPN_SOCCER_LEAGUE` — live-scores ESPN league slug (default `fifa.world`)
+- `LIVE_SOURCE` — live-scores source override: `espn` / `fd` / unset (=ESPN→FD fallback)
+- `LIVE_SCORES_DISABLED` — hard kill switch for the live-scores endpoint
+
+## Live scores (home-page LiveNow card)
+- `netlify/functions/get-live-scores.js` — cached proxy. PRIMARY source = ESPN
+  (free, no key, real-time); FALLBACK = football-data.org free tier
+  (deliberately minutes-delayed). Normalizers: `_sources/espnLive.js` (ESPN) and
+  `_sources/liveNormalize.js` (FD) emit the SAME entry shape so the client pairs
+  by team code with no source-specific branch.
+- ESPN is undocumented/unofficial — if its `fifa.world` slug breaks, flip
+  `LIVE_SOURCE=fd` (instant, no redeploy) to revert to the delayed feed.
 
 ## Git Workflow
 - Base branch: `claude/world-cup-prediction-game-uh4c5`
