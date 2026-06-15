@@ -26,6 +26,14 @@ assert(/html\.dark[\s\S]*?--color-card:\s*#/.test(css), "dark block overrides ca
 assert(/html\.dark \.bg-white/.test(css), "dark mode remaps the hard-coded bg-white surface to card");
 assert(/html\.dark \.input-duo/.test(css), "dark mode remaps white inputs to card");
 assert(/color-scheme:\s*dark/.test(css), "dark block sets color-scheme so native controls follow");
+assert(/--color-secondary-soft:/.test(css), "secondary-soft token defined (so light-blue panels re-theme)");
+assert(/html\.dark[\s\S]*?--color-secondary-soft:/.test(css), "secondary-soft inverts in dark mode");
+
+// No hard-coded light-blue panels remain in app code (they wouldn't re-theme).
+import { existsSync as _e } from "node:fs"; void _e;
+import { execSync } from "node:child_process";
+const hexHits = execSync("grep -rl '#F0F9FF' " + REPO + "/src --include=*.tsx || true").toString().trim();
+assert(hexHits === "", "no component hard-codes #F0F9FF (use --color-secondary-soft)");
 
 // ---- No-FOUC bootstrap -----------------------------------------------------
 const html = fs.readFileSync(`${REPO}/index.html`, "utf8");
@@ -41,6 +49,9 @@ assert(/export function useTheme/.test(theme), "exports useTheme hook");
 assert(/toggleTheme/.test(theme), "exposes toggleTheme");
 assert(/beeri:theme/.test(theme), "persists choice under the shared storage key");
 assert(/classList\.toggle\("dark"/.test(theme), "syncs the html.dark class with state");
+// Following the OS must not be frozen into an explicit choice on first load.
+assert(/explicitRef/.test(theme), "tracks whether the user made an explicit choice");
+assert(/if \(explicitRef\.current\)/.test(theme), "persists to storage only after an explicit toggle");
 
 // ---- Toggle mounted in the header ------------------------------------------
 assert(existsMigratedSrc("src/components/ThemeToggle.jsx"), "ThemeToggle component exists");

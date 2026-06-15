@@ -20,7 +20,11 @@
         try {
           var t = localStorage.getItem("beeri:theme");
           var dark = t === "dark" || (!t && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          if (dark) document.documentElement.classList.add("dark");
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute("content", "#16181C");
+          }
         } catch (e) { /* private mode - ignore */ }
       })();
     </script>

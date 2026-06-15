@@ -45,7 +45,10 @@ export default function LiveRankImpact() {
       const isKo = m.stage !== "group";
       const home = isKo ? current.actualBracket[m.id]?.home : m.homeTeam;
       const away = isKo ? current.actualBracket[m.id]?.away : m.awayTeam;
-      const entry: any = { homeScore: s.homeScore, awayScore: s.awayScore, played: true };
+      // `stage` matters: scoring multiplies points by round (scoring.ts reads
+      // actual.stage || "group"), so a live knockout match scored without it
+      // would be valued as a group game and skew the projection.
+      const entry: any = { stage: m.stage, homeScore: s.homeScore, awayScore: s.awayScore, played: true };
       if (isKo) {
         entry.homeTeam = home;
         entry.awayTeam = away;

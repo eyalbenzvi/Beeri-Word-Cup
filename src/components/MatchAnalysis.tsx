@@ -79,7 +79,7 @@ export default function MatchAnalysis({
   }, [fetchAnalysis]);
 
   return (
-    <div className="border-2 border-secondary/30 rounded-2xl p-4 mt-2 animate-fade-in" style={{ background: "#F0F9FF" }}>
+    <div className="border-2 border-secondary/30 rounded-2xl p-4 mt-2 animate-fade-in" style={{ background: "var(--color-secondary-soft)" }}>
       {loading && (
         <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-3">
           <div className="w-5 h-5 border-2 border-secondary border-t-transparent rounded-full animate-spin" />

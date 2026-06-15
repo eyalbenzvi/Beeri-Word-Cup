@@ -455,7 +455,7 @@ export default function Leaderboard({
                           ? "text-danger"
                           : "text-secondary"
                       }`}
-                      style={{ background: pts.wrongMatchup ? "var(--color-danger-soft)" : "#F0F9FF" }}
+                      style={{ background: pts.wrongMatchup ? "var(--color-danger-soft)" : "var(--color-secondary-soft)" }}
                     >
                       ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
                       {predMatchup.away?.name || "טרם נקבע"}

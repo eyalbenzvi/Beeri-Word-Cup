@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 // Light/dark theme state. The actual class is applied to <html> by an inline
 // script in index.html before first paint (no FOUC); this provider keeps React
@@ -24,19 +24,35 @@ function readInitialTheme(): Theme {
   return "light";
 }
 
+function hasStoredChoice(): boolean {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return v === "dark" || v === "light";
+  } catch {
+    return false;
+  }
+}
+
 export function ThemeProvider({ children }: { children: any }) {
   const [theme, setTheme] = useState<Theme>(readInitialTheme);
+  // Whether the user has made an EXPLICIT choice. Until they do, we follow the
+  // OS and must NOT persist — otherwise the first visit would freeze the
+  // resolved theme as a choice and later OS light/dark switches stop applying.
+  const explicitRef = useRef(hasStoredChoice());
 
   // Keep <html class="dark"> and the browser chrome colour in step with state.
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* ignore */ }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "dark" ? "#16181C" : "#58CC02");
+    if (explicitRef.current) {
+      try { localStorage.setItem(THEME_KEY, theme); } catch { /* ignore */ }
+    }
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
+    explicitRef.current = true;
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   }, []);
 

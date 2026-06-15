@@ -254,7 +254,7 @@ function MatchPredictions({ forms }) {
               onClick={() => setExpanded(expanded === "outcome:home" ? null : "outcome:home")}
               aria-expanded={expanded === "outcome:home"}
               className={`rounded-xl p-3 border-2 cursor-pointer transition-all ${expanded === "outcome:home" ? "border-secondary ring-2 ring-secondary/40" : "border-secondary/30"}`}
-              style={{ background: "#F0F9FF" }}
+              style={{ background: "var(--color-secondary-soft)" }}
             >
               <div className="text-xl font-extrabold text-secondary">
                 {matchStats.homeWin}

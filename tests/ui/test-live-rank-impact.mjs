@@ -27,6 +27,7 @@ assert((c.match(/useLeaderboardComputed/g) || []).length >= 2, "computes BOTH cu
 // Hypothetical = real results + live scores treated as final.
 assert(/const out: Record<string, any> = \{ \.\.\.results \}/.test(c), "hypothetical starts from the real results");
 assert(/homeScore: s\.homeScore, awayScore: s\.awayScore, played: true/.test(c), "live score injected as a played result");
+assert(/stage: m\.stage/.test(c), "hypothetical entry carries stage (so knockout games aren't mis-scored as group)");
 assert(/entry\.advancingTeam = home|advancingTeam = away/.test(c), "decisive knockout gets a provisional advancing side");
 
 // Projection = current rank vs hypothetical rank for the user's best form.

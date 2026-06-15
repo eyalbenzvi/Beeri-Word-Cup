@@ -60,6 +60,7 @@
   --color-accent-soft: #FFF8E1;
   --color-accent-soft-2: #FFF3D6;
   --color-danger-soft: #FFF1F1;
+  --color-secondary-soft: #F0F9FF;
 
   /* Brand partners */
   --color-whatsapp: #25D366;
@@ -115,6 +116,7 @@ html.dark {
   --color-accent-soft-2: #2C2008;
   --color-accent-text: #E8A33D;
   --color-danger-soft: #3A1717;
+  --color-secondary-soft: #14283A;
 }
 
 /* Hard-coded white surfaces → card token in dark mode. Kept as explicit

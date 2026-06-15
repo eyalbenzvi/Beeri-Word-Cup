@@ -154,7 +154,7 @@ export default function Profile() {
             <div className="text-2xl font-extrabold text-primary-dark tabular-nums">{totalExact}</div>
             <div className="text-ink-muted font-bold">{LABELS.exactCount}</div>
           </div>
-          <div className="rounded-xl p-3 border-2 border-secondary/30" style={{ background: "#F0F9FF" }}>
+          <div className="rounded-xl p-3 border-2 border-secondary/30" style={{ background: "var(--color-secondary-soft)" }}>
             <div className="text-2xl font-extrabold text-secondary-dark tabular-nums">{totalOutcome}</div>
             <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
