@@ -324,8 +324,7 @@ export default function Leaderboard({
             <button
               onClick={() => setComparing((v) => !v)}
               aria-pressed={comparing}
-              className={`btn-duo-flat shrink-0 ${comparing ? "" : ""}`}
-              style={comparing ? { background: "var(--color-secondary)", color: "white" } : undefined}
+              className={`chip-duo shrink-0 ${comparing ? "active-blue" : ""}`}
             >
               ⚔️ השווה
             </button>

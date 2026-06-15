@@ -45,6 +45,9 @@ export default function LiveRankImpact() {
       const isKo = m.stage !== "group";
       const home = isKo ? current.actualBracket[m.id]?.home : m.homeTeam;
       const away = isKo ? current.actualBracket[m.id]?.away : m.awayTeam;
+      // A live knockout match whose feeder slot hasn't resolved yet has no real
+      // teams — skip it rather than score a matchup with undefined teams.
+      if (isKo && (!home || !away)) continue;
       // `stage` matters: scoring multiplies points by round (scoring.ts reads
       // actual.stage || "group"), so a live knockout match scored without it
       // would be valued as a group game and skew the projection.
@@ -94,10 +97,7 @@ export default function LiveRankImpact() {
   const { formName, projectedRank, delta, livePoints } = impact;
 
   return (
-    <div
-      className="card-duo w-full text-right mb-3"
-      style={{ background: "var(--color-accent-soft)", borderColor: "var(--color-accent)" }}
-    >
+    <div className="alert-accent-soft w-full text-right mb-3">
       <div className="text-xs font-extrabold text-accent-text mb-1">
         📡 אם המשחקים החיים ייגמרו עכשיו
       </div>
@@ -120,7 +120,7 @@ export default function LiveRankImpact() {
           <span className="text-accent-text">· צבירה צפויה +{livePoints} נק׳</span>
         )}
       </div>
-      <div className="text-[11px] text-ink-light font-medium mt-1">ניחוש זמני — לא סופי עד שריקת הסיום</div>
+      <div className="text-xs text-ink-light font-medium mt-1">ניחוש זמני — לא סופי עד שריקת הסיום</div>
     </div>
   );
 }

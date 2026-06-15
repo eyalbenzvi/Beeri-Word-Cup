@@ -18,7 +18,7 @@ export default function MatchConsensusLine({ consensus }: { consensus?: MatchCon
   const pct = Math.round((top.n / preds) * 100);
 
   return (
-    <div className="text-[11px] text-ink-muted font-bold mt-2 pt-2 border-t border-border flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+    <div className="text-xs text-ink-muted font-bold mt-2 pt-2 border-t-2 border-border flex flex-wrap gap-x-2 gap-y-0.5 items-center">
       <span aria-hidden="true">🔮</span>
       <span>
         הקהל: <span className="text-ink">{top.sym} {pct}%</span>

@@ -42,7 +42,9 @@ export function recordRanks(
   let changed = false;
   for (const { formId, rank } of entries) {
     if (!formId || typeof rank !== "number") continue;
-    const arr = data[formId] || [];
+    // Coerce a corrupt per-form value (e.g. hand-edited storage turning the
+    // array into a scalar) to [] so .push / later .map never throw.
+    const arr = Array.isArray(data[formId]) ? data[formId] : [];
     const last = arr[arr.length - 1];
     // Record on: first ever point · a rank change · a new day for a stable rank.
     const shouldRecord = !last || last.rank !== rank || now - last.t >= DAY_MS;
@@ -63,5 +65,6 @@ export function getRankHistory(
   storage: StorageLike | null = defaultStorage(),
 ): RankPoint[] {
   if (!storage || !formId) return [];
-  return read(storage)[formId] || [];
+  const v = read(storage)[formId];
+  return Array.isArray(v) ? v : [];
 }

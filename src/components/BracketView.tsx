@@ -42,12 +42,12 @@ function BracketCell({ match, result, derived }: { match: any; result: any; deri
   }
   const koPens = hasResult && result.homeScore === result.awayScore && result.advancingTeam;
   return (
-    <div className={`rounded-xl border-2 p-2 text-xs bg-white ${hasResult ? "border-primary/40" : "border-border"}`}>
+    <div className={`rounded-xl border-2 p-2 text-xs bg-card ${hasResult ? "border-primary/60" : "border-border"}`}>
       {side(derived.home, hasResult ? result.homeScore : null, winner === derived.home, openTeam)}
       <div className="h-px bg-border my-1" />
       {side(derived.away, hasResult ? result.awayScore : null, winner === derived.away, openTeam)}
       {koPens && (
-        <div className="text-[10px] text-ink-light text-center mt-1">פנדלים</div>
+        <div className="text-xs text-ink-light text-center mt-1">פנדלים</div>
       )}
     </div>
   );

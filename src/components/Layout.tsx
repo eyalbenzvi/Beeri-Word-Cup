@@ -131,7 +131,7 @@ export default function Layout({ children, rightRail = null }) {
       </div>
 
       {/* Bottom nav — mobile/tablet only */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-border z-50 safe-area-bottom xl:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border z-50 safe-area-bottom xl:hidden">
         <div className="max-w-lg mx-auto flex">
           {allNavItems.map((item) => {
             const { Icon } = item;

@@ -33,7 +33,7 @@ function TeamFixtureRow({ match, result, derived }: { match: any; result: any; d
   const stageLabel = match.stage === "group" ? `בית ${match.group}` : STAGES[match.stage] || match.stage;
   const meta = [formatMatchDateShort(match), formatMatchClock(match)].filter(Boolean).join(" · ");
   return (
-    <div className={`rounded-xl p-3 border-2 ${hasResult ? "border-primary/40" : "border-border"} bg-bg-soft`}>
+    <div className={`rounded-xl p-3 border-2 ${hasResult ? "border-primary/60" : "border-border"} bg-bg-soft`}>
       <div className="flex justify-between items-center mb-1">
         <span className="text-xs font-bold text-secondary">{stageLabel}</span>
         <span className="text-xs text-ink-muted">{meta}</span>
@@ -135,7 +135,7 @@ function TeamModalBody({ teamCode, onClose }: { teamCode: string; onClose: () =>
     >
       <div
         ref={dialogRef}
-        className="bg-white rounded-3xl border-2 border-border max-w-md w-full max-h-[85vh] flex flex-col animate-pop-in"
+        className="bg-card rounded-3xl border-2 border-border max-w-md w-full max-h-[85vh] flex flex-col animate-pop-in"
       >
         <div className="flex items-center justify-between p-5 pb-3 border-b-2 border-border">
           <h2 id="team-modal-title" className="text-xl font-extrabold text-ink flex items-center gap-2">

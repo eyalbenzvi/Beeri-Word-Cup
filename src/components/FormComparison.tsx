@@ -27,9 +27,9 @@ function StatCell({ label, a, b }: { label: string; a: any; b: any }) {
   const aWins = typeof a === "number" && typeof b === "number" && a > b;
   const bWins = typeof a === "number" && typeof b === "number" && b > a;
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 border-b border-border text-sm">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 border-b-2 border-border text-sm">
       <div className={`text-right font-extrabold tabular-nums ${aWins ? "text-primary" : "text-ink"}`}>{a}</div>
-      <div className="text-[10px] text-ink-muted font-bold whitespace-nowrap">{label}</div>
+      <div className="text-xs text-ink-muted font-bold whitespace-nowrap">{label}</div>
       <div className={`text-left font-extrabold tabular-nums ${bWins ? "text-secondary" : "text-ink"}`}>{b}</div>
     </div>
   );
@@ -133,8 +133,7 @@ export default function FormComparison({ formAId, onClose }: { formAId: string; 
                 key={o.id}
                 onClick={() => setFormBId(o.id)}
                 aria-pressed={effectiveBId === o.id}
-                className={`chip-duo ${effectiveBId === o.id ? "active-blue" : ""}`}
-                style={{ fontSize: "0.7rem", padding: "0.3rem 0.6rem" }}
+                className={`chip-duo text-xs ${effectiveBId === o.id ? "active-blue" : ""}`}
               >
                 {o.label}
               </button>
@@ -146,7 +145,7 @@ export default function FormComparison({ formAId, onClose }: { formAId: string; 
       {/* Names header */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-2 text-sm font-extrabold">
         <div className="text-right text-primary truncate">{nameA}{rankA ? ` · #${rankA}` : ""}</div>
-        <div className="text-[10px] text-ink-muted">מול</div>
+        <div className="text-xs text-ink-muted">מול</div>
         <div className="text-left text-secondary truncate">{nameB}{rankB ? ` · #${rankB}` : ""}</div>
       </div>
 
@@ -185,13 +184,13 @@ export default function FormComparison({ formAId, onClose }: { formAId: string; 
                   <div className={`text-right ${r.aPts > r.bPts ? "text-primary font-extrabold" : "text-ink-muted"}`}>
                     {r.aPred ? <Score home={r.aPred.homeScore} away={r.aPred.awayScore} /> : "—"} ({r.aPts})
                   </div>
-                  <div className="text-[10px] text-ink-light">נק׳</div>
+                  <div className="text-xs text-ink-light">נק׳</div>
                   <div className={`text-left ${r.bPts > r.aPts ? "text-secondary font-extrabold" : "text-ink-muted"}`}>
                     {r.bPred ? <Score home={r.bPred.homeScore} away={r.bPred.awayScore} /> : "—"} ({r.bPts})
                   </div>
                 </div>
                 {r.stage !== "group" && (
-                  <div className="text-[10px] text-ink-light text-center mt-1">{STAGES[r.stage] || r.stage}</div>
+                  <div className="text-xs text-ink-light text-center mt-1">{STAGES[r.stage] || r.stage}</div>
                 )}
               </div>
             ))}

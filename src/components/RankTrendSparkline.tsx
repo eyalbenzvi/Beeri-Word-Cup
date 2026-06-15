@@ -1,3 +1,4 @@
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { getRankHistory } from "../utils/rankHistory";
 
 // Tiny inline-SVG sparkline of a form's rank over time (#6). Rank is inverted
@@ -37,9 +38,13 @@ export default function RankTrendSparkline({ formId }: { formId: string }) {
         <div className="text-sm font-extrabold text-ink">📈 מגמת דירוג</div>
         <div className="text-xs font-bold">
           {delta > 0 ? (
-            <span className="text-primary-dark">▲ {delta} מאז ההתחלה</span>
+            <span className="text-primary-dark inline-flex items-center gap-1">
+              <TrendingUp size={14} aria-hidden="true" /> {delta} מאז ההתחלה
+            </span>
           ) : delta < 0 ? (
-            <span className="text-danger">▼ {-delta} מאז ההתחלה</span>
+            <span className="text-danger inline-flex items-center gap-1">
+              <TrendingDown size={14} aria-hidden="true" /> {-delta} מאז ההתחלה
+            </span>
           ) : (
             <span className="text-ink-muted">יציב</span>
           )}
@@ -56,7 +61,7 @@ export default function RankTrendSparkline({ formId }: { formId: string }) {
         <path d={path} fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={lastX} cy={lastY} r="3" fill="var(--color-primary)" />
       </svg>
-      <div className="flex justify-between text-[10px] text-ink-light font-bold mt-1">
+      <div className="flex justify-between text-xs text-ink-light font-bold mt-1">
         <span>מקום {first}</span>
         <span>מקום {last} (נוכחי)</span>
       </div>

@@ -85,8 +85,7 @@ export default function WelcomeBackDigest() {
     <button
       type="button"
       onClick={() => navigate(newResults > 0 ? "results" : "leaderboard")}
-      className="card-duo w-full text-right mb-3 cursor-pointer tap-44"
-      style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)" }}
+      className="alert-primary-soft w-full text-right mb-3 cursor-pointer tap-44"
       aria-label="מה קרה מאז הביקור האחרון"
     >
       <div className="flex items-center justify-between gap-2">
