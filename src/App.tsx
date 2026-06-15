@@ -10,6 +10,7 @@ import WelcomeScreen from "./pages/WelcomeScreen";
 import ProfileSetup from "./components/ProfileSetup";
 import { useStoreReady, useCurrentUser } from "./hooks/useStore";
 import { NavigationProvider, useNavigation } from "./hooks/useNavigation";
+import { ThemeProvider } from "./hooks/useTheme";
 import { RailProvider, useRailContent } from "./hooks/useRail";
 import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
@@ -215,6 +216,7 @@ function AppShell({ page, Page }) {
 function App() {
   return (
     <ErrorBoundary>
+      <ThemeProvider>
       <NavigationProvider>
         <ToastProvider>
           <ConfirmProvider>
@@ -224,6 +226,7 @@ function App() {
           </ConfirmProvider>
         </ToastProvider>
       </NavigationProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

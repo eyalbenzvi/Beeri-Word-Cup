@@ -13,6 +13,17 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>טורניר הניחושים של בארי - מונדיאל 2026</title>
+    <!-- Apply the saved (or system) theme before first paint to avoid a
+         light->dark flash. Mirrors the default chosen in useTheme. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("beeri:theme");
+          var dark = t === "dark" || (!t && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) { /* private mode - ignore */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
