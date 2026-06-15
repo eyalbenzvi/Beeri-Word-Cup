@@ -24,6 +24,8 @@ import { preferredScrollBehavior } from "../utils/helpers";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 import AchievementBadges from "../components/AchievementBadges";
+import RankTrendSparkline from "../components/RankTrendSparkline";
+import { recordRanks } from "../utils/rankHistory";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
 
@@ -112,6 +114,15 @@ export default function Leaderboard({
     if (!user?.id) return [];
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
+
+  // Accumulate a local rank time-series for the user's own forms (#6). The
+  // util dedupes (records only on movement, or once/day for a stable rank), so
+  // this is safe to fire on every leaderboard recompute. Skipped in embedded
+  // admin preview.
+  useEffect(() => {
+    if (embedded || myForms.length === 0) return;
+    recordRanks(myForms.map((f) => ({ formId: f.formId, rank: f.rank })));
+  }, [myForms, embedded]);
 
   // Precomputed search haystack per form — built once whenever the
   // underlying data (users / brackets / predictions / lock state) changes,
@@ -321,6 +332,8 @@ export default function Leaderboard({
             <div className="text-ink-muted font-bold">{LABELS.outcomeCount}</div>
           </div>
         </div>
+
+        <RankTrendSparkline formId={selectedForm} />
 
         <AchievementBadges scored={scored} />
 
