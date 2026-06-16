@@ -33,7 +33,7 @@ export default function GroupTable({ matchData, group }) {
     <div data-group-table className="mb-3">
       <h4 className="text-xs font-extrabold text-ink-muted mb-2 uppercase tracking-wider">טבלת בית {group}</h4>
       <div className="overflow-x-auto scroll-smooth -mx-1">
-      <table className="w-full text-[11px] sm:text-xs min-w-[340px]">
+      <table className="w-full text-2xs sm:text-xs min-w-[340px]">
         <thead>
           <tr className="text-ink-muted border-b-2 border-border">
             <th scope="col" className="text-right py-1.5 pr-1 w-5 font-bold">#</th>
@@ -103,7 +103,7 @@ export default function GroupTable({ matchData, group }) {
         </tbody>
       </table>
       </div>
-      <div className="flex gap-4 mt-2 text-[10px] text-ink-muted font-bold">
+      <div className="flex gap-4 mt-2 text-3xs text-ink-muted font-bold">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--color-primary-soft)", border: "1px solid var(--color-primary)" }} /> עולה
         </span>

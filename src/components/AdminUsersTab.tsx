@@ -144,7 +144,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                 {submittedCount > 0 && ` • ${submittedCount} הוגשו`}
                 {draftCount > 0 && ` • ${draftCount} טיוטות`}
               </div>
-              <div className="text-[10px] text-ink-muted mt-0.5 space-x-2 space-x-reverse">
+              <div className="text-3xs text-ink-muted mt-0.5 space-x-2 space-x-reverse">
                 {u.lastLoginAt && (
                   <span>
                     התחברות אחרונה:{" "}
@@ -175,7 +175,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                     type="button"
                     disabled={pendingClaim === uid}
                     onClick={() => handleAdminToggle(uid, u.displayName, "demote")}
-                    className="text-[10px] text-ink-muted underline disabled:opacity-50"
+                    className="text-3xs text-ink-muted underline disabled:opacity-50"
                   >
                     {pendingClaim === uid ? "..." : "הסר מנהל"}
                   </button>
@@ -226,7 +226,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                   <div>
                     <label
                       htmlFor={`edit-first-${uid}`}
-                      className="block text-[10px] font-extrabold text-ink mb-1"
+                      className="block text-3xs font-extrabold text-ink mb-1"
                     >
                       שם פרטי
                     </label>
@@ -242,7 +242,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                   <div>
                     <label
                       htmlFor={`edit-last-${uid}`}
-                      className="block text-[10px] font-extrabold text-ink mb-1"
+                      className="block text-3xs font-extrabold text-ink mb-1"
                     >
                       שם משפחה
                     </label>
@@ -258,7 +258,7 @@ export default function AdminUsersTab({ users, allPredictions }) {
                   <div>
                     <label
                       htmlFor={`edit-nick-${uid}`}
-                      className="block text-[10px] font-extrabold text-ink mb-1"
+                      className="block text-3xs font-extrabold text-ink mb-1"
                     >
                       כינוי
                     </label>

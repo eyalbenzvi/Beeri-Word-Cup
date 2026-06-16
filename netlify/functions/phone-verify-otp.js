@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
 import { normalizeIsraeliMobile } from "../../src/utils/phone.js";
 import { deriveHashedUid } from "../../src/utils/uidHash.js";
 
@@ -16,17 +17,10 @@ function initAdmin() {
   adminInitialized = true;
 }
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173").split(",");
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
 function getCorsHeaders(event) {
-  const origin = event?.headers?.origin || event?.headers?.Origin;
-  const allowedOrigin = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json",
-  };
+  return buildCorsHeaders(event, { allowedOrigins: ALLOWED_ORIGINS, allowHeaders: "Content-Type" });
 }
 
 // Persistent brute-force protection — counter lives in Firestore so it

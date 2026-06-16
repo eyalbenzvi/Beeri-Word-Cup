@@ -43,6 +43,7 @@
 // the client falls back to the schedule-derived "משוחק עכשיו" UI.
 
 import { withSentry } from "./_sentry.js";
+import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
 import { getJson, dayWindow } from "./_sources/http.js";
 import { normalizeFdMatches } from "./_sources/liveNormalize.js";
 import { normalizeEspnEvents } from "./_sources/espnLive.js";
@@ -59,32 +60,27 @@ const CACHE_TTL_MS = 25 * 1000;
 // How long a stale payload is still worth serving when upstream is down.
 const STALE_MAX_MS = 10 * 60 * 1000;
 
-const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS ||
-  "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173"
-).split(",");
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
 function getCorsHeaders(event) {
-  const origin = event?.headers?.origin || event?.headers?.Origin;
-  const allowedOrigin =
-    origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    // CDN-cacheable: collapses N polling clients into ~1 origin hit per
-    // max-age per POP. max-age is the freshness window; stale-while-
-    // revalidate is kept short (≈ one refresh cycle) so the CDN serves the
-    // background-refreshed payload almost immediately instead of trailing a
-    // long stale shadow — the SWR window was the single biggest avoidable
-    // contributor to the live-score delay.
-    "Cache-Control": "public, max-age=30, stale-while-revalidate=30",
-    "Netlify-CDN-Cache-Control": "public, max-age=30, stale-while-revalidate=30",
-    // The ACAO header above is per-origin while the response is CDN-cached —
-    // without Vary the first requester's origin would be served to everyone.
-    "Vary": "Origin",
-    "Content-Type": "application/json",
-  };
+  return buildCorsHeaders(event, {
+    allowedOrigins: ALLOWED_ORIGINS,
+    methods: "GET, OPTIONS",
+    allowHeaders: "Content-Type",
+    extra: {
+      // CDN-cacheable: collapses N polling clients into ~1 origin hit per
+      // max-age per POP. max-age is the freshness window; stale-while-
+      // revalidate is kept short (≈ one refresh cycle) so the CDN serves the
+      // background-refreshed payload almost immediately instead of trailing a
+      // long stale shadow — the SWR window was the single biggest avoidable
+      // contributor to the live-score delay.
+      "Cache-Control": "public, max-age=30, stale-while-revalidate=30",
+      "Netlify-CDN-Cache-Control": "public, max-age=30, stale-while-revalidate=30",
+      // The ACAO header above is per-origin while the response is CDN-cached —
+      // without Vary the first requester's origin would be served to everyone.
+      "Vary": "Origin",
+    },
+  });
 }
 
 function json(statusCode, headers, payload) {

@@ -15,6 +15,20 @@ console.log("=== EMPTY STATES TESTS ===\n");
 const profile = readMigratedSrc("src/pages/Profile.jsx", "utf8");
 const stats = readMigratedSrc("src/pages/Stats.jsx", "utf8");
 const allForms = readMigratedSrc("src/pages/AllForms.jsx", "utf8");
+const formList = readMigratedSrc("src/components/FormList.jsx", "utf8");
+
+// --- FormList's zero-forms EmptyState carries a create-form CTA ---
+// Mobile users who scroll past the sticky header still get an actionable
+// onboarding button inside the empty state itself.
+assert(/import EmptyState/.test(formList), "FormList imports EmptyState");
+assert(
+  /forms\.length === 0[\s\S]{0,400}<EmptyState[\s\S]{0,400}cta=/.test(formList),
+  "FormList passes a cta to its zero-forms EmptyState",
+);
+assert(
+  /cta=\{[\s\S]{0,200}setShowNewForm\(true\)/.test(formList),
+  "FormList empty-state CTA opens the new-form flow",
+);
 
 // --- Profile imports and uses EmptyState for forms.length === 0 ---
 assert(/import EmptyState/.test(profile), "Profile imports EmptyState");

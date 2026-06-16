@@ -179,7 +179,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                       key={rowKey}
                       className="border-2 border-border rounded-xl p-2 text-xs"
                     >
-                      <div className="text-[10px] text-ink-muted mb-1">
+                      <div className="text-3xs text-ink-muted mb-1">
                         {match.id}
                         {match.label ? ` · ${match.label}` : ""}
                       </div>
@@ -231,7 +231,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                         <div className="flex gap-1 mt-1 justify-center">
                           <button
                             type="button"
-                            className="text-[10px] bg-bg-soft px-2 py-0.5 rounded"
+                            className="text-3xs bg-bg-soft px-2 py-0.5 rounded"
                             onClick={() => {
                               const hi = document.getElementById(
                                 `${match.id}-h`,
@@ -251,7 +251,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                           </button>
                           <button
                             type="button"
-                            className="text-[10px] bg-bg-soft px-2 py-0.5 rounded"
+                            className="text-3xs bg-bg-soft px-2 py-0.5 rounded"
                             onClick={() => {
                               const hi = document.getElementById(
                                 `${match.id}-h`,
@@ -508,7 +508,7 @@ export default function AdminFormsTab({ users, allPredictions }) {
               {f.label}
               {f.count != null && f.count > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full text-[10px] font-bold ${
+                  className={`inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full text-3xs font-bold ${
                     statusFilter === f.id ? "bg-white text-primary" : "bg-primary text-white"
                   }`}
                 >

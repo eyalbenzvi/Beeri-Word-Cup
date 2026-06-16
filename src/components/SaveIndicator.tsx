@@ -46,7 +46,7 @@ export default function SaveIndicator() {
 
   if (state === "error") {
     return (
-      <div className="border-2 border-danger rounded-2xl px-3 py-2 flex items-center justify-between gap-2 mb-3" style={{ background: "var(--color-danger-soft)" }}>
+      <div role="alert" aria-live="assertive" className="border-2 border-danger rounded-2xl px-3 py-2 flex items-center justify-between gap-2 mb-3" style={{ background: "var(--color-danger-soft)" }}>
         <span className="text-xs font-bold text-danger">
           {errorMsg}
         </span>
@@ -66,6 +66,8 @@ export default function SaveIndicator() {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`text-xs font-extrabold px-2.5 py-1 rounded-xl transition-all ${
         state === "saving"
           ? "text-accent-text"

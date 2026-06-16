@@ -70,6 +70,32 @@ assert(/open-info-drawer/.test(sideNavSrc), "DesktopSideNav dispatches open-info
 const emojiInNav = /emoji:\s*["'][🏠📋🏆⚽📊⚙️]["']/.test(layoutSrc);
 assert(!emojiInNav, "Layout nav items do not use emoji-as-icon");
 
+// --- Brand-book: no arbitrary text-[NNpx] font sizes scattered in components ---
+// Sub-12px micro text must use the centralized text-2xs / text-3xs utilities
+// (defined once in index.css), not inline arbitrary values.
+function walkSrc(dir, acc = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkSrc(full, acc);
+    else if (/\.(tsx|jsx|ts)$/.test(entry.name) && !/\.test\./.test(entry.name)) acc.push(full);
+  }
+  return acc;
+}
+const offenders = [];
+for (const f of walkSrc("src")) {
+  const matches = fs.readFileSync(f, "utf8").match(/text-\[\d+px\]/g);
+  if (matches) offenders.push(`${f}: ${[...new Set(matches)].join(", ")}`);
+}
+assert(
+  offenders.length === 0,
+  `No arbitrary text-[NNpx] font sizes in src (use text-2xs/text-3xs/standard scale). Offenders:\n    ${offenders.join("\n    ")}`,
+);
+
+// --- The micro-text utilities are defined exactly once, font-size only ---
+const microCss = fs.readFileSync("src/index.css", "utf8");
+assert(/@utility text-3xs \{ font-size: 0\.625rem; \}/.test(microCss), "text-3xs utility defined (10px, font-size only)");
+assert(/@utility text-2xs \{ font-size: 0\.6875rem; \}/.test(microCss), "text-2xs utility defined (11px, font-size only)");
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error("\nFailures:");

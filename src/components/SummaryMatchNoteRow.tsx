@@ -43,7 +43,7 @@ function MatchSuggestionPanel({ suggestions, onInsert }) {
             onClick={() => onInsert(s.text)}
             title={s.text}
             aria-label={BLOG.editor.suggestionInsertAria(s.text)}
-            className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-primary-soft text-primary-dark border-2 border-primary/30 hover:border-primary px-2 py-1 rounded-full cursor-pointer transition truncate max-w-[260px]"
+            className="inline-flex items-center gap-1 text-2xs font-extrabold bg-primary-soft text-primary-dark border-2 border-primary/30 hover:border-primary px-2 py-1 rounded-full cursor-pointer transition truncate max-w-[260px]"
           >
             <Plus size={12} className="flex-shrink-0" />
             <span className="truncate">{s.label}</span>
@@ -87,7 +87,7 @@ export default function SummaryMatchNoteRow({
         <span className="text-sm font-extrabold text-ink">
           {teamLabel(m.homeTeam)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(m.awayTeam)}
         </span>
-        <span className="text-[11px] font-bold text-ink-muted">
+        <span className="text-2xs font-bold text-ink-muted">
           {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} מדויקים
         </span>
       </div>

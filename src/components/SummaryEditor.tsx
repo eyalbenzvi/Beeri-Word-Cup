@@ -43,14 +43,14 @@ function GlobalSuggestionPanel({ suggestions, onInsertIntro, onInsertConclusion 
             <button
               type="button"
               onClick={() => onInsertIntro(s.text)}
-              className="btn-duo-flat text-[11px] flex-shrink-0"
+              className="btn-duo-flat text-2xs flex-shrink-0"
             >
               להקדמה
             </button>
             <button
               type="button"
               onClick={() => onInsertConclusion(s.text)}
-              className="btn-duo-flat text-[11px] flex-shrink-0"
+              className="btn-duo-flat text-2xs flex-shrink-0"
             >
               לסיכום
             </button>
@@ -90,7 +90,7 @@ function MatchRow({ match, result, selected, isAlreadyCovered, onToggle }) {
         </span>
       </div>
       {isAlreadyCovered && (
-        <span className="text-[10px] font-extrabold text-accent-text bg-accent-soft-2 px-2 py-0.5 rounded-full flex-shrink-0">
+        <span className="text-3xs font-extrabold text-accent-text bg-accent-soft-2 px-2 py-0.5 rounded-full flex-shrink-0">
           כבר בסיכום קודם
         </span>
       )}
@@ -663,7 +663,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
   // (banners, prev/next, archive) — those aren't part of the post itself.
   const previewColumn = (
     <div className="bg-bg rounded-2xl border-2 border-border p-4 md:p-6 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-      <div className="text-[11px] font-extrabold text-ink-light uppercase tracking-wider mb-3">
+      <div className="text-2xs font-extrabold text-ink-light uppercase tracking-wider mb-3">
         {BLOG.editor.tabPreview}
       </div>
       <SummaryArticle

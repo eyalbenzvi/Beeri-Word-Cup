@@ -1,5 +1,5 @@
 {
-  "_comment": "TypeScript configuration. allowJs:true keeps the existing .js/.jsx tree compilable while files are migrated one directory at a time. strict flags are enabled INCREMENTALLY: noImplicitAny -> strictNullChecks -> full strict. Each tightening lands as its own commit on the migration branch. After all files convert, allowJs is dropped.",
+  "_comment": "TypeScript configuration. The .ts/.tsx migration is complete (allowJs:false). Strict sub-flags that the codebase ALREADY satisfies (0 tsc errors) are enabled now: noImplicitThis, strictFunctionTypes, strictBindCallApply, alwaysStrict. The two big remaining tightenings are deferred (each is large + best done off a live tournament): noImplicitAny (~715 errors) and strictNullChecks (~342). Enable them incrementally, each as its own commit, then flip the `strict` umbrella.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -11,6 +11,10 @@
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
+    "noImplicitThis": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "alwaysStrict": true,
     "noEmit": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,

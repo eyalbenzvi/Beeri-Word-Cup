@@ -25,3 +25,6 @@ dist-ssr
 *.sln
 *.sw?
 .claude/
+
+# Large FIFA source spreadsheet — reference only, not bundled (see src/data/matches.ts)
+*.xlsx

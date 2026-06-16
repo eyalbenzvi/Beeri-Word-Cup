@@ -171,6 +171,7 @@ run_test "105. Live Rank Impact (hypothetical projection from live scores)" "ui/
 run_test "106. Sentry Error Fixes (timezone, chunk-reload, breadcrumb, ensure retry)" "store/test-sentry-error-fixes.mjs" "no"
 run_test "107. LLM Input Sanitize (prompt-injection hardening, shared lib + wiring)" "auth/test-llm-sanitize.mjs" "no"
 run_test "108. Error Reporting (no silent catches: FormsHub preload, PhoneSignIn WebOTP)" "store/test-error-reporting.mjs" "no"
+run_test "109. CORS Helper (shared origin allowlist + per-function variants + wiring)" "auth/test-cors-helper.mjs" "no"
 
 echo ""
 echo "==========================================="

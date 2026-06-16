@@ -481,7 +481,7 @@ function FreshnessFooter({ fetchedAt, failures, now }) {
     text = LIVE.staleNote(Math.round((now - fetchedAt) / 60000));
   }
   return (
-    <div className="text-[10px] md:text-xs text-ink-muted text-center mt-2">
+    <div className="text-3xs md:text-xs text-ink-muted text-center mt-2">
       {text}
     </div>
   );

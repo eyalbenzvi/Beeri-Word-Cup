@@ -96,7 +96,7 @@ export default function Admin() {
           >
             {tab.label}
             {tabBadges[tab.id] != null && (
-              <span className="mr-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-extrabold rounded-full bg-primary text-white">
+              <span className="mr-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-3xs font-extrabold rounded-full bg-primary text-white">
                 {tabBadges[tab.id]}
               </span>
             )}
