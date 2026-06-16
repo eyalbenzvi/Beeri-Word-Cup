@@ -25,7 +25,7 @@ assert(
   "Stats imports the aggregateMatchPredictions helper",
 );
 assert(
-  /aggregateMatchPredictions\(forms, selectedMatch\)/.test(stats),
+  /aggregateMatchPredictions\(forms, selectedMatch[^)]*\)/.test(stats),
   "match-stats memo delegates to aggregateMatchPredictions",
 );
 

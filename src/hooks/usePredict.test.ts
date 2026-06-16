@@ -1,20 +1,38 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createElement } from "react";
 import { renderHook, act } from "@testing-library/react";
 import { usePredictPosition, usePredictDuplicateNameView } from "./usePredict";
+import { NavigationProvider } from "./useNavigation";
+
+// usePredictPosition reads/writes navigation params via useNavigation(),
+// which throws if rendered outside NavigationProvider (App.tsx always
+// wraps the tree in one — see src/App.tsx).
+const withNavigation = ({ children }: { children: any }) =>
+  createElement(NavigationProvider, null, children);
 
 describe("usePredictPosition", () => {
-  beforeEach(() => sessionStorage.clear());
-  afterEach(() => sessionStorage.clear());
+  // NavigationProvider seeds its initial params from the real URL and
+  // pushes history entries on every setParamsPatch call — reset both so
+  // a stage/group set by one test doesn't leak into the next test's
+  // "URL wins over sessionStorage" branch.
+  beforeEach(() => {
+    sessionStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
+  afterEach(() => {
+    sessionStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("returns sane defaults when no saved state exists", () => {
-    const { result } = renderHook(() => usePredictPosition("formA"));
+    const { result } = renderHook(() => usePredictPosition("formA"), { wrapper: withNavigation });
     const [stage, , group] = result.current;
     expect(stage).toBe("group");
     expect(group).toBe("A");
   });
 
   it("persists changes to sessionStorage keyed by activeFormId", () => {
-    const { result } = renderHook(() => usePredictPosition("formA"));
+    const { result } = renderHook(() => usePredictPosition("formA"), { wrapper: withNavigation });
     const [, setStage, , setGroup] = result.current;
     act(() => {
       setStage("R32");
@@ -30,7 +48,7 @@ describe("usePredictPosition", () => {
       "predict-pos-formX",
       JSON.stringify({ stage: "QF", group: "C" }),
     );
-    const { result } = renderHook(() => usePredictPosition("formX"));
+    const { result } = renderHook(() => usePredictPosition("formX"), { wrapper: withNavigation });
     // The restore happens in a useEffect, so the first render still
     // shows the defaults. RTL renderHook doesn't auto-await effects in
     // the same render — so the defaults apply only on the first sync
@@ -42,14 +60,14 @@ describe("usePredictPosition", () => {
 
   it("ignores malformed saved JSON without throwing", () => {
     sessionStorage.setItem("predict-pos-formY", "not-json{");
-    const { result } = renderHook(() => usePredictPosition("formY"));
+    const { result } = renderHook(() => usePredictPosition("formY"), { wrapper: withNavigation });
     // Defaults survive the malformed restore.
     expect(result.current[0]).toBe("group");
     expect(result.current[2]).toBe("A");
   });
 
   it("does nothing when activeFormId is null", () => {
-    const { result } = renderHook(() => usePredictPosition(null));
+    const { result } = renderHook(() => usePredictPosition(null), { wrapper: withNavigation });
     const [, setStage] = result.current;
     act(() => setStage("R16"));
     // No persisted entry created.

@@ -85,7 +85,7 @@ export default function SummaryMatchNoteRow({
     <div className="border-2 border-border rounded-2xl p-3 bg-bg-soft/40">
       <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <span className="text-sm font-extrabold text-ink">
-          {teamLabel(m.homeTeam)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(m.awayTeam)}
+          {teamLabel(m.homeTeam)} {r ? `${r.awayScore}–${r.homeScore}` : "–"} {teamLabel(m.awayTeam)}
         </span>
         <span className="text-[11px] font-bold text-ink-muted">
           {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} מדויקים

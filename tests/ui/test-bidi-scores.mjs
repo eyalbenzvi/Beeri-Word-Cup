@@ -275,7 +275,7 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
   // helped the no-result case; the working fix uses `result?.homeTeam ||
   // bracketTeams[...]` as a chained fallback.
   assert(
-    /getCachedBracket\(\s*results\s*\)/.test(results),
+    /getCachedBracket\(\s*results\s*(,\s*true\s*)?\)/.test(results),
     "Results.tsx: bracket derived via getCachedBracket(results)",
   );
   assert(
