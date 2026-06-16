@@ -303,6 +303,18 @@ export function calcBracketTeams(matchPredictions: Record<string, any>) {
   );
   if (!hasGroupPredictions) return bracket;
 
+  // Check if all group stage matches are complete before populating R32 teams.
+  // Count completed matches per group (6 matches = all matches in a group).
+  const completedGroupMatches: Record<string, number> = {};
+  for (const match of groupMatches) {
+    const pred = matchPredictions[match.id];
+    if (isScoreValid(pred)) {
+      completedGroupMatches[match.group] = (completedGroupMatches[match.group] || 0) + 1;
+    }
+  }
+  const allGroupsComplete = Object.keys(completedGroupMatches).length === 12 &&
+    Object.values(completedGroupMatches).every((count: number) => count === 6);
+
   const bestThird = getBestThirdPlaceTeams(standings);
   const thirdAssignments = assignThirdPlaceTeams(bestThird);
 
@@ -310,14 +322,17 @@ export function calcBracketTeams(matchPredictions: Record<string, any>) {
     let home = null,
       away = null;
 
-    if (match.home.match(/^[12][A-L]$/)) {
-      home = resolvePosition(match.home, standings);
-    }
+    // Only resolve R32 teams if all group stage matches are complete
+    if (allGroupsComplete) {
+      if (match.home.match(/^[12][A-L]$/)) {
+        home = resolvePosition(match.home, standings);
+      }
 
-    if (match.away === "3rd") {
-      away = thirdAssignments[match.id] || null;
-    } else if (match.away.match(/^[12][A-L]$/)) {
-      away = resolvePosition(match.away, standings);
+      if (match.away === "3rd") {
+        away = thirdAssignments[match.id] || null;
+      } else if (match.away.match(/^[12][A-L]$/)) {
+        away = resolvePosition(match.away, standings);
+      }
     }
 
     bracket[match.id] = { home, away };
