@@ -38,6 +38,7 @@ import {
 import {
   cache,
   notifyAndEmit,
+  getMissingReadyKeys,
 } from "./cache";
 import { rebuildUserFormIndex, flushPendingWrites } from "./predictionsRepo";
 import { teardownPublicReadonlyMode } from "./publicMode";
@@ -258,13 +259,13 @@ export function initRealtimeListeners(userId: string) {
         flushPendingWrites();
       } else if (document.visibilityState === "visible") {
         // Tab became visible — re-subscribe if we hadn't fully loaded yet.
-        if (Object.values(cache._ready).some((v) => !v)) retryRealtimeListeners();
+        if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
       }
     });
     window.addEventListener("pagehide", flushPendingWrites);
     // When network comes back online, retry if anything still missing.
     window.addEventListener("online", () => {
-      if (Object.values(cache._ready).some((v) => !v)) retryRealtimeListeners();
+      if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
     });
   }
 

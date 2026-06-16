@@ -446,6 +446,49 @@ console.log("--- 15b. wiring: store exports retryRealtimeListeners; App offers i
   );
 }
 
+// ============ 16. Auto-retry predicate must detect missing ready keys ============
+console.log("--- 16. online/visibility auto-retry uses getMissingReadyKeys, not the dead Object.values predicate ---");
+
+{
+  // cache._ready is only ever set to `true` (or reset to {}); it is NEVER set
+  // to false. So the old predicate `Object.values(_ready).some(v => !v)` is
+  // ALWAYS false — the online/visibility auto-retry was dead code. The correct
+  // predicate compares the REQUIRED keys against what's present.
+  const REQUIRED = ["users", "userDirectory", "matchResults", "actualAdvancing", "actualBonuses", "settings", "predictions"];
+  function getMissingReadyKeys(ready) {
+    return REQUIRED.filter((k) => !ready[k]);
+  }
+  const oldPredicate = (ready) => Object.values(ready).some((v) => !v);
+
+  // Nothing loaded yet (fresh login): old predicate says "all good" (bug);
+  // new predicate correctly reports every required key missing.
+  assert(oldPredicate({}) === false, "old predicate is false on empty _ready (the bug)");
+  assert(getMissingReadyKeys({}).length === REQUIRED.length, "new predicate flags all keys missing when nothing loaded");
+
+  // Partially loaded: a couple of listeners fired, the rest are still missing.
+  const partial = { users: true, settings: true };
+  assert(oldPredicate(partial) === false, "old predicate stays false while keys are still missing (the bug)");
+  assert(getMissingReadyKeys(partial).length === REQUIRED.length - 2, "new predicate flags the still-missing keys");
+
+  // Fully loaded: no retry needed.
+  const full = Object.fromEntries(REQUIRED.map((k) => [k, true]));
+  assert(getMissingReadyKeys(full).length === 0, "new predicate reports nothing missing when fully ready");
+}
+
+console.log("--- 16b. wiring: listeners.ts auto-retry handlers call getMissingReadyKeys ---");
+
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync("src/store/listeners.ts", "utf8");
+  // Both the online + visibilitychange handlers must use the real predicate.
+  const matches = src.match(/getMissingReadyKeys\(\)\.length > 0/g) || [];
+  assert(matches.length >= 2, "online + visibility handlers both gate on getMissingReadyKeys().length > 0");
+  assert(
+    !/Object\.values\(cache\._ready\)\.some/.test(src),
+    "the dead Object.values(cache._ready).some(...) predicate is gone",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
