@@ -13,6 +13,7 @@
 // this works regardless of client transport state.
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { buildCorsHeaders } from "./_lib/cors.js";
 
 let adminInitialized = false;
 
@@ -32,15 +33,12 @@ const ALLOWED_ORIGINS = (
 ).split(",");
 
 function getCorsHeaders(event) {
-  const origin = event?.headers?.origin || event?.headers?.Origin;
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Cache-Control": "no-store",
-    "Content-Type": "application/json",
-  };
+  return buildCorsHeaders(event, {
+    allowedOrigins: ALLOWED_ORIGINS,
+    methods: "GET, OPTIONS",
+    allowHeaders: "Content-Type",
+    extra: { "Cache-Control": "no-store" },
+  });
 }
 
 async function getPublicSummariesHandler(event) {

@@ -16,6 +16,7 @@
 
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { buildCorsHeaders } from "./_lib/cors.js";
 import { decideSingleSource } from "./_sources/consensus.js";
 import { fetchMatchResult as fetchEspn } from "./_sources/espnResult.js";
 import { fetchMatchResult as fetchFootballData } from "./_sources/footballData.js";
@@ -37,14 +38,7 @@ function initAdmin() {
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173").split(",");
 
 function getCorsHeaders(event) {
-  const origin = event?.headers?.origin || event?.headers?.Origin;
-  const allowedOrigin = (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json",
-  };
+  return buildCorsHeaders(event, { allowedOrigins: ALLOWED_ORIGINS });
 }
 
 // Minimum age (since kickoff) before we attempt to record an official result.
