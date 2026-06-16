@@ -180,21 +180,25 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
 {
   const editor = readMigratedSrc("src/components/SummaryEditor.jsx", "utf8");
   const noteRow = readMigratedSrc("src/components/SummaryMatchNoteRow.jsx", "utf8");
+  // The blog editor renders the score INLINE between the two team-name labels,
+  // which appear home-first. Commit 33eaa12 ("Fix reversed score display in
+  // blog editor") aligned the score to that order — home-first — because the
+  // away-first order rendered reversed next to the names. Lock home-first here.
   assert(
-    /\$\{r\.awayScore\}[–-]\$\{r\.homeScore\}/.test(noteRow),
-    "SummaryMatchNoteRow inline score: ${away}–${home}",
+    /\$\{r\.homeScore\}[–-]\$\{r\.awayScore\}/.test(noteRow),
+    "SummaryMatchNoteRow inline score: ${home}–${away} (matches home-first labels)",
   );
   assert(
-    /\$\{result\.awayScore\}[–-]\$\{result\.homeScore\}/.test(editor),
-    "SummaryEditor MatchRow scoreText: ${away}–${home}",
+    /\$\{result\.homeScore\}[–-]\$\{result\.awayScore\}/.test(editor),
+    "SummaryEditor MatchRow scoreText: ${home}–${away}",
   );
   assert(
-    !/\$\{r\.homeScore\}[–-]\$\{r\.awayScore\}/.test(noteRow),
-    "SummaryMatchNoteRow: no legacy ${home}–${away} for r",
+    !/\$\{r\.awayScore\}[–-]\$\{r\.homeScore\}/.test(noteRow),
+    "SummaryMatchNoteRow: no reversed ${away}–${home} for r",
   );
   assert(
-    !/\$\{result\.homeScore\}[–-]\$\{result\.awayScore\}/.test(editor),
-    "SummaryEditor: no legacy ${home}–${away} for result",
+    !/\$\{result\.awayScore\}[–-]\$\{result\.homeScore\}/.test(editor),
+    "SummaryEditor: no reversed ${away}–${home} for result",
   );
 }
 
@@ -229,19 +233,22 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
 // === 9. statStarters (every "X:Y בול" template) ===
 {
   const src = readMigratedSrc("src/utils/statStarters.js", "utf8");
-  const homeFirst = src.match(/\$\{result\.homeScore\}:\$\{result\.awayScore\}/g);
-  assert(
-    !homeFirst,
-    `statStarters: no legacy \${home}:\${away} templates (found ${homeFirst?.length || 0})`,
-  );
+  // Auto-generated "X:Y בול" stat sentences read home-first (commit 33eaa12,
+  // same reversed-display fix as the blog editor above). The internal sort key
+  // (actualKey) intentionally stays away-first — it's a map key, never shown.
   const awayFirst = src.match(/\$\{result\.awayScore\}:\$\{result\.homeScore\}/g);
   assert(
-    awayFirst && awayFirst.length >= 4,
-    `statStarters: at least 4 \${away}:\${home} templates (found ${awayFirst?.length || 0})`,
+    !awayFirst,
+    `statStarters: no reversed \${away}:\${home} display templates (found ${awayFirst?.length || 0})`,
+  );
+  const homeFirst = src.match(/\$\{result\.homeScore\}:\$\{result\.awayScore\}/g);
+  assert(
+    homeFirst && homeFirst.length >= 4,
+    `statStarters: at least 4 \${home}:\${away} display templates (found ${homeFirst?.length || 0})`,
   );
   assert(
     /const actualKey = `\$\{Number\(result\.awayScore\)\}-\$\{Number\(result\.homeScore\)\}`/.test(src),
-    "statStarters actualKey: ${away}-${home}",
+    "statStarters actualKey stays away-first (internal sort key, not displayed)",
   );
 }
 
@@ -275,8 +282,8 @@ for (const { file, importRe, requiredProps } of SCORE_CONSUMERS) {
   // helped the no-result case; the working fix uses `result?.homeTeam ||
   // bracketTeams[...]` as a chained fallback.
   assert(
-    /getCachedBracket\(\s*results\s*\)/.test(results),
-    "Results.tsx: bracket derived via getCachedBracket(results)",
+    /getCachedBracket\(\s*results\s*(?:,\s*[^)]*)?\)/.test(results),
+    "Results.tsx: bracket derived via getCachedBracket(results, …)",
   );
   assert(
     /result\?\.homeTeam\s*\|\|\s*bracketTeams\[match\.id\]\?\.home/.test(
