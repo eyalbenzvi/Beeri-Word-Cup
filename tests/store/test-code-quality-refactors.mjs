@@ -135,6 +135,20 @@ console.log("--- 7. second-batch fixes (VALID_MODALS, MatchCard, bestCase) ---")
     "bestCase builds groupTeams from team codes, not team objects");
 }
 
+// --- TypeScript: the already-satisfied strict sub-flags stay enabled ---
+// These four cost 0 tsc errors today; pinning them prevents a silent revert
+// that would re-open the `this`/function-variance/bind-call-apply bug classes.
+{
+  const tsconfig = JSON.parse(readRaw("tsconfig.json"));
+  const co = tsconfig.compilerOptions || {};
+  for (const flag of ["noImplicitThis", "strictFunctionTypes", "strictBindCallApply", "alwaysStrict"]) {
+    assert(co[flag] === true, `tsconfig enables ${flag}`);
+  }
+  // The big remaining tightenings are intentionally still off (documented).
+  assert(co.noImplicitAny === false, "noImplicitAny still deferred (documented incremental work)");
+  assert(co.strictNullChecks === false, "strictNullChecks still deferred (documented incremental work)");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error("\nFAILURES:");
