@@ -256,23 +256,15 @@ export function initRealtimeListeners(userId: string) {
     window.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
         flushPendingWrites();
-      } else if (document.visibilityState === "visible" && currentListenerUserId) {
-        // Tab became visible — retry loading if we hadn't fully loaded yet.
-        // The check is done via the current readiness state via
-        // hadError flag below; we re-init when the gate reports missing keys.
-        if (Object.values(cache._ready).some((v) => !v)) {
-          listenersHadError = true;
-          initRealtimeListeners(currentListenerUserId);
-        }
+      } else if (document.visibilityState === "visible") {
+        // Tab became visible — re-subscribe if we hadn't fully loaded yet.
+        if (Object.values(cache._ready).some((v) => !v)) retryRealtimeListeners();
       }
     });
     window.addEventListener("pagehide", flushPendingWrites);
-    // When network comes back online, retry if anything still missing
+    // When network comes back online, retry if anything still missing.
     window.addEventListener("online", () => {
-      if (currentListenerUserId && Object.values(cache._ready).some((v) => !v)) {
-        listenersHadError = true;
-        initRealtimeListeners(currentListenerUserId);
-      }
+      if (Object.values(cache._ready).some((v) => !v)) retryRealtimeListeners();
     });
   }
 

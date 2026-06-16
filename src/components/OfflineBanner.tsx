@@ -38,7 +38,6 @@ export default function OfflineBanner() {
       role="status"
       aria-live="polite"
       className="bg-danger text-white text-xs font-bold text-center px-4 py-1.5"
-      style={{ background: "var(--color-danger)" }}
     >
       אין חיבור לאינטרנט — ייתכן שחלק מהנתונים לא יתעדכנו
     </div>

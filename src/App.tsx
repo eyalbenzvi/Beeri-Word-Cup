@@ -56,9 +56,14 @@ function Loading({ reason = "unknown", compact = false }) {
   const [retryNonce, setRetryNonce] = useState(0);
   const mountedAt = useRef(Date.now());
 
+  // (Re)start the stuck timer on a reason change OR an intentional retry. We
+  // deliberately do NOT reset `stuck` here: a reason transition while the
+  // recovery buttons are already showing (e.g. store-not-ready →
+  // user-not-in-cache, both still "not loaded") must keep them visible rather
+  // than hide them and force another full STUCK_THRESHOLD_MS wait. `stuck` is
+  // cleared only by retryListeners() below, on an explicit user retry.
   useEffect(() => {
     mountedAt.current = Date.now();
-    setStuck(false);
     const t = setTimeout(() => {
       setStuck(true);
       captureClientMessage("loading-stuck", {
@@ -71,7 +76,8 @@ function Loading({ reason = "unknown", compact = false }) {
 
   // Lighter-touch recovery: re-subscribe the Firestore listeners in place.
   // Preserves the auth session + any unsaved optimistic state. Falls back to
-  // a hard reload if there's no active listener user to retry.
+  // a hard reload if there's no active listener user to retry. Hides the
+  // recovery UI (setStuck(false)) and bumps the nonce to restart the timer.
   const retryListeners = () => {
     captureClientMessage("recovery-retry-listeners-tapped", {
       reason,
@@ -82,6 +88,7 @@ function Loading({ reason = "unknown", compact = false }) {
       window.location.reload();
       return;
     }
+    setStuck(false);
     setRetryNonce((n) => n + 1);
   };
 
