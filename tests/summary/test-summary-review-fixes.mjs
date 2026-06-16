@@ -152,10 +152,16 @@ assert(/cleanedInput\.length\s*>\s*MIN_POLISH_INPUT_LEN\s*&&\s*polished\.length\
   "polish refuses to return dramatically-truncated output");
 
 // ============ IMPL. control-token handling preserves content ============
+// The replacement table moved to the shared _lib/sanitizeLlmInput module so
+// every LLM caller (summary-ai + admin-query-translate) shares one
+// implementation. summary-ai must import it; the replacement details are
+// asserted against the shared lib (and exhaustively in test-llm-sanitize.mjs).
 console.log("--- IMPL: control-token replacement (not strip) ---");
-assert(/CONTROL_TOKEN_REPLACEMENTS/.test(aiFn), "control tokens are replaced, not stripped");
-assert(/\(token\)|\(tag\)/.test(aiFn), "replacements produce readable placeholders");
-assert(/'''/.test(aiFn), "triple-backticks replaced with ''' to preserve structure");
+const sanitizeLib = R("/home/user/Beeri-World-Cup/netlify/functions/_lib/sanitizeLlmInput.js");
+assert(/from "\.\/_lib\/sanitizeLlmInput\.js"/.test(aiFn), "summary-ai routes through the shared sanitizer");
+assert(/CONTROL_TOKEN_REPLACEMENTS/.test(sanitizeLib), "control tokens are replaced, not stripped");
+assert(/\(token\)|\(tag\)/.test(sanitizeLib), "replacements produce readable placeholders");
+assert(/'''/.test(sanitizeLib), "triple-backticks replaced with ''' to preserve structure");
 
 // ============ IMPL. Strict n parsing in DailySummary ============
 console.log("--- IMPL: DailySummary strict n parsing ---");
