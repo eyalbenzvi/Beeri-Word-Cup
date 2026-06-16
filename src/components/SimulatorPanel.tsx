@@ -308,10 +308,10 @@ export default function SimulatorPanel({
                   : { borderColor: "var(--color-border)" }}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-ink-muted font-medium">{match.id}</span>
+                <span className="text-3xs text-ink-muted font-medium">{match.id}</span>
                 <div className="flex items-center gap-1">
                   {isSimmed && (
-                    <span className="text-[10px] bg-accent text-white font-extrabold px-1.5 py-0.5 rounded-full">
+                    <span className="text-3xs bg-accent text-white font-extrabold px-1.5 py-0.5 rounded-full">
                       סימול
                     </span>
                   )}
@@ -319,7 +319,7 @@ export default function SimulatorPanel({
                     <button
                       type="button"
                       onClick={() => clearOne(match.id)}
-                      className="text-[10px] bg-bg-soft text-ink-muted px-1.5 py-0.5 rounded-full font-bold border-none cursor-pointer"
+                      className="text-3xs bg-bg-soft text-ink-muted px-1.5 py-0.5 rounded-full font-bold border-none cursor-pointer"
                       aria-label="בטל סימולציה למשחק זה"
                     >
                       ↺
@@ -438,7 +438,7 @@ export default function SimulatorPanel({
                 result && (
                   <div className="mt-1">
                     {needsTeam && (
-                      <div className="text-[10px] text-amber-700 text-center mb-1">
+                      <div className="text-3xs text-amber-700 text-center mb-1">
                         בחר קבוצה שעולה לשלב הבא:
                       </div>
                     )}

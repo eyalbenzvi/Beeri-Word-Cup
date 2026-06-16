@@ -10,13 +10,13 @@ import { BLOG } from "../constants/messages";
 function statusBadge(status) {
   if (status === "published") {
     return (
-      <span className="text-[10px] font-extrabold bg-primary text-white px-2 py-0.5 rounded-full">
+      <span className="text-3xs font-extrabold bg-primary text-white px-2 py-0.5 rounded-full">
         {BLOG.status.publishedBadge}
       </span>
     );
   }
   return (
-    <span className="text-[10px] font-extrabold bg-accent-soft-2 text-accent-text px-2 py-0.5 rounded-full">
+    <span className="text-3xs font-extrabold bg-accent-soft-2 text-accent-text px-2 py-0.5 rounded-full">
       {BLOG.status.draftBadge}
     </span>
   );
@@ -120,11 +120,11 @@ export default function AdminSummariesTab() {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                <span className="text-[11px] font-extrabold text-secondary tabular-nums">
+                <span className="text-2xs font-extrabold text-secondary tabular-nums">
                   #{s.number}
                 </span>
                 {statusBadge(s.status)}
-                <span className="text-[11px] text-ink-muted font-medium">
+                <span className="text-2xs text-ink-muted font-medium">
                   {(s.coveredMatchIds || []).length} משחקים
                 </span>
               </div>

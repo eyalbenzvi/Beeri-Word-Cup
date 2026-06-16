@@ -40,7 +40,7 @@ export default function TournamentCountdown({
           className={
             variant === "large"
               ? "text-center text-xs text-ink-muted mt-4 font-medium"
-              : "text-center text-[11px] text-ink-muted mt-3 font-medium"
+              : "text-center text-2xs text-ink-muted mt-3 font-medium"
           }
         >
           {footerText}

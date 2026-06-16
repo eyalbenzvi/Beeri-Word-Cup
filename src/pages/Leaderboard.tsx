@@ -698,7 +698,7 @@ export default function Leaderboard({
                       const up = delta > 0;
                       return (
                         <span
-                          className={`inline-flex items-center gap-0.5 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full tabular-nums animate-pop-in ${
+                          className={`inline-flex items-center gap-0.5 text-3xs font-extrabold px-1.5 py-0.5 rounded-full tabular-nums animate-pop-in ${
                             up ? "bg-primary/10 text-primary-dark" : "bg-danger/10 text-danger"
                           }`}
                           aria-label={up ? `עלית ${delta} מקומות` : `ירדת ${-delta} מקומות`}

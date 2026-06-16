@@ -29,7 +29,7 @@ export default function FormAvatar({ form, size = "md" }) {
       {submitted && (
         <span
           aria-hidden="true"
-          className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-white text-primary-dark text-[10px] font-extrabold flex items-center justify-center border border-primary-dark"
+          className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-white text-primary-dark text-3xs font-extrabold flex items-center justify-center border border-primary-dark"
         >
           ✓
         </span>

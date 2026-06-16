@@ -141,7 +141,7 @@ export default function MatchSearch({
                     style={{ background: missing ? "var(--color-danger)" : "var(--color-primary)" }}
                   />
                   <span
-                    className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
+                    className={`text-3xs font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
                       isKO ? "bg-purple" : "bg-secondary"
                     }`}
                   >

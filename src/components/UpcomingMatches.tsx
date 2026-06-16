@@ -72,7 +72,7 @@ function FormPredictionRow({ form, match, actualTeams, formBracket }) {
         isKnockout &&
         aligned.homeScore === aligned.awayScore &&
         aligned.advancingTeam && (
-          <span className="text-[10px] text-ink-muted whitespace-nowrap">
+          <span className="text-3xs text-ink-muted whitespace-nowrap">
             מעפילה: {teamName(aligned.advancingTeam)}
           </span>
         )}

@@ -57,7 +57,7 @@ export default function UnfilledQueue({
               className="w-full flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border-2 border-border hover:border-border-strong transition cursor-pointer text-right"
             >
               <span
-                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
+                className={`text-3xs font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap text-white ${
                   isKO ? "bg-purple" : "bg-secondary"
                 }`}
               >

@@ -225,11 +225,11 @@ export default function DailySummary() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[11px] font-extrabold text-secondary tabular-nums">
+                    <span className="text-2xs font-extrabold text-secondary tabular-nums">
                       #{s.number}
                     </span>
                     {s.status !== "published" && (
-                      <span className="text-[10px] font-extrabold bg-accent-soft-2 text-accent-text px-2 py-0.5 rounded-full">
+                      <span className="text-3xs font-extrabold bg-accent-soft-2 text-accent-text px-2 py-0.5 rounded-full">
                         טיוטה
                       </span>
                     )}
@@ -237,7 +237,7 @@ export default function DailySummary() {
                   <div className="text-sm font-extrabold text-ink truncate">
                     {s.title || `סיכום #${s.number}`}
                   </div>
-                  <div className="text-[11px] text-ink-muted font-medium">
+                  <div className="text-2xs text-ink-muted font-medium">
                     {(s.coveredMatchIds || []).length} משחקים
                   </div>
                 </button>
