@@ -4,6 +4,7 @@ import { useNavigation } from "../hooks/useNavigation";
 import MenuOverlay from "./MenuOverlay";
 import DesktopSideNav from "./DesktopSideNav";
 import ThemeToggle from "./ThemeToggle";
+import OfflineBanner from "./OfflineBanner";
 import { Menu, Home as HomeIcon, ClipboardList, Trophy, Goal, BarChart3, Settings, Newspaper } from "lucide-react";
 import { BLOG } from "../constants/messages";
 
@@ -36,6 +37,8 @@ export default function Layout({ children, rightRail = null }) {
 
   return (
     <div className="bg-bg">
+      {/* Connectivity indicator — renders nothing while online. */}
+      <OfflineBanner />
       {/* Header */}
       <header className="header-duo sticky top-0 z-50">
         <div className="max-w-7xl xl:max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between">

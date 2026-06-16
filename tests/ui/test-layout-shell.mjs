@@ -14,6 +14,10 @@ const layoutSrc = readMigratedSrc("src/components/Layout.jsx", "utf8");
 // --- Layout accepts rightRail prop ---
 assert(/rightRail/.test(layoutSrc), "Layout accepts rightRail prop");
 
+// --- Connectivity banner is mounted app-wide ---
+assert(/import OfflineBanner/.test(layoutSrc), "Layout imports OfflineBanner");
+assert(/<OfflineBanner\s*\/>/.test(layoutSrc), "Layout renders <OfflineBanner />");
+
 // --- Desktop sidebar component is imported ---
 assert(/DesktopSideNav/.test(layoutSrc), "Layout imports DesktopSideNav");
 
