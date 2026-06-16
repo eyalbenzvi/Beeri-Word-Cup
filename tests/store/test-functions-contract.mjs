@@ -64,7 +64,12 @@ assert(matchFile.includes('statusCode: 401'), "match-analysis returns 401 for un
 
 // ---- 6. Function: returns JSON content type ----
 console.log("--- 6. JSON content type ---");
-assert(matchFile.includes('"Content-Type": "application/json"'), "match-analysis sets JSON content type");
+// CORS headers (incl. the JSON content type) now come from the shared
+// _lib/cors.js builder. Verify match-analysis routes through it and that the
+// builder unconditionally sets the JSON content type.
+const corsLib = readFileSync('/home/user/Beeri-World-Cup/netlify/functions/_lib/cors.js', 'utf8');
+assert(matchFile.includes('buildCorsHeaders'), "match-analysis uses the shared CORS builder");
+assert(corsLib.includes('"Content-Type": "application/json"'), "shared CORS builder sets JSON content type");
 
 // ---- 7. Function: error responses include error field ----
 console.log("--- 7. Error response structure ---");
