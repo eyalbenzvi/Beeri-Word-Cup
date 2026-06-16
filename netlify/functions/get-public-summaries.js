@@ -13,7 +13,7 @@
 // this works regardless of client transport state.
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
-import { buildCorsHeaders } from "./_lib/cors.js";
+import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
 
 let adminInitialized = false;
 
@@ -27,10 +27,7 @@ function initAdmin() {
   adminInitialized = true;
 }
 
-const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS ||
-  "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173"
-).split(",");
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
 function getCorsHeaders(event) {
   return buildCorsHeaders(event, {

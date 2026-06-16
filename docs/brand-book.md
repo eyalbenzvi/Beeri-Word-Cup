@@ -50,6 +50,13 @@ Heading sizes use standard Tailwind scale (`text-base`, `text-lg`,
 `text-xl`, `text-2xl`, …). Avoid arbitrary `text-[11px]/[12px]/[15px]` —
 use the closest standard size.
 
+For sub-`text-xs` micro text (badges, dense table cells, helper captions),
+use the two sanctioned utilities `text-2xs` (11px) and `text-3xs` (10px)
+defined once in `index.css` — **not** inline `text-[10px]/[11px]`. They are
+the official body micro-scale below `text-xs` (12px): monotonic
+`text-3xs < text-2xs < text-xs`. Do not introduce further arbitrary pixel
+sizes; extend the named scale instead.
+
 Letter-spacing on display headings: `-0.01em`.
 
 ## Shape & elevation

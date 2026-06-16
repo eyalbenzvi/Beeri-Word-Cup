@@ -4,7 +4,12 @@
 // Plain node ESM — the helper is dependency-free.
 
 import { readFileSync, readdirSync } from "node:fs";
-import { pickAllowedOrigin, buildCorsHeaders } from "../../netlify/functions/_lib/cors.js";
+import {
+  pickAllowedOrigin,
+  buildCorsHeaders,
+  resolveAllowedOrigins,
+  DEFAULT_ALLOWED_ORIGINS,
+} from "../../netlify/functions/_lib/cors.js";
 
 let passed = 0,
   failed = 0;
@@ -17,6 +22,36 @@ function assert(c, m) {
 console.log("=== CORS HELPER TESTS ===\n");
 
 const ORIGINS = ["https://beeri-world-cup.web.app", "https://beeri-world-cup.firebaseapp.com", "http://localhost:5173"];
+
+// ---------- resolveAllowedOrigins ----------
+{
+  assert(
+    JSON.stringify(resolveAllowedOrigins(undefined)) === JSON.stringify(DEFAULT_ALLOWED_ORIGINS),
+    "unset env -> shared default origins",
+  );
+  assert(JSON.stringify(resolveAllowedOrigins("")) === JSON.stringify(DEFAULT_ALLOWED_ORIGINS), "empty env -> default origins");
+  assert(
+    JSON.stringify(resolveAllowedOrigins("https://a.com,https://b.com")) === JSON.stringify(["https://a.com", "https://b.com"]),
+    "env override -> split list",
+  );
+  // Must return a fresh array, never the shared module-level default (so a
+  // caller can't mutate the default for everyone).
+  const r = resolveAllowedOrigins(undefined);
+  r.push("https://injected.com");
+  assert(!DEFAULT_ALLOWED_ORIGINS.includes("https://injected.com"), "returns a fresh copy of the default (no shared mutation)");
+}
+
+// ---------- extra cannot override the security-relevant fixed keys ----------
+{
+  const ev = { headers: { origin: ORIGINS[2] } };
+  const h = buildCorsHeaders(ev, {
+    allowedOrigins: ORIGINS,
+    extra: { "Access-Control-Allow-Origin": "*", "Content-Type": "text/html", "X-Custom": "ok" },
+  });
+  assert(h["Access-Control-Allow-Origin"] === ORIGINS[2], "extra cannot override Access-Control-Allow-Origin");
+  assert(h["Content-Type"] === "application/json", "extra cannot override Content-Type");
+  assert(h["X-Custom"] === "ok", "extra non-conflicting headers still applied");
+}
 
 // ---------- pickAllowedOrigin ----------
 {

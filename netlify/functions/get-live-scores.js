@@ -43,7 +43,7 @@
 // the client falls back to the schedule-derived "משוחק עכשיו" UI.
 
 import { withSentry } from "./_sentry.js";
-import { buildCorsHeaders } from "./_lib/cors.js";
+import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
 import { getJson, dayWindow } from "./_sources/http.js";
 import { normalizeFdMatches } from "./_sources/liveNormalize.js";
 import { normalizeEspnEvents } from "./_sources/espnLive.js";
@@ -60,10 +60,7 @@ const CACHE_TTL_MS = 25 * 1000;
 // How long a stale payload is still worth serving when upstream is down.
 const STALE_MAX_MS = 10 * 60 * 1000;
 
-const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS ||
-  "https://beeri-world-cup.web.app,https://beeri-world-cup.firebaseapp.com,http://localhost:5173"
-).split(",");
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
 function getCorsHeaders(event) {
   return buildCorsHeaders(event, {

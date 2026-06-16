@@ -1,13 +1,27 @@
-// Shared CORS header builder for the Netlify functions.
+// Shared CORS for the Netlify functions.
 //
-// Every function previously hand-rolled an identical origin-allowlist match
-// (`origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]`)
-// — the security-relevant part — plus a near-identical header object. This
-// centralizes the origin selection + header shape; callers still own their
-// own ALLOWED_ORIGINS list (they legitimately differ: prod-only vs prod+dev)
-// and pass their method / allow-headers / extra (cache) headers.
-//
-// Pure + dependency-free so the test runner can import and assert on it.
+// Every function previously hand-rolled (a) the same origin-allowlist match
+// and (b) the same default-origins literal. Both are centralized here. Pure +
+// dependency-free so the test runner can import and assert on it.
+
+// The production + local-dev origins shared by every function EXCEPT
+// summary-ai (which adds its own NODE_ENV-gated prod/dev split). Override at
+// runtime with the ALLOWED_ORIGINS env var.
+export const DEFAULT_ALLOWED_ORIGINS = [
+  "https://beeri-world-cup.web.app",
+  "https://beeri-world-cup.firebaseapp.com",
+  "http://localhost:5173",
+];
+
+// Resolve a function's allowlist from its env override, falling back to the
+// shared default. Returns a fresh array (never the shared module-level one) so
+// a caller can't accidentally mutate the default for everyone.
+export function resolveAllowedOrigins(envValue) {
+  if (envValue && typeof envValue === "string") {
+    return envValue.split(",");
+  }
+  return [...DEFAULT_ALLOWED_ORIGINS];
+}
 
 // Pick the echoed Access-Control-Allow-Origin: the request origin iff it is in
 // the allowlist, otherwise the first allowlisted origin (never "*", so a
@@ -26,11 +40,14 @@ export function buildCorsHeaders(
     extra = {},
   },
 ) {
+  // `extra` is spread FIRST so the security-relevant fixed keys below always
+  // win — a caller's extra (cache headers, Vary, …) can never override the
+  // origin allowlist result or the JSON content type.
   return {
+    ...extra,
     "Access-Control-Allow-Origin": pickAllowedOrigin(event, allowedOrigins),
     "Access-Control-Allow-Headers": allowHeaders,
     "Access-Control-Allow-Methods": methods,
     "Content-Type": "application/json",
-    ...extra,
   };
 }
