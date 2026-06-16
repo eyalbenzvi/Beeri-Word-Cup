@@ -41,5 +41,19 @@ const minusBtnCount = (matchCard.match(/aria-label=\{`הורד גול מ/g) || [
 assert(plusBtnCount === 2, `MatchCard has 2 aria-labeled + buttons (found ${plusBtnCount})`);
 assert(minusBtnCount === 2, `MatchCard has 2 aria-labeled − buttons (found ${minusBtnCount})`);
 
+// --- SaveIndicator announces save state to screen readers ---
+// The save/saved/error pill is a live region: an error must be assertive
+// (interrupts), the saving/saved status polite. Without these, a blind user
+// gets no feedback that their prediction was saved or failed.
+const saveIndicator = readMigratedSrc("src/components/SaveIndicator.jsx", "utf8");
+assert(
+  /role="alert"[\s\S]{0,40}aria-live="assertive"/.test(saveIndicator),
+  "SaveIndicator error state is an assertive live region (role=alert)",
+);
+assert(
+  /role="status"[\s\S]{0,40}aria-live="polite"/.test(saveIndicator),
+  "SaveIndicator saving/saved state is a polite live region (role=status)",
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

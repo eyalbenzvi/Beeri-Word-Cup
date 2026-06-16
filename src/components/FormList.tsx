@@ -128,6 +128,14 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
             icon="📋"
             title="ברוך הבא!"
             description="צור טופס ניחושים ראשון כדי להתחיל לנחש תוצאות משחקים"
+            cta={
+              <button
+                onClick={() => setShowNewForm(true)}
+                className="btn-duo btn-duo-primary"
+              >
+                + צור טופס ראשון
+              </button>
+            }
           />
         </div>
       )}
