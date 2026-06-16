@@ -126,3 +126,36 @@ export async function maybeRefreshToken(err: any) {
     return false;
   }
 }
+
+// Run a Firestore op, retrying on a TRANSIENT permission-denied. A freshly
+// minted auth token (first sign-in, or after an iOS-Safari ITP token reset)
+// can be rejected because the backend hasn't seen it yet — the classic
+// "createUserField: Missing or insufficient permissions" / user-stuck-on-
+// loading Sentry signature. On denial we ask maybeRefreshToken to force a
+// fresh ID token (it actually refreshes at most once per uid per TTL, so a
+// later attempt mostly just waits for the first refresh to propagate) and back
+// off, then retry. A genuine rules violation simply exhausts the (small)
+// attempt budget and rethrows, so the caller's existing error path still logs
+// it. `op` is re-invoked per attempt so callers can rebuild a WriteBatch (a
+// committed batch can't be reused). Each attempt is bounded by withTimeout so a
+// hung request can't stall the whole bootstrap; with the defaults the realistic
+// (fast-rejection) worst case is ~3.6s per op, comfortably under the 15s
+// user-watchdog.
+export async function retryOnPermissionDenied<T>(
+  op: () => Promise<T>,
+  {
+    retries = 2,
+    backoffMs = 1200,
+    timeoutMs = 10000,
+  }: { retries?: number; backoffMs?: number; timeoutMs?: number } = {},
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await withTimeout(op(), timeoutMs);
+    } catch (err: any) {
+      if (err?.code !== "permission-denied" || attempt >= retries) throw err;
+      await maybeRefreshToken(err);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs * (attempt + 1)));
+    }
+  }
+}
