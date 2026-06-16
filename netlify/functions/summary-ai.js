@@ -13,6 +13,7 @@
 import Groq from "groq-sdk";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { sanitizeLlmInput } from "./_lib/sanitizeLlmInput.js";
 
 let adminInitialized = false;
 function initAdmin() {
@@ -76,26 +77,18 @@ async function checkRateLimit(uid) {
   });
 }
 
-// Prompt-injection hardening: neutralize control tokens the LLM might
-// interpret as role boundaries, and bound length. The caller is always
-// admin (auth-gated), so this is defense-in-depth, not the security layer.
-// We REPLACE rather than STRIP so legitimate content (e.g. an admin pasting
-// a fenced code block or a stat table) round-trips as readable text.
-const CONTROL_TOKEN_REPLACEMENTS = [
-  [/<\|[^|>]{0,40}\|>/gi, "(token)"],
-  [/<\/?(?:s|system|user|assistant)>/gi, "(tag)"],
-  [/```/g, "'''"],
-];
+// Prompt-injection hardening lives in the shared _lib/sanitizeLlmInput module
+// so admin-query-translate.js and any future LLM caller apply the SAME
+// neutralization. The caller is always admin (auth-gated), so this is
+// defense-in-depth, not the security layer. `sanitize`/`clampText` stay as
+// thin local aliases bound to this function's MAX_INPUT_CHARS so the existing
+// call sites read unchanged.
 function sanitize(s, max = MAX_INPUT_CHARS) {
-  if (typeof s !== "string") return "";
-  let cleaned = s;
-  for (const [re, repl] of CONTROL_TOKEN_REPLACEMENTS) cleaned = cleaned.replace(re, repl);
-  cleaned = cleaned.replace(/\s{3,}/g, "\n\n");
-  return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
+  return sanitizeLlmInput(s, max);
 }
 
 function clampText(s, max = MAX_INPUT_CHARS) {
-  return sanitize(s, max);
+  return sanitizeLlmInput(s, max);
 }
 
 async function verifyAdmin(idToken) {

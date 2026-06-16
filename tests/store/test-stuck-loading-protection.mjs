@@ -365,6 +365,130 @@ console.log("--- 14. ensureUserInStore reads userPrivate/{uid} so non-admins can
   );
 }
 
+// ============ 15. In-place listener retry (lighter than full reload) ============
+console.log("--- 15. retryRealtimeListeners forces a re-subscribe and no-ops when logged out ---");
+
+{
+  // Behavioural model of the listeners.ts guard + retry contract:
+  //   - initRealtimeListeners() early-returns when already initialized AND
+  //     error-free, so a plain re-call is a no-op.
+  //   - retryRealtimeListeners() flips the error flag first, forcing a genuine
+  //     re-subscribe, and returns false (no-op) when no listener user is set.
+  let listenersInitialized = false;
+  let listenersHadError = false;
+  let currentListenerUserId = null;
+  let subscribeCount = 0;
+
+  function initRealtimeListeners(uid) {
+    if (listenersInitialized && !listenersHadError) return; // guard
+    listenersInitialized = true;
+    listenersHadError = false;
+    currentListenerUserId = uid;
+    subscribeCount++;
+  }
+  function retryRealtimeListeners() {
+    if (!currentListenerUserId) return false;
+    listenersHadError = true;
+    initRealtimeListeners(currentListenerUserId);
+    return true;
+  }
+
+  // Logged out: retry is a no-op.
+  assert(retryRealtimeListeners() === false, "retry returns false when no listener user");
+  assert(subscribeCount === 0, "no re-subscribe while logged out");
+
+  // After login: initial subscribe, then a plain re-init is a guarded no-op.
+  initRealtimeListeners("dad");
+  assert(subscribeCount === 1, "initial init subscribes once");
+  initRealtimeListeners("dad");
+  assert(subscribeCount === 1, "guarded re-init is a no-op when error-free");
+
+  // retry forces a genuine re-subscribe.
+  assert(retryRealtimeListeners() === true, "retry returns true when a user is active");
+  assert(subscribeCount === 2, "retry forces exactly one re-subscribe");
+}
+
+console.log("--- 15b. wiring: store exports retryRealtimeListeners; App offers in-place retry ---");
+
+{
+  const fs = await import("node:fs");
+
+  const listenersSrc = fs.readFileSync("src/store/listeners.ts", "utf8");
+  assert(
+    /export function retryRealtimeListeners\(\)/.test(listenersSrc),
+    "listeners.ts exports retryRealtimeListeners",
+  );
+  assert(
+    /if \(!currentListenerUserId\) return false;/.test(listenersSrc),
+    "retryRealtimeListeners no-ops without an active listener user",
+  );
+
+  const indexSrc = fs.readFileSync("src/store/index.ts", "utf8");
+  assert(
+    /retryRealtimeListeners/.test(indexSrc),
+    "store barrel re-exports retryRealtimeListeners",
+  );
+
+  const appSrc = fs.readFileSync("src/App.tsx", "utf8");
+  assert(
+    /retryRealtimeListeners/.test(appSrc),
+    "App imports retryRealtimeListeners",
+  );
+  assert(
+    /RETRYABLE_REASONS/.test(appSrc) &&
+      /"store-not-ready"/.test(appSrc) &&
+      /"user-not-in-cache"/.test(appSrc),
+    "App gates in-place retry to data-not-ready reasons",
+  );
+  assert(
+    /נסה שוב/.test(appSrc),
+    "App renders a 'נסה שוב' in-place retry button",
+  );
+}
+
+// ============ 16. Auto-retry predicate must detect missing ready keys ============
+console.log("--- 16. online/visibility auto-retry uses getMissingReadyKeys, not the dead Object.values predicate ---");
+
+{
+  // cache._ready is only ever set to `true` (or reset to {}); it is NEVER set
+  // to false. So the old predicate `Object.values(_ready).some(v => !v)` is
+  // ALWAYS false — the online/visibility auto-retry was dead code. The correct
+  // predicate compares the REQUIRED keys against what's present.
+  const REQUIRED = ["users", "userDirectory", "matchResults", "actualAdvancing", "actualBonuses", "settings", "predictions"];
+  function getMissingReadyKeys(ready) {
+    return REQUIRED.filter((k) => !ready[k]);
+  }
+  const oldPredicate = (ready) => Object.values(ready).some((v) => !v);
+
+  // Nothing loaded yet (fresh login): old predicate says "all good" (bug);
+  // new predicate correctly reports every required key missing.
+  assert(oldPredicate({}) === false, "old predicate is false on empty _ready (the bug)");
+  assert(getMissingReadyKeys({}).length === REQUIRED.length, "new predicate flags all keys missing when nothing loaded");
+
+  // Partially loaded: a couple of listeners fired, the rest are still missing.
+  const partial = { users: true, settings: true };
+  assert(oldPredicate(partial) === false, "old predicate stays false while keys are still missing (the bug)");
+  assert(getMissingReadyKeys(partial).length === REQUIRED.length - 2, "new predicate flags the still-missing keys");
+
+  // Fully loaded: no retry needed.
+  const full = Object.fromEntries(REQUIRED.map((k) => [k, true]));
+  assert(getMissingReadyKeys(full).length === 0, "new predicate reports nothing missing when fully ready");
+}
+
+console.log("--- 16b. wiring: listeners.ts auto-retry handlers call getMissingReadyKeys ---");
+
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync("src/store/listeners.ts", "utf8");
+  // Both the online + visibilitychange handlers must use the real predicate.
+  const matches = src.match(/getMissingReadyKeys\(\)\.length > 0/g) || [];
+  assert(matches.length >= 2, "online + visibility handlers both gate on getMissingReadyKeys().length > 0");
+  assert(
+    !/Object\.values\(cache\._ready\)\.some/.test(src),
+    "the dead Object.values(cache._ready).some(...) predicate is gone",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }

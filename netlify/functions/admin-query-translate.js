@@ -7,6 +7,7 @@
 import Groq from "groq-sdk";
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
+import { sanitizeLlmInput, sanitizeLlmEntities } from "./_lib/sanitizeLlmInput.js";
 
 let adminInitialized = false;
 function initAdmin() {
@@ -202,23 +203,33 @@ async function adminQueryTranslateHandler(event) {
     };
   }
 
+  // Prompt-injection hardening: neutralize control tokens before the
+  // admin-supplied question + resolvedEntities reach the model. Auth-gated
+  // (admin only), so this is defense-in-depth against a compromised admin
+  // session / XSS, not the primary security layer.
+  const safeQuestion = sanitizeLlmInput(question, 500);
+  const safeEntities = sanitizeLlmEntities(resolvedEntities || {});
+
   const messages = [
     { role: "system", content: SYSTEM_PROMPT_TEMPLATE },
     {
       role: "user",
-      content: JSON.stringify({ question, resolvedEntities: resolvedEntities || {} }),
+      content: JSON.stringify({ question: safeQuestion, resolvedEntities: safeEntities }),
     },
   ];
   // On retry, append the assistant's prior reply + the validation error so the
-  // model conditions on the failure.
+  // model conditions on the failure. retryError is server-derived but still
+  // sanitized + clamped — a malformed prior turn shouldn't smuggle control
+  // tokens into the next prompt.
   if (retryError && typeof retryError === "string") {
+    const safeRetry = sanitizeLlmInput(retryError, 2000);
     messages.push({
       role: "assistant",
-      content: retryError.split("\n--RETRY--\n")[0] || "",
+      content: safeRetry.split("\n--RETRY--\n")[0] || "",
     });
     messages.push({
       role: "user",
-      content: `Previous output failed validation: ${retryError}. Please reply with corrected JSON only.`,
+      content: `Previous output failed validation: ${safeRetry}. Please reply with corrected JSON only.`,
     });
   }
 

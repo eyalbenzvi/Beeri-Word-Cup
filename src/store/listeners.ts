@@ -38,6 +38,7 @@ import {
 import {
   cache,
   notifyAndEmit,
+  getMissingReadyKeys,
 } from "./cache";
 import { rebuildUserFormIndex, flushPendingWrites } from "./predictionsRepo";
 import { teardownPublicReadonlyMode } from "./publicMode";
@@ -256,23 +257,15 @@ export function initRealtimeListeners(userId: string) {
     window.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
         flushPendingWrites();
-      } else if (document.visibilityState === "visible" && currentListenerUserId) {
-        // Tab became visible — retry loading if we hadn't fully loaded yet.
-        // The check is done via the current readiness state via
-        // hadError flag below; we re-init when the gate reports missing keys.
-        if (Object.values(cache._ready).some((v) => !v)) {
-          listenersHadError = true;
-          initRealtimeListeners(currentListenerUserId);
-        }
+      } else if (document.visibilityState === "visible") {
+        // Tab became visible — re-subscribe if we hadn't fully loaded yet.
+        if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
       }
     });
     window.addEventListener("pagehide", flushPendingWrites);
-    // When network comes back online, retry if anything still missing
+    // When network comes back online, retry if anything still missing.
     window.addEventListener("online", () => {
-      if (currentListenerUserId && Object.values(cache._ready).some((v) => !v)) {
-        listenersHadError = true;
-        initRealtimeListeners(currentListenerUserId);
-      }
+      if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
     });
   }
 
@@ -379,6 +372,20 @@ export function initRealtimeListeners(userId: string) {
 
   // PII migration Phase A: own private record listener.
   setupUserPrivateListener(userId);
+}
+
+// User-initiated, in-place recovery for the "logged in but data never
+// arrived" stuck state. initRealtimeListeners() early-returns when listeners
+// are already initialized and error-free, so a plain re-call is a no-op;
+// flipping listenersHadError forces a genuine re-subscribe. Lighter than the
+// full-page reload escape hatch — it preserves any unsaved optimistic state
+// and re-uses the existing auth session. No-op (returns false) when there is
+// no active listener user (logged out / pre-auth).
+export function retryRealtimeListeners(): boolean {
+  if (!currentListenerUserId) return false;
+  listenersHadError = true;
+  initRealtimeListeners(currentListenerUserId);
+  return true;
 }
 
 // Avoid a static cycle with cache.ts by re-exposing openBroadcastChannel

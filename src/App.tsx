@@ -16,7 +16,7 @@ import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
 import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "./constants/storageKeys";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
-import { initPublicReadonlyMode } from "./store";
+import { initPublicReadonlyMode, retryRealtimeListeners } from "./store";
 
 // Lazy-load pages that aren't needed on initial render
 const Predict = lazyWithRetry(() => import("./pages/Predict"));
@@ -45,11 +45,25 @@ const PAGES = {
 // denied after user deletion) would leave users watching a ball forever.
 const STUCK_THRESHOLD_MS = 12000;
 
+// Reasons where the data, not auth, is the missing piece — an in-place
+// listener retry can recover without a full-page reload.
+const RETRYABLE_REASONS = new Set(["store-not-ready", "user-not-in-cache"]);
+
 function Loading({ reason = "unknown", compact = false }) {
   const [stuck, setStuck] = useState(false);
+  // Bumped by the in-place retry to restart the stuck timer (and the visible
+  // spinner) without remounting / reloading the page.
+  const [retryNonce, setRetryNonce] = useState(0);
   const mountedAt = useRef(Date.now());
 
+  // (Re)start the stuck timer on a reason change OR an intentional retry. We
+  // deliberately do NOT reset `stuck` here: a reason transition while the
+  // recovery buttons are already showing (e.g. store-not-ready →
+  // user-not-in-cache, both still "not loaded") must keep them visible rather
+  // than hide them and force another full STUCK_THRESHOLD_MS wait. `stuck` is
+  // cleared only by retryListeners() below, on an explicit user retry.
   useEffect(() => {
+    mountedAt.current = Date.now();
     const t = setTimeout(() => {
       setStuck(true);
       captureClientMessage("loading-stuck", {
@@ -58,7 +72,25 @@ function Loading({ reason = "unknown", compact = false }) {
       });
     }, STUCK_THRESHOLD_MS);
     return () => clearTimeout(t);
-  }, [reason]);
+  }, [reason, retryNonce]);
+
+  // Lighter-touch recovery: re-subscribe the Firestore listeners in place.
+  // Preserves the auth session + any unsaved optimistic state. Falls back to
+  // a hard reload if there's no active listener user to retry. Hides the
+  // recovery UI (setStuck(false)) and bumps the nonce to restart the timer.
+  const retryListeners = () => {
+    captureClientMessage("recovery-retry-listeners-tapped", {
+      reason,
+      durationMs: Date.now() - mountedAt.current,
+    });
+    const retried = retryRealtimeListeners();
+    if (!retried) {
+      window.location.reload();
+      return;
+    }
+    setStuck(false);
+    setRetryNonce((n) => n + 1);
+  };
 
   const reload = () => {
     captureClientMessage("recovery-reload-tapped", {
@@ -97,7 +129,17 @@ function Loading({ reason = "unknown", compact = false }) {
             <p className="text-sm text-ink font-medium">
               נתקע? נסה את האפשרויות הבאות.
             </p>
-            <button onClick={reload} className="btn-duo btn-duo-primary w-full">
+            {RETRYABLE_REASONS.has(reason) && (
+              <button onClick={retryListeners} className="btn-duo btn-duo-primary w-full">
+                נסה שוב
+              </button>
+            )}
+            <button
+              onClick={reload}
+              className={`btn-duo w-full ${
+                RETRYABLE_REASONS.has(reason) ? "btn-duo-ghost" : "btn-duo-primary"
+              }`}
+            >
               רענן את הדף
             </button>
             <button onClick={signOutAndReload} className="btn-duo btn-duo-ghost w-full">

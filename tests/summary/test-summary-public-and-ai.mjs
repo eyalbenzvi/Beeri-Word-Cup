@@ -187,8 +187,11 @@ assert(aiSrc.includes("checkRateLimit"), "rate-limits per uid");
 assert(/collection\("rateLimit"\)/.test(aiSrc), "uses Firestore rateLimit collection");
 assert(/response_format:[\s\S]{0,80}type:\s*"json_object"/.test(aiSrc),
   "forces JSON response format");
-assert(/CONTROL_TOKEN_REPLACEMENTS/.test(aiSrc),
-  "neutralizes LLM control tokens in user text");
+// Control-token neutralization now lives in the shared _lib/sanitizeLlmInput
+// module (tested in depth by tests/auth/test-llm-sanitize.mjs); summary-ai
+// must route through it rather than keeping a duplicate local table.
+assert(/from "\.\/_lib\/sanitizeLlmInput\.js"/.test(aiSrc),
+  "neutralizes LLM control tokens via the shared sanitizer");
 assert(aiSrc.includes("USER_CONTENT_BEGIN") || aiSrc.includes("FACTS_BEGIN"),
   "delimits user content to reduce injection risk");
 assert(/MAX_INPUT_CHARS\s*=\s*6000/.test(aiSrc), "input length is clamped");

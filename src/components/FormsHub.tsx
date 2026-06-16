@@ -27,6 +27,7 @@ import EmptyState from "./EmptyState";
 import Spinner from "./Spinner";
 import { AUTH_COPY } from "../constants/messages";
 import { useNavigation } from "../hooks/useNavigation";
+import { captureClientError } from "../sentry";
 
 // Module-level loader so the chunk only fetches once across re-mounts.
 // Reuse this same callable for both `lazy` and the tab-mount preload below.
@@ -50,10 +51,14 @@ export default function FormsHub({
   // Eagerly fetch the AllForms chunk when the hub mounts so a tab toggle
   // doesn't trigger a Suspense fallback flash on first switch. The dynamic
   // import is module-cached, so the actual `lazy(loadAllForms)` evaluation
-  // a moment later is a free hit. Errors are swallowed — the lazy import
-  // below will re-attempt with the same loader if the preload fails.
+  // a moment later is a free hit. A preload failure is non-fatal — the
+  // `lazy(loadAllForms)` below re-attempts with the same loader — but we
+  // report it so a recurring chunk-fetch failure (bad deploy / CDN) is
+  // visible in Sentry instead of vanishing silently.
   useEffect(() => {
-    loadAllForms().catch(() => {});
+    loadAllForms().catch((err) => {
+      captureClientError(err, { source: "FormsHub.preloadAllForms" });
+    });
   }, []);
 
   // Default: mine when logged in, all for guests. Bogus values (?view=foo)

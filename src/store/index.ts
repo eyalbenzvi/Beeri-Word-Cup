@@ -113,7 +113,7 @@ export {
   adminTransferForm,
 } from "./predictionsRepo";
 export { initPublicReadonlyMode } from "./publicMode";
-export { initRealtimeListeners } from "./listeners";
+export { initRealtimeListeners, retryRealtimeListeners } from "./listeners";
 export {
   clearMatchResults,
   getMatchResults,

@@ -37,8 +37,16 @@ export default function PhoneSignIn() {
         const otp = cred?.code?.replace(/\D/g, "").slice(0, 6);
         if (otp && otp.length === 6) setCode(otp);
       })
-      .catch(() => {
-        // User dismissed the prompt or no SMS arrived — silent.
+      .catch((err: any) => {
+        // Expected, benign cases stay silent: the user dismissed the prompt
+        // (NotAllowedError), or we aborted on unmount/step-change (AbortError).
+        // Anything else (the WebOTP mechanism itself failing) is reported so a
+        // browser-level regression doesn't hide behind the manual-entry
+        // fallback. The manual code field still works regardless.
+        const name = err?.name;
+        if (name !== "AbortError" && name !== "NotAllowedError") {
+          captureClientError(err, { source: "PhoneSignIn.webOtp" });
+        }
       });
     return () => ac.abort();
   }, [step]);
