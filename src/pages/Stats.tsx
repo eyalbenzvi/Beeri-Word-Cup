@@ -661,7 +661,7 @@ export default function Stats() {
       .map(([formId, fAny]) => ({ formId, ...(fAny as any) }));
   }, [allPredictions]);
 
-  const actualBracketTeams = useMemo(() => getCachedBracket(results), [results]);
+  const actualBracketTeams = useMemo(() => getCachedBracket(results, true), [results]);
 
   const playerList = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),

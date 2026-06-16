@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { calcBracketTeams, deriveChampion } from "../utils/bracket";
 
-// WeakMap-based cache — automatically garbage collected when form data changes
+// Separate caches for gated (actual-results) vs ungated (prediction) brackets
 const bracketCache = new Map();
+const bracketGatedCache = new Map();
 const championCache = new Map();
 
 function getStableKey(matchPredictions: Record<string, any>) {
@@ -34,15 +35,16 @@ function getStableKey(matchPredictions: Record<string, any>) {
   return hash;
 }
 
-export function getCachedBracket(matches) {
+export function getCachedBracket(matches, gatingOnResults = false) {
   const key = getStableKey(matches);
-  if (bracketCache.has(key)) return bracketCache.get(key);
-  const result = calcBracketTeams(matches);
-  bracketCache.set(key, result);
+  const cache = gatingOnResults ? bracketGatedCache : bracketCache;
+  if (cache.has(key)) return cache.get(key);
+  const result = calcBracketTeams(matches, gatingOnResults);
+  cache.set(key, result);
   // Keep cache bounded
-  if (bracketCache.size > 1000) {
-    const firstKey = bracketCache.keys().next().value;
-    bracketCache.delete(firstKey);
+  if (cache.size > 1000) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
   }
   return result;
 }
@@ -80,5 +82,6 @@ export function useAllChampions(forms) {
 // Clear caches (call when data changes significantly)
 export function clearBracketCache() {
   bracketCache.clear();
+  bracketGatedCache.clear();
   championCache.clear();
 }

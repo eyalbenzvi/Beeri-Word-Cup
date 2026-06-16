@@ -128,7 +128,7 @@ export default function Results() {
   const [selectedGroup, setSelectedGroup] = useState("A");
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
-  const bracketTeams = useMemo(() => getCachedBracket(results), [results]);
+  const bracketTeams = useMemo(() => getCachedBracket(results, true), [results]);
 
   // Crowd consensus per match (#8). Only computed/shown once predictions are
   // locked, so it never reveals picks before kickoff. Built once per data
