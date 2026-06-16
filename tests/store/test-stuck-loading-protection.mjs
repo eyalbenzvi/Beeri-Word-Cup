@@ -365,6 +365,87 @@ console.log("--- 14. ensureUserInStore reads userPrivate/{uid} so non-admins can
   );
 }
 
+// ============ 15. In-place listener retry (lighter than full reload) ============
+console.log("--- 15. retryRealtimeListeners forces a re-subscribe and no-ops when logged out ---");
+
+{
+  // Behavioural model of the listeners.ts guard + retry contract:
+  //   - initRealtimeListeners() early-returns when already initialized AND
+  //     error-free, so a plain re-call is a no-op.
+  //   - retryRealtimeListeners() flips the error flag first, forcing a genuine
+  //     re-subscribe, and returns false (no-op) when no listener user is set.
+  let listenersInitialized = false;
+  let listenersHadError = false;
+  let currentListenerUserId = null;
+  let subscribeCount = 0;
+
+  function initRealtimeListeners(uid) {
+    if (listenersInitialized && !listenersHadError) return; // guard
+    listenersInitialized = true;
+    listenersHadError = false;
+    currentListenerUserId = uid;
+    subscribeCount++;
+  }
+  function retryRealtimeListeners() {
+    if (!currentListenerUserId) return false;
+    listenersHadError = true;
+    initRealtimeListeners(currentListenerUserId);
+    return true;
+  }
+
+  // Logged out: retry is a no-op.
+  assert(retryRealtimeListeners() === false, "retry returns false when no listener user");
+  assert(subscribeCount === 0, "no re-subscribe while logged out");
+
+  // After login: initial subscribe, then a plain re-init is a guarded no-op.
+  initRealtimeListeners("dad");
+  assert(subscribeCount === 1, "initial init subscribes once");
+  initRealtimeListeners("dad");
+  assert(subscribeCount === 1, "guarded re-init is a no-op when error-free");
+
+  // retry forces a genuine re-subscribe.
+  assert(retryRealtimeListeners() === true, "retry returns true when a user is active");
+  assert(subscribeCount === 2, "retry forces exactly one re-subscribe");
+}
+
+console.log("--- 15b. wiring: store exports retryRealtimeListeners; App offers in-place retry ---");
+
+{
+  const fs = await import("node:fs");
+
+  const listenersSrc = fs.readFileSync("src/store/listeners.ts", "utf8");
+  assert(
+    /export function retryRealtimeListeners\(\)/.test(listenersSrc),
+    "listeners.ts exports retryRealtimeListeners",
+  );
+  assert(
+    /if \(!currentListenerUserId\) return false;/.test(listenersSrc),
+    "retryRealtimeListeners no-ops without an active listener user",
+  );
+
+  const indexSrc = fs.readFileSync("src/store/index.ts", "utf8");
+  assert(
+    /retryRealtimeListeners/.test(indexSrc),
+    "store barrel re-exports retryRealtimeListeners",
+  );
+
+  const appSrc = fs.readFileSync("src/App.tsx", "utf8");
+  assert(
+    /retryRealtimeListeners/.test(appSrc),
+    "App imports retryRealtimeListeners",
+  );
+  assert(
+    /RETRYABLE_REASONS/.test(appSrc) &&
+      /"store-not-ready"/.test(appSrc) &&
+      /"user-not-in-cache"/.test(appSrc),
+    "App gates in-place retry to data-not-ready reasons",
+  );
+  assert(
+    /נסה שוב/.test(appSrc),
+    "App renders a 'נסה שוב' in-place retry button",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }

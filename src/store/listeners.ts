@@ -381,6 +381,20 @@ export function initRealtimeListeners(userId: string) {
   setupUserPrivateListener(userId);
 }
 
+// User-initiated, in-place recovery for the "logged in but data never
+// arrived" stuck state. initRealtimeListeners() early-returns when listeners
+// are already initialized and error-free, so a plain re-call is a no-op;
+// flipping listenersHadError forces a genuine re-subscribe. Lighter than the
+// full-page reload escape hatch — it preserves any unsaved optimistic state
+// and re-uses the existing auth session. No-op (returns false) when there is
+// no active listener user (logged out / pre-auth).
+export function retryRealtimeListeners(): boolean {
+  if (!currentListenerUserId) return false;
+  listenersHadError = true;
+  initRealtimeListeners(currentListenerUserId);
+  return true;
+}
+
 // Avoid a static cycle with cache.ts by re-exposing openBroadcastChannel
 // through a thin local function. cache.ts is already loaded by the time
 // initRealtimeListeners runs, so the dynamic import is cheap.
