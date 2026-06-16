@@ -168,6 +168,7 @@ run_test "102. Rank Trend (history dedupe/cap + sparkline wiring)" "ui/test-rank
 run_test "103. Form Comparison (head-to-head wiring)" "ui/test-form-comparison.mjs" "no"
 run_test "104. Bracket View (knockout tree columns + wiring)" "ui/test-bracket-view.mjs" "no"
 run_test "105. Live Rank Impact (hypothetical projection from live scores)" "ui/test-live-rank-impact.mjs" "no"
+run_test "106. Sentry Error Fixes (timezone, chunk-reload, breadcrumb, ensure retry)" "store/test-sentry-error-fixes.mjs" "no"
 
 echo ""
 echo "==========================================="

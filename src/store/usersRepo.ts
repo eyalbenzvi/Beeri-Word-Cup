@@ -36,6 +36,7 @@ import {
   withTimeout,
   safeClone,
   maybeRefreshToken,
+  retryOnPermissionDenied,
 } from "./firestoreClient";
 import {
   cache,
@@ -233,28 +234,29 @@ export async function updateUserField(uid: string, fields: Record<string, any>) 
   notifyAndEmit("users");
   emitSaving("users");
 
-  const batch = writeBatch(db);
   // Legacy users — dot-notation update.
   const legacyPayload: Record<string, any> = {};
   for (const [key, value] of Object.entries(fields)) {
     legacyPayload[`data.${uid}.${key}`] = value;
   }
-  batch.update(gameDocRef("users"), legacyPayload);
-  // Directory — setDoc(merge:true) so first-ever write creates the doc.
-  if (Object.keys(dirFields).length > 0) {
-    batch.set(
-      userDirectoryDocRef(),
-      { data: { [uid]: dirFields } },
-      { merge: true },
-    );
-  }
-  // userPrivate/{uid} — setDoc(merge:true) for create-or-update.
-  if (Object.keys(privFields).length > 0) {
-    batch.set(userPrivateDocRef(uid), privFields, { merge: true });
-  }
+  // Rebuilt per attempt (a committed WriteBatch can't be reused) so a
+  // transient permission-denied on a freshly-minted token can be retried.
+  const commitUserBatch = () => {
+    const batch = writeBatch(db);
+    batch.update(gameDocRef("users"), legacyPayload);
+    // Directory — setDoc(merge:true) so first-ever write creates the doc.
+    if (Object.keys(dirFields).length > 0) {
+      batch.set(userDirectoryDocRef(), { data: { [uid]: dirFields } }, { merge: true });
+    }
+    // userPrivate/{uid} — setDoc(merge:true) for create-or-update.
+    if (Object.keys(privFields).length > 0) {
+      batch.set(userPrivateDocRef(uid), privFields, { merge: true });
+    }
+    return batch.commit();
+  };
 
   try {
-    await withTimeout(batch.commit(), 10000);
+    await retryOnPermissionDenied(commitUserBatch);
     emitSaved("users");
     return true;
   } catch (err: any) {
@@ -308,21 +310,19 @@ export async function createUserField(uid: string, userData: Record<string, any>
   // setDoc(merge:true) on the legacy users doc handles both first-user-ever
   // (doc not yet created) and subsequent additions without try/catch
   // fallbacks, and keeps the whole operation atomic under writeBatch.
-  const batch = writeBatch(db);
-  batch.set(
-    gameDocRef("users"),
-    { data: { [uid]: userData } },
-    { merge: true },
-  );
-  batch.set(
-    userDirectoryDocRef(),
-    { data: { [uid]: dirFields } },
-    { merge: true },
-  );
-  batch.set(userPrivateDocRef(uid), privFields, { merge: true });
+  // Rebuilt per attempt — a committed WriteBatch can't be reused, and
+  // retryOnPermissionDenied re-invokes this on a transient first-sign-in
+  // permission-denied (token not yet propagated to the Firestore backend).
+  const commitUserBatch = () => {
+    const batch = writeBatch(db);
+    batch.set(gameDocRef("users"), { data: { [uid]: userData } }, { merge: true });
+    batch.set(userDirectoryDocRef(), { data: { [uid]: dirFields } }, { merge: true });
+    batch.set(userPrivateDocRef(uid), privFields, { merge: true });
+    return batch.commit();
+  };
 
   try {
-    await withTimeout(batch.commit(), 10000);
+    await retryOnPermissionDenied(commitUserBatch);
     emitSaved("users");
     return true;
   } catch (err: any) {
@@ -436,7 +436,7 @@ async function doEnsureUserInStore(uid: string, displayName: string, email: stri
   // into the catch and bailed without writing — the bouncing-ball trap.
   let firestoreUser: any = null;
   try {
-    const snap = await withTimeout(getDoc(userPrivateDocRef(uid)), 10000);
+    const snap = await retryOnPermissionDenied(() => getDoc(userPrivateDocRef(uid)));
     if (snap.exists()) firestoreUser = snap.data() as any;
   } catch (err: any) {
     console.error("Failed to verify user in Firestore:", err);

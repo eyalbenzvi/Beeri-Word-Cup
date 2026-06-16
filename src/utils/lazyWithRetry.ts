@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { isChunkLoadError } from "./chunkErrors";
 
 // React.lazy fails when a dynamic import 404s — happens to users who left the
 // tab open across a deploy, since the old chunk hashes no longer exist on the
@@ -10,8 +11,6 @@ const RELOAD_FLAG = "wc2026_chunkReloaded";
 // One-time migration: tidy up the old prefix on read so users who sat
 // across the deploy don't get their reload-guard ignored.
 try { const old = sessionStorage.getItem("wc_chunkReloaded"); if (old != null) { sessionStorage.setItem(RELOAD_FLAG, old); sessionStorage.removeItem("wc_chunkReloaded"); } } catch { /* ignore */ }
-const CHUNK_ERROR_RE =
-  /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk \d+ failed/i;
 
 export function lazyWithRetry(factory) {
   return lazy(async () => {
@@ -20,7 +19,7 @@ export function lazyWithRetry(factory) {
       try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* ignore */ }
       return mod;
     } catch (err) {
-      const isChunkError = CHUNK_ERROR_RE.test(err?.message || "");
+      const isChunkError = isChunkLoadError(err?.message);
       let alreadyReloaded = false;
       try { alreadyReloaded = sessionStorage.getItem(RELOAD_FLAG) === "1"; } catch { /* ignore */ }
       if (isChunkError && !alreadyReloaded) {

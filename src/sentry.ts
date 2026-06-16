@@ -2,6 +2,7 @@
 // אם חסר — מדלג בשקט (dev לוקאלי בלי DSN).
 // כל הפונקציות עטופות try/catch: דיווח שגיאות לעולם לא שובר את האפליקציה.
 import * as Sentry from "@sentry/react";
+import { CHUNK_ERROR_PATTERNS } from "./utils/chunkErrors";
 
 let initialized = false;
 
@@ -69,12 +70,9 @@ export function initSentry() {
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 1.0,
       // Stale chunk after deploy is auto-recovered by lazyWithRetry — drop the
-      // noise so real errors stay visible.
-      ignoreErrors: [
-        /Failed to fetch dynamically imported module/i,
-        /Importing a module script failed/i,
-        /Loading chunk \d+ failed/i,
-      ],
+      // noise so real errors stay visible. Patterns are shared with
+      // lazyWithRetry via chunkErrors.ts so the two can't drift.
+      ignoreErrors: [...CHUNK_ERROR_PATTERNS],
       // Defense-in-depth during the phone-UID PII migration: redact any
       // legacy `phone_<phone>` substring from breadcrumb/event payloads
       // before they leave the browser. Hashed UIDs are opaque and pass
@@ -153,9 +151,26 @@ export function captureClientError(err, context = {}) {
 // at most one event per watchdog.
 export function captureClientMessage(key: string, context: Record<string, any> = {}, level: import("@sentry/react").SeverityLevel = "warning") {
   if (!initialized) return;
-  if (emittedOnce.has(key)) return;
-  emittedOnce.add(key);
   try {
+    // `info`-level signals are heartbeats/diagnostics (e.g.
+    // `public-settings-success`), not problems. Recording them as standalone
+    // issues floods the dashboard and buries actionable errors, so attach
+    // them as breadcrumbs to the NEXT real event instead. Breadcrumbs are
+    // ring-buffered by Sentry, so we record one EVERY time (no dedup) to keep
+    // the trail current. Warnings and above still become deduped issues.
+    if (level === "info") {
+      Sentry.addBreadcrumb({
+        category: "app.signal",
+        message: key,
+        level,
+        data: { ...context, tabId: getTabId() },
+      });
+      return;
+    }
+    // Dedup issue-creating messages per session so one stuck state doesn't
+    // flood the dashboard.
+    if (emittedOnce.has(key)) return;
+    emittedOnce.add(key);
     Sentry.captureMessage(key, {
       level,
       extra: { ...context, tabId: getTabId() },

@@ -29,14 +29,33 @@ export const FALLBACK_TZ = "Asia/Jerusalem";
 // card across the Predict / Results / Upcoming lists.
 let cachedTz: string | null = null;
 
+// Some devices (locked-down Android, certain in-app webviews) resolve the
+// device timezone to "Etc/Unknown" — a value Intl will RETURN from
+// resolvedOptions() but then REJECT when passed back in as a `timeZone`
+// option, throwing "RangeError: Invalid time zone specified: Etc/Unknown" on
+// the very next formatter we build. Validate the resolved zone by actually
+// constructing a formatter with it; anything Intl can't use falls back to
+// Israel time so the whole time-display layer can never crash.
+function isUsableTimeZone(tz: string): boolean {
+  if (!tz || tz === "Etc/Unknown") return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Auto-detected IANA timezone of the device, e.g. "Asia/Jerusalem". */
 export function getUserTimeZone(): string {
   if (cachedTz) return cachedTz;
+  let resolved: string | undefined;
   try {
-    cachedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || FALLBACK_TZ;
+    resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch {
-    cachedTz = FALLBACK_TZ;
+    resolved = undefined;
   }
+  cachedTz = resolved && isUsableTimeZone(resolved) ? resolved : FALLBACK_TZ;
   return cachedTz;
 }
 

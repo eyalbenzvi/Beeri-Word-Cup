@@ -161,6 +161,14 @@ console.log("--- 8. Timezone detection helpers ---");
   assert(typeof tz === "string" && tz.length > 0, "getUserTimeZone returns a non-empty string");
   assert(isIsraelTimeZone("Asia/Jerusalem") === true, "isIsraelTimeZone true for Asia/Jerusalem");
   assert(isIsraelTimeZone("America/New_York") === false, "isIsraelTimeZone false for NY");
+
+  // Regression (Sentry RangeError "Invalid time zone specified: Etc/Unknown"):
+  // whatever getUserTimeZone returns must be usable as a `timeZone` option, so
+  // every downstream Intl.DateTimeFormat construction in this module can never
+  // throw — even on devices whose resolvedOptions() reports an unusable zone.
+  let tzThrew = false;
+  try { new Intl.DateTimeFormat("he-IL", { timeZone: tz }); } catch { tzThrew = true; }
+  assert(!tzThrew, "getUserTimeZone() result is always a usable Intl timeZone (never Etc/Unknown)");
 }
 
 // ---- 9. Static wiring: display surfaces use userTime helpers ----
