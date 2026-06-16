@@ -82,12 +82,6 @@ export default function Leaderboard({
   );
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState("");
-  // Exploration controls (#7). Sorting re-orders the visible list by a chosen
-  // metric while every row keeps its OFFICIAL rank badge — so you can ask
-  // "who has the most exact scores?" without losing the standings context.
-  // "mineOnly" narrows to the signed-in user's own forms.
-  const [sortBy, setSortBy] = useState<"rank" | "exact" | "outcome">("rank");
-  const [mineOnly, setMineOnly] = useState(false);
 
   // Deep-link support: arriving with ?form=<id> (e.g. tapping a form name in
   // the Stats voter lists) opens that form's detail view. Skipped in the
@@ -191,16 +185,9 @@ export default function Leaderboard({
     });
   }, [searchQuery, rankedLeaderboard, searchHaystacks]);
 
-  // The list actually rendered: search filter → "mine only" → chosen sort.
-  // Sorting clones the array (never mutate the memoized source) and always
-  // tie-breaks by official rank for a stable, deterministic order.
-  const displayedLeaderboard = useMemo(() => {
-    let list = filteredLeaderboard;
-    if (mineOnly && user?.id) list = list.filter((e) => e.userId === user.id);
-    if (sortBy === "rank") return list;
-    const metric = sortBy === "exact" ? "exactScoreCount" : "outcomeCount";
-    return [...list].sort((a, b) => (b[metric] || 0) - (a[metric] || 0) || a.rank - b.rank);
-  }, [filteredLeaderboard, mineOnly, sortBy, user?.id]);
+  // The list actually rendered is simply the search-filtered leaderboard,
+  // always in official rank order.
+  const displayedLeaderboard = filteredLeaderboard;
 
   // Smooth jump to a leaderboard row, expanding the page-size if the row
   // would otherwise be clipped behind "show more". Triggered ONLY by the
@@ -610,42 +597,6 @@ export default function Leaderboard({
             </div>
           )}
 
-          {!embedded && rankedLeaderboard.length > 1 && (
-            <div className="card-duo mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-extrabold text-ink-muted">מיון:</span>
-              {[
-                { id: "rank", label: "דירוג" },
-                { id: "exact", label: LABELS.exactCount },
-                { id: "outcome", label: LABELS.outcomeCount },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => {
-                    setSortBy(opt.id as "rank" | "exact" | "outcome");
-                    setShowCount(PAGE_SIZE);
-                  }}
-                  aria-pressed={sortBy === opt.id}
-                  className={`chip-duo ${sortBy === opt.id ? "active" : ""}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-              {myForms.length > 0 && (
-                <button
-                  onClick={() => {
-                    setMineOnly((v) => !v);
-                    setShowCount(PAGE_SIZE);
-                  }}
-                  aria-pressed={mineOnly}
-                  className={`chip-duo ${mineOnly ? "active-blue" : ""}`}
-                  style={{ marginInlineStart: "auto" }}
-                >
-                  שלי בלבד
-                </button>
-              )}
-            </div>
-          )}
-
           <div className="space-y-2">
             {displayedLeaderboard.slice(0, showCount).map((entry) => {
               const currentRank = entry.rank;
@@ -796,12 +747,8 @@ export default function Leaderboard({
             {leaderboard.length > 0 && displayedLeaderboard.length === 0 && (
               <EmptyState
                 icon="🔍"
-                title={mineOnly && !isSearching ? "אין לך טפסים בדירוג" : "לא נמצאו טפסים תואמים"}
-                description={
-                  mineOnly && !isSearching
-                    ? "בטל את הסינון \"שלי בלבד\" כדי לראות את כל הטפסים"
-                    : `נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`
-                }
+                title="לא נמצאו טפסים תואמים"
+                description={`נסה לחפש לפי שם טופס, משתמש, ${LABELS.champion} או ${LABELS.topScorer}`}
               />
             )}
           </div>
