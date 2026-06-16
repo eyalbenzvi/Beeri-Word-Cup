@@ -3,15 +3,43 @@
 // breakdowns that retain WHICH forms predicted each, so the UI can list the
 // voters behind every result/outcome — not just the counts.
 //
+// For knockout matches, only includes predictions from forms where the bracket-derived
+// match is identical to the actual match (same home and away teams). This prevents
+// counting a prediction for "TeamA vs TeamB" in a form that actually predicted
+// "TeamC vs TeamD" due to different group stage outcomes.
+//
 // Pure and side-effect free so it can be unit-tested directly.
 
 type Prediction = { homeScore?: number | null; awayScore?: number | null };
 type Form = { formId?: string; formName?: string; matches?: Record<string, Prediction> };
+export type BracketEntry = { home: string | null; away: string | null };
 
 // A voter carries both the form's id (so the UI can deep-link to that form's
 // view) and its display name. Previously this was a bare string[] of names;
 // the id was added so "who predicted this?" lists become navigable.
 export type Voter = { formId: string; name: string };
+
+// Check if a match is a knockout match (not group stage)
+function isKnockoutMatch(matchId: string): boolean {
+  return !matchId.startsWith("group-");
+}
+
+// Check if a form's bracket matches the actual bracket for a knockout match.
+// Returns true if it's a group match, or if both home/away teams match.
+function bracketMatchesActual(
+  formBracket: BracketEntry | null | undefined,
+  actualBracket: BracketEntry | null | undefined,
+  matchId: string,
+): boolean {
+  // Group stage matches don't require bracket validation
+  if (!isKnockoutMatch(matchId)) return true;
+
+  // For knockout matches, both the form's bracket and actual bracket must exist
+  // and have matching teams
+  if (!formBracket || !actualBracket) return false;
+
+  return formBracket.home === actualBracket.home && formBracket.away === actualBracket.away;
+}
 
 export type MatchPredictionStats = {
   preds: number;
@@ -42,13 +70,26 @@ export type MatchConsensus = {
   topCount: number;
 };
 
-export function computeConsensusMap(forms: Form[]): Record<string, MatchConsensus> {
+export function computeConsensusMap(
+  forms: Form[],
+  actualBracketTeams?: Record<string, BracketEntry>,
+  getFormBracketTeams?: (form: Form) => Record<string, BracketEntry>,
+): Record<string, MatchConsensus> {
   const acc: Record<string, { preds: number; homeWin: number; draw: number; awayWin: number; scores: Record<string, number> }> = {};
   for (const f of forms) {
+    const formBracket = getFormBracketTeams?.(f) || {};
     const matches = f.matches || {};
     for (const matchId in matches) {
       const p = matches[matchId];
       if (!p || p.homeScore == null || p.awayScore == null) continue;
+
+      // For knockout matches, verify the form's bracket matches the actual bracket
+      if (actualBracketTeams) {
+        if (!bracketMatchesActual(formBracket[matchId], actualBracketTeams[matchId], matchId)) {
+          continue;
+        }
+      }
+
       const h = p.homeScore as number;
       const a = p.awayScore as number;
       const m = (acc[matchId] ||= { preds: 0, homeWin: 0, draw: 0, awayWin: 0, scores: {} });
@@ -89,6 +130,8 @@ export function computeConsensusMap(forms: Form[]): Record<string, MatchConsensu
 export function aggregateMatchPredictions(
   forms: Form[],
   matchId: string,
+  actualBracketTeams?: Record<string, BracketEntry>,
+  getFormBracketTeams?: (form: Form) => Record<string, BracketEntry>,
 ): MatchPredictionStats {
   // Keep the form name alongside each prediction so we can list WHO
   // predicted each result/outcome, not just the counts. Resolve the name
@@ -96,7 +139,17 @@ export function aggregateMatchPredictions(
   const entries: { voter: Voter; p: Prediction }[] = [];
   for (const f of forms) {
     const p = f.matches?.[matchId];
-    if (p) entries.push({ voter: { formId: f.formId || "", name: f.formName || "טופס ללא שם" }, p });
+    if (!p) continue;
+
+    // For knockout matches, verify the form's bracket matches the actual bracket
+    if (actualBracketTeams) {
+      const formBracket = getFormBracketTeams?.(f) || {};
+      if (!bracketMatchesActual(formBracket[matchId], actualBracketTeams[matchId], matchId)) {
+        continue;
+      }
+    }
+
+    entries.push({ voter: { formId: f.formId || "", name: f.formName || "טופס ללא שם" }, p });
   }
 
   const outcomeVoters: { home: Voter[]; draw: Voter[]; away: Voter[] } = {

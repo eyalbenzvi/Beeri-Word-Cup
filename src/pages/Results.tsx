@@ -11,6 +11,7 @@ import { getFilteredMatches } from "../utils/matchFiltering";
 import { CHRONOLOGICAL_DAYS } from "../utils/chronologicalSchedule";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { getCachedBracket } from "../utils/bracketCache";
+import type { BracketEntry } from "../utils/matchPredictionStats";
 import GroupTable from "../components/GroupTable";
 import GroupSelector from "../components/GroupSelector";
 import ClickableName from "../components/ClickableName";
@@ -127,18 +128,20 @@ export default function Results() {
   const [selectedGroup, setSelectedGroup] = useState("A");
 
   const filteredMatches = getFilteredMatches(selectedStage, selectedGroup);
-  const bracketTeams = useMemo(() => getCachedBracket(results), [results]);
+  const bracketTeams = useMemo(() => getCachedBracket(results, true), [results]);
 
   // Crowd consensus per match (#8). Only computed/shown once predictions are
   // locked, so it never reveals picks before kickoff. Built once per data
   // change in a single pass over the submitted forms.
+  // For knockout matches, only include predictions from forms where the bracket
+  // match is identical to the actual bracket match.
   const consensusMap = useMemo(() => {
     if (!settings.predictionsLocked) return {};
     const submitted = Object.entries(allPredictions)
       .filter(([, f]) => normalizeStatus((f as any).status) === "submitted")
       .map(([formId, f]) => ({ formId, ...(f as any) }));
-    return computeConsensusMap(submitted);
-  }, [allPredictions, settings.predictionsLocked]);
+    return computeConsensusMap(submitted, bracketTeams, (form) => getCachedBracket(form.matches || {}));
+  }, [allPredictions, settings.predictionsLocked, bracketTeams]);
 
   const playedCount = Object.keys(results).length;
   const totalMatches = groupMatches.length + knockoutMatches.length;

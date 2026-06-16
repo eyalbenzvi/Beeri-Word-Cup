@@ -290,7 +290,7 @@ function getMatchWinner(matchId: string, matchPredictions: Record<string, any>, 
   return hs > as ? teams.home : teams.away;
 }
 
-export function calcBracketTeams(matchPredictions: Record<string, any>) {
+export function calcBracketTeams(matchPredictions: Record<string, any>, gatingOnResults = false) {
   // Opportunistic auto-fill poke (no-op in the pure test harness). See
   // src/utils/autoFillTrigger.ts.
   triggerAutoFillCheck();
@@ -303,6 +303,23 @@ export function calcBracketTeams(matchPredictions: Record<string, any>) {
   );
   if (!hasGroupPredictions) return bracket;
 
+  // When gatingOnResults=true (actual-results bracket only), gate R32 teams based on
+  // group completion. When false (prediction/draft brackets), allow full resolution.
+  // This prevents showing incomplete brackets in prediction views while still allowing
+  // early R32 assignment when group stages are done.
+  const completedGroupMatches: Record<string, number> = {};
+  if (gatingOnResults) {
+    for (const match of groupMatches) {
+      const pred = matchPredictions[match.id];
+      if (isScoreValid(pred)) {
+        completedGroupMatches[match.group] = (completedGroupMatches[match.group] || 0) + 1;
+      }
+    }
+  }
+  const allGroupsComplete = !gatingOnResults ||
+    (Object.keys(completedGroupMatches).length === 12 &&
+      Object.values(completedGroupMatches).every((count: number) => count === 6));
+
   const bestThird = getBestThirdPlaceTeams(standings);
   const thirdAssignments = assignThirdPlaceTeams(bestThird);
 
@@ -310,14 +327,24 @@ export function calcBracketTeams(matchPredictions: Record<string, any>) {
     let home = null,
       away = null;
 
-    if (match.home.match(/^[12][A-L]$/)) {
+    // For group-position slots (1A, 2B, etc.): fill when that group is complete.
+    // For 3rd-place slots: fill only when ALL groups are complete (3rd ranking depends on all).
+    const homeCompleted = !gatingOnResults || (match.home.match(/^[12][A-L]$/) ?
+      completedGroupMatches[match.home[1]] === 6 : true); // non-position home slots always ready
+    const awayCompleted = !gatingOnResults ||
+      (match.away === "3rd" ? allGroupsComplete :
+        (match.away.match(/^[12][A-L]$/) ? completedGroupMatches[match.away[1]] === 6 : true));
+
+    if (homeCompleted && match.home.match(/^[12][A-L]$/)) {
       home = resolvePosition(match.home, standings);
     }
 
-    if (match.away === "3rd") {
-      away = thirdAssignments[match.id] || null;
-    } else if (match.away.match(/^[12][A-L]$/)) {
-      away = resolvePosition(match.away, standings);
+    if (awayCompleted) {
+      if (match.away === "3rd") {
+        away = thirdAssignments[match.id] || null;
+      } else if (match.away.match(/^[12][A-L]$/)) {
+        away = resolvePosition(match.away, standings);
+      }
     }
 
     bracket[match.id] = { home, away };

@@ -10,14 +10,14 @@ import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
-import { getCachedChampion } from "../utils/bracketCache";
+import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
-import type { Voter } from "../utils/matchPredictionStats";
+import type { Voter, BracketEntry } from "../utils/matchPredictionStats";
 import ClickableName from "../components/ClickableName";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
@@ -151,7 +151,7 @@ function VoterBarList({
 }
 
 // ============ MATCH PREDICTIONS SECTION ============
-function MatchPredictions({ forms }) {
+function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualBracketTeams?: Record<string, BracketEntry> }) {
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -169,8 +169,8 @@ function MatchPredictions({ forms }) {
     if (!selectedMatch) return null;
     const match = allMatches.find((m) => m.id === selectedMatch);
     if (!match) return null;
-    return { match, ...aggregateMatchPredictions(forms, selectedMatch) };
-  }, [selectedMatch, forms]);
+    return { match, ...aggregateMatchPredictions(forms, selectedMatch, actualBracketTeams, (form) => getCachedBracket(form.matches || {})) };
+  }, [selectedMatch, forms, actualBracketTeams]);
 
   const home = matchStats?.match
     ? getTeamByCode(matchStats.match.homeTeam)
@@ -661,6 +661,8 @@ export default function Stats() {
       .map(([formId, fAny]) => ({ formId, ...(fAny as any) }));
   }, [allPredictions]);
 
+  const actualBracketTeams = useMemo(() => getCachedBracket(results, true), [results]);
+
   const playerList = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),
     [settings.topScorerPlayers],
@@ -757,7 +759,7 @@ export default function Stats() {
                 {activeTab === "matches" && (
                   <>
                     <GeneralStats forms={submittedForms} results={results} />
-                    <MatchPredictions forms={submittedForms} />
+                    <MatchPredictions forms={submittedForms} actualBracketTeams={actualBracketTeams} />
                   </>
                 )}
                 {activeTab === "teams" && (
