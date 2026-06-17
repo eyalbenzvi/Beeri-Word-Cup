@@ -93,6 +93,12 @@ async function fallbackLoadGameDoc(key: string, docName: string) {
     const snap = await withTimeout(getDoc(gameDocRef(docName)), 10000);
     if (snap.exists()) (cache as any)[key] = (snap.data() as any).data;
     cache._ready[key] = true;
+    // getDoc can also resolve from the offline cache; only count it as
+    // server-confirmed when it actually round-tripped (mirrors the listener
+    // path so a degraded connection can't reopen the stale-lock flash).
+    if (key === "settings" && !snap.metadata.fromCache) {
+      cache.settingsServerConfirmed = true;
+    }
     getRetryState(key).count = 0;
     notifyAndEmit(key);
     if (key === "settings" || key === "users") {
@@ -290,7 +296,16 @@ export function initRealtimeListeners(userId: string) {
           getRetryState(key).count = 0;
           const prevUsers = key === "users" ? cache.users || {} : null;
           if (snap.exists()) (cache as any)[key] = (snap.data() as any).data;
+          // Mark ready on the FIRST snapshot of any kind (cache or server) so
+          // isStoreReady() can never be trapped offline. Staleness is handled
+          // separately via settingsServerConfirmed (below): a snapshot served
+          // from the offline cache does NOT count as server-confirmed, so the
+          // Leaderboard lock screen waits for the real server value rather than
+          // flashing "rating unavailable" off a pre-lock IndexedDB read.
           cache._ready[key] = true;
+          if (key === "settings" && !snap.metadata.fromCache) {
+            cache.settingsServerConfirmed = true;
+          }
           // A7: if we just wrote our own user and the server snapshot has no
           // record of them, the write was rejected and the SDK reverted the
           // optimistic cache. Clear lastEnsuredUid so ensureUserInStore can

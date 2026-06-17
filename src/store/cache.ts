@@ -30,6 +30,14 @@ export type CacheShape = {
   actualAdvancing: Record<string, any>;
   actualBonuses: any;
   settings: Record<string, any>;
+  // True once we've seen a SERVER (non-offline-cache) settings snapshot, or a
+  // fresh HTTP fetch of the public settings endpoint, or the readiness
+  // watchdog forced it. Distinct from `_ready.settings` (which flips on the
+  // first snapshot of ANY kind, including a possibly-stale offline cache read)
+  // so consumers that must not act on stale `predictionsLocked` — namely the
+  // Leaderboard lock screen — can wait for server confirmation WITHOUT
+  // blocking the global readiness gate / trapping offline users on a spinner.
+  settingsServerConfirmed: boolean;
   summaries: Record<string, any>;
   _ready: Record<string, boolean>;
 };
@@ -49,6 +57,7 @@ export const cache: CacheShape = {
   actualAdvancing: {},
   actualBonuses: { champion: null, topScorers: [] },
   settings: { predictionsLocked: false },
+  settingsServerConfirmed: false,
   summaries: {}, // summaryId -> summaryData
   _ready: {},
 };

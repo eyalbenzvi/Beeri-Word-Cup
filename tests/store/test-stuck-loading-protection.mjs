@@ -489,6 +489,96 @@ console.log("--- 16b. wiring: listeners.ts auto-retry handlers call getMissingRe
   );
 }
 
+// ============ 17. Offline-cache stale settings must not flash the lock screen,
+//                  yet must NOT trap an offline user on the spinner ============
+console.log("--- 17. settings: ready resolves offline, but lock screen waits for server confirmation ---");
+
+{
+  // Behavioral model of the two coupled contracts:
+  //   (a) the settings-snapshot reducer in listeners.ts / publicMode.ts, and
+  //   (b) the Leaderboard lock-screen gate.
+  // These mirror the real code; if the real decision diverges from this truth
+  // table the fix is broken, so the static-wiring asserts below pin the source
+  // to this same shape.
+  //
+  // Reducer: every snapshot marks settings READY (so isStoreReady can resolve
+  // offline). Only a SERVER (non-cache) snapshot confirms the lock state.
+  function applySettingsSnapshot(state, { fromCache, predictionsLocked }) {
+    return {
+      ready: true, // unconditional — offline users never trapped
+      serverConfirmed: state.serverConfirmed || !fromCache,
+      predictionsLocked,
+    };
+  }
+  // Leaderboard pre-tournament lock screen shows only when server-confirmed-unlocked.
+  const lockScreenShown = (s) => s.serverConfirmed && !s.predictionsLocked;
+
+  let s = { ready: false, serverConfirmed: false, predictionsLocked: false };
+
+  // 1. First snapshot is a STALE offline cache from before the tournament locked.
+  s = applySettingsSnapshot(s, { fromCache: true, predictionsLocked: false });
+  assert(s.ready === true, "stale offline snapshot still marks settings ready (no spinner trap)");
+  assert(s.serverConfirmed === false, "offline-cache snapshot is NOT treated as server-confirmed");
+  assert(lockScreenShown(s) === false, "lock screen suppressed on stale offline snapshot (the bug being fixed)");
+
+  // 2. Offline user who never reaches the server: settings stay ready forever.
+  assert(s.ready === true, "offline-only session keeps settings ready (isStoreReady can resolve)");
+
+  // 3. Server snapshot finally lands with the real, post-lock value.
+  s = applySettingsSnapshot(s, { fromCache: false, predictionsLocked: true });
+  assert(s.serverConfirmed === true, "server snapshot confirms settings");
+  assert(lockScreenShown(s) === false, "tournament running: lock screen stays hidden");
+
+  // 4. Genuine pre-tournament, server-confirmed unlocked → lock screen SHOWN.
+  let pre = { ready: false, serverConfirmed: false, predictionsLocked: false };
+  pre = applySettingsSnapshot(pre, { fromCache: false, predictionsLocked: false });
+  assert(lockScreenShown(pre) === true, "pre-tournament server-confirmed: lock screen correctly shown");
+
+  // Static wiring: the real sources must match the modeled contract.
+  const fs = await import("node:fs");
+  const listenersSrc = fs.readFileSync("src/store/listeners.ts", "utf8");
+  const publicSrc = fs.readFileSync("src/store/publicMode.ts", "utf8");
+  const lbSrc = fs.readFileSync("src/pages/Leaderboard.tsx", "utf8");
+  const cacheSrc = fs.readFileSync("src/store/cache.ts", "utf8");
+
+  assert(
+    /settingsServerConfirmed:\s*false/.test(cacheSrc),
+    "cache.ts declares settingsServerConfirmed default false",
+  );
+  // _ready.settings must be set unconditionally (no skipReady gate that could trap offline).
+  assert(
+    !/skipReady/.test(listenersSrc),
+    "listeners.ts no longer gates _ready behind skipReady (offline trap removed)",
+  );
+  assert(
+    /key === "settings" && !snap\.metadata\.fromCache[\s\S]*settingsServerConfirmed = true/.test(listenersSrc),
+    "listeners.ts sets settingsServerConfirmed only on a server (non-cache) snapshot",
+  );
+  assert(
+    /!snap\.metadata\.fromCache[\s\S]*settingsServerConfirmed = true/.test(publicSrc),
+    "publicMode.ts confirms settings only on a server (non-cache) snapshot",
+  );
+  assert(
+    /useSettingsServerConfirmed/.test(lbSrc) && /settingsConfirmed && !locked/.test(lbSrc),
+    "Leaderboard gates the lock screen on settingsConfirmed && !locked",
+  );
+
+  // Sibling pages with the same "revealed when matches start" 🔒 lock screen
+  // must gate on the same server-confirmed flag, or they reproduce the bug.
+  const statsSrc = fs.readFileSync("src/pages/Stats.tsx", "utf8");
+  const simSrc = fs.readFileSync("src/pages/Simulator.tsx", "utf8");
+  assert(
+    /useSettingsServerConfirmed/.test(statsSrc) &&
+      /settingsConfirmed && !settings\.predictionsLocked/.test(statsSrc),
+    "Stats gates its lock screen on settingsConfirmed && !predictionsLocked",
+  );
+  assert(
+    /useSettingsServerConfirmed/.test(simSrc) &&
+      /settingsConfirmed && !settings\.predictionsLocked/.test(simSrc),
+    "Simulator gates its lock screen on settingsConfirmed && !predictionsLocked",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }

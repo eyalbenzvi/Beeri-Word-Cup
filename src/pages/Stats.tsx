@@ -4,6 +4,7 @@ import {
   useAllPredictions,
   useMatchResults,
   useSettings,
+  useSettingsServerConfirmed,
   useCurrentUser,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
@@ -639,6 +640,10 @@ export default function Stats() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
   const settings = useSettings();
+  // Gate the lock screen on SERVER-confirmed settings so a stale pre-lock
+  // offline-cache read doesn't falsely show "data revealed when matches
+  // start" once the tournament is running. See cache.ts / Leaderboard.tsx.
+  const settingsConfirmed = useSettingsServerConfirmed();
   const { user: currentUser } = useCurrentUser();
   const { params, setParamsPatch, navigate } = useNavigation();
   // Tab is URL-driven; falls back to "matches" for fresh entries or invalid
@@ -668,7 +673,7 @@ export default function Stats() {
     [settings.topScorerPlayers],
   );
 
-  if (!settings.predictionsLocked) {
+  if (settingsConfirmed && !settings.predictionsLocked) {
     return (
       <>
         <div className="text-center py-16 card-duo-lg max-w-md mx-auto">
