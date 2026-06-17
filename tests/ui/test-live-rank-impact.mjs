@@ -30,12 +30,14 @@ assert(/homeScore: s\.homeScore, awayScore: s\.awayScore, played: true/.test(c),
 assert(/stage: m\.stage/.test(c), "hypothetical entry carries stage (so knockout games aren't mis-scored as group)");
 assert(/entry\.advancingTeam = home|advancingTeam = away/.test(c), "decisive knockout gets a provisional advancing side");
 
-// Projection = current rank vs hypothetical rank for the user's best form.
-assert(/best\.rank - hypoEntry\.rank/.test(c), "delta = current rank − projected rank");
+// Projection = current rank vs hypothetical rank, for EVERY form the user owns.
+assert(/entry\.rank - hypoEntry\.rank/.test(c), "delta = current rank − projected rank");
 assert(/livePoints/.test(c), "shows provisional points from the live matches");
+assert(/\.filter\(\(e\) => e\.userId === user\.id\)/.test(c), "projects all of the user's forms, not just the best one");
+assert(/impacts\.map\(/.test(c), "renders one projection row per form");
 
 // Guards: nothing to show without a live score or without forms.
-assert(/scoredLiveCount === 0 \|\| !impact/.test(c), "renders nothing without a scored live match or user forms");
+assert(/scoredLiveCount === 0 \|\| impacts\.length === 0/.test(c), "renders nothing without a scored live match or user forms");
 assert(/לא סופי/.test(c), "labels the projection as provisional");
 
 // All hooks run before the early return (React hook-order safety).
