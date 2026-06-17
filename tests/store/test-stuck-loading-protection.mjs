@@ -562,6 +562,21 @@ console.log("--- 17. settings: ready resolves offline, but lock screen waits for
     /useSettingsServerConfirmed/.test(lbSrc) && /settingsConfirmed && !locked/.test(lbSrc),
     "Leaderboard gates the lock screen on settingsConfirmed && !locked",
   );
+
+  // Sibling pages with the same "revealed when matches start" 🔒 lock screen
+  // must gate on the same server-confirmed flag, or they reproduce the bug.
+  const statsSrc = fs.readFileSync("src/pages/Stats.tsx", "utf8");
+  const simSrc = fs.readFileSync("src/pages/Simulator.tsx", "utf8");
+  assert(
+    /useSettingsServerConfirmed/.test(statsSrc) &&
+      /settingsConfirmed && !settings\.predictionsLocked/.test(statsSrc),
+    "Stats gates its lock screen on settingsConfirmed && !predictionsLocked",
+  );
+  assert(
+    /useSettingsServerConfirmed/.test(simSrc) &&
+      /settingsConfirmed && !settings\.predictionsLocked/.test(simSrc),
+    "Simulator gates its lock screen on settingsConfirmed && !predictionsLocked",
+  );
 }
 
 // ============ SUMMARY ============
