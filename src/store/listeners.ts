@@ -20,6 +20,7 @@
 
 import {
   getDoc,
+  getDocFromServer,
   getDocs,
   onSnapshot,
   query,
@@ -265,13 +266,20 @@ export function initRealtimeListeners(userId: string) {
         flushPendingWrites();
       } else if (document.visibilityState === "visible") {
         // Tab became visible — re-subscribe if we hadn't fully loaded yet.
+        // If everything is already "ready", a re-subscribe is a no-op, but a
+        // stale lock value could still be cached (idle/dead listener), so
+        // force a fresh server read of settings specifically.
         if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
+        else refreshSettingsFromServer();
       }
     });
     window.addEventListener("pagehide", flushPendingWrites);
-    // When network comes back online, retry if anything still missing.
+    // When network comes back online, retry if anything still missing —
+    // otherwise force-refresh the lock value (it may have flipped while the
+    // tab was offline and the live listener never delivered the update).
     window.addEventListener("online", () => {
       if (getMissingReadyKeys().length > 0) retryRealtimeListeners();
+      else refreshSettingsFromServer();
     });
   }
 
@@ -387,6 +395,13 @@ export function initRealtimeListeners(userId: string) {
 
   // PII migration Phase A: own private record listener.
   setupUserPrivateListener(userId);
+
+  // Belt-and-suspenders: force one fresh server read of the lock value on
+  // (re)subscribe. The live listener normally delivers server data, but if it
+  // had previously degraded to a one-shot cached read, this guarantees the
+  // client doesn't boot on a stale predictionsLocked. Fire-and-forget; no-op
+  // offline.
+  void refreshSettingsFromServer();
 }
 
 // User-initiated, in-place recovery for the "logged in but data never
@@ -401,6 +416,34 @@ export function retryRealtimeListeners(): boolean {
   listenersHadError = true;
   initRealtimeListeners(currentListenerUserId);
   return true;
+}
+
+// Force-refresh ONLY the settings doc straight from the server, bypassing the
+// offline cache. `predictionsLocked` is the most consequential value in the
+// app (it gates the whole locked/unlocked UX and the all-forms read), and a
+// long-lived client can hold a stale copy: its IndexedDB predates the admin
+// lock, or its live listener died and fell back to a one-shot read (which may
+// have resolved from cache) and is no longer streaming server updates. The
+// keys-missing retry on focus/online does NOT cover this — once a stale
+// snapshot marks settings "ready", getMissingReadyKeys() is empty and nothing
+// re-syncs. This getDocFromServer call is the guaranteed-fresh path. It throws
+// when offline (no server reachable); we swallow that, since the live listener
+// / keys-missing retry will catch up once connectivity returns. Returns
+// silently on success after updating the cache + waking subscribers.
+export async function refreshSettingsFromServer(): Promise<void> {
+  if (!currentListenerUserId) return;
+  try {
+    const snap = await withTimeout(getDocFromServer(gameDocRef(DOCS.settings)), 10000);
+    if (snap.exists()) cache.settings = (snap.data() as any).data;
+    cache._ready.settings = true;
+    cache.settingsServerConfirmed = true;
+    notifyAndEmit("settings");
+    // A freshly-observed lock flip must also upgrade the predictions listener
+    // to all-forms (so the leaderboard populates), mirroring the snapshot path.
+    maybeUpgradePredictionsListener();
+  } catch {
+    // Offline / transient — the live listener + online/visibility retry recover.
+  }
 }
 
 // Avoid a static cycle with cache.ts by re-exposing openBroadcastChannel

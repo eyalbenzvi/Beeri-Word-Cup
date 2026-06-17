@@ -579,6 +579,54 @@ console.log("--- 17. settings: ready resolves offline, but lock screen waits for
   );
 }
 
+// ============ 18. Stale lock value: force a fresh server read so a
+//                  long-lived/idle client can't act on an out-of-date
+//                  predictionsLocked ============
+console.log("--- 18. settings: force a fresh server read on init / focus / online ---");
+
+{
+  const fs = await import("node:fs");
+  const src = fs.readFileSync("src/store/listeners.ts", "utf8");
+
+  // The fresh-read helper must exist and bypass the offline cache via
+  // getDocFromServer (NOT getDoc, which can resolve from IndexedDB).
+  assert(
+    /import \{[\s\S]*getDocFromServer[\s\S]*\} from "firebase\/firestore"/.test(src),
+    "listeners.ts imports getDocFromServer",
+  );
+  assert(
+    /export async function refreshSettingsFromServer/.test(src),
+    "refreshSettingsFromServer helper exists",
+  );
+  // Within the helper: server read + confirm + notify + listener upgrade.
+  const helper = src.slice(src.indexOf("export async function refreshSettingsFromServer"));
+  assert(
+    /getDocFromServer\(gameDocRef\(DOCS\.settings\)\)/.test(helper),
+    "refreshSettingsFromServer reads settings straight from the server",
+  );
+  assert(
+    /settingsServerConfirmed = true/.test(helper) &&
+      /notifyAndEmit\("settings"\)/.test(helper) &&
+      /maybeUpgradePredictionsListener\(\)/.test(helper),
+    "fresh read confirms settings, wakes subscribers, and upgrades the predictions listener",
+  );
+
+  // It must be invoked on (re)subscribe and on focus/online when nothing is
+  // reported missing (the exact gap: a cache-loaded client never re-syncs the
+  // lock value because getMissingReadyKeys() is empty).
+  assert(
+    /else refreshSettingsFromServer\(\);/.test(src),
+    "focus/online handlers force a settings refresh when no keys are missing",
+  );
+  const refreshCalls = src.match(/refreshSettingsFromServer\(\)/g) || [];
+  // 1 definition reference inside helper body is not counted (different text);
+  // expect at least: init call + visibility branch + online branch = 3.
+  assert(
+    refreshCalls.length >= 3,
+    "refreshSettingsFromServer is wired into init + visibility + online paths",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
