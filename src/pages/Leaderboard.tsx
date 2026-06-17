@@ -8,6 +8,7 @@ import {
   useUserDirectory,
   useActualBonuses,
   useSettings,
+  useSettingsReady,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useNavigation } from "../hooks/useNavigation";
@@ -71,6 +72,7 @@ export default function Leaderboard({
   const users = useUserDirectory();
   const actualBonuses = useActualBonuses();
   const settings = useSettings();
+  const settingsReady = useSettingsReady();
   const locked = settings.predictionsLocked;
   const playerList = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),
@@ -465,7 +467,7 @@ export default function Leaderboard({
     );
   };
 
-  if (!embedded && !forceUnlockView && !locked) {
+  if (!embedded && !forceUnlockView && settingsReady && !locked) {
     return (
       <>
         <div className="text-center py-16 card-duo-lg max-w-md mx-auto">

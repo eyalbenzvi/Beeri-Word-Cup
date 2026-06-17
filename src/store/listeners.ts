@@ -290,7 +290,16 @@ export function initRealtimeListeners(userId: string) {
           getRetryState(key).count = 0;
           const prevUsers = key === "users" ? cache.users || {} : null;
           if (snap.exists()) (cache as any)[key] = (snap.data() as any).data;
-          cache._ready[key] = true;
+          // For settings: if this is an offline-cache snapshot showing
+          // predictions as unlocked, hold off on marking ready until the
+          // server snapshot confirms. Stale cache (pre-tournament) would
+          // otherwise cause the Leaderboard to flash "rating unavailable"
+          // for users whose IndexedDB predates the lock being set.
+          const skipReady =
+            key === "settings" &&
+            snap.metadata.fromCache &&
+            !cache.settings?.predictionsLocked;
+          if (!skipReady) cache._ready[key] = true;
           // A7: if we just wrote our own user and the server snapshot has no
           // record of them, the write was rejected and the SDK reverted the
           // optimistic cache. Clear lastEnsuredUid so ensureUserInStore can

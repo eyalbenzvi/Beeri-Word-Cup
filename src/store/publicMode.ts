@@ -326,7 +326,12 @@ export function initPublicReadonlyMode() {
         console.error("Public settings snapshot parse error:", err);
         captureClientError(err, { source: "publicSettingsParse" });
       }
-      cache._ready.settings = true;
+      // Don't mark settings ready if this is a cached snapshot showing
+      // the pre-tournament (unlocked) state — wait for the server snapshot
+      // to confirm so the Leaderboard doesn't flash "rating unavailable".
+      if (!snap.metadata.fromCache || cache.settings?.predictionsLocked) {
+        cache._ready.settings = true;
+      }
       notifyAndEmit("settings");
     },
     (err: any) => {

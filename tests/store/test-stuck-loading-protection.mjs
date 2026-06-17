@@ -489,6 +489,41 @@ console.log("--- 16b. wiring: listeners.ts auto-retry handlers call getMissingRe
   );
 }
 
+// ============ 17. Offline-cache stale settings guard ============
+console.log("--- 17. stale offline-cache settings must not mark _ready.settings=true ---");
+
+{
+  // Verify listeners.ts holds off on _ready when settings are fromCache + unlocked.
+  // Verify publicMode.ts applies the same guard.
+  const fs = await import("node:fs");
+  const listenersSrc = fs.readFileSync("src/store/listeners.ts", "utf8");
+  const publicSrc = fs.readFileSync("src/store/publicMode.ts", "utf8");
+
+  assert(
+    /snap\.metadata\.fromCache/.test(listenersSrc),
+    "listeners.ts checks snap.metadata.fromCache for settings",
+  );
+  assert(
+    /skipReady/.test(listenersSrc) && /predictionsLocked/.test(listenersSrc),
+    "listeners.ts skips _ready when fromCache + unlocked",
+  );
+  assert(
+    /snap\.metadata\.fromCache/.test(publicSrc),
+    "publicMode.ts checks snap.metadata.fromCache for settings",
+  );
+
+  // Leaderboard must import useSettingsReady and gate the locked screen on it.
+  const lbSrc = fs.readFileSync("src/pages/Leaderboard.tsx", "utf8");
+  assert(
+    /useSettingsReady/.test(lbSrc),
+    "Leaderboard imports and calls useSettingsReady",
+  );
+  assert(
+    /settingsReady && !locked/.test(lbSrc),
+    "Leaderboard gates locked screen on settingsReady && !locked",
+  );
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== STUCK-LOADING PROTECTION: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
