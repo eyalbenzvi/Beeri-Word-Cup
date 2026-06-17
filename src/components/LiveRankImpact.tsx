@@ -70,55 +70,67 @@ export default function LiveRankImpact() {
     (m) => liveScores[m.id]?.homeScore != null && liveScores[m.id]?.awayScore != null,
   ).length;
 
-  const impact = useMemo(() => {
-    if (!user?.id) return null;
-    const mine = current.rankedLeaderboard.filter((e) => e.userId === user.id);
-    if (mine.length === 0) return null;
-    const best = mine.reduce((a, b) => (a.rank <= b.rank ? a : b));
-    const hypoEntry = hypo.rankedLeaderboard.find((e) => e.formId === best.formId);
-    if (!hypoEntry) return null;
-    // Provisional points this form picks up from the live matches.
-    let livePoints = 0;
-    const hypoScored = hypo.scoredForms.find((e) => e.formId === best.formId);
-    for (const m of liveMatches) {
-      livePoints += hypoScored?.matchScores?.[m.id]?.points || 0;
+  // One projection row per form the signed-in user owns (not just the best),
+  // ordered by current rank so the strongest form leads.
+  const impacts = useMemo(() => {
+    if (!user?.id) return [];
+    const mine = current.rankedLeaderboard
+      .filter((e) => e.userId === user.id)
+      .sort((a, b) => a.rank - b.rank);
+    const rows = [];
+    for (const entry of mine) {
+      const hypoEntry = hypo.rankedLeaderboard.find((e) => e.formId === entry.formId);
+      if (!hypoEntry) continue;
+      // Provisional points this form picks up from the live matches.
+      let livePoints = 0;
+      const hypoScored = hypo.scoredForms.find((e) => e.formId === entry.formId);
+      for (const m of liveMatches) {
+        livePoints += hypoScored?.matchScores?.[m.id]?.points || 0;
+      }
+      rows.push({
+        formId: entry.formId,
+        formName: entry.formName,
+        currentRank: entry.rank,
+        projectedRank: hypoEntry.rank,
+        delta: entry.rank - hypoEntry.rank, // positive = climbing
+        livePoints,
+      });
     }
-    return {
-      formName: best.formName,
-      currentRank: best.rank,
-      projectedRank: hypoEntry.rank,
-      delta: best.rank - hypoEntry.rank, // positive = climbing
-      livePoints,
-    };
+    return rows;
   }, [user?.id, current.rankedLeaderboard, hypo.rankedLeaderboard, hypo.scoredForms, liveMatches]);
 
-  if (scoredLiveCount === 0 || !impact) return null;
-
-  const { formName, projectedRank, delta, livePoints } = impact;
+  if (scoredLiveCount === 0 || impacts.length === 0) return null;
 
   return (
     <div className="alert-accent-soft w-full text-right mb-3">
       <div className="text-xs font-extrabold text-accent-text mb-1">
         📡 אם המשחקים החיים ייגמרו עכשיו
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold text-ink">
-        <span className="truncate">
-          {formName}: מקום <span className="tabular-nums">{projectedRank}</span>
-        </span>
-        {delta > 0 && (
-          <span className="inline-flex items-center gap-1 text-primary-dark">
-            <TrendingUp size={16} aria-hidden="true" /> +{delta}
-          </span>
-        )}
-        {delta < 0 && (
-          <span className="inline-flex items-center gap-1 text-danger">
-            <TrendingDown size={16} aria-hidden="true" /> {delta}
-          </span>
-        )}
-        {delta === 0 && <span className="text-ink-muted">ללא שינוי בדירוג</span>}
-        {livePoints > 0 && (
-          <span className="text-accent-text">· צבירה צפויה +{livePoints} נק׳</span>
-        )}
+      <div className="flex flex-col gap-1">
+        {impacts.map(({ formId, formName, projectedRank, delta, livePoints }) => (
+          <div
+            key={formId}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold text-ink"
+          >
+            <span className="truncate">
+              {formName}: מקום <span className="tabular-nums">{projectedRank}</span>
+            </span>
+            {delta > 0 && (
+              <span className="inline-flex items-center gap-1 text-primary-dark">
+                <TrendingUp size={16} aria-hidden="true" /> +{delta}
+              </span>
+            )}
+            {delta < 0 && (
+              <span className="inline-flex items-center gap-1 text-danger">
+                <TrendingDown size={16} aria-hidden="true" /> {delta}
+              </span>
+            )}
+            {delta === 0 && <span className="text-ink-muted">ללא שינוי בדירוג</span>}
+            {livePoints > 0 && (
+              <span className="text-accent-text">· צבירה צפויה +{livePoints} נק׳</span>
+            )}
+          </div>
+        ))}
       </div>
       <div className="text-xs text-ink-light font-medium mt-1">ניחוש זמני — לא סופי עד שריקת הסיום</div>
     </div>
