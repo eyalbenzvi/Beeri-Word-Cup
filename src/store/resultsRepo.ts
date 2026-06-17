@@ -75,6 +75,15 @@ export function isSettingsReady() {
   return !!cache._ready.settings;
 }
 
+// Whether the settings doc's value is SERVER-confirmed (not just a possibly
+// stale offline-cache read). Consumers that must not act on a stale
+// `predictionsLocked` — the Leaderboard lock screen — gate on this so they
+// don't flash "rating unavailable" off a pre-lock IndexedDB snapshot, while
+// the global readiness gate (isSettingsReady) stays resolvable offline.
+export function isSettingsServerConfirmed() {
+  return !!cache.settingsServerConfirmed;
+}
+
 export function updateSettings(newSettings: Record<string, any>) {
   if (!requireAdmin()) return;
   const settings = { ...getSettings(), ...newSettings };

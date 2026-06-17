@@ -489,38 +489,78 @@ console.log("--- 16b. wiring: listeners.ts auto-retry handlers call getMissingRe
   );
 }
 
-// ============ 17. Offline-cache stale settings guard ============
-console.log("--- 17. stale offline-cache settings must not mark _ready.settings=true ---");
+// ============ 17. Offline-cache stale settings must not flash the lock screen,
+//                  yet must NOT trap an offline user on the spinner ============
+console.log("--- 17. settings: ready resolves offline, but lock screen waits for server confirmation ---");
 
 {
-  // Verify listeners.ts holds off on _ready when settings are fromCache + unlocked.
-  // Verify publicMode.ts applies the same guard.
+  // Behavioral model of the two coupled contracts:
+  //   (a) the settings-snapshot reducer in listeners.ts / publicMode.ts, and
+  //   (b) the Leaderboard lock-screen gate.
+  // These mirror the real code; if the real decision diverges from this truth
+  // table the fix is broken, so the static-wiring asserts below pin the source
+  // to this same shape.
+  //
+  // Reducer: every snapshot marks settings READY (so isStoreReady can resolve
+  // offline). Only a SERVER (non-cache) snapshot confirms the lock state.
+  function applySettingsSnapshot(state, { fromCache, predictionsLocked }) {
+    return {
+      ready: true, // unconditional — offline users never trapped
+      serverConfirmed: state.serverConfirmed || !fromCache,
+      predictionsLocked,
+    };
+  }
+  // Leaderboard pre-tournament lock screen shows only when server-confirmed-unlocked.
+  const lockScreenShown = (s) => s.serverConfirmed && !s.predictionsLocked;
+
+  let s = { ready: false, serverConfirmed: false, predictionsLocked: false };
+
+  // 1. First snapshot is a STALE offline cache from before the tournament locked.
+  s = applySettingsSnapshot(s, { fromCache: true, predictionsLocked: false });
+  assert(s.ready === true, "stale offline snapshot still marks settings ready (no spinner trap)");
+  assert(s.serverConfirmed === false, "offline-cache snapshot is NOT treated as server-confirmed");
+  assert(lockScreenShown(s) === false, "lock screen suppressed on stale offline snapshot (the bug being fixed)");
+
+  // 2. Offline user who never reaches the server: settings stay ready forever.
+  assert(s.ready === true, "offline-only session keeps settings ready (isStoreReady can resolve)");
+
+  // 3. Server snapshot finally lands with the real, post-lock value.
+  s = applySettingsSnapshot(s, { fromCache: false, predictionsLocked: true });
+  assert(s.serverConfirmed === true, "server snapshot confirms settings");
+  assert(lockScreenShown(s) === false, "tournament running: lock screen stays hidden");
+
+  // 4. Genuine pre-tournament, server-confirmed unlocked → lock screen SHOWN.
+  let pre = { ready: false, serverConfirmed: false, predictionsLocked: false };
+  pre = applySettingsSnapshot(pre, { fromCache: false, predictionsLocked: false });
+  assert(lockScreenShown(pre) === true, "pre-tournament server-confirmed: lock screen correctly shown");
+
+  // Static wiring: the real sources must match the modeled contract.
   const fs = await import("node:fs");
   const listenersSrc = fs.readFileSync("src/store/listeners.ts", "utf8");
   const publicSrc = fs.readFileSync("src/store/publicMode.ts", "utf8");
-
-  assert(
-    /snap\.metadata\.fromCache/.test(listenersSrc),
-    "listeners.ts checks snap.metadata.fromCache for settings",
-  );
-  assert(
-    /skipReady/.test(listenersSrc) && /predictionsLocked/.test(listenersSrc),
-    "listeners.ts skips _ready when fromCache + unlocked",
-  );
-  assert(
-    /snap\.metadata\.fromCache/.test(publicSrc),
-    "publicMode.ts checks snap.metadata.fromCache for settings",
-  );
-
-  // Leaderboard must import useSettingsReady and gate the locked screen on it.
   const lbSrc = fs.readFileSync("src/pages/Leaderboard.tsx", "utf8");
+  const cacheSrc = fs.readFileSync("src/store/cache.ts", "utf8");
+
   assert(
-    /useSettingsReady/.test(lbSrc),
-    "Leaderboard imports and calls useSettingsReady",
+    /settingsServerConfirmed:\s*false/.test(cacheSrc),
+    "cache.ts declares settingsServerConfirmed default false",
+  );
+  // _ready.settings must be set unconditionally (no skipReady gate that could trap offline).
+  assert(
+    !/skipReady/.test(listenersSrc),
+    "listeners.ts no longer gates _ready behind skipReady (offline trap removed)",
   );
   assert(
-    /settingsReady && !locked/.test(lbSrc),
-    "Leaderboard gates locked screen on settingsReady && !locked",
+    /key === "settings" && !snap\.metadata\.fromCache[\s\S]*settingsServerConfirmed = true/.test(listenersSrc),
+    "listeners.ts sets settingsServerConfirmed only on a server (non-cache) snapshot",
+  );
+  assert(
+    /!snap\.metadata\.fromCache[\s\S]*settingsServerConfirmed = true/.test(publicSrc),
+    "publicMode.ts confirms settings only on a server (non-cache) snapshot",
+  );
+  assert(
+    /useSettingsServerConfirmed/.test(lbSrc) && /settingsConfirmed && !locked/.test(lbSrc),
+    "Leaderboard gates the lock screen on settingsConfirmed && !locked",
   );
 }
 

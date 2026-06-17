@@ -273,6 +273,10 @@ export function useSettingsReady() {
   return useStoreValue(store.isSettingsReady);
 }
 
+export function useSettingsServerConfirmed() {
+  return useStoreValue(store.isSettingsServerConfirmed);
+}
+
 export function useSummaries() {
   return useStoreValue(store.getSummaries);
 }

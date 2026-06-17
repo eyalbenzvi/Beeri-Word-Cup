@@ -123,6 +123,7 @@ export {
   saveActualBonuses,
   getSettings,
   isSettingsReady,
+  isSettingsServerConfirmed,
   updateSettings,
 } from "./resultsRepo";
 export { maybeTriggerAutoFill } from "./autoFill";
@@ -154,6 +155,7 @@ export function logoutUser() {
   cache.actualAdvancing = {};
   cache.actualBonuses = { champion: null, topScorers: [] };
   cache.settings = { predictionsLocked: false };
+  cache.settingsServerConfirmed = false;
   cache.summaries = {};
   cache._ready = {};
   rebuildUserFormIndex();

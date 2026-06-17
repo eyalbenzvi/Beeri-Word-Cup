@@ -8,7 +8,7 @@ import {
   useUserDirectory,
   useActualBonuses,
   useSettings,
-  useSettingsReady,
+  useSettingsServerConfirmed,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useNavigation } from "../hooks/useNavigation";
@@ -72,7 +72,10 @@ export default function Leaderboard({
   const users = useUserDirectory();
   const actualBonuses = useActualBonuses();
   const settings = useSettings();
-  const settingsReady = useSettingsReady();
+  // Gate the lock screen on SERVER-confirmed settings (not a possibly-stale
+  // offline-cache read) so users whose IndexedDB predates the lock don't flash
+  // "rating unavailable" once the tournament has started. See cache.ts.
+  const settingsConfirmed = useSettingsServerConfirmed();
   const locked = settings.predictionsLocked;
   const playerList = useMemo(
     () => resolvePlayerList(settings.topScorerPlayers),
@@ -467,7 +470,7 @@ export default function Leaderboard({
     );
   };
 
-  if (!embedded && !forceUnlockView && settingsReady && !locked) {
+  if (!embedded && !forceUnlockView && settingsConfirmed && !locked) {
     return (
       <>
         <div className="text-center py-16 card-duo-lg max-w-md mx-auto">

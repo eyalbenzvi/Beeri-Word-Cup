@@ -46,6 +46,13 @@ function markPublicReadinessForced() {
     cache._ready.settings = true;
     changed = true;
   }
+  // Last-resort: after the watchdog window we let the UI commit to whatever
+  // settings we have rather than leaving a guest waiting on server
+  // confirmation that an outage may never deliver.
+  if (!cache.settingsServerConfirmed) {
+    cache.settingsServerConfirmed = true;
+    changed = true;
+  }
   if (!cache._ready.matchResults) {
     cache._ready.matchResults = true;
     changed = true;
@@ -106,6 +113,9 @@ async function fetchPublicSettingsOnce() {
         cache.matchResults = data.matchResults;
       }
       cache._ready.settings = true;
+      // The public endpoint is a fresh HTTP round-trip (cache:"no-store"), so
+      // its predictionsLocked value is authoritative — confirm the lock state.
+      cache.settingsServerConfirmed = true;
       cache._ready.matchResults = true;
       notifyAndEmit("settings");
       notifyAndEmit("matchResults");
@@ -326,11 +336,13 @@ export function initPublicReadonlyMode() {
         console.error("Public settings snapshot parse error:", err);
         captureClientError(err, { source: "publicSettingsParse" });
       }
-      // Don't mark settings ready if this is a cached snapshot showing
-      // the pre-tournament (unlocked) state — wait for the server snapshot
-      // to confirm so the Leaderboard doesn't flash "rating unavailable".
-      if (!snap.metadata.fromCache || cache.settings?.predictionsLocked) {
-        cache._ready.settings = true;
+      // Mark ready on any snapshot (never trap a guest on the spinner), but
+      // only treat a server (non-cache) snapshot as confirmation of the lock
+      // state so the Leaderboard doesn't flash "rating unavailable" off a
+      // stale offline-cache read. See settingsServerConfirmed in cache.ts.
+      cache._ready.settings = true;
+      if (!snap.metadata.fromCache) {
+        cache.settingsServerConfirmed = true;
       }
       notifyAndEmit("settings");
     },
