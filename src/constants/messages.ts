@@ -111,8 +111,7 @@ export const FINISHED = {
 export const SCORE_STRIP = {
   header: "הניקוד שלך",
   officialOnly: "לפי משחקים שנגמרו",
-  todayPoints: (pts) => `היום: ‎+${pts} נק׳`,
-  yesterdayPoints: (pts) => `אתמול: ‎+${pts} נק׳`,
+  last24hPoints: (pts) => `24 השעות האחרונות: ‎+${pts} נק׳`,
   rankOf: (rank, total) => `מקום ${rank} מתוך ${total}`,
   leadingForm: "הטופס המוביל שלך",
   toLeaderboard: "לטבלת הדירוג",

@@ -13,6 +13,7 @@ import {
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
+import { getMatchSortTime } from "../utils/chronologicalSchedule";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
 import Score from "../components/Score";
@@ -287,7 +288,22 @@ export default function Leaderboard({
       advancingPoints: {},
       matchScores: {},
     };
-    const playedMatches = Object.keys(results);
+    // Chronological order (was Object.keys insertion order = the random order
+    // results were entered by the admin). Reuses getMatchSortTime — the same
+    // kickoff-instant sort key the Results "סדר כרונולוגי" view uses — so both
+    // screens agree on play order and can't drift. It also makes the stage
+    // GROUPS read in play order: group stage finishes before any knockout
+    // kicks off, so the first-appearance grouping below inherits the correct
+    // stage sequence. Kickoff-less rows fall back to their day + FIFA number;
+    // an unknown result id (no match object) sorts last.
+    const playedMatches = Object.keys(results).sort((a, b) => {
+      const ma = allMatchesMap[a];
+      const mb = allMatchesMap[b];
+      return (
+        getMatchSortTime(ma) - getMatchSortTime(mb) ||
+        (ma?.fifaMatch ?? 0) - (mb?.fifaMatch ?? 0)
+      );
+    });
 
     const matchesByStage = {};
     for (const matchId of playedMatches) {

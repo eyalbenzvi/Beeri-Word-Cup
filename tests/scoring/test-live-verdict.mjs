@@ -16,8 +16,7 @@ import {
   POINTS,
 } from "/home/user/Beeri-World-Cup/src/utils/scoring.js";
 import {
-  computeDailyFormPoints,
-  israelDateKeyForNow,
+  computeWindowFormPoints,
 } from "/home/user/Beeri-World-Cup/src/utils/dailyPoints.js";
 import { groupMatches } from "/home/user/Beeri-World-Cup/src/data/matches.js";
 import {
@@ -296,14 +295,11 @@ console.log("--- 6. Score-decrease debounce ---");
   assert(!pending2.m2, "flicker back up clears pending decrease");
 }
 
-// ---- 7. Daily points: viewer-timezone filtering + engine parity ----
-console.log("--- 7. computeDailyFormPoints ---");
+// ---- 7. Rolling-window points: kickoff-window filtering + engine parity ----
+console.log("--- 7. computeWindowFormPoints ---");
 {
-  // computeDailyFormPoints groups by the viewer's timezone; the caller must
-  // pass the SAME tz used to derive dateKey. We pin Israel time so the test is
-  // deterministic on a UTC CI host and the day keys match getMatchIsraelDateKey.
-  const TZ = "Asia/Jerusalem";
-  // Build a real two-matches-same-day fixture set from the schedule.
+  // Build a real two-matches-same-day fixture from the schedule, plus a match
+  // from a DIFFERENT day to prove the window excludes out-of-range kickoffs.
   const byDay = {};
   for (const m of groupMatches) {
     const k = getMatchIsraelDateKey(m);
@@ -322,43 +318,47 @@ console.log("--- 7. computeDailyFormPoints ---");
   const formMatches = {
     [mA.id]: { homeScore: 2, awayScore: 1 }, // exact: 1+3 = 4
     [mB.id]: { homeScore: 1, awayScore: 1 }, // outcome: 1
-    [mC.id]: { homeScore: 3, awayScore: 0 }, // exact but OTHER day — excluded
+    [mC.id]: { homeScore: 3, awayScore: 0 }, // exact but OUTSIDE window — excluded
   };
-  const day = computeDailyFormPoints({ formMatches, results, dateKey: dayKey, tz: TZ });
-  assert(day.points === 5, `same-day points = 5 (got ${day.points})`);
-  assert(day.exactCount === 1 && day.outcomeCount === 1, "exact/outcome counts");
-  assert(day.playedCount === 2, "playedCount counts only that day's finished matches");
 
-  const other = computeDailyFormPoints({ formMatches, results, dateKey: otherDayKey, tz: TZ });
-  assert(other.points === 4 && other.playedCount === 1, "other-day match scores on ITS day");
+  // A 24h window centered on the shared day. mC's kickoff is on another day, so
+  // it must fall outside [kA - 1h, kB + 1h] when those two share a calendar day.
+  const kA = getMatchKickoffUTC(mA);
+  const kB = getMatchKickoffUTC(mB);
+  const fromMs = Math.min(kA, kB) - 3600 * 1000;
+  const toMs = Math.max(kA, kB) + 3600 * 1000;
 
-  const noDay = computeDailyFormPoints({ formMatches, results, dateKey: "1999-01-01", tz: TZ });
-  assert(noDay.points === 0 && noDay.playedCount === 0, "day without matches -> zeros");
+  const win = computeWindowFormPoints({ formMatches, results, fromMs, toMs });
+  assert(win.points === 5, `in-window points = 5 (got ${win.points})`);
+  assert(win.exactCount === 1 && win.outcomeCount === 1, "exact/outcome counts");
+  assert(win.playedCount === 2, "playedCount counts only in-window finished matches");
 
-  // Timezone sensitivity: a late-Israel-evening match that crosses into the
-  // next UTC/eastern day is bucketed by the viewer's clock. Pick a match at
-  // 22:00+ Israel (already next-day-ish further east) and confirm a Tokyo
-  // viewer files it on the following calendar day.
-  const lateMatch = groupMatches.find((m) => m.time === "22:00");
-  if (lateMatch) {
-    const ilKey = getMatchIsraelDateKey(lateMatch);
-    const lateResults = { [lateMatch.id]: { homeScore: 1, awayScore: 0, stage: "group" } };
-    const lateForm = { [lateMatch.id]: { homeScore: 1, awayScore: 0 } };
-    const ilDay = computeDailyFormPoints({ formMatches: lateForm, results: lateResults, dateKey: ilKey, tz: TZ });
-    assert(ilDay.playedCount === 1, "late match counts on its Israel day for an Israel viewer");
-    // For a Tokyo viewer (UTC+9) a 22:00 Israel match is 04:00 next day.
-    const tokyoSameKey = computeDailyFormPoints({ formMatches: lateForm, results: lateResults, dateKey: ilKey, tz: "Asia/Tokyo" });
-    assert(tokyoSameKey.playedCount === 0, "Israel-day key matches nothing for a Tokyo viewer (day shifted)");
-  }
-}
+  // Window around mC only -> its exact 4 points, mA/mB excluded.
+  const kC = getMatchKickoffUTC(mC);
+  const cWin = computeWindowFormPoints({
+    formMatches,
+    results,
+    fromMs: kC - 3600 * 1000,
+    toMs: kC + 3600 * 1000,
+  });
+  assert(cWin.points === 4 && cWin.playedCount === 1, "other-day match scores only in ITS window");
 
-// ---- 8. israelDateKeyForNow: UTC evening crosses to next Israel day ----
-console.log("--- 8. Israel date key ---");
-{
-  assert(israelDateKeyForNow(Date.UTC(2026, 5, 12, 21, 30)) === "2026-06-13",
-    "21:30 UTC = 00:30 IDT next day");
-  assert(israelDateKeyForNow(Date.UTC(2026, 5, 12, 12, 0)) === "2026-06-12",
-    "midday UTC stays same Israel day");
+  // Empty window (far future) -> zeros.
+  const none = computeWindowFormPoints({
+    formMatches,
+    results,
+    fromMs: Date.UTC(2099, 0, 1),
+    toMs: Date.UTC(2099, 0, 2),
+  });
+  assert(none.points === 0 && none.playedCount === 0, "window with no matches -> zeros");
+
+  // Boundaries are inclusive: a match whose kickoff is exactly fromMs/toMs counts.
+  const edge = computeWindowFormPoints({ formMatches, results, fromMs: kA, toMs: kA });
+  assert(edge.playedCount === 1, "inclusive bounds: exact-kickoff match is in-window");
+
+  // Guard: non-finite bounds yield zeros, never a crash.
+  const bad = computeWindowFormPoints({ formMatches, results, fromMs: NaN, toMs });
+  assert(bad.playedCount === 0, "non-finite window bound -> zeros");
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);

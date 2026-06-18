@@ -180,7 +180,9 @@ console.log("--- 9. Display surfaces import userTime ---");
     ["src/pages/Results.jsx", /formatMatchClock|formatMatchDateShort/],
     ["src/components/LiveNowCard.jsx", /formatMatchClock|getMatchDateKey|dateKeyForNow/],
     ["src/components/AdminResultsTab.jsx", /formatMatchClock|formatMatchDateShort/],
-    ["src/components/ScoreStrip.jsx", /dateKeyForNow/],
+    // ScoreStrip dropped its userTime usage when its day-points strip moved to a
+    // timezone-independent rolling 24h window (no tz/date-key bucketing). See
+    // dailyPoints.computeWindowFormPoints.
     ["src/utils/exportFormExcel.js", /formatMatchClock|formatMatchDateShort/],
     ["src/components/KickoffFooter.jsx", /formatClockFromMs|formatLongDateHe/],
   ];

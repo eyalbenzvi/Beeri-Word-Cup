@@ -242,8 +242,14 @@ function MatchCard({
 
         <div className="flex flex-col items-center gap-1 min-w-[130px]">
           {hasResult && (
-            <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
-              <Score home={actualResult.homeScore} away={actualResult.awayScore} />
+            // Labelled "תוצאה" so that, when this card is viewed inside a
+            // form-detail (the only place an actualResult is passed), the big
+            // primary number is never mistaken for the owner's prediction.
+            <div className="flex flex-col items-center leading-none">
+              <span className="text-3xs font-bold text-ink-light mb-0.5">תוצאה</span>
+              <div className="text-2xl font-extrabold text-primary tracking-wider tabular-nums">
+                <Score home={actualResult.homeScore} away={actualResult.awayScore} />
+              </div>
             </div>
           )}
 
@@ -328,8 +334,14 @@ function MatchCard({
           )}
 
           {hasResult && !editable && predHome !== "" && (
-            <div className="text-xs text-ink-muted font-medium tabular-nums">
-              ניחוש: <Score home={predHome} away={predAway} />
+            // The prediction the form owner actually made. Explicitly labelled
+            // and given a legible size (was a tiny muted "ניחוש: x:y") so the
+            // result-vs-prediction pair reads clearly side by side.
+            <div className="flex flex-col items-center leading-none mt-0.5">
+              <span className="text-3xs font-bold text-ink-light mb-0.5">ניחוש</span>
+              <div className="text-base font-bold text-ink tabular-nums">
+                <Score home={predHome} away={predAway} />
+              </div>
             </div>
           )}
         </div>

@@ -26,8 +26,7 @@ import {
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useNavigation } from "../hooks/useNavigation";
-import { computeDailyFormPoints } from "../utils/dailyPoints";
-import { dateKeyForNow, getUserTimeZone } from "../utils/userTime";
+import { computeWindowFormPoints } from "../utils/dailyPoints";
 import { SCORE_STRIP, LABELS } from "../constants/messages";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -48,43 +47,28 @@ export default function ScoreStrip() {
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
 
-  // Per-form "today: +N" (or, before any of today's matches finished,
-  // "yesterday: +N" — the number a morning visitor opens the app for).
-  // playedCount depends only on results+date (identical across forms), so
-  // it's derived once, not inside the per-form loop.
+  // Per-form "24 השעות האחרונות: +N" — points from matches whose kickoff fell
+  // inside the rolling [now-24h, now] window. A rolling window (not a calendar
+  // "today") means last night's haul stays visible all morning and never
+  // resets at midnight — see dailyPoints.ts. The window is absolute-instant
+  // based, so no viewer timezone is needed.
   const dayLines = useMemo(() => {
     const now = Date.now();
-    // The viewer's timezone defines "today" for the day-points buckets, and
-    // the same tz is threaded into computeDailyFormPoints so the day filter
-    // and the day key can never disagree.
-    const tz = getUserTimeZone();
-    const todayKey = dateKeyForNow(now, tz);
-    const yesterdayKey = dateKeyForNow(now - DAY_MS, tz);
-    const todayPlayed = computeDailyFormPoints({
-      formMatches: {},
-      results,
-      dateKey: todayKey,
-      tz,
-    }).playedCount;
+    const fromMs = now - DAY_MS;
     const lines = {};
     for (const entry of myForms) {
       const formMatches = allPredictions[entry.formId]?.matches || {};
       const predBracket = formBracketMap[entry.formId]?.predBracket;
-      const dateKey = todayPlayed > 0 ? todayKey : yesterdayKey;
-      const day = computeDailyFormPoints({
+      const win = computeWindowFormPoints({
         formMatches,
         results,
-        dateKey,
+        fromMs,
+        toMs: now,
         predBracket,
         actualBracket,
-        tz,
       });
       lines[entry.formId] =
-        todayPlayed > 0
-          ? SCORE_STRIP.todayPoints(day.points)
-          : day.playedCount > 0
-            ? SCORE_STRIP.yesterdayPoints(day.points)
-            : null;
+        win.playedCount > 0 ? SCORE_STRIP.last24hPoints(win.points) : null;
     }
     return lines;
   }, [myForms, allPredictions, formBracketMap, actualBracket, results]);

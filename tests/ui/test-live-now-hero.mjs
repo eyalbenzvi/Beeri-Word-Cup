@@ -156,8 +156,9 @@ assert(/excludeLive && allUpcoming\.length > 0/.test(upcoming),
 // ---- 8. ScoreStrip + teaser specifics ----
 console.log("--- 8. Strip + teaser ---");
 assert(/myForms\.length === 0\) return null/.test(strip), "strip hidden for guests/no-forms");
-assert(/yesterdayPoints/.test(strip), "morning view falls back to yesterday's haul");
-assert(/computeDailyFormPoints/.test(strip), "daily points via the parity-tested util");
+assert(/last24hPoints/.test(strip), "strip shows the rolling last-24h haul");
+assert(/computeWindowFormPoints/.test(strip), "rolling-window points via the parity-tested util");
+assert(/now - DAY_MS/.test(strip), "window is anchored at now-24h (rolling, not calendar-day)");
 assert(/status !== "published"/.test(teaser) || /status === "published"/.test(teaser),
   "teaser filters published summaries only");
 assert(/navigate\("blog", \{ n: latest\.number \}\)/.test(teaser),
