@@ -189,6 +189,25 @@ assert(/RankTrendSparkline\s+history=\{selectedFormHistory\}/.test(lb), "form de
 assert(!/recordRanks/.test(lb), "the per-visit recordRanks side-effect is removed");
 assert(!existsMigratedSrc("src/utils/rankHistory.jsx") && !existsMigratedSrc("src/utils/rankHistory.js"), "retired localStorage rankHistory util is deleted");
 
+// ---------------------------------------------------------------------------
+// Readability (UX/infographic pass) — the chart must be self-explanatory.
+// ---------------------------------------------------------------------------
+// 1. RTL time direction: start drawn at the right edge, current at the left,
+//    so the line agrees with Hebrew reading order and the start/current labels.
+assert(/W\s*-\s*PAD\s*-\s*\(i\s*\/\s*\(n\s*-\s*1\)\)/.test(spark), "x axis runs right→left (RTL time direction)");
+// 2. Trend-driven colour shared by the line and the badge: green up, red down,
+//    blue flat — no more green-line/red-badge contradiction.
+assert(/trend\s*===\s*"down"/.test(spark) && /var\(--color-danger\)/.test(spark), "a worsening trend colours the line danger-red");
+assert(/var\(--color-primary\)/.test(spark) && /var\(--color-secondary\)/.test(spark), "trend colour resolves to primary (up) / secondary (flat) too");
+// 3. Inverted-axis cue: an explicit direction key removes the ambiguity.
+assert(/הדירוג טוב יותר/.test(spark), "a direction key explains that a higher line = better rank");
+// 4. A dashed starting-place baseline anchors the inverted axis.
+assert(/strokeDasharray/.test(spark), "a dashed starting-place baseline is drawn");
+// 5. Endpoint labels name start vs current (not just bare 'place N' columns).
+assert(/התחלה/.test(spark) && /נוכחי/.test(spark), "endpoints are labelled התחלה (start) and נוכחי (current)");
+// 6. The accessible description states start, current and the change.
+assert(/aria-label=\{ariaLabel\}/.test(spark) && /מגמת דירוג: התחלה במקום/.test(spark), "aria-label narrates start → current and the delta");
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   failures.forEach((f) => console.error("FAILED: " + f));
