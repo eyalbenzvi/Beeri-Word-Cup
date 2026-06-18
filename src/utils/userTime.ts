@@ -171,7 +171,7 @@ export function getMatchDateKey(match, tz: string = getUserTimeZone()): string |
 
 /**
  * "2026-06-14" calendar-day key for an arbitrary instant, in the viewer's
- * timezone. Generalises israelDateKeyForNow.
+ * timezone. The viewer-timezone analogue of getMatchIsraelDateKey.
  */
 export function dateKeyForNow(nowMs: number, tz: string = getUserTimeZone()): string {
   const p = partsAt(nowMs, tz);

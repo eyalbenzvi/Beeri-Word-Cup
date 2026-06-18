@@ -172,6 +172,7 @@ run_test "106. Sentry Error Fixes (timezone, chunk-reload, breadcrumb, ensure re
 run_test "107. LLM Input Sanitize (prompt-injection hardening, shared lib + wiring)" "auth/test-llm-sanitize.mjs" "no"
 run_test "108. Error Reporting (no silent catches: FormsHub preload, PhoneSignIn WebOTP)" "store/test-error-reporting.mjs" "no"
 run_test "109. CORS Helper (shared origin allowlist + per-function variants + wiring)" "auth/test-cors-helper.mjs" "no"
+run_test "110. Form-Detail Display (chronological order + result/prediction labels)" "ui/test-form-detail-display.mjs" "no"
 
 echo ""
 echo "==========================================="
