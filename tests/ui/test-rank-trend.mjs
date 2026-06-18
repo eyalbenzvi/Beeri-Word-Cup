@@ -71,8 +71,8 @@ assert(existsMigratedSrc("src/components/RankTrendSparkline.jsx"), "RankTrendSpa
 const spark = readMigratedSrc("src/components/RankTrendSparkline.jsx");
 assert(/history\.length < 2/.test(spark), "sparkline needs at least two points");
 const lb = readMigratedSrc("src/pages/Leaderboard.jsx");
-assert(/recordRanks\(myForms\.map/.test(lb), "Leaderboard records the user's form ranks");
-assert(/if \(embedded \|\| myForms\.length === 0\) return;/.test(lb), "recording skipped in embedded mode / no forms");
+assert(/recordRanks\(rankedLeaderboard\.map/.test(lb), "Leaderboard records all form ranks");
+assert(/if \(embedded \|\| rankedLeaderboard\.length === 0\) return;/.test(lb), "recording skipped in embedded mode / no forms");
 assert(/RankTrendSparkline formId=\{selectedForm\}/.test(lb), "form detail renders the rank trend");
 
 console.log(`\n${passed} passed, ${failed} failed`);
