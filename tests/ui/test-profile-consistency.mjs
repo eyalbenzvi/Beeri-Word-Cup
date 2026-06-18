@@ -63,9 +63,16 @@ assert(
   /rankedLeaderboard/.test(hook),
   "useLeaderboardComputed exports rankedLeaderboard",
 );
+// Dense-ranking (and its compareTiebreaker tie handling) lives in the shared
+// scoring core, which the hook composes via assignDenseRanks.
+const core = readMigratedSrc("src/utils/leaderboardCore.js", "utf8");
 assert(
-  /compareTiebreaker/.test(hook),
-  "useLeaderboardComputed uses compareTiebreaker for tied forms",
+  /assignDenseRanks/.test(hook),
+  "useLeaderboardComputed builds rankedLeaderboard via the shared assignDenseRanks",
+);
+assert(
+  /compareTiebreaker/.test(core),
+  "shared rank core uses compareTiebreaker for tied forms",
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);
