@@ -1,17 +1,18 @@
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { getRankHistory } from "../utils/rankHistory";
+import type { RankPoint } from "../utils/computeFormRankHistory";
 
 // Tiny inline-SVG sparkline of a form's rank over time (#6). Rank is inverted
-// on the Y axis (a lower number = better = higher on the chart). Renders
-// nothing until at least two recorded points exist, so a form with no history
-// (e.g. another user's, or a first visit) simply omits the panel.
+// on the Y axis (a lower number = better = higher on the chart). The series is
+// derived retroactively from official results (see computeFormRankHistory) —
+// one point per completed match, identical for every viewer. Renders nothing
+// until at least two matches have been played, so a single-result tournament
+// (or a form yet to be scored) simply omits the panel.
 const W = 240;
 const H = 48;
 const PAD = 4;
 
-export default function RankTrendSparkline({ formId }: { formId: string }) {
-  const history = getRankHistory(formId);
-  if (history.length < 2) return null;
+export default function RankTrendSparkline({ history }: { history: RankPoint[] }) {
+  if (!history || history.length < 2) return null;
 
   const ranks = history.map((p) => p.rank);
   const min = Math.min(...ranks);

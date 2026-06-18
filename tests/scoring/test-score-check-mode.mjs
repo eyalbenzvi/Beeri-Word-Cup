@@ -214,14 +214,20 @@ console.log("--- G. hook + SimulatorPanel wiring ---");
     /options\?\.bracketResults\s*\?\?\s*results/.test(hook),
     "bracketResults defaults to results (backward compatible)",
   );
+  // The matchPointsOnly gating lives in the shared scoring core (extracted from
+  // the hook so the live leaderboard and the rank-history replay share it).
+  const core = fs.readFileSync(
+    "/home/user/Beeri-World-Cup/src/utils/leaderboardCore.ts",
+    "utf8",
+  );
   assert(
     /matchPointsOnly\s*\?\s*EMPTY_ADVANCING\s*:\s*actualDerivedAdvancing/.test(
-      hook,
+      core,
     ),
     "matchPointsOnly excludes advancing points",
   );
   assert(
-    /matchPointsOnly[\s\S]{0,40}EMPTY_BONUSES/.test(hook),
+    /matchPointsOnly[\s\S]{0,40}EMPTY_BONUSES/.test(core),
     "matchPointsOnly excludes bonuses",
   );
 
