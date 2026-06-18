@@ -49,6 +49,9 @@ export function recordRanks(
     // Record on: first ever point · a rank change · a new day for a stable rank.
     const shouldRecord = !last || last.rank !== rank || now - last.t >= DAY_MS;
     if (!shouldRecord) continue;
+    // Seed an anchor on the very first entry so the sparkline (which requires
+    // ≥2 points) renders immediately on the first leaderboard visit.
+    if (!last) arr.push({ t: now - 1, rank });
     arr.push({ t: now, rank });
     if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
     data[formId] = arr;
