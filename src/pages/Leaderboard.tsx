@@ -28,7 +28,7 @@ import BestCasePanel from "../components/BestCasePanel";
 import AchievementBadges from "../components/AchievementBadges";
 import RankTrendSparkline from "../components/RankTrendSparkline";
 import FormComparison from "../components/FormComparison";
-import { recordRanks } from "../utils/rankHistory";
+import { computeFormRankHistory } from "../utils/computeFormRankHistory";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
 
@@ -123,13 +123,18 @@ export default function Leaderboard({
     return rankedLeaderboard.filter((e) => e.userId === user.id);
   }, [rankedLeaderboard, user?.id]);
 
-  // Accumulate a local rank time-series for all forms (#6). The util dedupes
-  // (records only on movement, or once/day for a stable rank), so this is safe
-  // to fire on every leaderboard recompute. Skipped in embedded admin preview.
-  useEffect(() => {
-    if (embedded || rankedLeaderboard.length === 0) return;
-    recordRanks(rankedLeaderboard.map((f) => ({ formId: f.formId, rank: f.rank })));
-  }, [rankedLeaderboard, embedded]);
+  // Retroactive rank trend for the open form (#6). Derived on-demand from the
+  // official results (one point per completed match, chronological) so it is
+  // accurate and identical for every viewer — see computeFormRankHistory, which
+  // memoises the heavy sweep per results-object identity. Only the selected
+  // form is read here; opening another form is an O(1) lookup into the cache.
+  const selectedFormHistory = useMemo(
+    () =>
+      selectedForm
+        ? computeFormRankHistory(selectedForm, results, allPredictions, actualBonuses)
+        : [],
+    [selectedForm, results, allPredictions, actualBonuses],
+  );
 
   // Precomputed search haystack per form — built once whenever the
   // underlying data (users / brackets / predictions / lock state) changes,
@@ -250,6 +255,9 @@ export default function Leaderboard({
     try {
       const raw = localStorage.getItem("beeri:prevRanks");
       if (raw) setPrevRanks(JSON.parse(raw));
+      // One-off cleanup of the retired localStorage rank-history series (the
+      // trend graph is now derived from results, not accumulated per-visit).
+      localStorage.removeItem("beeri:rankHistory");
     } catch { /* Private mode / quota — ignore */ }
   }, [embedded]);
   useEffect(() => {
@@ -363,7 +371,7 @@ export default function Leaderboard({
           </div>
         </div>
 
-        <RankTrendSparkline formId={selectedForm} />
+        <RankTrendSparkline history={selectedFormHistory} />
 
         <AchievementBadges scored={scored} />
 
