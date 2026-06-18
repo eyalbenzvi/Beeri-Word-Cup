@@ -22,12 +22,14 @@ function fakeStore() {
 
 const DAY = 24 * 3600 * 1000;
 
-// ---- first point is always recorded ----------------------------------------
+// ---- first record seeds two points so sparkline renders immediately --------
 {
   const s = fakeStore();
   recordRanks([{ formId: "f1", rank: 10 }], 1000, s);
-  assert(getRankHistory("f1", s).length === 1, "first point recorded");
-  assert(getRankHistory("f1", s)[0].rank === 10, "records the rank value");
+  const h = getRankHistory("f1", s);
+  assert(h.length === 2, "first record seeds anchor + real point (sparkline needs ≥2)");
+  assert(h[0].rank === 10 && h[1].rank === 10, "both seed points carry the same rank");
+  assert(h[1].t === 1000 && h[0].t === 999, "anchor is 1ms before the real point");
 }
 
 // ---- unchanged rank within a day is NOT duplicated -------------------------
@@ -35,31 +37,31 @@ const DAY = 24 * 3600 * 1000;
   const s = fakeStore();
   recordRanks([{ formId: "f1", rank: 10 }], 1000, s);
   recordRanks([{ formId: "f1", rank: 10 }], 1000 + 3600 * 1000, s); // +1h, same rank
-  assert(getRankHistory("f1", s).length === 1, "stable rank within a day is not re-recorded");
+  assert(getRankHistory("f1", s).length === 2, "stable rank within a day is not re-recorded (anchor+real stays at 2)");
 }
 
 // ---- rank change is recorded immediately -----------------------------------
 {
   const s = fakeStore();
-  recordRanks([{ formId: "f1", rank: 10 }], 1000, s);
+  recordRanks([{ formId: "f1", rank: 10 }], 1000, s); // seeds 2 points
   recordRanks([{ formId: "f1", rank: 7 }], 2000, s);
   const h = getRankHistory("f1", s);
-  assert(h.length === 2 && h[1].rank === 7, "rank movement appends a new point");
+  assert(h.length === 3 && h[2].rank === 7, "rank movement appends a new point");
 }
 
 // ---- stable rank across a day boundary records one daily point -------------
 {
   const s = fakeStore();
-  recordRanks([{ formId: "f1", rank: 5 }], 1000, s);
+  recordRanks([{ formId: "f1", rank: 5 }], 1000, s); // seeds 2 points
   recordRanks([{ formId: "f1", rank: 5 }], 1000 + DAY + 1, s); // next day, same rank
-  assert(getRankHistory("f1", s).length === 2, "stable rank still gets one point per day");
+  assert(getRankHistory("f1", s).length === 3, "stable rank still gets one point per day");
 }
 
 // ---- multiple forms tracked independently ----------------------------------
 {
   const s = fakeStore();
   recordRanks([{ formId: "a", rank: 1 }, { formId: "b", rank: 2 }], 1000, s);
-  assert(getRankHistory("a", s).length === 1 && getRankHistory("b", s).length === 1, "each form has its own series");
+  assert(getRankHistory("a", s).length === 2 && getRankHistory("b", s).length === 2, "each form has its own series");
 }
 
 // ---- no storage → safe no-op -----------------------------------------------
