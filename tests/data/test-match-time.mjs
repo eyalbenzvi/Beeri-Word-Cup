@@ -192,6 +192,30 @@ console.log("--- 11. All scheduled matches parse ---");
   }
 }
 
+// ---- 12. Specific kickoff regression: Paraguay vs Turkey (Group D, FIFA #31) ----
+// Real kickoff: Jun 19 2026, 20:00 PDT (Levi's Stadium, San Francisco Bay Area)
+// = 03:00 UTC Jun 20 = 06:00 Israel (IDT, UTC+3). Guards against the prior
+// off-by-one-hour error (was 07:00).
+console.log("--- 12. Paraguay vs Turkey kickoff (FIFA #31) ---");
+{
+  const { ALL_MATCHES } = await import("/home/user/Beeri-World-Cup/src/data/matches.js");
+  const parTur = ALL_MATCHES.find(
+    (m) =>
+      m.group === "D" &&
+      ((m.homeTeam === "TUR" && m.awayTeam === "PAR") ||
+        (m.homeTeam === "PAR" && m.awayTeam === "TUR"))
+  );
+  assert(parTur, "Group D Paraguay-Turkey match exists");
+  if (parTur) {
+    assert(parTur.fifaMatch === 31, `PAR-TUR is FIFA #31, got ${parTur.fifaMatch}`);
+    assert(parTur.date === "Jun 20", `PAR-TUR date Jun 20, got ${parTur.date}`);
+    assert(parTur.time === "06:00", `PAR-TUR time 06:00 Israel, got ${parTur.time}`);
+    // And the absolute UTC instant: 03:00 UTC Jun 20
+    const k = getMatchKickoffUTC(parTur);
+    assert(k === Date.UTC(2026, 5, 20, 3, 0, 0), `PAR-TUR kickoff == 03:00 UTC Jun 20, got ${k}`);
+  }
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) {
   console.error("\nFailures:");
