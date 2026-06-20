@@ -77,7 +77,7 @@ const GROUP_MATCH_SCHEDULE = [
   { fifaMatch: 28, group: "A", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "04:00" },
   { fifaMatch: 29, group: "C", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "04:00" },
   { fifaMatch: 30, group: "C", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "01:00" },
-  { fifaMatch: 31, group: "D", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "07:00" },
+  { fifaMatch: 31, group: "D", home: 4, away: 2, matchday: 2, date: "Jun 20", time: "06:00" },
   { fifaMatch: 32, group: "D", home: 1, away: 3, matchday: 2, date: "Jun 19", time: "22:00" },
   { fifaMatch: 33, group: "E", home: 1, away: 3, matchday: 2, date: "Jun 20", time: "23:00" },
   { fifaMatch: 34, group: "E", home: 4, away: 2, matchday: 2, date: "Jun 21", time: "03:00" },
