@@ -162,7 +162,12 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets }) {
   return (
     <div className="mt-2 pt-2 border-t border-border">
       <div className="text-xs text-ink-muted mb-0.5">{LIVE.yourForms(rows.length)}</div>
-      <div className="md:grid md:grid-cols-2 md:gap-x-4">
+      {/* Single column on every breakpoint: the cards themselves render two-up
+          on desktop (see the outer grid below), so a second nested two-column
+          grid here left each verdict cell only ~quarter-page wide — the
+          whitespace-nowrap verdict line then overflowed and adjacent columns
+          collided into garbled overlap. Full card width fits every verdict. */}
+      <div>
         {rows.map(({ form, verdict, predDisplay }) => (
           <FormVerdictRow
             key={form.formId}
