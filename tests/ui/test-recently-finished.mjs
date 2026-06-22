@@ -55,6 +55,12 @@ console.log("--- 3. Multi-form rules ---");
 assert(/form\.formName/.test(comp), "per-form rows show the form's name");
 assert(/status === "submitted"/.test(comp) && /status === "approved"/.test(comp),
   "only submitted/approved forms score");
+// Layout regression: the cards already render 2-up on desktop, so the inner
+// per-form verdict list must NOT also be a 2-col grid — a second nested
+// md:grid-cols-2 made each verdict cell ~quarter-page wide and the nowrap
+// verdict text overflowed, colliding adjacent columns into garbled overlap.
+assert((comp.match(/md:grid-cols-2/g) || []).length === 1,
+  "only the outer card grid is 2-col (verdict rows are single-column, no overlap)");
 
 // ---- 4. Official result fed as a FINISHED snapshot (no ET suppression) ----
 console.log("--- 4. Finished snapshot for verdict ---");
