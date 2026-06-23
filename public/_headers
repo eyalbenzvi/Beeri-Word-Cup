@@ -3,4 +3,14 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.google.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; frame-src https://accounts.google.com https://*.firebaseapp.com; font-src 'self' data:;
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.google.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; frame-src 'self' https://accounts.google.com https://*.firebaseapp.com; font-src 'self' data:;
+
+# Firebase Auth handler (proxied to firebaseapp.com via netlify.toml). When
+# VITE_FIREBASE_AUTH_DOMAIN points at this host, the Auth SDK loads
+# /__/auth/iframe SAME-ORIGIN to read the redirect result. The global
+# X-Frame-Options: DENY above would block that iframe, so scope this path to
+# SAMEORIGIN. Inert until the same-origin authDomain cutover (the SDK only
+# requests /__/auth/* on the authDomain origin). frame-src 'self' was added to
+# the CSP above for the same reason.
+/__/auth/*
+  X-Frame-Options: SAMEORIGIN

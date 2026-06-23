@@ -97,6 +97,24 @@ console.log("--- B. authDomain is env-configurable with a safe default + proxy -
     "auth proxy forwards to the firebaseapp.com origin with :splat");
 }
 
+// ============ B2. CSP / headers are cutover-ready ============
+console.log("--- B2. _headers allow the same-origin auth iframe (cutover-ready) ---");
+{
+  const headers = SRC("public/_headers");
+  // Same-origin authDomain makes the SDK load /__/auth/iframe from 'self'.
+  assert(/frame-src 'self'/.test(headers),
+    "CSP frame-src includes 'self' so the same-origin auth iframe isn't blocked");
+  // The global X-Frame-Options: DENY must be relaxed to SAMEORIGIN for /__/auth/*.
+  const authBlock = headers.slice(headers.indexOf("/__/auth/*"));
+  assert(/\/__\/auth\/\*/.test(headers), "_headers has a path block for /__/auth/*");
+  assert(/X-Frame-Options: SAMEORIGIN/.test(authBlock),
+    "/__/auth/* relaxes X-Frame-Options to SAMEORIGIN (global DENY would block the iframe)");
+  // The global default must STAY DENY — only the auth path is relaxed.
+  const globalBlock = headers.slice(headers.indexOf("/*"), headers.indexOf("/__/auth/*"));
+  assert(/X-Frame-Options: DENY/.test(globalBlock),
+    "the global /* default keeps X-Frame-Options: DENY (only /__/auth/* is relaxed)");
+}
+
 // ============ SUMMARY ============
 console.log(`\n=== iOS GOOGLE SIGN-IN: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
