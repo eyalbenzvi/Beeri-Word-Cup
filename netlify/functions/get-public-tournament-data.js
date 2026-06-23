@@ -21,6 +21,7 @@ import admin from "firebase-admin";
 import * as Sentry from "@sentry/node";
 import { withSentry } from "./_sentry.js";
 import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
+import { withFirestoreRetry } from "./_lib/firestoreRetry.js";
 
 let adminInitialized = false;
 
@@ -85,7 +86,13 @@ async function getPublicTournamentDataHandler(event) {
   try {
     initAdmin();
     const db = admin.firestore();
-    const settingsSnap = await db.collection("gameData").doc("settings").get();
+    // Transient ETIMEDOUT/UNAVAILABLE between the Lambda and Firestore was
+    // surfacing as a user-facing 500 (public-tournament-fetch-500). Retry the
+    // reads with backoff so a momentary blip self-heals; a real fault still
+    // fails fast and falls through to the catch below.
+    const settingsSnap = await withFirestoreRetry(() =>
+      db.collection("gameData").doc("settings").get(),
+    );
     const settingsData = settingsSnap.exists ? settingsSnap.data()?.data : null;
     const predictionsLocked = !!(settingsData && settingsData.predictionsLocked);
 
@@ -112,15 +119,17 @@ async function getPublicTournamentDataHandler(event) {
       userDirSnap,
       actualBonusesSnap,
       actualAdvancingSnap,
-    ] = await Promise.all([
-      db
-        .collection("predictions")
-        .where("status", "in", ["submitted", "approved"])
-        .get(),
-      db.collection("gameData").doc("userDirectory").get(),
-      db.collection("gameData").doc("actualBonuses").get(),
-      db.collection("gameData").doc("actualAdvancing").get(),
-    ]);
+    ] = await withFirestoreRetry(() =>
+      Promise.all([
+        db
+          .collection("predictions")
+          .where("status", "in", ["submitted", "approved"])
+          .get(),
+        db.collection("gameData").doc("userDirectory").get(),
+        db.collection("gameData").doc("actualBonuses").get(),
+        db.collection("gameData").doc("actualAdvancing").get(),
+      ]),
+    );
 
     const predictions = {};
     predictionsSnap.forEach((doc) => {

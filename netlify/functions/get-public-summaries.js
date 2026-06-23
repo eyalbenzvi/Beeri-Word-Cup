@@ -14,6 +14,7 @@
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
 import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
+import { withFirestoreRetry } from "./_lib/firestoreRetry.js";
 
 let adminInitialized = false;
 
@@ -50,11 +51,15 @@ async function getPublicSummariesHandler(event) {
 
   try {
     initAdmin();
-    const snap = await admin
-      .firestore()
-      .collection("summaries")
-      .where("status", "==", "published")
-      .get();
+    // Retry transient connect-timeouts to Firestore so a momentary blip
+    // doesn't 500 the guest /blog page.
+    const snap = await withFirestoreRetry(() =>
+      admin
+        .firestore()
+        .collection("summaries")
+        .where("status", "==", "published")
+        .get(),
+    );
     const summaries = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
       statusCode: 200,
@@ -62,10 +67,13 @@ async function getPublicSummariesHandler(event) {
       body: JSON.stringify({ summaries }),
     };
   } catch (err) {
+    // Don't echo raw error text to anonymous clients — a transient Firestore
+    // failure (now retried + rethrown by withFirestoreRetry) can carry internal
+    // Google host/IP detail (e.g. "connect ETIMEDOUT 64.233.180.95:443").
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err?.message || "Internal error" }),
+      body: JSON.stringify({ error: "Internal error" }),
     };
   }
 }

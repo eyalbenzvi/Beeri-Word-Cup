@@ -14,3 +14,24 @@
   to = "/.netlify/functions/og-summary?n=:n"
   status = 200
   force = true
+
+# Same-origin Firebase Auth handler proxy.
+#
+# These forward the Firebase OAuth helper endpoints to the project's
+# firebaseapp.com origin while keeping the URL on OUR domain. That lets us set
+# VITE_FIREBASE_AUTH_DOMAIN to this host so the sign-in handshake is same-origin
+# — which is what fixes the iOS WebKit storage-partition failure (Chrome-iOS
+# renderer crash on Google sign-in). Harmless until that env var is set: the
+# SDK only requests these paths when authDomain points here.
+# See: https://firebase.google.com/docs/auth/web/redirect-best-practices
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://beeri-world-cup.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/__/firebase/*"
+  to = "https://beeri-world-cup.firebaseapp.com/__/firebase/:splat"
+  status = 200
+  force = true

@@ -9,6 +9,7 @@
 import admin from "firebase-admin";
 import { withSentry } from "./_sentry.js";
 import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
+import { withFirestoreRetry } from "./_lib/firestoreRetry.js";
 
 let adminInitialized = false;
 
@@ -46,10 +47,14 @@ async function getPublicSettingsHandler(event) {
   try {
     initAdmin();
     const col = admin.firestore().collection("gameData");
-    const [settingsSnap, resultsSnap] = await Promise.all([
-      col.doc("settings").get(),
-      col.doc("matchResults").get(),
-    ]);
+    // Retry transient connect-timeouts to Firestore so a momentary blip
+    // doesn't 500 the welcome screen for logged-out visitors.
+    const [settingsSnap, resultsSnap] = await withFirestoreRetry(() =>
+      Promise.all([
+        col.doc("settings").get(),
+        col.doc("matchResults").get(),
+      ]),
+    );
     const settingsData = settingsSnap.exists ? settingsSnap.data()?.data : null;
     const resultsData = resultsSnap.exists ? resultsSnap.data()?.data : null;
     return {
@@ -61,10 +66,13 @@ async function getPublicSettingsHandler(event) {
       }),
     };
   } catch (err) {
+    // Don't echo raw error text to anonymous clients — a transient Firestore
+    // failure (now retried + rethrown by withFirestoreRetry) can carry internal
+    // Google host/IP detail (e.g. "connect ETIMEDOUT 64.233.180.95:443").
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err?.message || "Internal error" }),
+      body: JSON.stringify({ error: "Internal error" }),
     };
   }
 }

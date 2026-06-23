@@ -180,6 +180,15 @@ export function captureClientMessage(key: string, context: Record<string, any> =
   }
 }
 
+// iOS Safari/WebKit Firestore-persistence blip: the IndexedDB connection is
+// torn down on tab backgrounding / BFCache restore and surfaces as an
+// unhandled rejection. Environmental and self-healing — matched so the global
+// handler can downgrade it from error → warning.
+function isIndexedDbConnectionLost(msg) {
+  if (!msg) return false;
+  return /Connection to Indexed Database server lost/i.test(String(msg));
+}
+
 // Noise filter for global handlers: skip browser-extension / third-party
 // script errors we can't act on.
 function looksLikeExtensionNoise(msg) {
@@ -217,6 +226,18 @@ export function installGlobalErrorHandlers() {
         : new Error(
             typeof reason === "string" ? reason : "unhandledrejection",
           );
+    // iOS Safari/WebKit drops the Firestore IndexedDB connection when a tab is
+    // backgrounded / restored from the BFCache, surfacing as an UNHANDLED
+    // rejection ("Connection to Indexed Database server lost. Refresh the page
+    // to try again"). It's environmental and self-heals on reload — not a code
+    // fault — so we downgrade it to a deduped warning signal instead of letting
+    // it count as a hard error and inflate the error rate.
+    if (isIndexedDbConnectionLost(err?.message)) {
+      captureClientMessage("indexeddb-connection-lost", {
+        message: err?.message || "unknown",
+      }, "warning");
+      return;
+    }
     captureClientError(err, { source: "unhandledrejection" });
   });
 }
