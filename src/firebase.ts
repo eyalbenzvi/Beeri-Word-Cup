@@ -18,7 +18,18 @@ import { captureClientError } from "./sentry";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "beeri-world-cup.firebaseapp.com",
+  // authDomain controls which origin serves the OAuth handler (/__/auth/*).
+  // The default firebaseapp.com is a DIFFERENT origin from where the app is
+  // hosted (netlify.app), and on iOS WebKit (Safari + Chrome/Firefox-for-iOS,
+  // which are all WebKit) cross-origin storage partitioning breaks the sign-in
+  // handshake — on Chrome iOS it manifests as a renderer crash ("the page
+  // can't be opened"). Serving the auth handler same-origin (via the Netlify
+  // /__/auth/* proxy in netlify.toml) fixes it. We read it from an env var so
+  // the cutover is a reversible Netlify setting flip, NOT a code change:
+  // unset → keeps the current firebaseapp.com behaviour (zero risk on merge);
+  // set to the app's own host (e.g. beeri-world-cup.netlify.app) → same-origin.
+  authDomain:
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "beeri-world-cup.firebaseapp.com",
   projectId: "beeri-world-cup",
   storageBucket: "beeri-world-cup.firebasestorage.app",
   messagingSenderId: "701233284129",
@@ -65,9 +76,28 @@ function isInAppBrowser() {
   return /FBAN|FBAV|Instagram|WhatsApp|Line|wv|WebView/i.test(ua);
 }
 
+// Detect iOS, including iPhone/iPad/iPod AND the iPadOS-on-desktop-UA case
+// (iPad reports as "MacIntel" with a touch screen). Every browser on iOS —
+// Safari, Chrome (CriOS), Firefox (FxiOS), Edge (EdgiOS) — is WebKit under the
+// hood, so they ALL share WebKit's fragile popup + storage-partition behaviour.
+// `signInWithPopup` on Chrome iOS in particular crashes the renderer mid-flow
+// ("the page can't be opened"); the popup error is never even thrown, so the
+// existing catch-and-fallback-to-redirect can't save us. We must avoid the
+// popup entirely on iOS and go straight to redirect.
+export function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS 13+ masquerades as macOS Safari but is still WebKit-on-touch.
+  return navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1;
+}
+
 export async function signInWithGoogle() {
-  // In-app browsers don't support popups — use redirect
-  if (isInAppBrowser()) {
+  // In-app browsers and ALL iOS browsers (WebKit) can't reliably use the popup
+  // flow — use redirect. On iOS the popup path can crash the renderer before
+  // any catchable error fires, so this MUST be decided up front, not via the
+  // popup-failure fallback below.
+  if (isInAppBrowser() || isIOS()) {
     await signInWithRedirect(auth, googleProvider);
     return null; // auth completes on redirect back via getRedirectResult
   }

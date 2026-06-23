@@ -174,6 +174,9 @@ run_test "107. LLM Input Sanitize (prompt-injection hardening, shared lib + wiri
 run_test "108. Error Reporting (no silent catches: FormsHub preload, PhoneSignIn WebOTP)" "store/test-error-reporting.mjs" "no"
 run_test "109. CORS Helper (shared origin allowlist + per-function variants + wiring)" "auth/test-cors-helper.mjs" "no"
 run_test "110. Form-Detail Display (chronological order + result/prediction labels)" "ui/test-form-detail-display.mjs" "no"
+run_test "111. iOS Google Sign-In (redirect-first on WebKit + env authDomain + proxy)" "auth/test-google-signin-ios.mjs" "no"
+run_test "112. Lazy + IndexedDB Resilience (stalled-chunk reload + IDB-lost downgrade)" "store/test-lazy-and-idb-resilience.mjs" "no"
+run_test "113. Public-Fetch Firestore Retry (transient ETIMEDOUT backoff + wiring)" "store/test-public-fetch-retry.mjs" "no"
 
 echo ""
 echo "==========================================="
