@@ -127,11 +127,18 @@ export function isIOS() {
 }
 
 export async function signInWithGoogle() {
-  // In-app browsers and ALL iOS browsers (WebKit) can't reliably use the popup
-  // flow — use redirect. On iOS the popup path can crash the renderer before
-  // any catchable error fires, so this MUST be decided up front, not via the
-  // popup-failure fallback below.
-  if (isInAppBrowser() || isIOS()) {
+  // STOPGAP REVERT of #236's iOS branch. #236 routed ALL iOS browsers to
+  // signInWithRedirect to dodge the Chrome-iOS popup renderer crash. But
+  // signInWithRedirect silently FAILS on iOS WebKit while authDomain is the
+  // cross-origin firebaseapp.com — Safari storage partitioning never returns
+  // the result (firebase-js-sdk #7824), so the user bounces back logged out.
+  // That regressed the iOS-Safari majority. Until the same-origin authDomain
+  // cutover is live (VITE_FIREBASE_AUTH_DOMAIN + the Netlify /__/auth proxy,
+  // which is what makes redirect actually work on iOS), fall back to the popup
+  // flow that worked before #236. `isIOS()` is kept (still used by the proxy/
+  // cutover tests) — re-add `|| isIOS()` here once the cutover is active so iOS
+  // uses the more robust same-origin redirect again.
+  if (isInAppBrowser()) {
     await signInWithRedirect(auth, googleProvider);
     return null; // auth completes on redirect back via getRedirectResult
   }
