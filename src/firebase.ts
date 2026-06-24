@@ -3,6 +3,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  memoryLocalCache,
 } from "firebase/firestore";
 import {
   getAuth,
@@ -15,6 +16,10 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { captureClientError } from "./sentry";
+import {
+  shouldBypassFirestoreCache,
+  wipeFirestoreIndexedDb,
+} from "./utils/firestoreCacheRecovery";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -50,25 +55,54 @@ const app = initializeApp(firebaseConfig);
 // app backgrounding) survive to the next session and replay automatically.
 // Without this, debouncedWriteForm's last 500ms of edits could vanish when
 // the user closes the tab.
+// Cache-recovery escape hatch: if a previous session detected a fatal,
+// unrecoverable Firestore IndexedDB corruption (the "b815" internal assertion,
+// see firestoreCacheRecovery.ts) it armed a localStorage bypass flag and
+// reloaded. On this boot we honour it by initialising with an in-memory cache
+// instead of the persistent (IndexedDB) one — fully functional, just without
+// offline persistence — so the user is never re-trapped on the poisoned store.
+// After init we wipe the idle on-disk DB and clear the flag so the NEXT session
+// returns to normal persistent caching.
+const bypassPersistentCache = shouldBypassFirestoreCache();
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
+  localCache: bypassPersistentCache
+    ? memoryLocalCache()
+    : persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
 });
+if (bypassPersistentCache) {
+  // Fire-and-forget: this session runs on memory cache, so the on-disk
+  // Firestore IndexedDB is idle and safe to delete. Success clears the bypass
+  // flag (resume persistent next boot); failure keeps it (retry next boot).
+  void wipeFirestoreIndexedDb();
+}
 export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
 
 // Handle pending redirect result on page load (for mobile redirect flow)
-// Log errors for debugging but don't bother the user — they can tap sign-in again
-getRedirectResult(auth).catch((err) => {
-  const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
-  if (!silent.includes(err?.code)) {
-    console.error("Redirect sign-in failed:", err?.code, err?.message);
-    captureClientError(err, { source: "getRedirectResult", code: err?.code });
-  }
-});
+// Log errors for debugging but don't bother the user — they can tap sign-in again.
+//
+// While this is settling we set a window flag the cache-recovery path reads:
+// a fatal-cache reload fired mid-handshake could drop the OAuth provider's
+// one-shot params and strand an iOS redirect sign-in, so recovery defers until
+// getRedirectResult resolves. The flag is set true on every load and cleared
+// when the (usually instant) resolution lands; redirect-returns are exactly the
+// case where it stays true long enough to matter.
+try { (window as any).__wcAuthRedirectPending = true; } catch { /* no window */ }
+getRedirectResult(auth)
+  .catch((err) => {
+    const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
+    if (!silent.includes(err?.code)) {
+      console.error("Redirect sign-in failed:", err?.code, err?.message);
+      captureClientError(err, { source: "getRedirectResult", code: err?.code });
+    }
+  })
+  .finally(() => {
+    try { (window as any).__wcAuthRedirectPending = false; } catch { /* no window */ }
+  });
 
 // Detect in-app browsers (WhatsApp, Facebook, Instagram, etc.)
 function isInAppBrowser() {

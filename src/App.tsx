@@ -16,6 +16,7 @@ import { firebaseSignOut } from "./firebase";
 import { captureClientMessage } from "./sentry";
 import { CURRENT_USER_KEY, ACTIVE_FORM_KEY } from "./constants/storageKeys";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
+import { setFirestoreCacheBypass } from "./utils/firestoreCacheRecovery";
 import { initPublicReadonlyMode, retryRealtimeListeners } from "./store";
 
 // Lazy-load pages that aren't needed on initial render
@@ -108,6 +109,11 @@ function Loading({ reason = "unknown", compact = false }) {
     try { await firebaseSignOut(); } catch { /* ignore */ }
     try { localStorage.removeItem(CURRENT_USER_KEY); } catch { /* ignore */ }
     try { localStorage.removeItem(ACTIVE_FORM_KEY); } catch { /* ignore */ }
+    // Last-resort recovery: a stuck splash is often a wedged Firestore
+    // IndexedDB cache, which a plain reload would just re-open. Arm the
+    // bypass flag so the reload boots on a clean in-memory cache and wipes
+    // the poisoned on-disk store (see firestoreCacheRecovery.ts).
+    setFirestoreCacheBypass();
     window.location.reload();
   };
 

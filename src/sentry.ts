@@ -3,6 +3,10 @@
 // כל הפונקציות עטופות try/catch: דיווח שגיאות לעולם לא שובר את האפליקציה.
 import * as Sentry from "@sentry/react";
 import { CHUNK_ERROR_PATTERNS } from "./utils/chunkErrors";
+import {
+  isFatalFirestoreCacheError,
+  triggerFirestoreCacheRecovery,
+} from "./utils/firestoreCacheRecovery";
 
 let initialized = false;
 
@@ -92,6 +96,18 @@ export function initSentry() {
       },
       beforeSend(event) {
         try {
+          // Fatal Firestore IndexedDB-cache corruption (b815) is thrown from
+          // inside the SDK's async queue (a setTimeout callback). Sentry's own
+          // browserApiErrors instrumentation wraps setTimeout and can capture
+          // that throw BEFORE it ever reaches our window.onerror handler — so
+          // beforeSend, which sees every captured event regardless of which
+          // integration caught it, is the reliable place to trigger recovery.
+          const exceptionValue = event.exception?.values?.[0]?.value;
+          if (isFatalFirestoreCacheError(event.message || exceptionValue)) {
+            triggerFirestoreCacheRecovery("sentry.beforeSend");
+            // fall through: still record the event (the deferred reload lets it
+            // flush first), so the b815 occurrence stays visible in Sentry.
+          }
           if (event.message) {
             event.message = scrubPhoneUid(event.message) as string;
           }
@@ -210,6 +226,14 @@ export function installGlobalErrorHandlers() {
   window.addEventListener("error", (event) => {
     const msg = event?.message || event?.error?.message;
     if (looksLikeExtensionNoise(msg)) return;
+    // Fatal Firestore IndexedDB-cache corruption (b815 internal assertion) is
+    // thrown from inside the SDK's async queue and surfaces here via
+    // window.onerror. It permanently wedges Firestore (listeners die → user
+    // stuck on the splash → "can't log in"), and a plain reload re-opens the
+    // same poisoned cache. Reboot ONCE on a bypass (memory) cache instead.
+    if (isFatalFirestoreCacheError(msg)) {
+      if (triggerFirestoreCacheRecovery("window.onerror")) return;
+    }
     const err = event?.error || new Error(msg || "window.onerror");
     captureClientError(err, {
       source: "window.onerror",
@@ -237,6 +261,11 @@ export function installGlobalErrorHandlers() {
         message: err?.message || "unknown",
       }, "warning");
       return;
+    }
+    // Same fatal b815 cache corruption as the window.onerror path, in case the
+    // SDK rejects rather than throws — reboot once on a bypass (memory) cache.
+    if (isFatalFirestoreCacheError(err?.message)) {
+      if (triggerFirestoreCacheRecovery("unhandledrejection")) return;
     }
     captureClientError(err, { source: "unhandledrejection" });
   });
