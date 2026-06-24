@@ -4,6 +4,7 @@
 
 import { ALL_MATCHES } from "../data/matches";
 import { getMatchKickoffUTC } from "./matchTime";
+import { getMatchDateKey } from "./userTime";
 import { FD_FINISHED_STATUS } from "./liveScores";
 import { MINUTE_MS } from "./constants";
 
@@ -35,20 +36,48 @@ export function liveStatusInfo(live: any, stage: string): LiveStatusInfo {
   return { kind: "fallback" };
 }
 
-// Earliest not-yet-resolved match kicking off strictly after `now`.
+// Every not-yet-resolved match sharing the EARLIEST kickoff strictly after
+// `now`. On matchday 3 a group's two matches kick off at the same minute (by
+// design, for sporting fairness), so "the next match" is really a set — the
+// caller decides how to render one vs. many. Two passes: find the earliest
+// eligible kickoff, then collect all matches at exactly that timestamp.
+// Returns `null` (never an empty set) when nothing is eligible.
 export function findNextMatch(results: Record<string, any> | null | undefined, now: number) {
-  let best: any = null;
   let bestKickoff = Infinity;
   for (const match of ALL_MATCHES) {
     if (results?.[match.id]) continue;
     const kickoff = getMatchKickoffUTC(match);
     if (kickoff == null || kickoff <= now) continue;
-    if (kickoff < bestKickoff) {
-      best = match;
-      bestKickoff = kickoff;
-    }
+    if (kickoff < bestKickoff) bestKickoff = kickoff;
   }
-  return best ? { match: best, kickoff: bestKickoff } : null;
+  if (bestKickoff === Infinity) return null;
+  // Array order = group letter within a shared slot, a sensible reading order.
+  const matches = ALL_MATCHES.filter((match) => {
+    if (results?.[match.id]) return false;
+    return getMatchKickoffUTC(match) === bestKickoff;
+  });
+  return { matches, kickoff: bestKickoff };
+}
+
+// Count not-yet-resolved matches that kick off STRICTLY LATER on `todayKey`
+// (the viewer's local day), excluding a set of already-shown match ids. The
+// "next match" strip shows the earliest-kickoff set above this count, so those
+// ids must be excluded — otherwise a simultaneous twin is double-counted as
+// "one more later today" while it's already on screen kicking off right now.
+export function countLaterTodayMatches(
+  results: Record<string, any> | null | undefined,
+  now: number,
+  todayKey: string,
+  tz: string | undefined,
+  excludeIds: Set<string>,
+): number {
+  return ALL_MATCHES.filter(
+    (m) =>
+      !results?.[m.id] &&
+      getMatchDateKey(m, tz) === todayKey &&
+      (getMatchKickoffUTC(m) ?? 0) > now &&
+      !excludeIds.has(m.id),
+  ).length;
 }
 
 // Hebrew countdown label, e.g. "45 דקות" / "2:05 שעות" / "3 שעות".

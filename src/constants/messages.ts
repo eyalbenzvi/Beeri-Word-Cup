@@ -86,8 +86,15 @@ export const LIVE = {
   yourForms: (n) => `הטפסים שלך (${n})`,
   // Pre-match / rest-day
   nextMatchLabel: "המשחק הבא",
+  // Plural label for a simultaneous-kickoff set (matchday-3 group pairs).
+  nextMatchesLabel: "המשחקים הבאים",
+  // Time-line tag when >1 match shares the kickoff — replaces the single venue
+  // so the user never expects a stagger that isn't there.
+  inParallel: "במקביל",
   todayAt: (time) => `היום ב־${time}`,
   startsIn: (txt) => `בעוד ${txt}`,
+  // Strictly-later-today counter — the simultaneous set is shown above, so it's
+  // excluded from this count; the wording ("ועוד … היום") stays accurate.
   moreToday: (n) => (n === 1 ? "ועוד משחק אחד היום" : `ועוד ${n} משחקים היום`),
   // Freshness honesty
   refreshNote: "מתעדכן בכל דקה בערך",

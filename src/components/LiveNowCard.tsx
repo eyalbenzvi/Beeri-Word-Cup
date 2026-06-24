@@ -25,9 +25,8 @@ import { useCurrentUser, useUserForms, useMatchResults } from "../hooks/useStore
 import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
 import { useLiveScores } from "../hooks/useLiveScores";
 import { getTeamByCode } from "../data/teams";
-import { ALL_MATCHES, STAGES } from "../data/matches";
+import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
-import { getMatchKickoffUTC } from "../utils/matchTime";
 import {
   getMatchDateKey,
   formatMatchDateNumeric,
@@ -43,7 +42,12 @@ import {
   alignPredictionToActual,
   resolveMatchTeams,
 } from "../utils/predictionAlign";
-import { liveStatusInfo, findNextMatch, formatTimeLeft } from "../utils/liveNow";
+import {
+  liveStatusInfo,
+  findNextMatch,
+  formatTimeLeft,
+  countLaterTodayMatches,
+} from "../utils/liveNow";
 import Score from "./Score";
 import { LIVE } from "../constants/messages";
 
@@ -429,41 +433,68 @@ function MatchLiveBlock({ match, actualTeams, live, forms, formBrackets }) {
 function NextMatchStrip({ results, now }) {
   const next = findNextMatch(results, now);
   if (!next) return null;
-  const { match, kickoff } = next;
-  const teams = resolveMatchTeams(match, getCachedBracket(results || {}));
+  const { matches, kickoff } = next;
+  const bracket = getCachedBracket(results || {});
   const tz = getUserTimeZone();
   const todayKey = dateKeyForNow(now, tz);
-  const isToday = getMatchDateKey(match, tz) === todayKey;
+  const multi = matches.length > 1;
+  // Every match in the set shares one kickoff, so date / time / today-ness are
+  // identical across them — derive from the first.
+  const lead = matches[0];
+  const isToday = getMatchDateKey(lead, tz) === todayKey;
+  // "ועוד … היום" counts only matches kicking off STRICTLY LATER today. The
+  // simultaneous set is already shown above, so exclude every id in it —
+  // otherwise the twin would be double-counted as "one more later".
+  const selectedIds = new Set(matches.map((m) => m.id));
   const remainingToday = isToday
-    ? ALL_MATCHES.filter(
-        (m) =>
-          !results?.[m.id] &&
-          getMatchDateKey(m, tz) === todayKey &&
-          (getMatchKickoffUTC(m) ?? 0) > now &&
-          m.id !== match.id,
-      ).length
+    ? countLaterTodayMatches(results, now, todayKey, tz, selectedIds)
     : 0;
+
+  // Shared time line: today → "היום ב־HH:MM"; future → date · time. When the
+  // set has >1 match the single venue is dropped for the "במקביל" tag (two
+  // venues — showing one would mislead); a lone match keeps its venue.
+  const timeSuffix = multi
+    ? ` · ${LIVE.inParallel}`
+    : lead.venue
+      ? ` · ${lead.venue}`
+      : "";
+  const timeLine = isToday ? (
+    <>
+      {LIVE.todayAt(formatMatchClock(lead, tz))}
+      {timeSuffix}
+    </>
+  ) : (
+    <>
+      <bdi>{formatMatchDateNumeric(lead, tz)}</bdi> · <bdi>{formatMatchClock(lead, tz)}</bdi>
+      {timeSuffix}
+    </>
+  );
 
   return (
     <div className="card-duo mb-3">
       <div className="text-xs font-extrabold text-ink-muted mb-1">
-        {isToday ? LIVE.startsIn(formatTimeLeft(kickoff - now)) : LIVE.nextMatchLabel}
+        {isToday
+          ? LIVE.startsIn(formatTimeLeft(kickoff - now))
+          : multi
+            ? LIVE.nextMatchesLabel
+            : LIVE.nextMatchLabel}
       </div>
-      <div className="font-heading font-extrabold text-lg text-ink">
-        <bdi>{teamName(teams.home)}</bdi>{" "}
-        <span className="text-ink-muted">{LIVE.versus}</span>{" "}
-        <bdi>{teamName(teams.away)}</bdi>
+      <div className={multi ? "space-y-0.5" : undefined}>
+        {matches.map((match) => {
+          const teams = resolveMatchTeams(match, bracket);
+          return (
+            <div
+              key={match.id}
+              className="font-heading font-extrabold text-lg text-ink"
+            >
+              <bdi>{teamName(teams.home)}</bdi>{" "}
+              <span className="text-ink-muted">{LIVE.versus}</span>{" "}
+              <bdi>{teamName(teams.away)}</bdi>
+            </div>
+          );
+        })}
       </div>
-      <div className="text-sm font-bold text-ink-muted mt-0.5">
-        {isToday ? (
-          <>{LIVE.todayAt(formatMatchClock(match, tz))}{match.venue ? ` · ${match.venue}` : ""}</>
-        ) : (
-          <>
-            <bdi>{formatMatchDateNumeric(match, tz)}</bdi> · <bdi>{formatMatchClock(match, tz)}</bdi>
-            {match.venue ? ` · ${match.venue}` : ""}
-          </>
-        )}
-      </div>
+      <div className="text-sm font-bold text-ink-muted mt-0.5">{timeLine}</div>
       {remainingToday > 0 && (
         <div className="text-xs font-bold text-ink-muted mt-1.5">
           {LIVE.moreToday(remainingToday)}

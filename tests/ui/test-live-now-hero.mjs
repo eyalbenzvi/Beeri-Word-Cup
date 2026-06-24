@@ -166,5 +166,33 @@ assert(/navigate\("blog", \{ n: latest\.number \}\)/.test(teaser),
 assert(/!ready \|\| !latest\) return null/.test(teaser),
   "teaser renders nothing while loading (no flash)");
 
+// ---- 9. Simultaneous next-match set (matchday-3 parallel pairs) ----
+console.log("--- 9. Parallel next-match handling ---");
+const liveNow = readMigratedSrc("src/utils/liveNow.js");
+// findNextMatch returns the whole shared-kickoff SET, never a single match.
+assert(/return \{ matches, kickoff/.test(liveNow),
+  "findNextMatch returns a matches[] set (all games at the earliest kickoff)");
+assert(/getMatchKickoffUTC\(match\) === bestKickoff/.test(liveNow),
+  "findNextMatch collects every match at exactly the earliest kickoff");
+assert(!/\{ match: best, kickoff/.test(liveNow),
+  "findNextMatch no longer returns a lone {match} (the parallel twin was being dropped)");
+// NextMatchStrip renders the set and labels simultaneity honestly.
+assert(/const \{ matches, kickoff \} = next/.test(hero),
+  "NextMatchStrip consumes the matches[] set");
+assert(/matches\.map\(\(match\)/.test(hero),
+  "NextMatchStrip renders one row per simultaneous match");
+assert(/nextMatchesLabel/.test(hero) && /nextMatchesLabel:/.test(messages),
+  "plural label used for a multi-match set");
+assert(/inParallel/.test(hero) && /inParallel:/.test(messages),
+  "'במקביל' tag marks the shared-kickoff time line");
+// The 'more later today' counter excludes the whole set, not just one match —
+// otherwise the parallel twin is double-counted as 'one more later today'.
+assert(/const selectedIds = new Set\(matches\.map/.test(hero),
+  "the shown set's ids are collected for exclusion");
+assert(/countLaterTodayMatches\(results, now, todayKey, tz, selectedIds\)/.test(hero),
+  "remainingToday delegates to the pure helper, passing the whole set to exclude");
+assert(/!excludeIds\.has\(m\.id\)/.test(liveNow),
+  "countLaterTodayMatches excludes the shown set (twin not double-counted)");
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
