@@ -99,7 +99,7 @@ console.log("--- 3. firebase.ts boots on memory cache when bypass is armed ---")
   assert(pickCache(false) === "persistent", "no flag → persistent cache (normal)");
 }
 
-// ============ 4. Wipe clears the flag on success, keeps it on failure ============
+// ============ 4. Wipe clears the flag ONLY on a genuinely complete wipe ============
 console.log("--- 4. wipeFirestoreIndexedDb resumes persistent caching only after a clean wipe ---");
 {
   const src = SRC("src/utils/firestoreCacheRecovery.ts");
@@ -108,15 +108,66 @@ console.log("--- 4. wipeFirestoreIndexedDb resumes persistent caching only after
   // onblocked must resolve so a delete held open by another tab can't hang.
   assert(/onblocked/.test(src), "a blocked delete still resolves (no hung promise)");
   assert(/firestore\//.test(src), "targets Firestore-owned IndexedDB names");
+  // Expert review: an onblocked outcome must NOT be treated as a successful
+  // wipe — otherwise the flag clears and the next boot returns to persistent
+  // cache against the still-poisoned DB, re-trapping the user.
+  assert(/every\(\(o\) => o === "deleted"\)/.test(src),
+    "the flag clears only when EVERY delete genuinely completed ('deleted')");
+  assert(/blocked/.test(src) && /DeleteOutcome/.test(src),
+    "delete outcomes distinguish deleted / blocked / error");
 
-  // Behavioral: success clears the flag, failure keeps it for a retry next boot.
-  function wipe({ ok }) {
-    const local = new Map([["bypass", "1"]]);
-    if (ok) local.delete("bypass");
-    return local.has("bypass");
+  // Behavioral: model the all-deleted decision over per-DB outcomes.
+  const clearsBypass = (outcomes) => outcomes.every((o) => o === "deleted");
+  assert(clearsBypass(["deleted"]) === true, "single clean delete → resume persistent next boot");
+  assert(clearsBypass(["deleted", "deleted"]) === true, "all deleted → resume persistent");
+  assert(clearsBypass(["deleted", "blocked"]) === false,
+    "a blocked delete keeps bypass armed (the re-trap bug being fixed)");
+  assert(clearsBypass(["error"]) === false, "an errored delete keeps bypass armed");
+}
+
+// ============ 4b. Recovery defers during an OAuth redirect handshake ============
+console.log("--- 4b. recovery does not reload mid getRedirectResult (iOS redirect sign-in) ---");
+{
+  const recovSrc = SRC("src/utils/firestoreCacheRecovery.ts");
+  const fbSrc = SRC("src/firebase.ts");
+  assert(/authRedirectInProgress/.test(recovSrc), "recovery checks an auth-redirect-in-progress flag");
+  assert(/__wcAuthRedirectPending/.test(recovSrc) && /__wcAuthRedirectPending/.test(fbSrc),
+    "firebase.ts owns the flag; recovery reads it (no import cycle)");
+  // firebase.ts must set it true around getRedirectResult and clear it in finally.
+  assert(/getRedirectResult\(auth\)[\s\S]*\.finally\([\s\S]*__wcAuthRedirectPending = false/.test(fbSrc),
+    "the pending flag is cleared once getRedirectResult settles");
+  // The guard must return WITHOUT arming the session guard so a later (settled)
+  // b815 can still trigger recovery.
+  const trigFn = recovSrc.slice(recovSrc.indexOf("export function triggerFirestoreCacheRecovery"));
+  const redirectIdx = trigFn.indexOf("authRedirectInProgress()");
+  const guardSetIdx = trigFn.indexOf("setItem(FS_CACHE_RELOAD_GUARD");
+  assert(redirectIdx > -1 && guardSetIdx > -1 && redirectIdx < guardSetIdx,
+    "redirect check precedes (and short-circuits) the session-guard arming");
+
+  // Behavioral: while a redirect is in progress, trigger is a no-op; once it
+  // settles, the next call proceeds.
+  function makeTrigger() {
+    let redirectPending = true;
+    const session = new Map();
+    let reloads = 0;
+    return {
+      settleRedirect() { redirectPending = false; },
+      trigger() {
+        if (redirectPending) return false;
+        if (session.get("guard") === "1") return false;
+        session.set("guard", "1");
+        reloads++;
+        return true;
+      },
+      reloads: () => reloads,
+    };
   }
-  assert(wipe({ ok: true }) === false, "successful wipe clears bypass → persistent next boot");
-  assert(wipe({ ok: false }) === true, "failed wipe keeps bypass → stays on memory cache, retries next boot");
+  const t = makeTrigger();
+  assert(t.trigger() === false, "no reload while the redirect handshake is in flight");
+  assert(t.reloads() === 0, "redirect handshake preserved");
+  t.settleRedirect();
+  assert(t.trigger() === true, "after the redirect settles, recovery proceeds");
+  assert(t.reloads() === 1, "exactly one reload once it's safe");
 }
 
 // ============ 5. Wiring: global handlers + manual escape hatch ============
@@ -131,6 +182,14 @@ console.log("--- 5. detection is wired into sentry handlers and App's escape hat
   const onreject = sentrySrc.slice(sentrySrc.indexOf('addEventListener("unhandledrejection"'));
   assert(/isFatalFirestoreCacheError/.test(onerror), "window.onerror checks for the fatal cache error");
   assert(/isFatalFirestoreCacheError/.test(onreject), "unhandledrejection checks for the fatal cache error");
+
+  // Expert review (highest-value): b815 is thrown from a setTimeout callback,
+  // which Sentry's browserApiErrors integration can capture before it reaches
+  // window.onerror. beforeSend sees every event, so detection must ALSO run
+  // there or the fix may never fire for the population it targets.
+  const beforeSend = sentrySrc.slice(sentrySrc.indexOf("beforeSend(event)"), sentrySrc.indexOf("Sentry.setTag"));
+  assert(/isFatalFirestoreCacheError/.test(beforeSend) && /triggerFirestoreCacheRecovery/.test(beforeSend),
+    "beforeSend also detects b815 and triggers recovery (covers the setTimeout-instrumented path)");
 
   // The manual last-resort button must arm the bypass so its reload escapes a
   // corrupt cache (a plain reload alone would re-open it).

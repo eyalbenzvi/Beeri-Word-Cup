@@ -86,6 +86,12 @@ export function clearFirestoreCacheBypass(): void {
 // guard already fired (so the caller lets the error fall through to normal
 // handling / the manual recovery UI).
 export function triggerFirestoreCacheRecovery(reason: string): boolean {
+  // Don't reload mid OAuth-redirect handshake. firebase.ts sets this flag while
+  // getRedirectResult() is settling; reloading then could drop the provider's
+  // one-shot state/code params and strand an iOS redirect sign-in (the exact
+  // population this fix targets). We return WITHOUT arming the session guard, so
+  // a later b815 (once auth has settled) can still trigger recovery.
+  if (authRedirectInProgress()) return false;
   let alreadyTried = false;
   try {
     alreadyTried = sessionStorage.getItem(FS_CACHE_RELOAD_GUARD) === "1";
@@ -100,12 +106,31 @@ export function triggerFirestoreCacheRecovery(reason: string): boolean {
   }
   setFirestoreCacheBypass();
   captureClientMessage("firestore-cache-recovery-triggered", { reason }, "warning");
+  // Defer the reload a beat so the just-queued recovery event (and the
+  // triggering error) have a chance to reach Sentry's transport before the
+  // navigation aborts in-flight requests.
   try {
-    window.location.reload();
+    setTimeout(() => {
+      try { window.location.reload(); } catch { /* non-browser context */ }
+    }, 150);
   } catch {
-    /* non-browser context */
+    try { window.location.reload(); } catch { /* non-browser context */ }
   }
   return true;
+}
+
+// True while Firebase Auth's getRedirectResult() is still resolving on this
+// load (firebase.ts owns the flag). Reading a window global avoids importing
+// firebase.ts here (which would create a heavy import cycle).
+function authRedirectInProgress(): boolean {
+  try {
+    return (
+      typeof window !== "undefined" &&
+      (window as any).__wcAuthRedirectPending === true
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Best-effort wipe of the on-disk Firestore IndexedDB. Safe to call only when
@@ -122,35 +147,48 @@ export async function wipeFirestoreIndexedDb(): Promise<boolean> {
   }
   try {
     const names = await listFirestoreDbNames();
-    await Promise.all(
-      names.map(
-        (name) =>
-          new Promise<void>((resolve) => {
-            try {
-              const req = indexedDB.deleteDatabase(name);
-              // Resolve on success, error, OR blocked — we never want a hung
-              // delete (another open tab) to leave the promise pending forever.
-              req.onsuccess = () => resolve();
-              req.onerror = () => resolve();
-              req.onblocked = () => resolve();
-            } catch {
-              resolve();
-            }
-          }),
-      ),
-    );
-    clearFirestoreCacheBypass();
+    const outcomes = await Promise.all(names.map((name) => deleteDb(name)));
+    // Only resume persistent caching if EVERY delete genuinely completed. A
+    // delete blocked by another open tab (onblocked) does NOT remove the
+    // poisoned DB — treating it as success would clear the bypass flag and the
+    // next boot would return to persistent cache against the still-corrupt
+    // store, re-trapping the user. In that case we keep the flag (stay on
+    // memory cache, fully functional) and retry the wipe on the next boot.
+    const allDeleted = outcomes.every((o) => o === "deleted");
+    if (allDeleted) {
+      clearFirestoreCacheBypass();
+      captureClientMessage("firestore-cache-wiped", { dbCount: names.length }, "info");
+      return true;
+    }
     captureClientMessage(
-      "firestore-cache-wiped",
-      { dbCount: names.length },
-      "info",
+      "firestore-cache-wipe-incomplete",
+      { dbCount: names.length, outcomes },
+      "warning",
     );
-    return true;
+    return false;
   } catch {
     // Couldn't enumerate/delete — keep the bypass flag so we stay on memory
     // cache (fully functional) and retry the wipe on the next boot.
     return false;
   }
+}
+
+type DeleteOutcome = "deleted" | "blocked" | "error";
+
+// Delete one IndexedDB database, resolving with the outcome. Resolves on every
+// terminal callback (incl. onblocked) so a delete held open by another tab can
+// never leave the promise pending forever.
+function deleteDb(name: string): Promise<DeleteOutcome> {
+  return new Promise<DeleteOutcome>((resolve) => {
+    try {
+      const req = indexedDB.deleteDatabase(name);
+      req.onsuccess = () => resolve("deleted");
+      req.onerror = () => resolve("error");
+      req.onblocked = () => resolve("blocked");
+    } catch {
+      resolve("error");
+    }
+  });
 }
 
 // Firestore's IndexedDB databases are named `firestore/<dbId>/<key>/main` (e.g.

@@ -96,6 +96,18 @@ export function initSentry() {
       },
       beforeSend(event) {
         try {
+          // Fatal Firestore IndexedDB-cache corruption (b815) is thrown from
+          // inside the SDK's async queue (a setTimeout callback). Sentry's own
+          // browserApiErrors instrumentation wraps setTimeout and can capture
+          // that throw BEFORE it ever reaches our window.onerror handler — so
+          // beforeSend, which sees every captured event regardless of which
+          // integration caught it, is the reliable place to trigger recovery.
+          const exceptionValue = event.exception?.values?.[0]?.value;
+          if (isFatalFirestoreCacheError(event.message || exceptionValue)) {
+            triggerFirestoreCacheRecovery("sentry.beforeSend");
+            // fall through: still record the event (the deferred reload lets it
+            // flush first), so the b815 occurrence stays visible in Sentry.
+          }
           if (event.message) {
             event.message = scrubPhoneUid(event.message) as string;
           }

@@ -83,14 +83,26 @@ export const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Handle pending redirect result on page load (for mobile redirect flow)
-// Log errors for debugging but don't bother the user — they can tap sign-in again
-getRedirectResult(auth).catch((err) => {
-  const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
-  if (!silent.includes(err?.code)) {
-    console.error("Redirect sign-in failed:", err?.code, err?.message);
-    captureClientError(err, { source: "getRedirectResult", code: err?.code });
-  }
-});
+// Log errors for debugging but don't bother the user — they can tap sign-in again.
+//
+// While this is settling we set a window flag the cache-recovery path reads:
+// a fatal-cache reload fired mid-handshake could drop the OAuth provider's
+// one-shot params and strand an iOS redirect sign-in, so recovery defers until
+// getRedirectResult resolves. The flag is set true on every load and cleared
+// when the (usually instant) resolution lands; redirect-returns are exactly the
+// case where it stays true long enough to matter.
+try { (window as any).__wcAuthRedirectPending = true; } catch { /* no window */ }
+getRedirectResult(auth)
+  .catch((err) => {
+    const silent = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
+    if (!silent.includes(err?.code)) {
+      console.error("Redirect sign-in failed:", err?.code, err?.message);
+      captureClientError(err, { source: "getRedirectResult", code: err?.code });
+    }
+  })
+  .finally(() => {
+    try { (window as any).__wcAuthRedirectPending = false; } catch { /* no window */ }
+  });
 
 // Detect in-app browsers (WhatsApp, Facebook, Instagram, etc.)
 function isInAppBrowser() {
