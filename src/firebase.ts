@@ -3,6 +3,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  memoryLocalCache,
 } from "firebase/firestore";
 import {
   getAuth,
@@ -15,6 +16,10 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { captureClientError } from "./sentry";
+import {
+  shouldBypassFirestoreCache,
+  wipeFirestoreIndexedDb,
+} from "./utils/firestoreCacheRecovery";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -50,12 +55,29 @@ const app = initializeApp(firebaseConfig);
 // app backgrounding) survive to the next session and replay automatically.
 // Without this, debouncedWriteForm's last 500ms of edits could vanish when
 // the user closes the tab.
+// Cache-recovery escape hatch: if a previous session detected a fatal,
+// unrecoverable Firestore IndexedDB corruption (the "b815" internal assertion,
+// see firestoreCacheRecovery.ts) it armed a localStorage bypass flag and
+// reloaded. On this boot we honour it by initialising with an in-memory cache
+// instead of the persistent (IndexedDB) one — fully functional, just without
+// offline persistence — so the user is never re-trapped on the poisoned store.
+// After init we wipe the idle on-disk DB and clear the flag so the NEXT session
+// returns to normal persistent caching.
+const bypassPersistentCache = shouldBypassFirestoreCache();
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
+  localCache: bypassPersistentCache
+    ? memoryLocalCache()
+    : persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
 });
+if (bypassPersistentCache) {
+  // Fire-and-forget: this session runs on memory cache, so the on-disk
+  // Firestore IndexedDB is idle and safe to delete. Success clears the bypass
+  // flag (resume persistent next boot); failure keeps it (retry next boot).
+  void wipeFirestoreIndexedDb();
+}
 export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
