@@ -11,6 +11,7 @@ import {
   useSettingsServerConfirmed,
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
+import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
 import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { getMatchSortTime } from "../utils/chronologicalSchedule";
@@ -113,6 +114,14 @@ export default function Leaderboard({
 
   const { formBracketMap, scoredForms, leaderboard, rankedLeaderboard, actualBracket } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
+
+  // Matches that haven't finished yet and kick off within the next 24h (plus
+  // any that just kicked off and have no recorded result — "live"). Reuses the
+  // exact same selector that powers the home-page "המשחקים הבאים" widget, so
+  // the 24h window definition lives in one place and can't drift. Shown ABOVE
+  // the finished matches inside an opened form detail. Hook ticks once a minute
+  // so a match crosses from "upcoming" into "finished" on its own.
+  const upcomingMatches = useUpcomingMatches();
 
   // Find every form belonging to the current user, sorted by rank ascending
   // (best first). On the locked tournament view this powers the "your forms:
@@ -295,20 +304,24 @@ export default function Leaderboard({
       advancingPoints: {},
       matchScores: {},
     };
-    // Chronological order (was Object.keys insertion order = the random order
-    // results were entered by the admin). Reuses getMatchSortTime — the same
-    // kickoff-instant sort key the Results "סדר כרונולוגי" view uses — so both
-    // screens agree on play order and can't drift. It also makes the stage
-    // GROUPS read in play order: group stage finishes before any knockout
-    // kicks off, so the first-appearance grouping below inherits the correct
-    // stage sequence. Kickoff-less rows fall back to their day + FIFA number;
-    // an unknown result id (no match object) sorts last.
+    // Reverse-chronological order: newest finished match first. Reuses
+    // getMatchSortTime — the same kickoff-instant sort key the Results
+    // "סדר כרונולוגי" view uses — so both screens agree on play order and can't
+    // drift. Sorting DESCENDING also inverts the first-appearance stage grouping
+    // below: because the group stage finishes before any knockout kicks off, the
+    // latest stage (e.g. the final) now heads the list and the group stage sinks
+    // to the bottom — i.e. newest-to-oldest, the requested order. Kickoff-less
+    // rows fall back to their day + FIFA number.
     const playedMatches = Object.keys(results).sort((a, b) => {
       const ma = allMatchesMap[a];
       const mb = allMatchesMap[b];
+      // Pin rows with no known match object (a corrupt/stale result id) LAST in
+      // either direction: their getMatchSortTime is MAX_SAFE_INTEGER, which the
+      // descending sort would otherwise float to the very top.
+      if (!ma !== !mb) return ma ? -1 : 1;
       return (
-        getMatchSortTime(ma) - getMatchSortTime(mb) ||
-        (ma?.fifaMatch ?? 0) - (mb?.fifaMatch ?? 0)
+        getMatchSortTime(mb) - getMatchSortTime(ma) ||
+        (mb?.fifaMatch ?? 0) - (ma?.fifaMatch ?? 0)
       );
     });
 
@@ -320,6 +333,71 @@ export default function Leaderboard({
       if (!matchesByStage[stage]) matchesByStage[stage] = [];
       matchesByStage[stage].push({ matchId, match, result });
     }
+
+    // Single source of truth for a form-detail match row, shared by the
+    // upcoming-matches section (result = null — no official result yet, so no
+    // points badge) and the finished stages below. For knockout rows the
+    // DISPLAYED matchup uses the actual bracket teams; the form owner's own
+    // predicted matchup (which may differ) is shown in the note underneath —
+    // identical to how the finished rows have always rendered.
+    const renderMatchCard = (matchId, match, result) => {
+      const prediction = predData.matches?.[matchId];
+      const predTeams = predBracket[matchId] || null;
+      const actTeams = actualBracket[matchId] || null;
+      const stage = result?.stage || match?.stage || "group";
+      const pts = result
+        ? score.matchScores?.[matchId] || {
+            points: 0,
+            outcomePoints: 0,
+            exactPoints: 0,
+            breakdown: "",
+            wrongMatchup: false,
+          }
+        : null;
+      const derivedMatch =
+        match?.stage !== "group" && actTeams
+          ? {
+              ...match,
+              homeTeam: actTeams.home,
+              awayTeam: actTeams.away,
+            }
+          : match || {
+              homeTeam: result?.homeTeam,
+              awayTeam: result?.awayTeam,
+            };
+      const predMatchup =
+        stage !== "group" && predTeams?.home && predTeams?.away
+          ? {
+              home: getTeamByCode(predTeams.home),
+              away: getTeamByCode(predTeams.away),
+            }
+          : null;
+      return (
+        <div key={matchId}>
+          <MatchCard
+            match={derivedMatch}
+            prediction={prediction}
+            actualResult={result}
+            showPoints={!!result}
+            points={pts}
+          />
+          {predMatchup && (
+            <div
+              className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl font-bold ${
+                pts?.wrongMatchup ? "text-danger" : "text-secondary"
+              }`}
+              style={{ background: pts?.wrongMatchup ? "var(--color-danger-soft)" : "var(--color-secondary-soft)" }}
+            >
+              ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
+              {predMatchup.away?.name || "טרם נקבע"}
+              {prediction
+                ? <>{" "}<Score home={prediction.homeScore} away={prediction.awayScore} separator="-" wrap="parens" /></>
+                : ""}
+            </div>
+          )}
+        </div>
+      );
+    };
 
     return (
       <div className="mt-4">
@@ -419,72 +497,32 @@ export default function Leaderboard({
           ) : null}
         </div>
 
+        {/* Upcoming matches (next 24h, not finished) shown ABOVE the finished
+            stages — soonest first, so the most imminent match the form owner
+            predicted sits at the top. Each renders the owner's prediction with
+            no result/points yet; a match moves down into the finished stages on
+            its own once a result is recorded (the hook re-ticks every minute). */}
+        {upcomingMatches.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-extrabold text-ink mb-2">
+              המשחקים הקרובים
+            </h3>
+            {upcomingMatches.map((m) => renderMatchCard(m.id, m, null))}
+          </div>
+        )}
+
         {Object.entries(matchesByStage).map(([stage, matchesAny]) => (
           <div key={stage} className="mb-4">
             <h3 className="text-sm font-extrabold text-ink mb-2">
               {STAGES[stage] || stage}
             </h3>
-            {(matchesAny as any[]).map(({ matchId, match, result }) => {
-              const prediction = predData.matches?.[matchId];
-              const predTeams = predBracket[matchId] || null;
-              const actTeams = actualBracket[matchId] || null;
-              const pts = score.matchScores?.[matchId] || {
-                points: 0,
-                outcomePoints: 0,
-                exactPoints: 0,
-                breakdown: "",
-                wrongMatchup: false,
-              };
-              const derivedMatch =
-                match?.stage !== "group" && actTeams
-                  ? {
-                      ...match,
-                      homeTeam: actTeams.home,
-                      awayTeam: actTeams.away,
-                    }
-                  : match || {
-                      homeTeam: result.homeTeam,
-                      awayTeam: result.awayTeam,
-                    };
-              const predMatchup =
-                stage !== "group" && predTeams?.home && predTeams?.away
-                  ? {
-                      home: getTeamByCode(predTeams.home),
-                      away: getTeamByCode(predTeams.away),
-                    }
-                  : null;
-              return (
-                <div key={matchId}>
-                  <MatchCard
-                    match={derivedMatch}
-                    prediction={prediction}
-                    actualResult={result}
-                    showPoints
-                    points={pts}
-                  />
-                  {predMatchup && (
-                    <div
-                      className={`text-xs px-3 py-1.5 -mt-1 mb-2 rounded-b-xl font-bold ${
-                        pts.wrongMatchup
-                          ? "text-danger"
-                          : "text-secondary"
-                      }`}
-                      style={{ background: pts.wrongMatchup ? "var(--color-danger-soft)" : "var(--color-secondary-soft)" }}
-                    >
-                      ניחש: {predMatchup.home?.name || "טרם נקבע"} נגד{" "}
-                      {predMatchup.away?.name || "טרם נקבע"}
-                      {prediction
-                        ? <>{" "}<Score home={prediction.homeScore} away={prediction.awayScore} separator="-" wrap="parens" /></>
-                        : ""}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {(matchesAny as any[]).map(({ matchId, match, result }) =>
+              renderMatchCard(matchId, match, result),
+            )}
           </div>
         ))}
 
-        {playedMatches.length === 0 && (
+        {playedMatches.length === 0 && upcomingMatches.length === 0 && (
           <p className="text-center text-ink-muted font-medium py-8">
             עדיין לא שוחקו משחקים
           </p>

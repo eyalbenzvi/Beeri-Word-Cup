@@ -13,7 +13,7 @@ const TICK_MS = 60_000;
 // `matchResultsOverride` lets the welcome screen (logged-out) pass results
 // fetched from the public Netlify endpoint, since Firestore listeners
 // don't run without auth and the store cache would otherwise be empty.
-export function useUpcomingMatches(matchResultsOverride) {
+export function useUpcomingMatches(matchResultsOverride?: Record<string, any> | null) {
   const storeResults = useMatchResults();
   const matchResults = matchResultsOverride ?? storeResults;
   const [now, setNow] = useState(() => Date.now());
