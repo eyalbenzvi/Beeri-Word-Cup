@@ -7,6 +7,7 @@ import {
   clearMatchResults,
 } from "../store";
 import { TOP_SCORER_PLAYERS } from "../data/players";
+import { isBestCaseAvailable } from "../utils/bestCase";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 
@@ -54,6 +55,31 @@ export default function AdminSettingsTab({
           >
             <span
               className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.predictionsLocked ? "translate-x-6" : "translate-x-0.5"}`}
+            />
+          </button>
+        </div>
+        <div className="flex items-center justify-between py-3">
+          <div className="pl-3">
+            <div className="text-sm font-medium">חישוב תרחיש מיטבי</div>
+            <div className="text-xs text-ink-muted">
+              מפעיל את כפתור "חשב תרחיש מיטבי" בטבלת הדירוג
+            </div>
+            {settings.bestCaseEnabled && !isBestCaseAvailable(results) && (
+              <div className="text-xs text-accent-text font-bold mt-1">
+                שלב הבתים טרם הסתיים — החישוב עלול להיות איטי וחסר משמעות
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() =>
+              updateSettings({ bestCaseEnabled: !settings.bestCaseEnabled })
+            }
+            className={`relative shrink-0 w-12 h-6 rounded-full transition-colors ${settings.bestCaseEnabled ? "bg-primary" : "bg-border-strong"}`}
+            aria-pressed={!!settings.bestCaseEnabled}
+            aria-label="הפעל חישוב תרחיש מיטבי"
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings.bestCaseEnabled ? "translate-x-6" : "translate-x-0.5"}`}
             />
           </button>
         </div>

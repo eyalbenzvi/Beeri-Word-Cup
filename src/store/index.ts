@@ -154,7 +154,7 @@ export function logoutUser() {
   cache.matchResults = {};
   cache.actualAdvancing = {};
   cache.actualBonuses = { champion: null, topScorers: [] };
-  cache.settings = { predictionsLocked: false };
+  cache.settings = { predictionsLocked: false, bestCaseEnabled: false };
   cache.settingsServerConfirmed = false;
   cache.summaries = {};
   cache._ready = {};

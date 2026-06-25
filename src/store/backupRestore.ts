@@ -141,7 +141,7 @@ export async function clearAllData() {
   ops.push({ type: "set", ref: gameDocRef("matchResults"), data: { data: {} } });
   ops.push({ type: "set", ref: gameDocRef("actualAdvancing"), data: { data: {} } });
   ops.push({ type: "set", ref: gameDocRef("actualBonuses"), data: { data: { champion: null, topScorers: [] } } });
-  ops.push({ type: "set", ref: gameDocRef("settings"), data: { data: { predictionsLocked: false } } });
+  ops.push({ type: "set", ref: gameDocRef("settings"), data: { data: { predictionsLocked: false, bestCaseEnabled: false } } });
   await commitInBatches(ops);
 
   cache.users = {};
@@ -151,7 +151,7 @@ export async function clearAllData() {
   cache.matchResults = {};
   cache.actualAdvancing = {};
   cache.actualBonuses = { champion: null, topScorers: [] };
-  cache.settings = { predictionsLocked: false };
+  cache.settings = { predictionsLocked: false, bestCaseEnabled: false };
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(ACTIVE_FORM_KEY);
   notifyAndEmit("all");

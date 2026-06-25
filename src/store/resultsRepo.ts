@@ -1,7 +1,7 @@
 // Admin-write repos for the small singleton gameData docs:
 //   - matchResults: { [matchId]: { homeScore, awayScore, advancingTeam? } }
 //   - actualBonuses: { champion, topScorers[] }
-//   - settings: { predictionsLocked, topScorerPlayers? }
+//   - settings: { predictionsLocked, bestCaseEnabled?, topScorerPlayers? }
 //
 // All writes go through writeGameDoc (in usersRepo) so the don't-shrink
 // safety guard + audit + timeout + token-refresh wrapping applies
@@ -13,7 +13,10 @@ import { requireAdmin, writeGameDoc } from "./usersRepo";
 
 const EMPTY_OBJ: Record<string, any> = {};
 const DEFAULT_BONUSES = { champion: null as string | null, topScorers: [] as string[] };
-const DEFAULT_SETTINGS: Record<string, any> = { predictionsLocked: false };
+const DEFAULT_SETTINGS: Record<string, any> = {
+  predictionsLocked: false,
+  bestCaseEnabled: false,
+};
 
 // ============ MATCH RESULTS (admin) ============
 
