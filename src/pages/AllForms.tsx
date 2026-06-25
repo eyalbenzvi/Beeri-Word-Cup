@@ -4,7 +4,7 @@ import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
-import FormMatchesView from "../components/FormMatchesView";
+import FormPredictionView from "../components/FormPredictionView";
 import {
   useAllPredictions,
   useUserDirectory,
@@ -61,7 +61,7 @@ function FormCard({ form, championDisplay, locked, isOwnForm, userName, playerLi
 
       {expanded && canExpand && (
         <div className="px-4 pb-4">
-          <FormMatchesView predictions={predictions} />
+          <FormPredictionView predictions={predictions} />
 
           <div className="pt-2 mt-3 border-t-2 border-border">
             <div className="flex justify-between text-sm">

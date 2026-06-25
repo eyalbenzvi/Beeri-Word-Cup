@@ -181,6 +181,7 @@ run_test "114. Firestore Cache Recovery (b815 bypass: memory cache + IDB wipe + 
 run_test "115. Best-Case Admin Toggle (settings gate + note + warning + wiring)" "ui/test-best-case-toggle.mjs" "no"
 run_test "116. Team Prediction Stats (per-team admin aggregator: positions/rounds/champion)" "data/test-team-prediction-stats.mjs" "yes"
 run_test "117. Admin Insights Tab (מידע ונתונים: team + knockout breakdowns, shared components)" "ui/test-admin-insights.mjs" "no"
+run_test "118. Form Prediction View (others' forms = group tables + bracket, shared blocks)" "ui/test-form-prediction-view.mjs" "no"
 
 echo ""
 echo "==========================================="
