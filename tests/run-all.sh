@@ -178,6 +178,7 @@ run_test "111. iOS Google Sign-In (redirect-first on WebKit + env authDomain + p
 run_test "112. Lazy + IndexedDB Resilience (stalled-chunk reload + IDB-lost downgrade)" "store/test-lazy-and-idb-resilience.mjs" "no"
 run_test "113. Public-Fetch Firestore Retry (transient ETIMEDOUT backoff + wiring)" "store/test-public-fetch-retry.mjs" "no"
 run_test "114. Firestore Cache Recovery (b815 bypass: memory cache + IDB wipe + reload guard)" "store/test-firestore-cache-recovery.mjs" "no"
+run_test "115. Best-Case Admin Toggle (settings gate + note + warning + wiring)" "ui/test-best-case-toggle.mjs" "no"
 
 echo ""
 echo "==========================================="

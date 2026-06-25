@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { BestCaseResult } from "../utils/bestCase";
-import { isBestCaseAvailable } from "../utils/bestCase";
-import { useAllPredictions, useMatchResults } from "./useStore";
+import { useAllPredictions, useMatchResults, useSettings } from "./useStore";
 
 type Phase =
   | "idle"
@@ -41,11 +40,15 @@ export function useBestCase(formId: string | null): {
 } {
   const allForms = useAllPredictions();
   const matchResults = useMatchResults();
-  // Gate: optimizer is only available once the group stage is complete
-  // (all R32 qualifiers determined). Before the results listener loads,
-  // matchResults is {} → unavailable, which is the safe default (no flash
-  // of an enabled button while data is still in flight).
-  const available = isBestCaseAvailable(matchResults);
+  const settings = useSettings();
+  // Gate: the optimizer is offered only when the site admin flips the
+  // `bestCaseEnabled` switch (Admin → settings). It is meant to be turned on
+  // once the group stage is complete — running it earlier is both meaningless
+  // and prohibitively slow — but the timing is now an admin decision rather
+  // than an automatic check. Before the settings listener loads, the flag is
+  // undefined → unavailable, the safe default (no flash of an enabled button
+  // while data is still in flight).
+  const available = settings?.bestCaseEnabled === true;
   const workerRef = useRef<Worker | null>(null);
   // Tracks whether the component is still mounted — guards every async
   // setState inside the worker handlers against post-unmount calls

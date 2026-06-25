@@ -108,6 +108,7 @@ async function fetchPublicSettingsOnce() {
       cache.settings = {
         ...(cache.settings || {}),
         predictionsLocked: !!data?.predictionsLocked,
+        bestCaseEnabled: !!data?.bestCaseEnabled,
       };
       if (data?.matchResults && typeof data.matchResults === "object") {
         cache.matchResults = data.matchResults;
@@ -331,6 +332,7 @@ export function initPublicReadonlyMode() {
         cache.settings = {
           ...(cache.settings || {}),
           predictionsLocked: !!(data && data.predictionsLocked),
+          bestCaseEnabled: !!(data && data.bestCaseEnabled),
         };
       } catch (err) {
         console.error("Public settings snapshot parse error:", err);

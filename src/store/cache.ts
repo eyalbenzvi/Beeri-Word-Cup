@@ -56,7 +56,7 @@ export const cache: CacheShape = {
   matchResults: {},
   actualAdvancing: {},
   actualBonuses: { champion: null, topScorers: [] },
-  settings: { predictionsLocked: false },
+  settings: { predictionsLocked: false, bestCaseEnabled: false },
   settingsServerConfirmed: false,
   summaries: {}, // summaryId -> summaryData
   _ready: {},

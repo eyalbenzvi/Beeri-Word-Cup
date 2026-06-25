@@ -1,6 +1,7 @@
-// Public endpoint that exposes `predictionsLocked` and `matchResults` so the
-// welcome screen can decide what to show for logged-out visitors and filter
-// out already-played matches from the "next matches" widget.
+// Public endpoint that exposes `predictionsLocked`, `bestCaseEnabled` and
+// `matchResults` so the welcome screen can decide what to show for logged-out
+// visitors, filter out already-played matches from the "next matches" widget,
+// and gate the leaderboard best-case button for read-only viewers.
 //
 // Uses the Firebase Admin SDK (bypasses Firestore security rules), so
 // this works even when the rules haven't granted unauth reads of
@@ -62,6 +63,7 @@ async function getPublicSettingsHandler(event) {
       headers,
       body: JSON.stringify({
         predictionsLocked: !!(settingsData && settingsData.predictionsLocked),
+        bestCaseEnabled: !!(settingsData && settingsData.bestCaseEnabled),
         matchResults: resultsData && typeof resultsData === "object" ? resultsData : {},
       }),
     };
