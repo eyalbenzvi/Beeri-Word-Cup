@@ -19,47 +19,11 @@ import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter, BracketEntry } from "../utils/matchPredictionStats";
-import ClickableName from "../components/ClickableName";
+import { Bar, VoterList, VoterBarList } from "../components/VoterList";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
 const allMatches = [...groupMatches, ...knockoutMatches];
-
-function Bar({ label, count, total, color = "bg-primary" }) {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  const width = count > 0 ? Math.max(pct, 8) : 0;
-  // A narrow fill can't contain the count label without clipping it —
-  // below this width the count renders on the track, past the fill's tip.
-  const countFitsInside = width >= 25;
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-24 text-right text-ink font-bold truncate">
-        {label}
-      </span>
-      <div className="relative flex-1 bg-bg-soft rounded-full h-6 overflow-hidden border border-border">
-        <div
-          className={`${color} h-full rounded-full transition-all duration-500 flex items-center justify-end px-2`}
-          style={{ width: `${width}%` }}
-        >
-          {countFitsInside && (
-            <span className="text-white text-xs font-extrabold">{count}</span>
-          )}
-        </div>
-        {!countFitsInside && count > 0 && (
-          <span
-            className="absolute inset-y-0 flex items-center px-2 text-ink text-xs font-extrabold"
-            style={{ insetInlineStart: `${width}%` }}
-          >
-            {count}
-          </span>
-        )}
-      </div>
-      <span className="w-10 text-left text-ink-muted text-xs font-bold">
-        {pct.toFixed(0)}%
-      </span>
-    </div>
-  );
-}
 
 function StatCard({ title, icon, children }) {
   return (
@@ -68,85 +32,6 @@ function StatCard({ title, icon, children }) {
         {icon} {title}
       </h3>
       {children}
-    </div>
-  );
-}
-
-// Scrollable list of the forms behind a given result/outcome. Used by the
-// accordion panels in MatchPredictions so users can see WHO predicted each one
-// — and tap a form to jump straight to its full view in the leaderboard.
-function VoterList({ voters }: { voters: Voter[] }) {
-  const { navigate } = useNavigation();
-  if (!voters || voters.length === 0) {
-    return (
-      <p className="text-xs text-ink-muted text-center py-2 font-bold">
-        אין נתונים
-      </p>
-    );
-  }
-  return (
-    <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pl-1">
-      {voters.map((v, i) => (
-        <div
-          key={`${v.formId}-${i}`}
-          className="text-xs rounded-lg px-3 py-1.5 border border-border text-right font-bold text-ink"
-          style={{ background: "var(--color-bg-soft)" }}
-        >
-          {v.formId ? (
-            <ClickableName onClick={() => navigate("leaderboard", { form: v.formId })}>
-              {v.name || "טופס ללא שם"}
-            </ClickableName>
-          ) : (
-            v.name || "טופס ללא שם"
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// A list of clickable distribution bars; tapping one expands an accordion
-// listing the form names behind it. Shared by the champion and top-scorer
-// breakdowns so "who predicted this?" works identically across the page.
-// `items` is pre-sorted: [{ key, label, voters, color }, ...].
-function VoterBarList({
-  items,
-  total,
-}: {
-  items: { key: string; label: string; voters: Voter[]; color?: string }[];
-  total: number;
-}) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  return (
-    <div className="space-y-1.5">
-      {items.map((item) => {
-        const open = expanded === item.key;
-        return (
-          <div key={item.key}>
-            <button
-              type="button"
-              onClick={() => setExpanded(open ? null : item.key)}
-              aria-expanded={open}
-              className="w-full flex items-center gap-1.5 cursor-pointer"
-            >
-              <span
-                className={`text-ink-muted text-xs transition-transform ${open ? "rotate-180" : ""}`}
-              >
-                ▾
-              </span>
-              <div className="flex-1">
-                <Bar
-                  label={item.label}
-                  count={item.voters.length}
-                  total={total}
-                  color={item.color}
-                />
-              </div>
-            </button>
-            {open && <VoterList voters={item.voters} />}
-          </div>
-        );
-      })}
     </div>
   );
 }
