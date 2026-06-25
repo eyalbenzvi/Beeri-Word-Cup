@@ -12,6 +12,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
 import PageHeader from "../components/PageHeader";
@@ -120,7 +121,8 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
                   : "bg-white text-ink border-border hover:border-border-strong"
               }`}
             >
-              {h?.name || "טרם נקבע"} נגד {a?.name || "טרם נקבע"}
+              {h?.name || r32SlotLabel(m, "home") || "טרם נקבע"} נגד{" "}
+              {a?.name || r32SlotLabel(m, "away") || "טרם נקבע"}
             </button>
           );
         })}
@@ -146,7 +148,7 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
                 {matchStats.homeWin}
               </div>
               <div className="text-xs text-secondary font-bold">
-                1 {home?.name || ""}
+                1 {home?.name || (matchStats?.match ? r32SlotLabel(matchStats.match, "home") : "") || ""}
               </div>
             </button>
             <button
@@ -174,7 +176,7 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
                 {matchStats.awayWin}
               </div>
               <div className="text-xs text-danger font-bold">
-                2 {away?.name || ""}
+                2 {away?.name || (matchStats?.match ? r32SlotLabel(matchStats.match, "away") : "") || ""}
               </div>
             </button>
           </div>

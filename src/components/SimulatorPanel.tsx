@@ -9,6 +9,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
+import { r32SlotLabel } from "../utils/matchSlot";
 import GroupSelector from "./GroupSelector";
 
 // Stable empty base for "score check" mode — see scoreCheckMode below.
@@ -335,7 +336,7 @@ export default function SimulatorPanel({
                       {homeTeam?.flag && (
                         <span aria-hidden="true">{homeTeam.flag}</span>
                       )}
-                      <bdi className="truncate">{homeTeam?.name || "—"}</bdi>
+                      <bdi className="truncate">{homeTeam?.name || r32SlotLabel(match, "home") || "—"}</bdi>
                     </span>
                     {isEditing ? (
                       <input
@@ -364,7 +365,7 @@ export default function SimulatorPanel({
                       {awayTeam?.flag && (
                         <span aria-hidden="true">{awayTeam.flag}</span>
                       )}
-                      <bdi className="truncate">{awayTeam?.name || "—"}</bdi>
+                      <bdi className="truncate">{awayTeam?.name || r32SlotLabel(match, "away") || "—"}</bdi>
                     </span>
                     {isEditing ? (
                       <input

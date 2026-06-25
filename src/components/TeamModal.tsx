@@ -10,6 +10,7 @@ import {
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { getTeamByCode } from "../data/teams";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { getCachedBracket, getCachedChampion } from "../utils/bracketCache";
 import { calcGroupStandings } from "../utils/bracket";
 import { normalizeStatus } from "../utils/helpers";
@@ -40,7 +41,7 @@ function TeamFixtureRow({ match, result, derived }: { match: any; result: any; d
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className={`text-sm font-bold flex-1 text-right ${home ? "text-ink" : "text-ink-light italic"}`}>
-          <bdi>{home?.name || "טרם נקבע"}</bdi>
+          <bdi>{home?.name || r32SlotLabel(match, "home") || "טרם נקבע"}</bdi>
         </span>
         <span className="min-w-[52px] text-center font-extrabold tabular-nums">
           {hasResult ? (
@@ -50,7 +51,7 @@ function TeamFixtureRow({ match, result, derived }: { match: any; result: any; d
           )}
         </span>
         <span className={`text-sm font-bold flex-1 text-left ${away ? "text-ink" : "text-ink-light italic"}`}>
-          <bdi>{away?.name || "טרם נקבע"}</bdi>
+          <bdi>{away?.name || r32SlotLabel(match, "away") || "טרם נקבע"}</bdi>
         </span>
       </div>
     </div>

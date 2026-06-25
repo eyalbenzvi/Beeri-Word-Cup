@@ -182,6 +182,7 @@ run_test "115. Best-Case Admin Toggle (settings gate + note + warning + wiring)"
 run_test "116. Team Prediction Stats (per-team admin aggregator: positions/rounds/champion)" "data/test-team-prediction-stats.mjs" "yes"
 run_test "117. Admin Insights Tab (מידע ונתונים: team + knockout breakdowns, shared components)" "ui/test-admin-insights.mjs" "no"
 run_test "118. Form Prediction View (others' forms = group tables + bracket, shared blocks)" "ui/test-form-prediction-view.mjs" "no"
+run_test "119. R32 Slot Placeholder (show '1A'/'מקום 3' instead of 'טרם נקבע')" "data/test-r32-slot-placeholder.mjs" "yes"
 
 echo ""
 echo "==========================================="

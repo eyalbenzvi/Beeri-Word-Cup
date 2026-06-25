@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
 // Cap on rendered match results — anything beyond this is hidden behind a
@@ -150,8 +151,8 @@ export default function MatchSearch({
                       : STAGES[match.stage]}
                   </span>
                   <span className="text-sm text-ink font-bold flex-1 truncate">
-                    {homeInfo?.name || "טרם נקבע"} —{" "}
-                    {awayInfo?.name || "טרם נקבע"}
+                    {homeInfo?.name || r32SlotLabel(match, "home") || "טרם נקבע"} —{" "}
+                    {awayInfo?.name || r32SlotLabel(match, "away") || "טרם נקבע"}
                   </span>
                   <span className="text-ink-light text-xs">←</span>
                 </button>

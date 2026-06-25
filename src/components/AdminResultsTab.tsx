@@ -4,6 +4,7 @@ import { saveMatchResult, deleteMatchResult } from "../store";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { randomScore, flipMatchLabelForRtl } from "../utils/helpers";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { KNOCKOUT_STAGE_ORDER } from "../utils/constants";
@@ -311,12 +312,12 @@ export default function AdminResultsTab() {
                 <div className="flex-1">
                   <div className="text-sm">
                     <span className="font-medium">
-                      {homeTeam?.name || "טרם נקבע"}
+                      {homeTeam?.name || r32SlotLabel(match, "home") || "טרם נקבע"}
                     </span>
                   </div>
                   <div className="text-sm mt-1">
                     <span className="font-medium">
-                      {awayTeam?.name || "טרם נקבע"}
+                      {awayTeam?.name || r32SlotLabel(match, "away") || "טרם נקבע"}
                     </span>
                   </div>
                 </div>

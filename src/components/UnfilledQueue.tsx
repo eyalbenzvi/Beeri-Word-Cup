@@ -1,5 +1,6 @@
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { r32SlotLabel } from "../utils/matchSlot";
 
 export default function UnfilledQueue({
   groupMatches,
@@ -66,7 +67,8 @@ export default function UnfilledQueue({
                   : STAGES[match.stage]}
               </span>
               <span className="text-sm text-ink font-bold flex-1 truncate">
-                {homeInfo?.name || "טרם נקבע"} — {awayInfo?.name || "טרם נקבע"}
+                {homeInfo?.name || r32SlotLabel(match, "home") || "טרם נקבע"} —{" "}
+                {awayInfo?.name || r32SlotLabel(match, "away") || "טרם נקבע"}
               </span>
               <span className="text-ink-light text-xs">←</span>
             </button>
