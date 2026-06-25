@@ -59,12 +59,19 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
     return { match, ...aggregateMatchPredictions(forms, selectedMatch, actualBracketTeams, (form) => getCachedBracket(form.matches || {})) };
   }, [selectedMatch, forms, actualBracketTeams]);
 
-  const home = matchStats?.match
-    ? getTeamByCode(matchStats.match.homeTeam)
-    : null;
-  const away = matchStats?.match
-    ? getTeamByCode(matchStats.match.awayTeam)
-    : null;
+  // Resolve the selected match's teams the same way the list does: knockout
+  // slots come from the actual (results-gated) bracket so a qualified team
+  // shows its real name, falling back to the raw fixture for group matches.
+  const selectedDerived = matchStats?.match
+    ? matchStats.match.stage !== "group" && actualBracketTeams?.[matchStats.match.id]
+      ? {
+          home: actualBracketTeams[matchStats.match.id].home,
+          away: actualBracketTeams[matchStats.match.id].away,
+        }
+      : { home: matchStats.match.homeTeam, away: matchStats.match.awayTeam }
+    : { home: null, away: null };
+  const home = getTeamByCode(selectedDerived.home);
+  const away = getTeamByCode(selectedDerived.away);
 
   return (
     <StatCard title="ניחושים למשחק" icon="🔍">
@@ -109,8 +116,16 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
       {/* Match list */}
       <div className="space-y-1.5 mb-3">
         {filteredMatches.map((m) => {
-          const h = getTeamByCode(m.homeTeam);
-          const a = getTeamByCode(m.awayTeam);
+          // Knockout slots resolve from the ACTUAL bracket (gated on results),
+          // so a team that already qualified for the slot shows its real name
+          // rather than the "1A" placeholder — matching the Results tab. The
+          // r32SlotLabel fallback only kicks in while the slot is undecided.
+          const derived =
+            m.stage !== "group" && actualBracketTeams?.[m.id]
+              ? { home: actualBracketTeams[m.id].home, away: actualBracketTeams[m.id].away }
+              : { home: m.homeTeam, away: m.awayTeam };
+          const h = getTeamByCode(derived.home);
+          const a = getTeamByCode(derived.away);
           return (
             <button
               key={m.id}
