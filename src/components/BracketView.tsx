@@ -1,4 +1,4 @@
-import { knockoutMatches, STAGES } from "../data/matches";
+import { knockoutMatches, STAGES, BRACKET_DISPLAY_ORDER } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
 import { r32SlotLabel } from "../utils/matchSlot";
 import { useTeamModal } from "./TeamModal";
@@ -67,7 +67,14 @@ export default function BracketView({ results, bracketTeams }: { results: Record
       <div className="overflow-x-auto -mx-1 px-1 pb-2">
         <div className="flex gap-3 min-w-max">
           {ROUND_ORDER.map((stage) => {
-            const matches = knockoutMatches.filter((m) => m.stage === stage);
+            // Stack each round in bracket order (not raw FIFA-number order) so
+            // every match sits vertically centred between its two feeders — the
+            // adjacency IS the tree, so the order has to encode the real
+            // homeFrom/awayFrom links (e.g. R16-1 between R32-2 and R32-5).
+            const order: string[] = BRACKET_DISPLAY_ORDER[stage] || [];
+            const matches = knockoutMatches
+              .filter((m) => m.stage === stage)
+              .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
             if (matches.length === 0) return null;
             return (
               <div key={stage} className="flex flex-col gap-2 w-[150px] sm:w-[170px] shrink-0">

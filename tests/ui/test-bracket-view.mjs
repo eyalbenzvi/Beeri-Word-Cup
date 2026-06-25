@@ -19,7 +19,8 @@ assert(existsMigratedSrc("src/components/BracketView.jsx"), "BracketView compone
 const b = readMigratedSrc("src/components/BracketView.jsx");
 
 assert(/ROUND_ORDER = \["R32", "R16", "QF", "SF", "F"\]/.test(b), "rounds rendered R32 → Final in order");
-assert(/knockoutMatches\.filter\(\(m\) => m\.stage === stage\)/.test(b), "each column lists that round's matches");
+assert(/knockoutMatches\s*\.filter\(\(m\) => m\.stage === stage\)/.test(b), "each column lists that round's matches");
+assert(/BRACKET_DISPLAY_ORDER/.test(b) && /\.sort\(\(a, b\) => order\.indexOf/.test(b), "columns stack in bracket order (feeders adjacent), not raw FIFA order");
 assert(/bracketTeams\[m\.id\]\?\.home/.test(b), "teams resolved from the actual bracket");
 assert(/result\.advancingTeam/.test(b), "advancing side honours the explicit advancing team (penalties)");
 assert(/פנדלים/.test(b), "penalty shootout is labelled");
