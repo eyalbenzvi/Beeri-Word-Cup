@@ -534,6 +534,40 @@ export function getMatchById(matchId) {
   return MATCH_BY_ID[matchId] || null;
 }
 
+// Bracket display order — a post-order (feeders-first) DFS over the knockout
+// tree, from the Final down to the Round of 32.
+//
+// The raw R32_MATCHES / R16_MATCHES / QF_MATCHES arrays are ordered by FIFA
+// match number, which does NOT line up with the visual bracket: R16-1 is fed by
+// R32-2 and R32-5 (not the first two R32 matches), and SF-1 is fed by QF-1 and
+// QF-3 (not adjacent QFs). Rendering each round as a stacked column in raw
+// order therefore mis-pairs the tree — the winner of R32-2 (Germany) visually
+// lines up next to the winner of R32-1, even though it actually meets the
+// winner of R32-5 (France). Walking feeders-first yields, per stage, the order
+// in which matches must be stacked so every parent sits centred between its two
+// feeder matches.
+function computeBracketDisplayOrder() {
+  const byId = Object.fromEntries(knockoutMatches.map((m) => [m.id, m]));
+  const order = {};
+  const seen = new Set();
+  const visit = (id) => {
+    if (!id) return;
+    const m = byId[id];
+    if (!m || seen.has(id)) return;
+    seen.add(id);
+    // Descend into the feeder matches first so leaves (R32) land in bracket
+    // order and each parent is appended only after its two children.
+    visit(m.homeFrom);
+    visit(m.awayFrom);
+    (order[m.stage] ||= []).push(id);
+  };
+  visit("F-1");
+  return order;
+}
+
+// { R32: [...ids], R16: [...], QF: [...], SF: [...], F: [...] } in bracket order.
+export const BRACKET_DISPLAY_ORDER = computeBracketDisplayOrder();
+
 export const STAGES = {
   group: "שלב הבתים",
   R32: "שלב ה-32",
