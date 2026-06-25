@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useState, useEffect } from "react";
 import { getTeamByCode } from "../data/teams";
 import type { Match } from "../data/matches";
 import { preferredScrollBehavior, flipMatchLabelForRtl } from "../utils/helpers";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import MatchAnalysis from "./MatchAnalysis";
 import Score from "./Score";
@@ -103,8 +104,8 @@ function MatchCard({
   const awayCode = (bracketEntry?.away) || match.awayTeam;
   const homeTeam = getTeamByCode(homeCode);
   const awayTeam = getTeamByCode(awayCode);
-  const homeName = homeTeam?.name || "טרם נקבע";
-  const awayName = awayTeam?.name || "טרם נקבע";
+  const homeName = homeTeam?.name || r32SlotLabel(match, "home") || "טרם נקבע";
+  const awayName = awayTeam?.name || r32SlotLabel(match, "away") || "טרם נקבע";
   const predHome = prediction?.homeScore ?? "";
   const predAway = prediction?.awayScore ?? "";
   const hasResult = actualResult && actualResult.homeScore !== null;

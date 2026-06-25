@@ -1,5 +1,6 @@
 import { knockoutMatches, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { useTeamModal } from "./TeamModal";
 import ClickableName from "./ClickableName";
 
@@ -11,7 +12,7 @@ import ClickableName from "./ClickableName";
 // official results. A small third-place card sits below.
 const ROUND_ORDER = ["R32", "R16", "QF", "SF", "F"];
 
-function side(code: string | null, score: number | null, isWinner: boolean, openTeam: (c: string) => void) {
+function side(code: string | null, score: number | null, isWinner: boolean, openTeam: (c: string) => void, placeholder: string | null) {
   const team = code ? getTeamByCode(code) : null;
   return (
     <div className={`flex items-center justify-between gap-1 ${isWinner ? "font-extrabold text-ink" : "text-ink-muted"}`}>
@@ -22,7 +23,7 @@ function side(code: string | null, score: number | null, isWinner: boolean, open
             {team.name}
           </ClickableName>
         ) : (
-          <span className="italic text-ink-light truncate">טרם נקבע</span>
+          <span className="italic text-ink-light truncate">{placeholder || "טרם נקבע"}</span>
         )}
       </span>
       <span className="tabular-nums shrink-0">{score == null ? "" : score}</span>
@@ -43,9 +44,9 @@ function BracketCell({ match, result, derived }: { match: any; result: any; deri
   const koPens = hasResult && result.homeScore === result.awayScore && result.advancingTeam;
   return (
     <div className={`rounded-xl border-2 p-2 text-xs bg-card ${hasResult ? "border-primary/60" : "border-border"}`}>
-      {side(derived.home, hasResult ? result.homeScore : null, winner === derived.home, openTeam)}
+      {side(derived.home, hasResult ? result.homeScore : null, winner === derived.home, openTeam, r32SlotLabel(match, "home"))}
       <div className="h-px bg-border my-1" />
-      {side(derived.away, hasResult ? result.awayScore : null, winner === derived.away, openTeam)}
+      {side(derived.away, hasResult ? result.awayScore : null, winner === derived.away, openTeam, r32SlotLabel(match, "away"))}
       {koPens && (
         <div className="text-xs text-ink-light text-center mt-1">פנדלים</div>
       )}

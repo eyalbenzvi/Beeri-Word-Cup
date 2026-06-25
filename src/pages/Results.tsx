@@ -7,6 +7,7 @@ import MatchConsensusLine from "../components/MatchConsensusLine";
 import BracketView from "../components/BracketView";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { getFilteredMatches } from "../utils/matchFiltering";
 import { CHRONOLOGICAL_DAYS } from "../utils/chronologicalSchedule";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
@@ -24,10 +25,10 @@ function getStageContextLabel(match) {
   return match.stage === "group" ? `בית ${match.group}` : STAGES[match.stage];
 }
 
-function TeamNameCell({ team, code, className }: { team: any; code: string | null; className: string }) {
+function TeamNameCell({ team, code, className, placeholder }: { team: any; code: string | null; className: string; placeholder?: string | null }) {
   const openTeam = useTeamModal();
   if (!team) {
-    return <span className={`${className} text-ink-light italic`}>טרם נקבע</span>;
+    return <span className={`${className} text-ink-light italic`}>{placeholder || "טרם נקבע"}</span>;
   }
   return (
     <ClickableName onClick={() => openTeam(code as string)} className={`${className} text-ink`} title={`פרטי ${team.name}`}>
@@ -80,13 +81,13 @@ function ResultMatchCard({ match, result, bracketTeams, chronological, consensus
       {result ? (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" placeholder={r32SlotLabel(match, "home")} />
             <span className={`text-2xl font-extrabold tabular-nums ${result.homeScore > result.awayScore ? "text-primary" : "text-ink-muted"}`}>
               {result.homeScore}
             </span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" placeholder={r32SlotLabel(match, "away")} />
             <span className={`text-2xl font-extrabold tabular-nums ${result.awayScore > result.homeScore ? "text-primary" : "text-ink-muted"}`}>
               {result.awayScore}
             </span>
@@ -104,11 +105,11 @@ function ResultMatchCard({ match, result, bracketTeams, chronological, consensus
       ) : (
         <div>
           <div className="flex items-center justify-between py-1.5">
-            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" />
+            <TeamNameCell team={homeTeam} code={derived.home} className="text-sm font-bold" placeholder={r32SlotLabel(match, "home")} />
             <span className="text-sm text-ink-light">–</span>
           </div>
           <div className="flex items-center justify-between py-1.5 border-t border-border">
-            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" />
+            <TeamNameCell team={awayTeam} code={derived.away} className="text-sm font-bold" placeholder={r32SlotLabel(match, "away")} />
             <span className="text-sm text-ink-light">–</span>
           </div>
         </div>

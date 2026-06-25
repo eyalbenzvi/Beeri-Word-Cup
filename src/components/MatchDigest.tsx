@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { BLOG } from "../constants/messages";
 
 // How many exact-hit names to show inline above the fold before
@@ -74,8 +75,9 @@ export default function MatchDigest({
   const awayWin = !!result && result.awayScore > result.homeScore;
 
   const stageLabel = STAGES[match.stage] || match.stage;
-  const homeName = home?.name || match.homeFrom || match.thirdFrom || "טרם נקבע";
-  const awayName = away?.name || match.awayFrom || "טרם נקבע";
+  const homeName =
+    home?.name || r32SlotLabel(match, "home") || match.homeFrom || match.thirdFrom || "טרם נקבע";
+  const awayName = away?.name || r32SlotLabel(match, "away") || match.awayFrom || "טרם נקבע";
 
   return (
     <section className="mt-10 pt-8 border-t border-border first:border-t-0 first:pt-0 first:mt-6">

@@ -12,6 +12,7 @@ import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
+import { r32SlotLabel } from "../utils/matchSlot";
 import { calcBracketTeams } from "../utils/bracket";
 import GroupSelector from "./GroupSelector";
 import { LABELS } from "../constants/messages";
@@ -185,7 +186,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="truncate max-w-[40%]">
-                          {homeTeam?.name || "—"}
+                          {homeTeam?.name || r32SlotLabel(match, "home") || "—"}
                         </span>
                         <input
                           type="number"
@@ -207,7 +208,7 @@ function AdminFormEditModal({ formId, form, onClose }) {
                           className="w-10 border-2 border-border rounded-xl text-center"
                         />
                         <span className="truncate max-w-[40%]">
-                          {awayTeam?.name || "—"}
+                          {awayTeam?.name || r32SlotLabel(match, "away") || "—"}
                         </span>
                         <button
                           type="button"

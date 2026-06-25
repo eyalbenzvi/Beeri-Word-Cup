@@ -3,6 +3,7 @@ import Score from "./Score";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedBracket } from "../utils/bracketCache";
+import { r32SlotLabel } from "../utils/matchSlot";
 
 // Compact list of all 104 matches with their (predicted or actual) results,
 // grouped by group letter (A–L) and KO stage. Used by both AllForms (to view
@@ -25,8 +26,8 @@ export function MatchRow({
 }) {
   const home = getTeamByCode(match.homeTeam);
   const away = getTeamByCode(match.awayTeam);
-  const homeName = home?.name || "טרם נקבע";
-  const awayName = away?.name || "טרם נקבע";
+  const homeName = home?.name || r32SlotLabel(match, "home") || "טרם נקבע";
+  const awayName = away?.name || r32SlotLabel(match, "away") || "טרם נקבע";
   const hasScore =
     prediction?.homeScore != null && prediction?.awayScore != null;
 

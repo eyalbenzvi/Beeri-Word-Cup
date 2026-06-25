@@ -4,6 +4,7 @@ import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
 import { getCachedBracket } from "../utils/bracketCache";
+import { r32SlotLabel } from "../utils/matchSlot";
 import {
   formatMatchDateNumeric,
   formatMatchDateShort,
@@ -153,7 +154,7 @@ function MatchRow({ match, actualTeams }) {
               home ? "text-ink" : "text-ink-muted italic"
             }`}
           >
-            <bdi>{home?.name || "טרם נקבע"}</bdi>
+            <bdi>{home?.name || r32SlotLabel(match, "home") || "טרם נקבע"}</bdi>
           </div>
         </div>
         <div className="text-sm text-ink-muted font-black shrink-0">–</div>
@@ -163,7 +164,7 @@ function MatchRow({ match, actualTeams }) {
               away ? "text-ink" : "text-ink-muted italic"
             }`}
           >
-            <bdi>{away?.name || "טרם נקבע"}</bdi>
+            <bdi>{away?.name || r32SlotLabel(match, "away") || "טרם נקבע"}</bdi>
           </div>
         </div>
       </div>

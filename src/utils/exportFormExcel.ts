@@ -2,6 +2,7 @@ import { getCachedBracket, getCachedChampion } from './bracketCache';
 import { groupMatches, knockoutMatches, STAGES } from '../data/matches';
 import { GROUPS, getTeamByCode } from '../data/teams';
 import { formatMatchDateShort, formatMatchClock, getUserTimeZone } from './userTime';
+import { r32SlotLabel } from './matchSlot';
 
 // XLSX RTL note: this version of xlsx applies rightToLeft at workbook level via
 // wb.Workbook.Views[0].RTL. Since all content is Hebrew we set all sheets RTL.
@@ -152,10 +153,10 @@ export async function exportToExcel(form: any): Promise<void> {
       const awayCode = stageTeamEntry?.away || null;
       const homeName = homeCode
         ? (getTeamByCode(homeCode)?.name || homeCode)
-        : 'טרם נקבע';
+        : (r32SlotLabel(match, 'home') || 'טרם נקבע');
       const awayName = awayCode
         ? (getTeamByCode(awayCode)?.name || awayCode)
-        : 'טרם נקבע';
+        : (r32SlotLabel(match, 'away') || 'טרם נקבע');
 
       const isTie =
         pred?.homeScore != null &&
