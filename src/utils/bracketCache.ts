@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { calcBracketTeams, deriveChampion } from "../utils/bracket";
+import { calcBracketTeams, calcGroupStandings, deriveChampion } from "../utils/bracket";
 
 // Separate caches for gated (actual-results) vs ungated (prediction) brackets
 const bracketCache = new Map();
 const bracketGatedCache = new Map();
 const championCache = new Map();
+const standingsCache = new Map();
 
 function getStableKey(matchPredictions: Record<string, any>) {
   const entries = Object.entries(matchPredictions);
@@ -49,6 +50,21 @@ export function getCachedBracket(matches, gatingOnResults = false) {
   return result;
 }
 
+// Cached group standings (ordered arrays per group). Same FNV key + bounded
+// LRU as the bracket caches. Used by the admin team-insights aggregation so
+// per-form group positions aren't recomputed on every render.
+export function getCachedStandings(matches) {
+  const key = getStableKey(matches);
+  if (standingsCache.has(key)) return standingsCache.get(key);
+  const result = calcGroupStandings(matches);
+  standingsCache.set(key, result);
+  if (standingsCache.size > 1000) {
+    const firstKey = standingsCache.keys().next().value;
+    standingsCache.delete(firstKey);
+  }
+  return result;
+}
+
 export function getCachedChampion(matches) {
   const key = getStableKey(matches);
   if (championCache.has(key)) return championCache.get(key);
@@ -84,4 +100,5 @@ export function clearBracketCache() {
   bracketCache.clear();
   bracketGatedCache.clear();
   championCache.clear();
+  standingsCache.clear();
 }

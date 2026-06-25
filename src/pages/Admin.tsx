@@ -17,6 +17,7 @@ import AdminFormsTab from "../components/AdminFormsTab";
 import AdminToolsTab from "../components/AdminToolsTab";
 import AdminSummariesTab from "../components/AdminSummariesTab";
 import AdminQueryTab from "../components/adminQuery/AdminQueryTab";
+import AdminInsightsTab from "../components/AdminInsightsTab";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import PageHeader from "../components/PageHeader";
 import { isSamePlayer, getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
@@ -78,6 +79,7 @@ export default function Admin() {
           { id: "dashboard", label: "סקירה" },
           { id: "forms", label: "טפסים" },
           { id: "results", label: "תוצאות" },
+          { id: "insights", label: "מידע ונתונים" },
           { id: "summaries", label: "בלוג" },
           { id: "topscorer", label: "מלך שערים" },
           { id: "users", label: "משתמשים" },
@@ -118,6 +120,8 @@ export default function Admin() {
       )}
 
       {activeTab === "results" && <AdminResultsTab />}
+
+      {activeTab === "insights" && <AdminInsightsTab />}
 
       {activeTab === "summaries" && <AdminSummariesTab />}
 

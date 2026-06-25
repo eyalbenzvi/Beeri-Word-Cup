@@ -21,7 +21,10 @@ function assert(c, m) {
 
 console.log("=== STATS BAR READABILITY REGRESSION TESTS ===\n");
 
-const stats = readMigratedSrc("src/pages/Stats.jsx", "utf8");
+// The Bar primitive was extracted to a shared component (src/components/
+// VoterList.tsx) so the admin "מידע ונתונים" tab can reuse it. The readability
+// fix lives there now.
+const stats = readMigratedSrc("src/components/VoterList.jsx", "utf8");
 
 // The Bar component decides whether the count fits inside the fill.
 assert(

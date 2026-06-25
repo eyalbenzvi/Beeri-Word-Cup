@@ -179,6 +179,8 @@ run_test "112. Lazy + IndexedDB Resilience (stalled-chunk reload + IDB-lost down
 run_test "113. Public-Fetch Firestore Retry (transient ETIMEDOUT backoff + wiring)" "store/test-public-fetch-retry.mjs" "no"
 run_test "114. Firestore Cache Recovery (b815 bypass: memory cache + IDB wipe + reload guard)" "store/test-firestore-cache-recovery.mjs" "no"
 run_test "115. Best-Case Admin Toggle (settings gate + note + warning + wiring)" "ui/test-best-case-toggle.mjs" "no"
+run_test "116. Team Prediction Stats (per-team admin aggregator: positions/rounds/champion)" "data/test-team-prediction-stats.mjs" "yes"
+run_test "117. Admin Insights Tab (מידע ונתונים: team + knockout breakdowns, shared components)" "ui/test-admin-insights.mjs" "no"
 
 echo ""
 echo "==========================================="

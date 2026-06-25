@@ -18,11 +18,19 @@ function assert(c, m) {
 console.log("=== STATS GUESS DETAIL (UI WIRING) REGRESSION TESTS ===\n");
 
 const stats = readMigratedSrc("src/pages/Stats.jsx", "utf8");
+// The Bar / VoterList / VoterBarList primitives were extracted to a shared
+// component so the admin "מידע ונתונים" tab can reuse them without duplication.
+const shared = readMigratedSrc("src/components/VoterList.jsx", "utf8");
 
 // Aggregation is delegated to the shared, unit-tested helper.
 assert(
   /import \{ aggregateMatchPredictions \} from "\.\.\/utils\/matchPredictionStats"/.test(stats),
   "Stats imports the aggregateMatchPredictions helper",
+);
+// The voter-list primitives are imported from the shared component.
+assert(
+  /import \{ Bar, VoterList, VoterBarList \} from "\.\.\/components\/VoterList"/.test(stats),
+  "Stats imports the shared voter-list primitives",
 );
 assert(
   /aggregateMatchPredictions\(forms,\s*selectedMatch\b/.test(stats),
@@ -36,13 +44,13 @@ assert(
   "expanded accordion state resets when selectedMatch changes",
 );
 
-// The voter list component renders names and scrolls for long lists.
+// The shared voter list component renders names and scrolls for long lists.
 assert(
-  /function VoterList/.test(stats) && /max-h-48 overflow-y-auto/.test(stats),
+  /function VoterList/.test(shared) && /max-h-48 overflow-y-auto/.test(shared),
   "VoterList renders a scrollable list of form names",
 );
 assert(
-  /אין נתונים/.test(stats),
+  /אין נתונים/.test(shared),
   "VoterList has an empty-state fallback",
 );
 
@@ -68,7 +76,7 @@ assert(
 
 // Voter form names deep-link to the form's view via ClickableName + navigate.
 assert(
-  /ClickableName[\s\S]{0,120}?navigate\("leaderboard", \{ form: v\.formId \}\)/.test(stats),
+  /ClickableName[\s\S]{0,120}?navigate\("leaderboard", \{ form: v\.formId \}\)/.test(shared),
   "voter form names link to that form in the leaderboard",
 );
 
@@ -82,7 +90,7 @@ assert(
 
 // Shared clickable-bar component drives both team breakdowns.
 assert(
-  /function VoterBarList/.test(stats) && /<VoterList voters=\{item\.voters\}/.test(stats),
+  /function VoterBarList/.test(shared) && /<VoterList voters=\{item\.voters\}/.test(shared),
   "VoterBarList renders clickable bars that expand to their voters",
 );
 
