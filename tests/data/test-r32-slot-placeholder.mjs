@@ -77,6 +77,20 @@ for (const path of CONSUMERS) {
   assert(/r32SlotLabel/.test(src), `${path} imports and uses r32SlotLabel`);
 }
 
+// ---- Stats "נתונים" tab resolves qualified teams before the placeholder ------
+// A team that already qualified for an R32 slot must show its real name (like
+// the Results tab), not the "1A" placeholder. Stats does this by resolving
+// knockout slots from the actual (results-gated) bracket before falling back.
+const stats = readMigratedSrc("src/pages/Stats.tsx");
+assert(
+  /m\.stage !== "group" && actualBracketTeams\?\.\[m\.id\]/.test(stats),
+  "Stats match list resolves knockout slots from the actual bracket",
+);
+assert(
+  /actualBracketTeams\?\.\[matchStats\.match\.id\]/.test(stats),
+  "Stats selected-match header resolves from the actual bracket",
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   failures.forEach((f) => console.error("FAILED: " + f));
