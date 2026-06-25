@@ -10,13 +10,13 @@ import { getCachedBracket } from "../utils/bracketCache";
 // scenario's results). The two callers share identical layout so consumers
 // see a consistent "results form" shape regardless of source.
 
-type Prediction = {
+export type Prediction = {
   homeScore?: number | null;
   awayScore?: number | null;
   advancingTeam?: string;
 };
 
-function MatchRow({
+export function MatchRow({
   match,
   prediction,
 }: {
