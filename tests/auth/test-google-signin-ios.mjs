@@ -1,15 +1,18 @@
 // Regression tests for the iOS Google-sign-in crash fix batch.
 //
-// Real-world bug: an iPhone user could not sign in with Google on Chrome iOS
-// (the page crashed: "לא ניתן לפתוח את הדף") but COULD on Firefox iOS. Root
-// cause: every iOS browser is WebKit; signInWithPopup on Chrome iOS crashes the
-// renderer mid-flow, and the cross-origin (firebaseapp.com) OAuth handler trips
-// WebKit storage partitioning. Two fixes:
-//   A. Detect iOS (incl. CriOS/FxiOS + iPadOS-as-Mac) and go straight to
-//      signInWithRedirect, never the popup path.
+// Real-world bug: every iOS browser is WebKit; signInWithPopup on Chrome iOS
+// crashes the renderer mid-flow, and the cross-origin (firebaseapp.com) OAuth
+// handler trips WebKit storage partitioning. #236's batch had two parts:
+//   A. (NOW REVERTED — stopgap) #236 routed all iOS to signInWithRedirect to
+//      dodge the Chrome-iOS popup crash. But signInWithRedirect ALSO fails on
+//      iOS WebKit with a cross-origin authDomain (firebase-js-sdk #7824) — it
+//      bounces users back logged out — which regressed the iOS-Safari majority.
+//      Until the same-origin authDomain cutover (B) is activated, iOS is back
+//      on the popup flow that worked before #236. Section A pins that revert.
 //   B. authDomain is read from VITE_FIREBASE_AUTH_DOMAIN (default = the current
 //      firebaseapp.com) so the same-origin cutover is a reversible env flip,
-//      backed by a Netlify /__/auth/* + /__/firebase/* proxy.
+//      backed by a Netlify /__/auth/* + /__/firebase/* proxy. (Unchanged — this
+//      is the REAL fix; once live, redirect-on-iOS in A should be restored.)
 //
 // Project convention: static source audits + behavioral simulations of the
 // exact shipped logic (see test-sentry-error-fixes #2 / test-stuck-loading #14).
@@ -24,55 +27,51 @@ const SRC = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 
 console.log("=== iOS GOOGLE SIGN-IN REGRESSION TESTS ===\n");
 
-// ============ A. iOS detection + redirect-first ============
-console.log("--- A. signInWithGoogle routes iOS to redirect, not popup ---");
+// ============ A. iOS stopgap revert: popup, NOT redirect ============
+console.log("--- A. signInWithGoogle uses popup on iOS again (stopgap revert of #236) ---");
 {
+  // STOPGAP: #236 forced ALL iOS to signInWithRedirect, but redirect silently
+  // fails on iOS WebKit while authDomain is the cross-origin firebaseapp.com
+  // (Safari storage partitioning — firebase-js-sdk #7824), bouncing users back
+  // logged out. Until the same-origin authDomain cutover is live, iOS falls
+  // back to the popup flow that worked before #236. Only true in-app browsers
+  // (WhatsApp/Instagram/etc.) still force redirect (they can't open popups).
   const src = SRC("src/firebase.ts");
 
-  assert(/export function isIOS\(/.test(src), "firebase.ts exports an isIOS() detector");
+  // isIOS() is deliberately RETAINED (the proxy/cutover tests reference it, and
+  // redirect-on-iOS returns once the cutover is active).
+  assert(/export function isIOS\(/.test(src), "firebase.ts still exports the isIOS() detector (kept for the cutover)");
   assert(/iPad\|iPhone\|iPod/.test(src), "isIOS matches iPhone/iPad/iPod user agents");
   assert(/MacIntel/.test(src) && /maxTouchPoints/.test(src),
     "isIOS also catches iPadOS-masquerading-as-Mac (MacIntel + touch points)");
 
-  // The decision MUST be made up front (isInAppBrowser() || isIOS()) — the old
-  // popup-then-catch fallback can't help because the iOS renderer crashes
-  // before any catchable error is thrown.
-  assert(/if \(isInAppBrowser\(\) \|\| isIOS\(\)\)/.test(src),
-    "signInWithGoogle short-circuits to redirect for in-app AND iOS browsers");
-
+  // The sign-in guard must NO LONGER force redirect on iOS — only in-app.
+  assert(/if \(isInAppBrowser\(\)\) \{/.test(src),
+    "signInWithGoogle forces redirect only for in-app browsers (iOS reverted to popup)");
   const fn = src.slice(src.indexOf("export async function signInWithGoogle"));
-  const guardIdx = fn.indexOf("isIOS()");
-  const popupIdx = fn.indexOf("signInWithPopup");
-  assert(guardIdx > -1 && popupIdx > -1 && guardIdx < popupIdx,
-    "the iOS guard precedes signInWithPopup (popup never reached on iOS)");
+  const guardLine = fn.slice(0, fn.indexOf("signInWithRedirect"));
+  assert(!/\|\| isIOS\(\)/.test(guardLine),
+    "the up-front redirect guard does NOT include isIOS() anymore (the regressing line is gone)");
+  // The comment must document WHY (so a future reader doesn't 'fix' it back blindly).
+  assert(/cutover/i.test(fn) && /7824/.test(fn),
+    "the revert is documented (cutover + firebase-js-sdk #7824) so it isn't reverted blindly");
 
-  // Behavioral: replicate the shipped isIOS() and the routing decision.
-  function isIOS(nav) {
-    const ua = nav.userAgent || "";
-    if (/iPad|iPhone|iPod/.test(ua)) return true;
-    return nav.platform === "MacIntel" && (nav.maxTouchPoints || 0) > 1;
-  }
+  // Behavioral: replicate the NEW routing decision (in-app → redirect; everything
+  // else, including iOS, → popup).
   function isInApp(nav) {
     return /FBAN|FBAV|Instagram|WhatsApp|Line|wv|WebView/i.test(nav.userAgent || "");
   }
-  const decide = (nav) => (isInApp(nav) || isIOS(nav) ? "redirect" : "popup");
+  const decide = (nav) => (isInApp(nav) ? "redirect" : "popup");
 
-  // The exact reported browser (Chrome iOS = CriOS) must take the redirect path.
-  const chromeIOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0 Mobile/15E148 Safari/604.1", platform: "iPhone", maxTouchPoints: 5 };
-  const firefoxIOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/130.0 Mobile/15E148 Safari/605.1.15", platform: "iPhone", maxTouchPoints: 5 };
   const safariIOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", platform: "iPhone", maxTouchPoints: 5 };
-  const iPadOS = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 };
-  const desktopChrome = { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36", platform: "Win32", maxTouchPoints: 0 };
-  const desktopMac = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36", platform: "MacIntel", maxTouchPoints: 0 };
+  const chromeIOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0 Mobile/15E148 Safari/604.1", platform: "iPhone", maxTouchPoints: 5 };
+  const whatsappIOS = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/WhatsApp]", platform: "iPhone", maxTouchPoints: 5 };
   const androidChrome = { userAgent: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36", platform: "Linux armv8l", maxTouchPoints: 5 };
 
-  assert(decide(chromeIOS) === "redirect", "Chrome iOS (the reported crash) → redirect");
-  assert(decide(firefoxIOS) === "redirect", "Firefox iOS → redirect");
-  assert(decide(safariIOS) === "redirect", "Safari iOS → redirect");
-  assert(decide(iPadOS) === "redirect", "iPadOS (Mac UA + touch) → redirect");
-  assert(decide(desktopChrome) === "popup", "Desktop Chrome keeps the popup (better UX)");
-  assert(decide(desktopMac) === "popup", "Desktop Mac (no touch) keeps the popup — NOT misdetected as iPad");
-  assert(decide(androidChrome) === "popup", "Android Chrome keeps the popup (not WebKit)");
+  assert(decide(safariIOS) === "popup", "Safari iOS → popup (the path that worked before #236)");
+  assert(decide(chromeIOS) === "popup", "Chrome iOS → popup (stopgap; redirect was broken cross-origin too)");
+  assert(decide(whatsappIOS) === "redirect", "In-app WhatsApp browser still → redirect (can't open popups)");
+  assert(decide(androidChrome) === "popup", "Android Chrome keeps the popup (unchanged)");
 }
 
 // ============ B. authDomain via env var + Netlify proxy ============
