@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useAllPredictions,
   useMatchResults,
@@ -29,7 +29,7 @@ import {
   FAMILY_EYEBROW,
   MAX_SELECTED_METRICS,
   computeAdvancingCounts,
-  computeExactByStage,
+  computeMatchupHitsByStage,
   computeFormMetricValues,
   sortFormMetricRows,
 } from "../utils/formMetrics";
@@ -297,9 +297,10 @@ function KnockoutInsights({ forms }: { forms: any[] }) {
   );
 }
 
-// Forms analytics table. Every metric reuses the leaderboard scoring core
-// (so "דירוג"/"ניקוד" match the public board exactly); the per-stage team and
-// exact-match counts come from the pure derivations in formMetrics.ts. The
+// Forms analytics table. דירוג/ניקוד/מדויקים/הכרעות come from the leaderboard
+// scoring core (so they match the public board); the per-stage team-advancement
+// and correct-matchup columns are derived from the BRACKET (same results-gated
+// bracket the Results tab uses), via the pure helpers in formMetrics.ts. The
 // admin picks up to MAX_SELECTED_METRICS columns and sorts by any of them.
 function FormsInsights() {
   const allPredictions = useAllPredictions();
@@ -307,7 +308,7 @@ function FormsInsights() {
   const users = useUserDirectory();
   const actualBonuses = useActualBonuses();
 
-  const { rankedLeaderboard, formBracketMap, actualDerivedAdvancing } =
+  const { rankedLeaderboard, formBracketMap } =
     useLeaderboardComputed(results, allPredictions, users, actualBonuses);
 
   // Default columns: rank (the natural board order) + points. The first
@@ -317,22 +318,30 @@ function FormsInsights() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [query, setQuery] = useState("");
 
-  // Resolve a match's stage exactly as scoring.ts does (`actual.stage ||
-  // "group"`) so the per-stage exact columns can never bucket a hit into a
-  // stage that scoring scored differently. Every matchScores key comes from
-  // `results`, so this lookup always hits.
-  const stageOf = useCallback(
-    (matchId: string) => results[matchId]?.stage || "group",
+  // The actual bracket, gated only on real results (identical to the Results
+  // tab / KnockoutInsights). The per-stage team + matchup metrics read from
+  // THIS — not from scoring's advancing derivation — so they reflect the live
+  // bracket and don't wait for the whole group stage to finish.
+  const actualBracketTeams = useMemo(
+    () => getCachedBracket(results, true),
     [results],
+  );
+  const actualAdvancing = useMemo(
+    () => deriveAdvancingTeams(actualBracketTeams),
+    [actualBracketTeams],
   );
 
   const rows = useMemo(() => {
     return rankedLeaderboard.map((entry) => {
+      const bracketInfo = formBracketMap[entry.formId];
       const advancingCounts = computeAdvancingCounts(
-        formBracketMap[entry.formId]?.advancing,
-        actualDerivedAdvancing,
+        bracketInfo?.advancing,
+        actualAdvancing,
       );
-      const exactByStage = computeExactByStage(entry.matchScores, stageOf);
+      const matchupHits = computeMatchupHitsByStage(
+        bracketInfo?.predBracket,
+        actualBracketTeams,
+      );
       const values = computeFormMetricValues(
         {
           rank: entry.rank,
@@ -341,7 +350,7 @@ function FormsInsights() {
           outcomeCount: entry.outcomeCount,
         },
         advancingCounts,
-        exactByStage,
+        matchupHits,
       );
       const owner = users[entry.userId];
       const ownerName = owner?.firstName
@@ -357,7 +366,7 @@ function FormsInsights() {
         values,
       };
     });
-  }, [rankedLeaderboard, formBracketMap, actualDerivedAdvancing, users, stageOf]);
+  }, [rankedLeaderboard, formBracketMap, actualAdvancing, actualBracketTeams, users]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -463,7 +472,8 @@ function FormsInsights() {
           </p>
         )}
         <p className="text-2xs text-ink-muted font-bold">
-          עלו = ניחושי קבוצות שהגיעו לשלב · מדויק = תוצאות מדויקות בשלב
+          עלו = קבוצות שניחשתם נכון שיגיעו לשלב · מדויק = משחקים שניחשתם נכון את
+          זהות שתי הקבוצות בהם
         </p>
       </div>
 
