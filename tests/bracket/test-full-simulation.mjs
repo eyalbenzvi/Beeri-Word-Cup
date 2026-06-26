@@ -178,17 +178,20 @@ for (const m of groupMatches) {
 }
 const partialBracket = calcBracketTeams(partialRes);
 const partialAdv = deriveActualAdvancing(partialBracket, partialRes);
-// Early-certainty: a COMPLETED group's winner + runner-up are clinched into R32
-// the moment that group ends — no need to wait for all 12 groups. Groups A–F are
-// done here (6 groups × {1st, 2nd} = 12 teams), G–L are unplayed.
-assert(partialAdv.R32.length === 12, `Partial: 12 clinched position teams from 6 done groups, got ${partialAdv.R32.length}`);
-// Every credited team must be the winner or runner-up of a completed group, never
-// a third-placed team (no third has clinched: all six groups played identically,
-// so their thirds tie, and six unplayed groups could still overtake any of them).
-for (const code of partialAdv.R32) {
-  const g = code && Object.entries(GROUPS).find(([, ts]) => ts.some((t) => t.code === code))?.[0];
-  assert(["A","B","C","D","E","F"].includes(g), `Partial: ${code} belongs to a completed group`);
+// R32 advancing points are NOT awarded until the ENTIRE group stage is over.
+// Here only groups A–F are complete (G–L unplayed), so no R32 advancer is
+// credited yet — even teams already mathematically clinched stay un-credited
+// until the last group match has been played.
+assert(partialAdv.R32.length === 0, `Partial: no R32 advancers credited before all groups finish, got ${partialAdv.R32.length}`);
+
+// Once ALL 12 groups are complete, the full 32-team R32 field is credited.
+const fullRes = {};
+for (const m of groupMatches) {
+  fullRes[m.id] = { homeScore: 1, awayScore: 0, stage: "group", group: m.group };
 }
+const fullBracket = calcBracketTeams(fullRes);
+const fullAdv = deriveActualAdvancing(fullBracket, fullRes);
+assert(fullAdv.R32.length === 32, `All groups complete: full 32-team R32 field, got ${fullAdv.R32.length}`);
 
 // ---- 8. Leaderboard sort ----
 console.log("\n--- 8. Leaderboard sort ---");

@@ -452,28 +452,29 @@ export function deriveAdvancingTeams(bracketTeams: Record<string, any>) {
 export function deriveActualAdvancing(bracketTeams, actualResults) {
   const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
 
-  // R32 advancers are credited the moment they are MATHEMATICALLY CLINCHED — not
-  // gated on the whole group stage finishing:
-  //   • A completed group's winner (1st) and runner-up (2nd) are guaranteed into
-  //     R32 the instant their own group ends.
-  //   • A third-placed team is added once it is guaranteed to be among the best 8
-  //     (computeThirdPlaceCertainty — sound, never a false positive), even if its
-  //     exact R32 slot is not yet pinned. Advancing-points scoring keys on R32 set
-  //     membership only, so the slot is irrelevant here.
-  // When all 12 groups are complete this yields exactly the full 32-team set, so
-  // final scoring is unchanged — the relaxation only surfaces clinches earlier.
+  // R32 advancing POINTS are awarded only once the ENTIRE group stage is over —
+  // never before every group match has been played. This is deliberate: the R32
+  // field (12 winners + 12 runners-up + 8 best thirds) is not truly settled until
+  // the last group kicks off, and crediting "mathematically clinched" teams early
+  // surfaced points before the group stage finished, which the game does not want.
+  // Knockout-round advancing (R16/QF/SF/F) is gated separately below on its own
+  // feeding matches being played, so it is unaffected by this group-stage gate.
   const standings = calcGroupStandings(actualResults);
-  const pushR32 = (code: string | null | undefined) => {
-    if (code && !advancing.R32.includes(code)) advancing.R32.push(code);
-  };
-  for (const group of Object.keys(standings)) {
-    if (!isGroupComplete(group, actualResults)) continue;
-    const sorted = standings[group];
-    pushR32(sorted?.[0]?.code); // group winner
-    pushR32(sorted?.[1]?.code); // runner-up
+  const allGroupsComplete = Object.keys(standings).every((group) =>
+    isGroupComplete(group, actualResults),
+  );
+  if (allGroupsComplete) {
+    const pushR32 = (code: string | null | undefined) => {
+      if (code && !advancing.R32.includes(code)) advancing.R32.push(code);
+    };
+    for (const group of Object.keys(standings)) {
+      const sorted = standings[group];
+      pushR32(sorted?.[0]?.code); // group winner
+      pushR32(sorted?.[1]?.code); // runner-up
+    }
+    const certainty = computeThirdPlaceCertainty(actualResults, standings);
+    for (const code of certainty.qualifiedThirds) pushR32(code);
   }
-  const certainty = computeThirdPlaceCertainty(actualResults, standings);
-  for (const code of certainty.qualifiedThirds) pushR32(code);
 
   for (const [matchId, t] of Object.entries(bracketTeams)) {
     const teams = t as any;
