@@ -4,7 +4,10 @@
 //
 // Run with the .ts-aware loader (registered "yes" in run-all.sh).
 
-import { aggregateMatchPredictions } from "../../src/utils/matchPredictionStats.ts";
+import {
+  aggregateMatchPredictions,
+  groupVotersByAdvancing,
+} from "../../src/utils/matchPredictionStats.ts";
 
 let passed = 0, failed = 0;
 const failures = [];
@@ -185,6 +188,70 @@ const names = (voters) => voters.map((v) => v.name).join();
   assert(
     s.outcomeVoters.draw[0].advancingTeam == null,
     "group-match draw never carries advancingTeam (self-enforcing gate, not UI-dependent)",
+  );
+}
+
+// ---- 11. groupVotersByAdvancing groups by team, ordered by crowd size ----
+{
+  const v = (name, team) => ({ formId: `id-${name}`, name, advancingTeam: team });
+  const voters = [
+    v("A", "ISR"),
+    v("B", "ARG"),
+    v("C", "ISR"),
+    v("D", "ISR"),
+    v("E", "ARG"),
+  ];
+  const { groups, ungrouped } = groupVotersByAdvancing(voters);
+  assert(ungrouped.length === 0, "all qualified voters are grouped (none left ungrouped)");
+  assert(groups.length === 2, "one group per distinct advancing team");
+  // ISR has 3, ARG has 2 → ISR first (count desc).
+  assert(groups[0].team === "ISR" && groups[0].count === 3, "biggest tie-group (ISR×3) ranked first");
+  assert(groups[1].team === "ARG" && groups[1].count === 2, "runner-up tie-group (ARG×2) ranked second");
+  // Each group lists exactly its own voters, consecutively.
+  assert(
+    groups[0].voters.map((x) => x.name).join() === "A,C,D",
+    "ISR group lists its three predictors consecutively",
+  );
+  assert(
+    groups[0].count === groups[0].voters.length,
+    "group count equals its voter-list length (single source of truth)",
+  );
+}
+
+// ---- 12. Equal-size groups break ties by team code (deterministic order) ----
+{
+  const v = (name, team) => ({ formId: `id-${name}`, name, advancingTeam: team });
+  const { groups } = groupVotersByAdvancing([v("A", "ZZZ"), v("B", "AAA")]);
+  assert(
+    groups.map((g) => g.team).join() === "AAA,ZZZ",
+    "equal-count groups ordered by team code for a stable, testable list",
+  );
+}
+
+// ---- 13. Voters without a qualifier are separated, not dropped ----
+{
+  const withTeam = { formId: "id-T", name: "T", advancingTeam: "ISR" };
+  const noTeam = { formId: "id-N", name: "N" }; // e.g. a group-stage draw
+  const { groups, ungrouped } = groupVotersByAdvancing([withTeam, noTeam]);
+  assert(groups.length === 1 && groups[0].team === "ISR", "only qualified voters form groups");
+  assert(
+    ungrouped.length === 1 && ungrouped[0].name === "N",
+    "voters without advancingTeam are returned as ungrouped, never lost",
+  );
+}
+
+// ---- 14. Aggregator output feeds the grouper end-to-end ----
+{
+  const tie = (name, adv) => ({
+    formId: `id-${name}`,
+    formName: name,
+    matches: { [MID]: { homeScore: 1, awayScore: 1, advancingTeam: adv } },
+  });
+  const s = aggregateMatchPredictions([tie("A", "ISR"), tie("B", "ISR"), tie("C", "ARG")], MID);
+  const { groups } = groupVotersByAdvancing(s.outcomeVoters.draw);
+  assert(
+    groups[0].team === "ISR" && groups[0].count === 2 && groups[1].team === "ARG",
+    "draw bucket from the aggregator groups straight into the advancing breakdown",
   );
 }
 

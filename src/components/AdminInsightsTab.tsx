@@ -16,7 +16,7 @@ import {
 } from "../utils/teamPredictionStats";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter } from "../utils/matchPredictionStats";
-import { VoterList, VoterBarList } from "./VoterList";
+import { VoterList, VoterBarList, AdvancingVoterBreakdown } from "./VoterList";
 import EmptyState from "./EmptyState";
 
 // Admin "מידע ונתונים" tab. Two analyses over the submitted forms:
@@ -244,6 +244,16 @@ function KnockoutInsights({ forms }: { forms: any[] }) {
               total={forms.length}
             />
           </div>
+
+          {/* Tie predictors split by the team they advance on penalties */}
+          {matchStats.stats.draw > 0 && (
+            <div className="border-t-2 border-border pt-3 mb-4">
+              <p className="text-sm font-extrabold text-ink mb-2">
+                תיקו — מי עולה? ({matchStats.stats.draw})
+              </p>
+              <AdvancingVoterBreakdown voters={matchStats.stats.outcomeVoters.draw} />
+            </div>
+          )}
 
           {/* Predicted-score distribution among those forms */}
           <div className="border-t-2 border-border pt-3">

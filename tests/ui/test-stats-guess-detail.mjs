@@ -29,7 +29,7 @@ assert(
 );
 // The voter-list primitives are imported from the shared component.
 assert(
-  /import \{ Bar, VoterList, VoterBarList \} from "\.\.\/components\/VoterList"/.test(stats),
+  /import \{ Bar, VoterList, VoterBarList, AdvancingVoterBreakdown \} from "\.\.\/components\/VoterList"/.test(stats),
   "Stats imports the shared voter-list primitives",
 );
 assert(
@@ -60,8 +60,8 @@ assert(
   "home-win card toggles its voter accordion",
 );
 assert(
-  /expanded === "outcome:draw"[\s\S]{0,200}?VoterList voters=\{matchStats\.outcomeVoters\.draw\}/.test(stats),
-  "draw accordion panel renders the draw voters",
+  /expanded === "outcome:draw"[\s\S]{0,200}?AdvancingVoterBreakdown voters=\{matchStats\.outcomeVoters\.draw\}/.test(stats),
+  "draw accordion panel renders the tie-advancement breakdown over the draw voters",
 );
 assert(
   /expanded === "outcome:away"[\s\S]{0,200}?VoterList voters=\{matchStats\.outcomeVoters\.away\}/.test(stats),

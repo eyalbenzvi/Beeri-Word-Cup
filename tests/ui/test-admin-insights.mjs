@@ -53,7 +53,8 @@ assert(
 );
 // --- Knockout-tie qualifier is surfaced for every voter (Stats + Admin) ---
 assert(
-  /v\.advancingTeam && <AdvancingChip/.test(shared) &&
+  /showAdvancingChip && v\.advancingTeam && \(/.test(shared) &&
+    /<AdvancingChip/.test(shared) &&
     /function AdvancingChip/.test(shared),
   "shared VoterList renders the advancing-team chip for knockout-tie voters",
 );
@@ -61,10 +62,30 @@ assert(
   /getTeamByCode/.test(shared) && /from "\.\.\/data\/teams"/.test(shared),
   "AdvancingChip resolves the advancing team's flag/name from the team data",
 );
+// --- Tie predictors grouped by advancing team, reusing VoterBarList (DRY) ---
+assert(
+  /export function AdvancingVoterBreakdown/.test(shared) &&
+    /groupVotersByAdvancing/.test(shared),
+  "VoterList exports AdvancingVoterBreakdown built on the shared grouping helper",
+);
+assert(
+  /<VoterBarList items=\{items\} total=\{total\} showAdvancingChip=\{false\}/.test(shared),
+  "the breakdown renders one bar per advancing team via the shared VoterBarList (no per-row chip duplication)",
+);
+// Admin surfaces a dedicated tie-advancement section over the draw bucket.
+assert(
+  /תיקו — מי עולה\?/.test(tab) &&
+    /<AdvancingVoterBreakdown voters=\{matchStats\.stats\.outcomeVoters\.draw\}/.test(tab),
+  "AdminInsightsTab shows a 'תיקו — מי עולה?' breakdown over the draw voters",
+);
+assert(
+  /matchStats\.stats\.draw > 0/.test(tab),
+  "the tie-advancement section is gated on there being tie predictions",
+);
 
 // --- Tab reuses shared aggregators + components instead of duplicating ---
 assert(
-  /import \{ VoterList, VoterBarList \} from "\.\/VoterList"/.test(tab),
+  /import \{ VoterList, VoterBarList, AdvancingVoterBreakdown \} from "\.\/VoterList"/.test(tab),
   "AdminInsightsTab imports the shared voter-list components",
 );
 assert(
