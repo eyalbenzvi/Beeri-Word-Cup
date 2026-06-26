@@ -560,7 +560,10 @@ function FormsInsights() {
             })}
           </div>
 
-          <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+          {/* No nested scroller: the rows flow in the app-shell's single
+              inner scroll container (#app-scroll, since #253), like the sibling
+              נבחרות/נוקאאוט views. content-visibility keeps long lists cheap. */}
+          <div className="space-y-1">
             {sortedRows.map((r) => (
               <div
                 key={r.formId}
