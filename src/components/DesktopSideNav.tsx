@@ -19,7 +19,7 @@ export default function DesktopSideNav({ items, currentPage, onNavigate, user })
 
   return (
     <aside
-      className="hidden xl:flex xl:flex-col xl:gap-1 xl:sticky xl:top-[5.5rem] xl:self-start xl:pt-2"
+      className="hidden xl:flex xl:flex-col xl:gap-1 xl:sticky xl:top-4 xl:self-start xl:pt-2"
       aria-label="ניווט ראשי"
     >
       <nav className="flex flex-col gap-1">

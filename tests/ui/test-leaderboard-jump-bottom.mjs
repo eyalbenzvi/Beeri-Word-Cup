@@ -18,6 +18,11 @@ console.log("=== LEADERBOARD JUMP-TO-BOTTOM TESTS ===\n");
 
 const lb = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 const btn = readMigratedSrc("src/components/ScrollToBottomButton.jsx", "utf8");
+// Scroll is routed through the #app-scroll container via the appScroll helper
+// (the document/body no longer scrolls). The passive + resize + cleanup
+// listener guarantees now live in appScroll, with the button opting into the
+// resize tick via onAppScroll(evaluate, { resize: true }).
+const appScroll = readMigratedSrc("src/utils/appScroll.js", "utf8");
 
 // --- 1. ScrollToBottomButton component contract --------------------------
 
@@ -34,16 +39,16 @@ assert(
   "jump-to-bottom uses a downward chevron (mirror of back-to-top)",
 );
 assert(
-  /\{ passive: true \}/.test(btn),
-  "scroll listener is passive (no scroll jank on mobile)",
+  /\{ passive: true \}/.test(appScroll),
+  "appScroll scroll listener is passive (no scroll jank on mobile)",
 );
 assert(
-  /removeEventListener\("scroll"/.test(btn) && /removeEventListener\("resize"/.test(btn),
-  "scroll + resize listeners are both cleaned up on unmount",
+  /removeEventListener\(\s*["']scroll["']/.test(appScroll) && /removeEventListener\(\s*["']resize["']/.test(appScroll),
+  "appScroll cleans up scroll + resize listeners (button returns its unsubscribe)",
 );
 assert(
-  /addEventListener\("resize"/.test(btn),
-  "listens on resize too — 'show more' growing the list emits no scroll event",
+  /onAppScroll\(\s*evaluate\s*,\s*\{\s*resize:\s*true\s*\}\)/.test(btn),
+  "jump-to-bottom listens on resize too — 'show more' growing the list emits no scroll event",
 );
 assert(
   /requestAnimationFrame/.test(btn),

@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
     <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%2358CC02'/><text x='50%25' y='50%25' text-anchor='middle' dominant-baseline='central' font-size='130'>⚽</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover exposes env(safe-area-inset-*) so the frozen
+         header/footer can pad around the notch, status bar and Android
+         gesture bar (otherwise the bottom-nav labels hide behind it).
+         interactive-widget=resizes-content: the app shell is height:100dvh;
+         overflow:hidden, so the soft keyboard must SHRINK the layout viewport
+         (and thus 100dvh / the inner #app-scroll) instead of overlaying it —
+         otherwise the score inputs at the bottom of a form could be trapped
+         behind the keyboard with no way to scroll them into view. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#58CC02" />
     <link rel="preconnect" href="https://firestore.googleapis.com" />
     <link rel="preconnect" href="https://apis.google.com" />

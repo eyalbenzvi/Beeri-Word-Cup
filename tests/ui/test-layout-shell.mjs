@@ -31,9 +31,16 @@ assert(!/<main[^>]*max-w-4xl/.test(layoutSrc), "main element is NOT capped at ma
 assert(/xl:hidden/.test(layoutSrc), "xl:hidden applied somewhere (hamburger + top tabs)");
 
 // --- Bottom-nav gated xl:hidden (available on mobile + tablet, hidden on desktop) ---
+// The nav is now a FROZEN flex child of the app shell (not position:fixed): it
+// sits outside #app-scroll so the mobile URL bar can't push it behind the
+// gesture bar. It must still be gated xl:hidden and pad the bottom safe-area.
 assert(
-  /xl:hidden/.test(layoutSrc) && /fixed bottom-0/.test(layoutSrc),
-  "bottom-nav present and gated xl:hidden (shown on mobile+tablet, replaced by side nav on xl)"
+  /<nav[^>]*xl:hidden/.test(layoutSrc) && /<nav[^>]*flex-shrink-0/.test(layoutSrc),
+  "bottom-nav present, gated xl:hidden, and a frozen flex child (flex-shrink-0)"
+);
+assert(
+  /<nav[^>]*safe-area-bottom/.test(layoutSrc),
+  "bottom-nav pads the bottom safe-area (clears the gesture bar)"
 );
 
 // --- DesktopSideNav component exists ---

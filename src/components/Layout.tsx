@@ -36,11 +36,20 @@ export default function Layout({ children, rightRail = null }) {
   if (user?.isAdmin) allNavItems.push({ id: "admin", label: "ניהול", Icon: Settings });
 
   return (
-    <div className="bg-bg">
-      {/* Connectivity indicator — renders nothing while online. */}
+    // App shell: a fixed-height (100dvh) flex column. The header + bottom-nav
+    // are flex children OUTSIDE the scroll container, so they are frozen on
+    // every platform; only #app-scroll scrolls. Keeping the document itself
+    // non-scrolling stops the mobile URL bar from collapsing mid-scroll, which
+    // is what used to clip the header and hide the nav behind the gesture bar.
+    // safe-area-top is on the shell (not the header) so the single top inset
+    // is consumed once above whichever element is first — the OfflineBanner
+    // when offline, otherwise the header — with no double padding.
+    <div className="app-shell bg-bg safe-area-top">
+      {/* Connectivity indicator — renders nothing while online. Part of the
+          frozen top chrome so an offline user always sees it. */}
       <OfflineBanner />
-      {/* Header */}
-      <header className="header-duo sticky top-0 z-50">
+      {/* Frozen header */}
+      <header className="header-duo z-50 flex-shrink-0 safe-area-x">
         <div className="max-w-7xl xl:max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Hamburger — hidden on xl: (replaced by DesktopSideNav) */}
@@ -112,29 +121,35 @@ export default function Layout({ children, rightRail = null }) {
 
       <MenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      {/* App shell:
+      {/* The single document-level scroll container. Everything below the
+          frozen header and above the frozen bottom-nav scrolls here.
           - Mobile/tablet: single column capped at max-w-4xl
-          - xl:  3-column grid (RTL: DesktopSideNav on right, content center, rightRail on left) */}
-      <div
-        className={`mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-24 xl:pb-8 xl:min-h-[calc(100vh-4rem)] ${
-          rightRail
-            ? "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)_320px] xl:gap-8"
-            : "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-8"
-        }`}
-      >
-        <DesktopSideNav items={allNavItems} currentPage={page} onNavigate={navigate} user={user} />
-        <main className="min-w-0">
-          {children}
-        </main>
-        {rightRail && (
-          <aside className="hidden xl:block xl:sticky xl:top-[5.5rem] xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto" aria-label="פאנל הקשרי">
-            {rightRail}
-          </aside>
-        )}
+          - xl:  3-column grid (RTL: DesktopSideNav on right, content center, rightRail on left)
+          Sticky offsets inside (DesktopSideNav, rail, page sub-bars) are now
+          measured from THIS container's top (the header no longer occupies
+          scroll space), so they use small top offsets rather than ~header-height. */}
+      <div id="app-scroll" className="app-scroll">
+        <div
+          className={`mx-auto w-full px-4 md:px-6 pt-3 md:pt-6 pb-8 ${
+            rightRail
+              ? "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)_320px] xl:gap-8"
+              : "max-w-4xl xl:max-w-[1400px] xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:gap-8"
+          }`}
+        >
+          <DesktopSideNav items={allNavItems} currentPage={page} onNavigate={navigate} user={user} />
+          <main className="min-w-0">
+            {children}
+          </main>
+          {rightRail && (
+            <aside className="hidden xl:block xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" aria-label="פאנל הקשרי">
+              {rightRail}
+            </aside>
+          )}
+        </div>
       </div>
 
-      {/* Bottom nav — mobile/tablet only */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border z-50 safe-area-bottom xl:hidden">
+      {/* Frozen bottom nav — mobile/tablet only */}
+      <nav className="bg-card border-t-2 border-border z-50 flex-shrink-0 safe-area-bottom safe-area-x xl:hidden">
         <div className="max-w-lg mx-auto flex">
           {allNavItems.map((item) => {
             const { Icon } = item;

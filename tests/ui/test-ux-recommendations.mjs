@@ -87,7 +87,10 @@ console.log("--- Phase 4: Tablet nav + sticky offset ---");
 const layout = readMigratedSrc("src/components/Layout.jsx");
 assert(!/md:flex\s+xl:hidden\s+items-center\s+gap-1/.test(layout), "Layout no longer has tablet header tabs row");
 assert(!/top-\[56px\]/.test(predict), "Predict sticky no longer uses top-[56px]");
-assert(/sticky\s+top-16/.test(predict), "Predict sticky uses Tailwind native top-16 (64px)");
+// The header is now a frozen flex child OUTSIDE the #app-scroll container, so
+// in-page sticky sub-bars stick to the top of the scroll area (top-0), not at
+// header-height (top-16) as they did when the document itself scrolled.
+assert(/sticky\s+top-0/.test(predict), "Predict sticky bar uses top-0 (sticks to top of #app-scroll under the frozen header)");
 
 // ---------- Phase 5: Focus management ----------
 console.log("--- Phase 5: Focus management ---");

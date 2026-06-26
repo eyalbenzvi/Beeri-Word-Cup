@@ -644,7 +644,7 @@ export default function Predict() {
 
       {(
         <>
-          <div className="sticky top-16 z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="sticky top-0 z-20 bg-bg pt-1 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
             <StageSelector
               selectedStage={selectedStage}
               onSelect={setSelectedStage}

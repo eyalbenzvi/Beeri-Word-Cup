@@ -90,9 +90,46 @@ html, body {
   background-color: var(--color-bg);
   color: var(--color-ink);
   margin: 0;
+  height: 100%;
+  /* No document-level bounce / pull-to-refresh: the app scrolls inside
+     #app-scroll (see .app-shell below), and a rubber-banding document would
+     visually detach the frozen header/footer from the content. */
+  overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+#root { height: 100%; }
+
+/* --------- App shell (frozen header + footer) ---------
+   The whole signed-in/guest app lives in a fixed-height flex column whose
+   MIDDLE region (#app-scroll) is the only scroll container. Keeping the
+   document/body itself non-scrolling means the browser's dynamic toolbar
+   (Android Chrome URL bar, iOS Safari bars) never collapses mid-scroll —
+   which is exactly what used to clip the sticky header to half height and
+   push the bottom-nav under the gesture bar. The chrome (header + bottom
+   nav) sits OUTSIDE the scroller as flex children, so it is genuinely frozen
+   on every platform with no position:sticky/fixed-vs-toolbar fighting.
+
+   `100dvh` tracks the *dynamic* viewport; the preceding `100vh` is the
+   fallback for engines without dvh. NOTE: do not add transform/filter/
+   perspective to .app-shell or .app-scroll — that would make position:fixed
+   descendants (modals, overlays, floating buttons) be clipped by the shell
+   instead of escaping to the viewport. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+.app-scroll {
+  flex: 1 1 auto;
+  min-height: 0; /* critical: lets the flex child shrink so it can scroll */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* no scroll-chaining into the (locked) body */
 }
 
 /* --------- Dark mode ---------
@@ -574,6 +611,14 @@ button:focus-visible { border-radius: 14px; }
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  /* Frozen header pads under the notch / translucent status bar (iOS PWA,
+     landscape notch); the bottom-nav and header also pad the left/right
+     insets so a landscape notch never overlaps their edge content. */
+  .safe-area-top { padding-top: env(safe-area-inset-top); }
+  .safe-area-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 /* --------- Tap targets ---------
