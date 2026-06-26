@@ -51,6 +51,16 @@ assert(
   /max-h-48 overflow-y-auto/.test(shared) && /אין נתונים/.test(shared),
   "shared VoterList is scrollable with an empty-state fallback",
 );
+// --- Knockout-tie qualifier is surfaced for every voter (Stats + Admin) ---
+assert(
+  /v\.advancingTeam && <AdvancingChip/.test(shared) &&
+    /function AdvancingChip/.test(shared),
+  "shared VoterList renders the advancing-team chip for knockout-tie voters",
+);
+assert(
+  /getTeamByCode/.test(shared) && /from "\.\.\/data\/teams"/.test(shared),
+  "AdvancingChip resolves the advancing team's flag/name from the team data",
+);
 
 // --- Tab reuses shared aggregators + components instead of duplicating ---
 assert(

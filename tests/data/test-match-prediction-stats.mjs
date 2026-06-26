@@ -133,6 +133,61 @@ const names = (voters) => voters.map((v) => v.name).join();
   );
 }
 
+// ---- 8. Knockout-tie predictions carry the advancing team on the voter ----
+{
+  // A level score with an explicit qualifier — the form sent ISR through on
+  // penalties. The voter must expose advancingTeam so VoterList can show it.
+  const tieForm = {
+    formId: "id-Tie",
+    formName: "Tie",
+    matches: { [MID]: { homeScore: 1, awayScore: 1, advancingTeam: "ISR" } },
+  };
+  // A decisive score: winner is implied, so no annotation should ride along.
+  const winForm = {
+    formId: "id-Win",
+    formName: "Win",
+    matches: { [MID]: { homeScore: 2, awayScore: 1, advancingTeam: "ARG" } },
+  };
+  const s = aggregateMatchPredictions([tieForm, winForm], MID);
+  const drawVoter = s.outcomeVoters.draw.find((v) => v.name === "Tie");
+  assert(drawVoter && drawVoter.advancingTeam === "ISR", "knockout-tie draw voter carries advancingTeam");
+  // The same voter object is reused in the score lists, so the tie score (away-home key "1-1") carries it too.
+  assert(
+    (s.scoreVoters["1-1"] || []).some((v) => v.advancingTeam === "ISR"),
+    "tie-score voter carries advancingTeam",
+  );
+  // A decisive result must NOT surface advancingTeam even if the field exists
+  // on the prediction — the winner is unambiguous from the score.
+  const winVoter = s.outcomeVoters.home.find((v) => v.name === "Win");
+  assert(winVoter && winVoter.advancingTeam == null, "decisive-score voter has no advancingTeam annotation");
+}
+
+// ---- 9. Tie WITHOUT a recorded qualifier yields null (no crash, no ghost) ----
+{
+  const forms = [form("NoAdv", 0, 0)]; // group-style draw, no advancingTeam
+  const s = aggregateMatchPredictions(forms, MID);
+  assert(s.outcomeVoters.draw[0].advancingTeam == null, "draw without advancingTeam → null, not undefined-team");
+}
+
+// ---- 10. A GROUP draw never surfaces a qualifier, even with stale data ----
+{
+  // Stale/imported form: a group 1-1 that still carries a leftover advancingTeam.
+  // The aggregator must not annotate it — group draws send no one through.
+  const GID = "group-A-1";
+  const forms = [
+    {
+      formId: "id-Grp",
+      formName: "Grp",
+      matches: { [GID]: { homeScore: 1, awayScore: 1, advancingTeam: "ISR" } },
+    },
+  ];
+  const s = aggregateMatchPredictions(forms, GID);
+  assert(
+    s.outcomeVoters.draw[0].advancingTeam == null,
+    "group-match draw never carries advancingTeam (self-enforcing gate, not UI-dependent)",
+  );
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   failures.forEach((f) => console.error("FAILED: " + f));
