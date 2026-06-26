@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigation } from "../hooks/useNavigation";
 import ClickableName from "./ClickableName";
 import { getTeamByCode } from "../data/teams";
+import { groupVotersByAdvancing } from "../utils/matchPredictionStats";
 import type { Voter } from "../utils/matchPredictionStats";
 
 // Compact "advances on penalties" chip shown next to a voter whose knockout
@@ -74,8 +75,17 @@ export function Bar({
 }
 
 // Scrollable list of the forms behind a given result/outcome/parameter. Each
-// form name deep-links to its full view in the leaderboard.
-export function VoterList({ voters }: { voters: Voter[] }) {
+// form name deep-links to its full view in the leaderboard. `showAdvancingChip`
+// (default on) annotates each knockout-tie voter with the team it sent through;
+// it's turned OFF inside AdvancingVoterBreakdown, where a per-team header
+// already states the qualifier and a per-row chip would just repeat it.
+export function VoterList({
+  voters,
+  showAdvancingChip = true,
+}: {
+  voters: Voter[];
+  showAdvancingChip?: boolean;
+}) {
   const { navigate } = useNavigation();
   if (!voters || voters.length === 0) {
     return (
@@ -101,9 +111,67 @@ export function VoterList({ voters }: { voters: Voter[] }) {
               v.name || "טופס ללא שם"
             )}
           </span>
-          {v.advancingTeam && <AdvancingChip teamCode={v.advancingTeam} />}
+          {showAdvancingChip && v.advancingTeam && (
+            <AdvancingChip teamCode={v.advancingTeam} />
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Knockout-tie breakdown: the forms that predicted a tie, grouped by the team
+// each one sent through. Reuses VoterBarList so every advancing team is a
+// clickable bar — its height/percentage gives the per-team tie count at a
+// glance (requirement: "how many advanced each team"), and expanding it lists
+// that team's predictors consecutively (requirement: "group by advancing
+// team"). Degrades to a plain list when no qualifier data is present (e.g. a
+// group-stage draw), so callers can use it unconditionally for any draw bucket.
+export function AdvancingVoterBreakdown({ voters }: { voters: Voter[] }) {
+  const { groups, ungrouped } = useMemo(
+    () => groupVotersByAdvancing(voters),
+    [voters],
+  );
+
+  if (groups.length === 0) {
+    // Nothing to group on — render the forms as a normal list (no tie chrome).
+    return <VoterList voters={voters} />;
+  }
+
+  // Percentages are over the whole tie bucket so the bars read as a split.
+  const total = voters.length;
+  // Accent the crowd favourite, primary for the runner-up, muted beyond.
+  const barColor = (i: number) =>
+    i === 0 ? "bg-secondary" : i === 1 ? "bg-primary" : "bg-ink-muted";
+  const items = groups.map((g, i) => {
+    const team = getTeamByCode(g.team);
+    return {
+      key: g.team,
+      label: (
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden="true">⬆</span>
+          {team?.flag} {team?.name || g.team}
+        </span>
+      ),
+      voters: g.voters,
+      color: barColor(i),
+    };
+  });
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-ink-muted font-bold">
+        התפלגות מנחשי התיקו לפי הנבחרת שעולה · לחצו על נבחרת כדי לראות מי ניחש
+      </p>
+      <VoterBarList items={items} total={total} showAdvancingChip={false} />
+      {ungrouped.length > 0 && (
+        <div>
+          <p className="text-3xs text-ink-muted font-bold mt-1 mb-1">
+            ללא בחירת נבחרת עולה
+          </p>
+          <VoterList voters={ungrouped} />
+        </div>
+      )}
     </div>
   );
 }
@@ -115,9 +183,11 @@ export function VoterList({ voters }: { voters: Voter[] }) {
 export function VoterBarList({
   items,
   total,
+  showAdvancingChip = true,
 }: {
   items: { key: string; label: React.ReactNode; voters: Voter[]; color?: string }[];
   total: number;
+  showAdvancingChip?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   return (
@@ -146,7 +216,9 @@ export function VoterBarList({
                 />
               </div>
             </button>
-            {open && <VoterList voters={item.voters} />}
+            {open && (
+              <VoterList voters={item.voters} showAdvancingChip={showAdvancingChip} />
+            )}
           </div>
         );
       })}

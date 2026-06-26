@@ -20,7 +20,7 @@ import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter, BracketEntry } from "../utils/matchPredictionStats";
-import { Bar, VoterList, VoterBarList } from "../components/VoterList";
+import { Bar, VoterList, VoterBarList, AdvancingVoterBreakdown } from "../components/VoterList";
 
 const VALID_TABS = new Set(["matches", "teams", "forms"]);
 
@@ -199,7 +199,7 @@ function MatchPredictions({ forms, actualBracketTeams }: { forms: any[]; actualB
             <VoterList voters={matchStats.outcomeVoters.home} />
           )}
           {expanded === "outcome:draw" && (
-            <VoterList voters={matchStats.outcomeVoters.draw} />
+            <AdvancingVoterBreakdown voters={matchStats.outcomeVoters.draw} />
           )}
           {expanded === "outcome:away" && (
             <VoterList voters={matchStats.outcomeVoters.away} />

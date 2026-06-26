@@ -136,6 +136,40 @@ export function computeConsensusMap(
   return out;
 }
 
+// A run of tie-predicting forms that all sent the SAME team through. Used by
+// the UI to list knockout-tie voters grouped by their advancing pick.
+export type AdvancingGroup = { team: string; voters: Voter[]; count: number };
+
+// Groups a knockout-tie voter list by the team each form advanced, so every
+// team's predictors appear consecutively, ordered by crowd size (desc) — the
+// app's "most-predicted first" convention — with a stable team-code tie-break
+// for deterministic, testable output. Voters without a recorded qualifier
+// (a group-stage draw, or an incomplete knockout form) are returned separately
+// as `ungrouped` so the caller can still surface them rather than drop them.
+export function groupVotersByAdvancing(voters: Voter[]): {
+  groups: AdvancingGroup[];
+  ungrouped: Voter[];
+} {
+  const byTeam = new Map<string, Voter[]>();
+  const ungrouped: Voter[] = [];
+  for (const v of voters) {
+    if (v.advancingTeam) {
+      const arr = byTeam.get(v.advancingTeam);
+      if (arr) arr.push(v);
+      else byTeam.set(v.advancingTeam, [v]);
+    } else {
+      ungrouped.push(v);
+    }
+  }
+  const groups = [...byTeam.entries()]
+    .map(([team, vs]) => ({ team, voters: vs, count: vs.length }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || (a.team < b.team ? -1 : a.team > b.team ? 1 : 0),
+    );
+  return { groups, ungrouped };
+}
+
 export function aggregateMatchPredictions(
   forms: Form[],
   matchId: string,
