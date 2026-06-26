@@ -10,14 +10,23 @@
 //
 // Pure and side-effect free so it can be unit-tested directly.
 
-type Prediction = { homeScore?: number | null; awayScore?: number | null };
+type Prediction = {
+  homeScore?: number | null;
+  awayScore?: number | null;
+  // For a knockout tie the score alone doesn't say who goes through — the
+  // form stores the qualifier (penalty-shootout winner) here.
+  advancingTeam?: string | null;
+};
 type Form = { formId?: string; formName?: string; matches?: Record<string, Prediction> };
 export type BracketEntry = { home: string | null; away: string | null };
 
-// A voter carries both the form's id (so the UI can deep-link to that form's
-// view) and its display name. Previously this was a bare string[] of names;
-// the id was added so "who predicted this?" lists become navigable.
-export type Voter = { formId: string; name: string };
+// A voter carries the form's id (so the UI can deep-link to that form's view)
+// and its display name. `advancingTeam` is set only for knockout-tie
+// predictions — the team the form picked to go through on penalties — so the
+// shared VoterList can show which team advances when the score is level. It's
+// null for group matches and for any decisive knockout score (the winner is
+// implied by the result, so no annotation is needed).
+export type Voter = { formId: string; name: string; advancingTeam?: string | null };
 
 // Check if a match is a knockout match (not group stage)
 function isKnockoutMatch(matchId: string): boolean {
@@ -149,7 +158,24 @@ export function aggregateMatchPredictions(
       }
     }
 
-    entries.push({ voter: { formId: f.formId || "", name: f.formName || "טופס ללא שם" }, p });
+    // Surface the qualifier only for a level KNOCKOUT score — a decisive score
+    // needs no annotation, and a group draw never sends anyone through. Gating
+    // on the match type (rather than trusting the form to have stripped the
+    // field on group matches) keeps this pure module's contract self-enforcing
+    // against stale/imported data.
+    const isTie =
+      isKnockoutMatch(matchId) &&
+      p.homeScore != null &&
+      p.awayScore != null &&
+      p.homeScore === p.awayScore;
+    entries.push({
+      voter: {
+        formId: f.formId || "",
+        name: f.formName || "טופס ללא שם",
+        advancingTeam: isTie ? p.advancingTeam ?? null : null,
+      },
+      p,
+    });
   }
 
   const outcomeVoters: { home: Voter[]; draw: Voter[]; away: Voter[] } = {

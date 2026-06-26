@@ -1,7 +1,26 @@
 import { useState } from "react";
 import { useNavigation } from "../hooks/useNavigation";
 import ClickableName from "./ClickableName";
+import { getTeamByCode } from "../data/teams";
 import type { Voter } from "../utils/matchPredictionStats";
+
+// Compact "advances on penalties" chip shown next to a voter whose knockout
+// prediction was a tie. Without it a level score (e.g. 1-1) leaves the reader
+// guessing which team the form sent through. The ⬆ + flag keeps it glanceable
+// inside the scrollable voter list; the team name is the source of truth.
+function AdvancingChip({ teamCode }: { teamCode: string }) {
+  const team = getTeamByCode(teamCode);
+  return (
+    <span
+      className="shrink-0 inline-flex items-center gap-1 text-3xs font-extrabold rounded-full px-2 py-0.5 border border-secondary/40 text-secondary"
+      style={{ background: "var(--color-secondary-soft)" }}
+      title="עולה בבעיטות הכרעה"
+    >
+      <span aria-hidden="true">⬆</span>
+      {team?.flag} {team?.name || teamCode}
+    </span>
+  );
+}
 
 // Shared "who predicted this?" primitives. Extracted from Stats.tsx so the
 // admin "מידע ונתונים" tab can reuse the exact same clickable-bar + voter-list
@@ -70,16 +89,19 @@ export function VoterList({ voters }: { voters: Voter[] }) {
       {voters.map((v, i) => (
         <div
           key={`${v.formId}-${i}`}
-          className="text-xs rounded-lg px-3 py-1.5 border border-border text-right font-bold text-ink"
+          className="text-xs rounded-lg px-3 py-1.5 border border-border text-right font-bold text-ink flex items-center justify-between gap-2"
           style={{ background: "var(--color-bg-soft)" }}
         >
-          {v.formId ? (
-            <ClickableName onClick={() => navigate("leaderboard", { form: v.formId })}>
-              {v.name || "טופס ללא שם"}
-            </ClickableName>
-          ) : (
-            v.name || "טופס ללא שם"
-          )}
+          <span className="min-w-0 truncate">
+            {v.formId ? (
+              <ClickableName onClick={() => navigate("leaderboard", { form: v.formId })}>
+                {v.name || "טופס ללא שם"}
+              </ClickableName>
+            ) : (
+              v.name || "טופס ללא שם"
+            )}
+          </span>
+          {v.advancingTeam && <AdvancingChip teamCode={v.advancingTeam} />}
         </div>
       ))}
     </div>
