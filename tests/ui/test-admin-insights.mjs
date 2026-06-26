@@ -139,6 +139,83 @@ assert(
   "predicted-score rows expose the voters who predicted each score",
 );
 
+// --- Forms analytics sub-view (new "📋 טפסים" view) ---
+const metrics = readMigratedSrc("src/utils/formMetrics.js", "utf8");
+
+assert(
+  /id:\s*"forms",\s*label:\s*"📋 טפסים"/.test(tab),
+  "AdminInsightsTab registers the third '📋 טפסים' sub-view chip",
+);
+assert(
+  /view === "forms"|<FormsInsights \/>/.test(tab),
+  "AdminInsightsTab renders FormsInsights for the forms view",
+);
+assert(
+  /function FormsInsights/.test(tab),
+  "AdminInsightsTab defines the FormsInsights component",
+);
+// Reuses the shared leaderboard scoring core so דירוג/ניקוד match the public board.
+assert(
+  /useLeaderboardComputed/.test(tab) &&
+    /from "\.\.\/hooks\/useLeaderboardComputed"/.test(tab),
+  "FormsInsights reuses useLeaderboardComputed (no parallel scoring)",
+);
+// Metric derivations come from the shared pure util, not inline duplication.
+assert(
+  /computeAdvancingCounts/.test(tab) &&
+    /computeExactByStage/.test(tab) &&
+    /computeFormMetricValues/.test(tab) &&
+    /sortFormMetricRows/.test(tab) &&
+    /from "\.\.\/utils\/formMetrics"/.test(tab),
+  "FormsInsights delegates metric math to formMetrics.ts",
+);
+// Up-to-3 cap is enforced in the picker.
+assert(
+  /MAX_SELECTED_METRICS/.test(tab) &&
+    /selected\.length >= MAX_SELECTED_METRICS/.test(tab),
+  "FormsInsights enforces the max-3 metric cap",
+);
+// Sort is by the first selected metric initially, and tappable headers re-sort.
+assert(
+  /applySort/.test(tab) && /aria-label=\{`מיין לפי /.test(tab),
+  "FormsInsights exposes tappable, labelled column sort controls",
+);
+// RTL-safe numbers everywhere in the table.
+assert(
+  /<bdi>\{r\.values\[m\.key\]\}<\/bdi>/.test(tab) && /tabular-nums/.test(tab),
+  "metric cells render numbers in <bdi> with tabular-nums (RTL-safe)",
+);
+// Owner identity + secondary rank for principled-order reassurance.
+assert(
+  /#\{r\.rank\}|#\{r\.rank\}/.test(tab) || /<bdi>#\{r\.rank\}<\/bdi>/.test(tab),
+  "rows show a secondary official rank",
+);
+// Search + count line for 200+ forms.
+assert(
+  /חיפוש לפי שם טופס/.test(tab) && /aria-live="polite"/.test(tab),
+  "FormsInsights provides a form search + live result count",
+);
+
+// --- formMetrics.ts registry contract (mirrors the unit test, static guard) ---
+assert(
+  /export const FORM_METRICS/.test(metrics) &&
+    /key: "rank"[\s\S]*?key: "exact3RD"/.test(metrics),
+  "formMetrics exports the ordered FORM_METRICS registry incl. exact3RD",
+);
+assert(
+  /export function computeAdvancingCounts/.test(metrics) &&
+    /export function computeExactByStage/.test(metrics) &&
+    /export function sortFormMetricRows/.test(metrics),
+  "formMetrics exports the pure derivations + sort",
+);
+// Tiebreak: equal metric falls back to official rank then formId (determinism).
+assert(
+  /if \(a\.rank !== b\.rank\) return a\.rank - b\.rank;[\s\S]*?localeCompare\(b\.formId\)/.test(
+    metrics,
+  ),
+  "sortFormMetricRows tiebreaks by rank then formId",
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   failures.forEach((f) => console.error("FAILED: " + f));
