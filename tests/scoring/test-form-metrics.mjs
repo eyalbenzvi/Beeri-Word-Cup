@@ -1,7 +1,8 @@
 // Unit tests for the admin Forms-table metric registry + pure derivations
-// (src/utils/formMetrics.ts). Verifies the 15-metric catalogue, the two
-// derivations the scored form doesn't expose (advancing-team counts per round,
-// exact-score hits per stage), the flat value mapping, and the sort with its
+// (src/utils/formMetrics.ts). Verifies the 19-metric catalogue, the three
+// bracket-derived families the scored form doesn't expose (advancing-team
+// counts per round, correct-matchup counts per stage, exact-position team
+// counts per stage), the flat value mapping, and the sort with its
 // deterministic tiebreak.
 
 import {
@@ -11,8 +12,10 @@ import {
   MAX_SELECTED_METRICS,
   ADVANCING_ROUNDS,
   EXACT_STAGES,
+  EXACT_POS_STAGES,
   computeAdvancingCounts,
   computeMatchupHitsByStage,
+  computeExactPositionTeamsByStage,
   computeFormMetricValues,
   sortFormMetricRows,
 } from "/home/user/Beeri-World-Cup/src/utils/formMetrics.js";
@@ -39,9 +42,9 @@ function eq(a, b, m) {
 console.log("=== FORM METRICS (admin טפסים table) TESTS ===\n");
 
 // --- 1. Registry shape ---
-eq(FORM_METRICS.length, 15, "registry has all 15 metrics");
+eq(FORM_METRICS.length, 19, "registry has all 19 metrics");
 eq(MAX_SELECTED_METRICS, 3, "cap is 3 metrics");
-eq(new Set(FORM_METRIC_KEYS).size, 15, "all metric keys are unique");
+eq(new Set(FORM_METRIC_KEYS).size, 19, "all metric keys are unique");
 eq(
   FORM_METRICS.filter((m) => m.family === "general").length,
   4,
@@ -55,7 +58,12 @@ eq(
 eq(
   FORM_METRICS.filter((m) => m.family === "exact").length,
   6,
-  "6 exact-per-stage metrics (incl. 3rd-place)",
+  "6 exact-matchup-per-stage metrics (incl. 3rd-place)",
+);
+eq(
+  FORM_METRICS.filter((m) => m.family === "exactPos").length,
+  4,
+  "4 exact-position-team metrics (R32..SF, no final / 3rd)",
 );
 eq(FORM_METRIC_MAP.rank.dir, "asc", "rank sorts ascending (lower is better)");
 assert(
@@ -72,6 +80,14 @@ assert(
   ADVANCING_ROUNDS.length === 5 &&
     ["R32", "R16", "QF", "SF", "F"].every((r) => ADVANCING_ROUNDS.includes(r)),
   "ADVANCING_ROUNDS covers R32..F",
+);
+// The exact-position family deliberately stops at SF (no F / 3RD).
+assert(
+  EXACT_POS_STAGES.length === 4 &&
+    ["R32", "R16", "QF", "SF"].every((s) => EXACT_POS_STAGES.includes(s)) &&
+    !EXACT_POS_STAGES.includes("F") &&
+    !EXACT_POS_STAGES.includes("3RD"),
+  "EXACT_POS_STAGES = R32..SF only (final + 3rd excluded)",
 );
 
 // --- 2. computeAdvancingCounts: intersection of predicted vs actual ---
@@ -162,12 +178,58 @@ assert(
   "undefined actual bracket → all-zero matchup buckets",
 );
 
+// --- 3b. computeExactPositionTeamsByStage: teams in the correct bracket slot ---
+// "קבוצה מדויקת" = the form placed the team in the SAME slot (match + side).
+// Slot-level: a fully-correct match contributes 2, a half-correct match 1.
+{
+  const actualBracket = {
+    "R32-1": { home: "A", away: "B" }, // both determined
+    "R32-2": { home: "C", away: "D" },
+    "R32-3": { home: "E", away: null }, // away not determined
+    "R16-1": { home: "A", away: "C" },
+    "QF-1": { home: "A", away: "C" },
+    "SF-1": { home: "A", away: "C" },
+    "F-1": { home: "A", away: "C" }, // final excluded from this family
+    "3RD-1": { home: "X", away: "Y" }, // 3rd excluded
+  };
+  const predBracket = {
+    "R32-1": { home: "A", away: "B" }, // both correct → +2
+    "R32-2": { home: "C", away: "Z" }, // home correct only → +1
+    "R32-3": { home: "E", away: "Q" }, // home correct (+1); away undetermined
+    "R16-1": { home: "Q", away: "C" }, // away correct only → +1
+    "QF-1": { home: "A", away: "C" }, // both → +2
+    "SF-1": { home: "Z", away: "Z" }, // none → 0
+    "F-1": { home: "A", away: "C" }, // ignored (not in family)
+    "3RD-1": { home: "X", away: "Y" }, // ignored
+  };
+  const p = computeExactPositionTeamsByStage(predBracket, actualBracket);
+  eq(p.R32, 4, "R32 exact-position teams: 2 + 1 + 1 across the three matches");
+  eq(p.R16, 1, "R16 exact-position teams: away slot only");
+  eq(p.QF, 2, "QF exact-position teams: both slots");
+  eq(p.SF, 0, "SF exact-position teams: none correct");
+  assert(!("F" in p), "final is not part of the exact-position family");
+  assert(!("3RD" in p), "3rd-place is not part of the exact-position family");
+}
+// Swapped home/away counts ZERO exact positions (each team in the wrong slot).
+{
+  const p = computeExactPositionTeamsByStage(
+    { "R32-1": { home: "B", away: "A" } },
+    { "R32-1": { home: "A", away: "B" } },
+  );
+  eq(p.R32, 0, "swapped sides → no team is in its exact slot");
+}
+assert(
+  EXACT_POS_STAGES.every((s) => computeExactPositionTeamsByStage(null, null)[s] === 0),
+  "null brackets → all-zero exact-position buckets",
+);
+
 // --- 4. computeFormMetricValues flattening ---
 {
   const values = computeFormMetricValues(
     { rank: 7, totalPoints: 123, exactScoreCount: 9, outcomeCount: 20 },
     { R32: 8, R16: 4, QF: 2, SF: 1, F: 1 },
     { R32: 3, R16: 2, QF: 1, SF: 0, F: 1, "3RD": 0 },
+    { R32: 6, R16: 3, QF: 1, SF: 0 },
   );
   eq(values.rank, 7, "rank value");
   eq(values.points, 123, "points value");
@@ -177,6 +239,9 @@ assert(
   eq(values.teamsF, 1, "teamsF value");
   eq(values.exactR16, 2, "exactR16 value");
   eq(values.exact3RD, 0, "exact3RD value");
+  eq(values.posR32, 6, "posR32 value");
+  eq(values.posR16, 3, "posR16 value");
+  eq(values.posSF, 0, "posSF value");
   // Every registry key must resolve to a number (no undefined columns).
   assert(
     FORM_METRIC_KEYS.every((k) => typeof values[k] === "number"),

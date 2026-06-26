@@ -30,6 +30,7 @@ import {
   MAX_SELECTED_METRICS,
   computeAdvancingCounts,
   computeMatchupHitsByStage,
+  computeExactPositionTeamsByStage,
   computeFormMetricValues,
   sortFormMetricRows,
 } from "../utils/formMetrics";
@@ -37,7 +38,7 @@ import type { MetricFamily } from "../utils/formMetrics";
 import { VoterList, VoterBarList, AdvancingVoterBreakdown } from "./VoterList";
 import EmptyState from "./EmptyState";
 
-const METRIC_FAMILIES: MetricFamily[] = ["general", "advancing", "exact"];
+const METRIC_FAMILIES: MetricFamily[] = ["general", "advancing", "exact", "exactPos"];
 
 // Admin "מידע ונתונים" tab. Two analyses over the submitted forms:
 //   1) Team-level: for every team, how many forms placed it 1st–4th in its
@@ -342,6 +343,10 @@ function FormsInsights() {
         bracketInfo?.predBracket,
         actualBracketTeams,
       );
+      const positionHits = computeExactPositionTeamsByStage(
+        bracketInfo?.predBracket,
+        actualBracketTeams,
+      );
       const values = computeFormMetricValues(
         {
           rank: entry.rank,
@@ -351,6 +356,7 @@ function FormsInsights() {
         },
         advancingCounts,
         matchupHits,
+        positionHits,
       );
       const owner = users[entry.userId];
       const ownerName = owner?.firstName
@@ -472,8 +478,9 @@ function FormsInsights() {
           </p>
         )}
         <p className="text-2xs text-ink-muted font-bold">
-          עלו = קבוצות שניחשתם נכון שיגיעו לשלב · מדויק = משחקים שניחשתם נכון את
-          זהות שתי הקבוצות בהם
+          עלו = קבוצות שניחשתם נכון שיגיעו לשלב · משחק = משחקים שניחשתם נכון את
+          זהות שתי הקבוצות בהם · מיקום = קבוצות שניחשתם נכון את המיקום המדויק שלהן
+          בבראקט
         </p>
       </div>
 

@@ -164,6 +164,7 @@ assert(
 assert(
   /computeAdvancingCounts/.test(tab) &&
     /computeMatchupHitsByStage/.test(tab) &&
+    /computeExactPositionTeamsByStage/.test(tab) &&
     /computeFormMetricValues/.test(tab) &&
     /sortFormMetricRows/.test(tab) &&
     /from "\.\.\/utils\/formMetrics"/.test(tab),
@@ -217,6 +218,7 @@ assert(
 assert(
   /export function computeAdvancingCounts/.test(metrics) &&
     /export function computeMatchupHitsByStage/.test(metrics) &&
+    /export function computeExactPositionTeamsByStage/.test(metrics) &&
     /export function sortFormMetricRows/.test(metrics),
   "formMetrics exports the pure derivations + sort",
 );
