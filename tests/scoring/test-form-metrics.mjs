@@ -16,6 +16,10 @@ import {
   computeFormMetricValues,
   sortFormMetricRows,
 } from "/home/user/Beeri-World-Cup/src/utils/formMetrics.js";
+import {
+  calculateFullScore,
+  POINTS,
+} from "/home/user/Beeri-World-Cup/src/utils/scoring.js";
 
 let passed = 0,
   failed = 0;
@@ -187,6 +191,53 @@ assert(
   ];
   const out = sortFormMetricRows(rows, "v", "desc");
   eq(out[0].formId, "a", "final tiebreak is formId asc");
+}
+
+// --- 6. Cross-check vs the real scoring engine ---
+// Lock the "count vs points" relationship: the advancing COUNT this table
+// shows, multiplied by the per-stage advancing point value the scorer uses,
+// must equal the advancingPoints calculateFullScore produces from the SAME
+// predicted/actual advancing sets. If POINTS or the scoring loop ever change,
+// this fails instead of the table silently drifting from the leaderboard.
+{
+  const predAdvancing = {
+    R32: ["A", "B", "C"],
+    R16: ["A", "B"],
+    QF: ["A"],
+    SF: ["A"],
+    F: ["A"],
+  };
+  const actualAdvancing = {
+    R32: ["A", "B", "X"], // 2 correct
+    R16: ["A", "Y"], // 1 correct
+    QF: ["A"], // 1 correct
+    SF: ["Z"], // 0 correct
+    F: ["A"], // 1 correct
+  };
+  // Round → the stage whose `advancing` value scores it (mirrors scoring.ts).
+  const PARENT = { R32: "group", R16: "R32", QF: "R16", SF: "QF", F: "SF" };
+
+  const counts = computeAdvancingCounts(predAdvancing, actualAdvancing);
+  const score = calculateFullScore(
+    { advancing: predAdvancing },
+    {}, // no match results — isolate the advancing contribution
+    actualAdvancing,
+    { champion: null, topScorers: [] },
+    {},
+    {},
+  );
+
+  for (const round of ADVANCING_ROUNDS) {
+    const value = POINTS[PARENT[round]].advancing;
+    eq(
+      counts[round] * value,
+      score.advancingPoints[round] || 0,
+      `${round}: count×${value} matches scoring advancingPoints`,
+    );
+  }
+  // Sanity: the fixture actually exercises non-zero and zero rounds.
+  eq(counts.R32, 2, "cross-check fixture: R32 count");
+  eq(counts.SF, 0, "cross-check fixture: SF count (miss)");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -7,7 +7,7 @@ import {
 } from "../hooks/useStore";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
+import { knockoutMatches, STAGES } from "../data/matches";
 import { normalizeStatus } from "../utils/helpers";
 import { deriveAdvancingTeams } from "../utils/bracket";
 import {
@@ -36,12 +36,6 @@ import {
 import type { MetricFamily } from "../utils/formMetrics";
 import { VoterList, VoterBarList, AdvancingVoterBreakdown } from "./VoterList";
 import EmptyState from "./EmptyState";
-
-// Schedule lookup so a match's stage can fall back to its scheduled stage when
-// a stored result omits one (mirrors the Leaderboard's stage resolution).
-const ALL_MATCHES_MAP: Record<string, { stage?: string }> = Object.fromEntries(
-  [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
-);
 
 const METRIC_FAMILIES: MetricFamily[] = ["general", "advancing", "exact"];
 
@@ -323,9 +317,12 @@ function FormsInsights() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [query, setQuery] = useState("");
 
+  // Resolve a match's stage exactly as scoring.ts does (`actual.stage ||
+  // "group"`) so the per-stage exact columns can never bucket a hit into a
+  // stage that scoring scored differently. Every matchScores key comes from
+  // `results`, so this lookup always hits.
   const stageOf = useCallback(
-    (matchId: string) =>
-      results[matchId]?.stage || ALL_MATCHES_MAP[matchId]?.stage || "group",
+    (matchId: string) => results[matchId]?.stage || "group",
     [results],
   );
 
@@ -509,10 +506,11 @@ function FormsInsights() {
                   type="button"
                   onClick={() => applySort(m.key)}
                   aria-pressed={active}
+                  title={m.label}
                   aria-label={`מיין לפי ${m.label}${
                     active ? (sortDir === "asc" ? " (עולה)" : " (יורד)") : ""
                   }`}
-                  className={`w-14 shrink-0 flex flex-col items-center justify-end rounded-lg px-0.5 py-1 cursor-pointer border-none ${
+                  className={`tap-44 w-14 shrink-0 flex flex-col items-center justify-end rounded-lg px-0.5 py-1 cursor-pointer border-none ${
                     active ? "bg-primary-soft" : "bg-transparent"
                   }`}
                 >
