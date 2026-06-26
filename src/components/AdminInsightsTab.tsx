@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
-import { useAllPredictions, useMatchResults } from "../hooks/useStore";
+import { useCallback, useMemo, useState } from "react";
+import {
+  useAllPredictions,
+  useMatchResults,
+  useUserDirectory,
+  useActualBonuses,
+} from "../hooks/useStore";
+import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { GROUPS, getTeamByCode } from "../data/teams";
-import { knockoutMatches, STAGES } from "../data/matches";
+import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { normalizeStatus } from "../utils/helpers";
 import { deriveAdvancingTeams } from "../utils/bracket";
 import {
@@ -16,8 +22,28 @@ import {
 } from "../utils/teamPredictionStats";
 import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter } from "../utils/matchPredictionStats";
+import {
+  FORM_METRICS,
+  FORM_METRIC_MAP,
+  FAMILY_TITLE,
+  FAMILY_EYEBROW,
+  MAX_SELECTED_METRICS,
+  computeAdvancingCounts,
+  computeExactByStage,
+  computeFormMetricValues,
+  sortFormMetricRows,
+} from "../utils/formMetrics";
+import type { MetricFamily } from "../utils/formMetrics";
 import { VoterList, VoterBarList, AdvancingVoterBreakdown } from "./VoterList";
 import EmptyState from "./EmptyState";
+
+// Schedule lookup so a match's stage can fall back to its scheduled stage when
+// a stored result omits one (mirrors the Leaderboard's stage resolution).
+const ALL_MATCHES_MAP: Record<string, { stage?: string }> = Object.fromEntries(
+  [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
+);
+
+const METRIC_FAMILIES: MetricFamily[] = ["general", "advancing", "exact"];
 
 // Admin "מידע ונתונים" tab. Two analyses over the submitted forms:
 //   1) Team-level: for every team, how many forms placed it 1st–4th in its
@@ -277,9 +303,294 @@ function KnockoutInsights({ forms }: { forms: any[] }) {
   );
 }
 
+// Forms analytics table. Every metric reuses the leaderboard scoring core
+// (so "דירוג"/"ניקוד" match the public board exactly); the per-stage team and
+// exact-match counts come from the pure derivations in formMetrics.ts. The
+// admin picks up to MAX_SELECTED_METRICS columns and sorts by any of them.
+function FormsInsights() {
+  const allPredictions = useAllPredictions();
+  const results = useMatchResults();
+  const users = useUserDirectory();
+  const actualBonuses = useActualBonuses();
+
+  const { rankedLeaderboard, formBracketMap, actualDerivedAdvancing } =
+    useLeaderboardComputed(results, allPredictions, users, actualBonuses);
+
+  // Default columns: rank (the natural board order) + points. The first
+  // selected metric is the initial sort key, per spec.
+  const [selected, setSelected] = useState<string[]>(["rank", "points"]);
+  const [sortKey, setSortKey] = useState<string>("rank");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [query, setQuery] = useState("");
+
+  const stageOf = useCallback(
+    (matchId: string) =>
+      results[matchId]?.stage || ALL_MATCHES_MAP[matchId]?.stage || "group",
+    [results],
+  );
+
+  const rows = useMemo(() => {
+    return rankedLeaderboard.map((entry) => {
+      const advancingCounts = computeAdvancingCounts(
+        formBracketMap[entry.formId]?.advancing,
+        actualDerivedAdvancing,
+      );
+      const exactByStage = computeExactByStage(entry.matchScores, stageOf);
+      const values = computeFormMetricValues(
+        {
+          rank: entry.rank,
+          totalPoints: entry.totalPoints,
+          exactScoreCount: entry.exactScoreCount,
+          outcomeCount: entry.outcomeCount,
+        },
+        advancingCounts,
+        exactByStage,
+      );
+      const owner = users[entry.userId];
+      const ownerName = owner?.firstName
+        ? owner.lastName
+          ? `${owner.firstName} ${owner.lastName}`
+          : owner.firstName
+        : owner?.displayName || "";
+      return {
+        formId: entry.formId,
+        formName: entry.formName,
+        ownerName,
+        rank: entry.rank,
+        values,
+      };
+    });
+  }, [rankedLeaderboard, formBracketMap, actualDerivedAdvancing, users, stageOf]);
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (r) =>
+        r.formName.toLowerCase().includes(q) ||
+        r.ownerName.toLowerCase().includes(q),
+    );
+  }, [rows, query]);
+
+  const sortedRows = useMemo(
+    () => sortFormMetricRows(filteredRows, sortKey, sortDir),
+    [filteredRows, sortKey, sortDir],
+  );
+
+  const selectedDefs = selected.map((k) => FORM_METRIC_MAP[k]);
+
+  const toggleMetric = (key: string) => {
+    if (selected.includes(key)) {
+      const next = selected.filter((k) => k !== key);
+      setSelected(next);
+      // Removing the active sort key falls back to the new first column.
+      if (sortKey === key && next.length > 0) {
+        setSortKey(next[0]);
+        setSortDir(FORM_METRIC_MAP[next[0]].dir);
+      }
+    } else {
+      if (selected.length >= MAX_SELECTED_METRICS) return; // hard cap
+      const wasEmpty = selected.length === 0;
+      setSelected([...selected, key]);
+      // First metric selected becomes the sort key (spec: sort by the first).
+      if (wasEmpty) {
+        setSortKey(key);
+        setSortDir(FORM_METRIC_MAP[key].dir);
+      }
+    }
+  };
+
+  const applySort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(FORM_METRIC_MAP[key].dir);
+    }
+  };
+
+  if (rankedLeaderboard.length === 0) {
+    return (
+      <EmptyState
+        icon="📋"
+        title="אין טפסים שהוגשו"
+        description="הטבלה תופיע כאן ברגע שיוגשו טפסים."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="card-duo space-y-3">
+        <div>
+          <h3 className="text-base font-extrabold text-ink mb-1">📋 טבלת טפסים</h3>
+          <p className="text-xs text-ink-muted font-bold">
+            בחרו עד {MAX_SELECTED_METRICS} נתונים להצגה. הקישו על כותרת עמודה כדי
+            למיין לפיה.
+          </p>
+        </div>
+
+        {METRIC_FAMILIES.map((fam) => (
+          <div key={fam}>
+            <div className="text-2xs font-extrabold text-ink-muted mb-1.5">
+              {FAMILY_TITLE[fam]}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {FORM_METRICS.filter((m) => m.family === fam).map((m) => {
+                const isSel = selected.includes(m.key);
+                const capped =
+                  !isSel && selected.length >= MAX_SELECTED_METRICS;
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => toggleMetric(m.key)}
+                    disabled={capped}
+                    aria-pressed={isSel}
+                    className={`chip-duo tap-44 text-xs ${isSel ? "active" : ""} ${
+                      capped ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {selected.length >= MAX_SELECTED_METRICS && (
+          <p className="text-2xs text-ink-muted font-bold">
+            נבחרו {MAX_SELECTED_METRICS} מתוך {MAX_SELECTED_METRICS} — הסירו נתון
+            כדי להחליף.
+          </p>
+        )}
+        <p className="text-2xs text-ink-muted font-bold">
+          עלו = ניחושי קבוצות שהגיעו לשלב · מדויק = תוצאות מדויקות בשלב
+        </p>
+      </div>
+
+      {selected.length === 0 ? (
+        <EmptyState
+          icon="🔧"
+          title="לא נבחרו נתונים"
+          description={`בחרו עד ${MAX_SELECTED_METRICS} נתונים להצגה בטבלה`}
+        />
+      ) : (
+        <div className="card-duo">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="חיפוש לפי שם טופס / משתמש..."
+            className="input-duo w-full mb-2"
+            maxLength={50}
+            aria-label="חיפוש בטבלת הטפסים"
+          />
+          <p
+            className="text-xs text-ink-muted font-bold mb-2"
+            aria-live="polite"
+          >
+            {query.trim()
+              ? `מציג ${sortedRows.length} מתוך ${rows.length} טפסים`
+              : `${rows.length} טפסים`}
+          </p>
+
+          {/* Aligned header strip — each metric cell is a sort control. */}
+          <div className="flex items-stretch gap-1 border-b-2 border-border pb-1.5 mb-1.5">
+            <div className="flex-1 min-w-0 self-end pb-1 text-2xs font-extrabold text-ink-muted">
+              טופס
+            </div>
+            {selectedDefs.map((m) => {
+              const active = sortKey === m.key;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => applySort(m.key)}
+                  aria-pressed={active}
+                  aria-label={`מיין לפי ${m.label}${
+                    active ? (sortDir === "asc" ? " (עולה)" : " (יורד)") : ""
+                  }`}
+                  className={`w-14 shrink-0 flex flex-col items-center justify-end rounded-lg px-0.5 py-1 cursor-pointer border-none ${
+                    active ? "bg-primary-soft" : "bg-transparent"
+                  }`}
+                >
+                  {FAMILY_EYEBROW[m.family] && (
+                    <span
+                      className={`text-3xs font-bold leading-none ${
+                        active ? "text-primary-dark" : "text-ink-light"
+                      }`}
+                    >
+                      {FAMILY_EYEBROW[m.family]}
+                    </span>
+                  )}
+                  <span
+                    className={`text-2xs font-extrabold leading-tight text-center ${
+                      active ? "text-primary-dark" : "text-ink-muted"
+                    }`}
+                  >
+                    {m.col}
+                  </span>
+                  <span
+                    className={`text-3xs leading-none ${
+                      active ? "text-primary" : "text-ink-light"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {active ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+            {sortedRows.map((r) => (
+              <div
+                key={r.formId}
+                className="flex items-center gap-1 py-1.5 border-b border-border last:border-b-0"
+                style={{ contentVisibility: "auto", containIntrinsicSize: "0 40px" }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-ink truncate">
+                    {r.formName}
+                  </div>
+                  <div className="text-2xs text-ink-muted truncate">
+                    {r.ownerName ? `${r.ownerName} · ` : ""}
+                    <bdi>#{r.rank}</bdi>
+                  </div>
+                </div>
+                {selectedDefs.map((m) => {
+                  const active = sortKey === m.key;
+                  return (
+                    <div
+                      key={m.key}
+                      className={`w-14 shrink-0 text-center text-sm font-extrabold tabular-nums ${
+                        active ? "text-primary" : "text-ink"
+                      }`}
+                    >
+                      <bdi>{r.values[m.key]}</bdi>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {sortedRows.length === 0 && (
+              <p className="text-center text-ink-muted py-6 text-sm">
+                אין תוצאות
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminInsightsTab() {
   const allPredictions = useAllPredictions();
-  const [view, setView] = useState<"teams" | "knockout">("teams");
+  const [view, setView] = useState<"teams" | "knockout" | "forms">("teams");
 
   const submittedForms = useMemo(
     () =>
@@ -305,10 +616,11 @@ export default function AdminInsightsTab() {
         {[
           { id: "teams", label: "🏳️ נבחרות" },
           { id: "knockout", label: "🧩 נוקאאוט" },
+          { id: "forms", label: "📋 טפסים" },
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => setView(t.id as "teams" | "knockout")}
+            onClick={() => setView(t.id as "teams" | "knockout" | "forms")}
             aria-pressed={view === t.id}
             className={`chip-duo flex-shrink-0 ${view === t.id ? "active" : ""}`}
           >
@@ -319,8 +631,10 @@ export default function AdminInsightsTab() {
 
       {view === "teams" ? (
         <TeamInsights forms={submittedForms} />
-      ) : (
+      ) : view === "knockout" ? (
         <KnockoutInsights forms={submittedForms} />
+      ) : (
+        <FormsInsights />
       )}
     </div>
   );
