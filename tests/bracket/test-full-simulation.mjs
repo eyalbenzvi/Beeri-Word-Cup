@@ -178,7 +178,17 @@ for (const m of groupMatches) {
 }
 const partialBracket = calcBracketTeams(partialRes);
 const partialAdv = deriveActualAdvancing(partialBracket, partialRes);
-assert(partialAdv.R32.length === 0, `Partial: R32 empty when not all groups done, got ${partialAdv.R32.length}`);
+// Early-certainty: a COMPLETED group's winner + runner-up are clinched into R32
+// the moment that group ends — no need to wait for all 12 groups. Groups A–F are
+// done here (6 groups × {1st, 2nd} = 12 teams), G–L are unplayed.
+assert(partialAdv.R32.length === 12, `Partial: 12 clinched position teams from 6 done groups, got ${partialAdv.R32.length}`);
+// Every credited team must be the winner or runner-up of a completed group, never
+// a third-placed team (no third has clinched: all six groups played identically,
+// so their thirds tie, and six unplayed groups could still overtake any of them).
+for (const code of partialAdv.R32) {
+  const g = code && Object.entries(GROUPS).find(([, ts]) => ts.some((t) => t.code === code))?.[0];
+  assert(["A","B","C","D","E","F"].includes(g), `Partial: ${code} belongs to a completed group`);
+}
 
 // ---- 8. Leaderboard sort ----
 console.log("\n--- 8. Leaderboard sort ---");
