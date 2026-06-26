@@ -510,8 +510,14 @@ function FormsInsights() {
               : `${rows.length} טפסים`}
           </p>
 
-          {/* Aligned header strip — each metric cell is a sort control. */}
-          <div className="flex items-stretch gap-1 border-b-2 border-border pb-1.5 mb-1.5">
+          {/* Aligned header strip — each metric cell is a sort control. Sticky
+              at the top of #app-scroll (post-#253 there's no nested scroller)
+              so the sort arrows + column labels stay visible down a long list.
+              top-0/z-20 mirror the app's other rebased in-page sticky bars. */}
+          <div
+            className="sticky top-0 z-20 flex items-stretch gap-1 border-b-2 border-border pt-1 pb-1.5 mb-1.5"
+            style={{ background: "var(--color-card)" }}
+          >
             <div className="flex-1 min-w-0 self-end pb-1 text-2xs font-extrabold text-ink-muted">
               טופס
             </div>

@@ -20,6 +20,7 @@ import AdminQueryTab from "../components/adminQuery/AdminQueryTab";
 import AdminInsightsTab from "../components/AdminInsightsTab";
 import PlayerAutocomplete from "../components/PlayerAutocomplete";
 import PageHeader from "../components/PageHeader";
+import BackToTopButton from "../components/BackToTopButton";
 import { isSamePlayer, getPlayerDisplayName, resolvePlayerList } from "../utils/playerSearch";
 
 export default function Admin() {
@@ -208,6 +209,11 @@ export default function Admin() {
       {activeTab === "users" && (
         <AdminUsersTab users={users} allPredictions={allPredictions} />
       )}
+
+      {/* The admin tabs (forms table, users, results) can grow long, and #253
+          froze the chrome with no document-level scroll-to-top. This routes
+          through appScroll and self-hides until scrolled, like Leaderboard. */}
+      <BackToTopButton />
     </div>
   );
 }

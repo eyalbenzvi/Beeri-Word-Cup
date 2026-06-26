@@ -521,11 +521,15 @@ export default function AdminFormsTab({ users, allPredictions }) {
         </div>
       </div>
 
-      <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+      {/* Flow in the app-shell's single scroll container (#app-scroll, #253)
+          rather than a nested 60vh scroller; content-visibility keeps the
+          (potentially long) list cheap. */}
+      <div className="space-y-2">
         {rows.map((r) => (
           <div
             key={r.formId}
             className="card-duo-tight text-sm"
+            style={{ contentVisibility: "auto", containIntrinsicSize: "0 140px" }}
           >
             <div className="font-bold text-primary truncate">
               {r.formName || "ללא שם"}
