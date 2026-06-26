@@ -23,6 +23,7 @@ const ROUND_PARENT = { R16: "R32", QF: "R16", SF: "QF", F: "SF" };
 
 import { isScoreValid } from "./helpers";
 import { triggerAutoFillCheck } from "./autoFillTrigger";
+import { computeThirdPlaceCertainty, isGroupComplete } from "./thirdPlaceCertainty";
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -316,35 +317,43 @@ export function calcBracketTeams(matchPredictions: Record<string, any>, gatingOn
       }
     }
   }
-  const allGroupsComplete = !gatingOnResults ||
-    (Object.keys(completedGroupMatches).length === 12 &&
-      Object.values(completedGroupMatches).every((count: number) => count === 6));
-
-  const bestThird = getBestThirdPlaceTeams(standings);
-  const thirdAssignments = assignThirdPlaceTeams(bestThird);
+  // Third-place R32 slots.
+  //  • Prediction/draft brackets (gatingOnResults=false): show the full
+  //    hypothetical assignment from the current standings — the user is exploring
+  //    a complete what-if, so nothing is gated.
+  //  • Actual-results bracket (gatingOnResults=true): fill a 3rd slot ONLY once its
+  //    occupant is mathematically certain (see thirdPlaceCertainty.ts). When all
+  //    groups are complete this returns the full, final assignment — so the result
+  //    is identical to the old all-complete behaviour, just available earlier for
+  //    any slot that has already clinched.
+  let thirdSlotTeam: (matchId: string) => string | null;
+  if (gatingOnResults) {
+    const certainty = computeThirdPlaceCertainty(matchPredictions, standings);
+    thirdSlotTeam = (matchId) => certainty.certainSlots[matchId] || null;
+  } else {
+    const bestThird = getBestThirdPlaceTeams(standings);
+    const thirdAssignments = assignThirdPlaceTeams(bestThird);
+    thirdSlotTeam = (matchId) => thirdAssignments[matchId] || null;
+  }
 
   for (const match of R32_MATCHES) {
     let home = null,
       away = null;
 
-    // For group-position slots (1A, 2B, etc.): fill when that group is complete.
-    // For 3rd-place slots: fill only when ALL groups are complete (3rd ranking depends on all).
+    // Group-position slots (1A, 2B, …): fill when that group is complete.
     const homeCompleted = !gatingOnResults || (match.home.match(/^[12][A-L]$/) ?
       completedGroupMatches[match.home[1]] === 6 : true); // non-position home slots always ready
     const awayCompleted = !gatingOnResults ||
-      (match.away === "3rd" ? allGroupsComplete :
-        (match.away.match(/^[12][A-L]$/) ? completedGroupMatches[match.away[1]] === 6 : true));
+      (match.away.match(/^[12][A-L]$/) ? completedGroupMatches[match.away[1]] === 6 : true);
 
     if (homeCompleted && match.home.match(/^[12][A-L]$/)) {
       home = resolvePosition(match.home, standings);
     }
 
-    if (awayCompleted) {
-      if (match.away === "3rd") {
-        away = thirdAssignments[match.id] || null;
-      } else if (match.away.match(/^[12][A-L]$/)) {
-        away = resolvePosition(match.away, standings);
-      }
+    if (match.away === "3rd") {
+      away = thirdSlotTeam(match.id);
+    } else if (awayCompleted && match.away.match(/^[12][A-L]$/)) {
+      away = resolvePosition(match.away, standings);
     }
 
     bracket[match.id] = { home, away };
@@ -443,33 +452,28 @@ export function deriveAdvancingTeams(bracketTeams: Record<string, any>) {
 export function deriveActualAdvancing(bracketTeams, actualResults) {
   const advancing = { R32: [], R16: [], QF: [], SF: [], F: [] };
 
-  const groupMatchCounts = {};
-  for (const matchId of Object.keys(actualResults)) {
-    const groupMatch = matchId.match(/^group-([A-L])-/);
-    if (groupMatch) {
-      const g = groupMatch[1];
-      groupMatchCounts[g] = (groupMatchCounts[g] || 0) + 1;
-    }
+  // R32 advancers are credited the moment they are MATHEMATICALLY CLINCHED — not
+  // gated on the whole group stage finishing:
+  //   • A completed group's winner (1st) and runner-up (2nd) are guaranteed into
+  //     R32 the instant their own group ends.
+  //   • A third-placed team is added once it is guaranteed to be among the best 8
+  //     (computeThirdPlaceCertainty — sound, never a false positive), even if its
+  //     exact R32 slot is not yet pinned. Advancing-points scoring keys on R32 set
+  //     membership only, so the slot is irrelevant here.
+  // When all 12 groups are complete this yields exactly the full 32-team set, so
+  // final scoring is unchanged — the relaxation only surfaces clinches earlier.
+  const standings = calcGroupStandings(actualResults);
+  const pushR32 = (code: string | null | undefined) => {
+    if (code && !advancing.R32.includes(code)) advancing.R32.push(code);
+  };
+  for (const group of Object.keys(standings)) {
+    if (!isGroupComplete(group, actualResults)) continue;
+    const sorted = standings[group];
+    pushR32(sorted?.[0]?.code); // group winner
+    pushR32(sorted?.[1]?.code); // runner-up
   }
-  const completedGroups = new Set(
-    Object.entries(groupMatchCounts)
-      .filter(([, count]) => (count as number) >= 6)
-      .map(([g]) => g),
-  );
-
-  const allGroupsComplete = completedGroups.size >= 12;
-  if (allGroupsComplete) {
-    for (const [matchId, t] of Object.entries(bracketTeams)) {
-      const teams = t as any;
-      if (!matchId.startsWith("R32-")) continue;
-      if (teams.home && !advancing.R32.includes(teams.home)) {
-        advancing.R32.push(teams.home);
-      }
-      if (teams.away && !advancing.R32.includes(teams.away)) {
-        advancing.R32.push(teams.away);
-      }
-    }
-  }
+  const certainty = computeThirdPlaceCertainty(actualResults, standings);
+  for (const code of certainty.qualifiedThirds) pushR32(code);
 
   for (const [matchId, t] of Object.entries(bracketTeams)) {
     const teams = t as any;
