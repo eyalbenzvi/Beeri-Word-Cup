@@ -1,12 +1,26 @@
 // Per-form metric registry + pure derivations for the admin "מידע ונתונים →
-// טפסים" analytics table. The 15 selectable metrics all build on data the
-// leaderboard core already produces (rank, totalPoints, exactScoreCount,
-// outcomeCount, advancingPoints, matchScores) — this module only adds the two
-// derivations the scored form doesn't expose directly:
-//   • teams-reached-stage counts  (correct advancing picks per knockout round)
-//   • exact-score hits bucketed by knockout stage
+// טפסים" analytics table. Some metrics reuse leaderboard-scored fields (rank,
+// totalPoints, exactScoreCount, outcomeCount); the two per-stage families are
+// derived here directly from BRACKETS (not from scoring), so they reflect the
+// current bracket — exactly like the Results tab — without waiting for the
+// whole group stage to finish:
+//   • teams-reached-stage counts  (predicted advancers ∩ the bracket's actual
+//     advancers, per knockout round)
+//   • correct-matchup counts      (form predicted the right team identities for
+//     a knockout match, bucketed by stage — same ordered home/away test the
+//     Stats/Results match panels use)
 // Keeping the metric list, labels and value extraction in ONE place means the
 // component and its tests share a single source of truth.
+
+import { knockoutMatches } from "../data/matches";
+
+// matchId → stage for every knockout match (R32-1 → "R32", 3RD-1 → "3RD", …).
+const KO_STAGE_BY_ID: Record<string, string> = Object.fromEntries(
+  knockoutMatches.map((m) => [m.id, m.stage]),
+);
+
+// A bracket slot's two teams (null until the slot is determined).
+export type BracketEntry = { home?: string | null; away?: string | null };
 
 // Knockout advancing rounds, in tournament order. Matches the keys produced by
 // deriveAdvancingTeams / deriveActualAdvancing in bracket.ts.
@@ -106,20 +120,26 @@ export function computeAdvancingCounts(
   return out;
 }
 
-// Count of exact-score hits bucketed by knockout stage. `matchScores` is the
-// per-match scoring map from calculateFullScore (exactPoints > 0 ⇒ exact hit);
-// `stageOf` resolves a matchId to its stage code (results stage first, schedule
-// fallback) exactly as the leaderboard does.
-export function computeExactByStage(
-  matchScores: Record<string, { exactPoints?: number }> | null | undefined,
-  stageOf: (matchId: string) => string,
+// Count of knockout matches whose TEAM IDENTITIES the form predicted correctly,
+// bucketed by stage. A match counts only when the actual bracket slot is
+// determined (both teams known) and the form's predicted bracket has the same
+// two teams in the same home/away slots — the identical ordered test the
+// Stats/Results match panels use (bracketMatchesActual). This is bracket-based,
+// so it tracks the live bracket without waiting for the group stage to end.
+export function computeMatchupHitsByStage(
+  predBracket: Record<string, BracketEntry> | null | undefined,
+  actualBracket: Record<string, BracketEntry> | null | undefined,
 ): Record<ExactStage, number> {
   const out = { R32: 0, R16: 0, QF: 0, SF: 0, F: 0, "3RD": 0 } as Record<ExactStage, number>;
-  if (!matchScores) return out;
-  for (const [matchId, s] of Object.entries(matchScores)) {
-    if (!s || !((s.exactPoints ?? 0) > 0)) continue;
-    const stage = stageOf(matchId);
-    if (stage in out) out[stage as ExactStage]++;
+  if (!actualBracket) return out;
+  for (const [matchId, at] of Object.entries(actualBracket)) {
+    if (!at || !at.home || !at.away) continue; // slot not determined yet
+    const stage = KO_STAGE_BY_ID[matchId];
+    if (!stage || !(stage in out)) continue;
+    const pt = predBracket?.[matchId];
+    if (pt && pt.home === at.home && pt.away === at.away) {
+      out[stage as ExactStage]++;
+    }
   }
   return out;
 }
@@ -135,7 +155,7 @@ export function computeFormMetricValues(
     outcomeCount: number;
   },
   advancingCounts: Record<AdvancingRound, number>,
-  exactByStage: Record<ExactStage, number>,
+  matchupByStage: Record<ExactStage, number>,
 ): Record<string, number> {
   return {
     rank: base.rank,
@@ -147,12 +167,12 @@ export function computeFormMetricValues(
     teamsQF: advancingCounts.QF,
     teamsSF: advancingCounts.SF,
     teamsF: advancingCounts.F,
-    exactR32: exactByStage.R32,
-    exactR16: exactByStage.R16,
-    exactQF: exactByStage.QF,
-    exactSF: exactByStage.SF,
-    exactF: exactByStage.F,
-    exact3RD: exactByStage["3RD"],
+    exactR32: matchupByStage.R32,
+    exactR16: matchupByStage.R16,
+    exactQF: matchupByStage.QF,
+    exactSF: matchupByStage.SF,
+    exactF: matchupByStage.F,
+    exact3RD: matchupByStage["3RD"],
   };
 }
 

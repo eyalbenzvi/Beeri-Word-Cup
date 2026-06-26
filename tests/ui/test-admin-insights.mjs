@@ -163,11 +163,23 @@ assert(
 // Metric derivations come from the shared pure util, not inline duplication.
 assert(
   /computeAdvancingCounts/.test(tab) &&
-    /computeExactByStage/.test(tab) &&
+    /computeMatchupHitsByStage/.test(tab) &&
     /computeFormMetricValues/.test(tab) &&
     /sortFormMetricRows/.test(tab) &&
     /from "\.\.\/utils\/formMetrics"/.test(tab),
   "FormsInsights delegates metric math to formMetrics.ts",
+);
+// Per-stage team + matchup metrics are bracket-based (Results-tab parity),
+// NOT scoring's all-groups-gated advancing — so they don't wait for the group
+// stage to finish.
+assert(
+  /getCachedBracket\(results, true\)/.test(tab) &&
+    /deriveAdvancingTeams\(actualBracketTeams\)/.test(tab),
+  "FormsInsights derives actual advancing/matchups from the results-gated bracket",
+);
+assert(
+  !/actualDerivedAdvancing/.test(tab),
+  "FormsInsights does NOT use scoring's gated actualDerivedAdvancing for the table",
 );
 // Up-to-3 cap is enforced in the picker.
 assert(
@@ -204,7 +216,7 @@ assert(
 );
 assert(
   /export function computeAdvancingCounts/.test(metrics) &&
-    /export function computeExactByStage/.test(metrics) &&
+    /export function computeMatchupHitsByStage/.test(metrics) &&
     /export function sortFormMetricRows/.test(metrics),
   "formMetrics exports the pure derivations + sort",
 );

@@ -12,7 +12,7 @@ import {
   ADVANCING_ROUNDS,
   EXACT_STAGES,
   computeAdvancingCounts,
-  computeExactByStage,
+  computeMatchupHitsByStage,
   computeFormMetricValues,
   sortFormMetricRows,
 } from "/home/user/Beeri-World-Cup/src/utils/formMetrics.js";
@@ -114,32 +114,52 @@ assert(
   eq(c.R32, 2, "predicted duplicates each count if actual contains them (set membership)");
 }
 
-// --- 3. computeExactByStage: bucket exact hits by stage ---
+// --- 3. computeMatchupHitsByStage: correct team-identity per knockout match ---
+// "משחק מדויק" = the form predicted the right two teams (ordered home/away,
+// same test the Stats/Results panels use), counted only for determined slots.
 {
-  const matchScores = {
-    "GROUP-1": { exactPoints: 3, outcomePoints: 1 }, // group exact (not a column)
-    "R32-1": { exactPoints: 3 }, // counts R32
-    "R32-2": { exactPoints: 0, outcomePoints: 3 }, // outcome only → not exact
-    "R16-1": { exactPoints: 3 },
-    "R16-2": { exactPoints: 3 },
-    "QF-1": { exactPoints: 0 },
-    "F-1": { exactPoints: 3 },
-    "3RD-1": { exactPoints: 3 },
+  const actualBracket = {
+    "R32-1": { home: "A", away: "B" }, // determined
+    "R32-2": { home: "C", away: "D" }, // determined
+    "R32-3": { home: "E", away: null }, // NOT determined (away missing)
+    "R32-4": { home: "G", away: "H" }, // determined, but form has no pred
+    "R16-1": { home: "A", away: "C" },
+    "QF-1": { home: null, away: null }, // not determined
+    "F-1": { home: "A", away: "Z" },
+    "3RD-1": { home: "M", away: "N" },
   };
-  const stageOf = (id) => id.split("-")[0].replace("GROUP", "group");
-  const e = computeExactByStage(matchScores, stageOf);
-  eq(e.R32, 1, "one exact hit in R32");
-  eq(e.R16, 2, "two exact hits in R16");
-  eq(e.QF, 0, "no exact hits in QF");
-  eq(e.SF, 0, "no exact hits in SF");
-  eq(e.F, 1, "one exact hit in final");
-  eq(e["3RD"], 1, "one exact hit in 3rd-place match");
-  // Group-stage exacts are intentionally NOT in the per-stage breakdown.
-  assert(!("group" in e), "group stage is excluded from per-stage exact buckets");
+  const predBracket = {
+    "R32-1": { home: "A", away: "B" }, // exact ✓
+    "R32-2": { home: "D", away: "C" }, // swapped → ordered test fails ✗
+    "R32-3": { home: "E", away: "F" }, // actual undetermined → not counted
+    "R16-1": { home: "A", away: "C" }, // ✓
+    "F-1": { home: "A", away: "Z" }, // ✓
+    "3RD-1": { home: "M", away: "X" }, // away wrong ✗
+  };
+  const m = computeMatchupHitsByStage(predBracket, actualBracket);
+  eq(m.R32, 1, "R32: only the exactly-matched pairing counts");
+  eq(m.R16, 1, "R16 matchup hit");
+  eq(m.QF, 0, "QF undetermined → 0");
+  eq(m.SF, 0, "SF absent → 0");
+  eq(m.F, 1, "final matchup hit");
+  eq(m["3RD"], 0, "3rd-place: wrong away team → no hit");
+  assert(!("group" in m), "no group bucket in the per-stage matchup map");
+}
+// Swapped home/away does NOT count (ordered comparison, mirrors scoring).
+{
+  const m = computeMatchupHitsByStage(
+    { "R32-1": { home: "B", away: "A" } },
+    { "R32-1": { home: "A", away: "B" } },
+  );
+  eq(m.R32, 0, "swapped pairing is not a matchup hit (ordered slots)");
 }
 assert(
-  EXACT_STAGES.every((s) => computeExactByStage(null, () => "F")[s] === 0),
-  "null matchScores → all-zero exact buckets",
+  EXACT_STAGES.every((s) => computeMatchupHitsByStage(null, null)[s] === 0),
+  "null brackets → all-zero matchup buckets",
+);
+assert(
+  EXACT_STAGES.every((s) => computeMatchupHitsByStage({}, undefined)[s] === 0),
+  "undefined actual bracket → all-zero matchup buckets",
 );
 
 // --- 4. computeFormMetricValues flattening ---
