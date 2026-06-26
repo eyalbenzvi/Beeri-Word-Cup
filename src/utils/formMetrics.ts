@@ -1,14 +1,17 @@
 // Per-form metric registry + pure derivations for the admin "מידע ונתונים →
 // טפסים" analytics table. Some metrics reuse leaderboard-scored fields (rank,
-// totalPoints, exactScoreCount, outcomeCount); the two per-stage families are
+// totalPoints, exactScoreCount, outcomeCount); the three per-stage families are
 // derived here directly from BRACKETS (not from scoring), so they reflect the
 // current bracket — exactly like the Results tab — without waiting for the
 // whole group stage to finish:
 //   • teams-reached-stage counts  (predicted advancers ∩ the bracket's actual
-//     advancers, per knockout round)
+//     advancers, per knockout round — position-INDEPENDENT)
 //   • correct-matchup counts      (form predicted the right team identities for
 //     a knockout match, bucketed by stage — same ordered home/away test the
 //     Stats/Results match panels use)
+//   • exact-position team counts  (teams the form placed in the SAME bracket
+//     slot — match + home/away side — as the actual bracket; finer than
+//     "reached the stage", more lenient than a full matchup)
 // Keeping the metric list, labels and value extraction in ONE place means the
 // component and its tests share a single source of truth.
 
@@ -31,10 +34,15 @@ export const ADVANCING_ROUNDS = ["R32", "R16", "QF", "SF", "F"] as const;
 // exactTotal metric, not a per-stage column.
 export const EXACT_STAGES = ["R32", "R16", "QF", "SF", "F", "3RD"] as const;
 
+// Knockout stages that carry an "exact-position teams" metric. The final and
+// third-place play-off are deliberately excluded (redundant there).
+export const EXACT_POS_STAGES = ["R32", "R16", "QF", "SF"] as const;
+
 export type AdvancingRound = (typeof ADVANCING_ROUNDS)[number];
 export type ExactStage = (typeof EXACT_STAGES)[number];
+export type ExactPosStage = (typeof EXACT_POS_STAGES)[number];
 
-export type MetricFamily = "general" | "advancing" | "exact";
+export type MetricFamily = "general" | "advancing" | "exact" | "exactPos";
 
 export interface FormMetricDef {
   key: string;
@@ -55,11 +63,13 @@ export const FAMILY_TITLE: Record<MetricFamily, string> = {
   general: "כללי",
   advancing: "קבוצות שעלו",
   exact: "משחקים מדויקים",
+  exactPos: "קבוצות מדויקות",
 };
 export const FAMILY_EYEBROW: Record<MetricFamily, string> = {
   general: "",
   advancing: "עלו",
-  exact: "מדויק",
+  exact: "משחק",
+  exactPos: "מיקום",
 };
 
 // Compact, RTL-friendly stage tokens reused by both stage families.
@@ -92,6 +102,11 @@ export const FORM_METRICS: FormMetricDef[] = [
   { key: "exactSF", label: "כמות משחקים מדויקים בחצי", family: "exact", col: STAGE_COL.SF, dir: "desc" },
   { key: "exactF", label: "כמות משחקים מדויקים בגמר", family: "exact", col: STAGE_COL.F, dir: "desc" },
   { key: "exact3RD", label: "כמות משחקים מדויקים במקום ה-3", family: "exact", col: STAGE_COL["3RD"], dir: "desc" },
+
+  { key: "posR32", label: "כמות קבוצות מדויקות בשלב ה-32", family: "exactPos", col: STAGE_COL.R32, dir: "desc" },
+  { key: "posR16", label: "כמות קבוצות מדויקות בשמינית", family: "exactPos", col: STAGE_COL.R16, dir: "desc" },
+  { key: "posQF", label: "כמות קבוצות מדויקות ברבע", family: "exactPos", col: STAGE_COL.QF, dir: "desc" },
+  { key: "posSF", label: "כמות קבוצות מדויקות בחצי", family: "exactPos", col: STAGE_COL.SF, dir: "desc" },
 ];
 
 export const FORM_METRIC_KEYS = FORM_METRICS.map((m) => m.key);
@@ -144,7 +159,31 @@ export function computeMatchupHitsByStage(
   return out;
 }
 
-// Flatten a scored leaderboard entry + the two derivations into the flat
+// Count of teams the form placed in the EXACT bracket slot (match + home/away
+// side) the actual bracket has them in, bucketed by stage. Slot-level: a match
+// where both teams are correctly placed contributes 2; one correct slot
+// contributes 1. Only determined actual slots count. Stricter than "reached the
+// stage" (advancing), more lenient than a full matchup hit. Final / 3rd-place
+// are intentionally not part of this family.
+export function computeExactPositionTeamsByStage(
+  predBracket: Record<string, BracketEntry> | null | undefined,
+  actualBracket: Record<string, BracketEntry> | null | undefined,
+): Record<ExactPosStage, number> {
+  const out = { R32: 0, R16: 0, QF: 0, SF: 0 } as Record<ExactPosStage, number>;
+  if (!actualBracket) return out;
+  for (const [matchId, at] of Object.entries(actualBracket)) {
+    if (!at) continue;
+    const stage = KO_STAGE_BY_ID[matchId];
+    if (!stage || !(stage in out)) continue;
+    const pt = predBracket?.[matchId];
+    if (!pt) continue;
+    if (at.home && pt.home === at.home) out[stage as ExactPosStage]++;
+    if (at.away && pt.away === at.away) out[stage as ExactPosStage]++;
+  }
+  return out;
+}
+
+// Flatten a scored leaderboard entry + the bracket derivations into the flat
 // metric-key → number record the table reads. Single source for "what value
 // does metric X have for this form", shared by the component and the tests.
 export function computeFormMetricValues(
@@ -156,6 +195,7 @@ export function computeFormMetricValues(
   },
   advancingCounts: Record<AdvancingRound, number>,
   matchupByStage: Record<ExactStage, number>,
+  positionByStage: Record<ExactPosStage, number>,
 ): Record<string, number> {
   return {
     rank: base.rank,
@@ -173,6 +213,10 @@ export function computeFormMetricValues(
     exactSF: matchupByStage.SF,
     exactF: matchupByStage.F,
     exact3RD: matchupByStage["3RD"],
+    posR32: positionByStage.R32,
+    posR16: positionByStage.R16,
+    posQF: positionByStage.QF,
+    posSF: positionByStage.SF,
   };
 }
 
