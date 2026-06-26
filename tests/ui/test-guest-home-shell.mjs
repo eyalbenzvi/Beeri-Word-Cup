@@ -97,9 +97,11 @@ for (const id of ["home", "predict", "leaderboard", "results", "stats"]) {
     `Layout nav lists "${id}" tab`);
 }
 
-// Bottom-nav (mobile/tablet) and DesktopSideNav coexist.
-assert(/<nav\s+className="fixed\s+bottom-0[^"]*xl:hidden/.test(layout),
-  "Layout has bottom-nav scoped to xl:hidden (mobile/tablet)");
+// Bottom-nav (mobile/tablet) and DesktopSideNav coexist. The nav is now a
+// frozen flex child of the app shell (not position:fixed) so the mobile URL
+// bar can't push it behind the gesture bar; still gated xl:hidden.
+assert(/<nav\s+className="[^"]*xl:hidden/.test(layout) && /<nav\s+className="[^"]*flex-shrink-0/.test(layout),
+  "Layout has frozen bottom-nav scoped to xl:hidden (mobile/tablet)");
 assert(/<DesktopSideNav\b/.test(layout),
   "Layout renders DesktopSideNav (xl+)");
 

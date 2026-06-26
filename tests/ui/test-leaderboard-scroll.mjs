@@ -20,6 +20,10 @@ console.log("=== LEADERBOARD SCROLL / BACK-TO-TOP TESTS ===\n");
 
 const lb = readMigratedSrc("src/pages/Leaderboard.jsx", "utf8");
 const btn = readMigratedSrc("src/components/BackToTopButton.jsx", "utf8");
+// Scroll is now routed through the #app-scroll container via the appScroll
+// helper (the document/body no longer scrolls). The passive-listener +
+// cleanup guarantees that used to live inline in the button now live here.
+const appScroll = readMigratedSrc("src/utils/appScroll.js", "utf8");
 
 // --- 1. No auto-scroll on entry -----------------------------------------
 
@@ -89,12 +93,20 @@ assert(
   "back-to-top scroll respects prefers-reduced-motion",
 );
 assert(
-  /\{ passive: true \}/.test(btn),
-  "scroll listener is passive (no scroll jank on mobile)",
+  /onAppScroll/.test(btn),
+  "back-to-top subscribes via onAppScroll (the #app-scroll container, not window)",
 );
 assert(
-  /removeEventListener\("scroll"/.test(btn),
-  "scroll listener is cleaned up on unmount",
+  /\{ passive: true \}/.test(appScroll),
+  "appScroll scroll listener is passive (no scroll jank on mobile)",
+);
+assert(
+  /removeEventListener\(\s*["']scroll["']/.test(appScroll),
+  "appScroll cleans up the scroll listener (button returns its unsubscribe)",
+);
+assert(
+  /return onAppScroll\(/.test(btn),
+  "back-to-top returns the onAppScroll unsubscribe for cleanup on unmount",
 );
 assert(
   /requestAnimationFrame/.test(btn),

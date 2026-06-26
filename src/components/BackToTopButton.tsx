@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronUp } from "lucide-react";
 import { preferredScrollBehavior } from "../utils/helpers";
+import { getAppScrollTop, onAppScroll, scrollAppToTop } from "../utils/appScroll";
 
 // Appear only after the user has scrolled roughly a phone viewport down —
 // at the top of the page the button is dead weight that covers content.
@@ -29,13 +30,14 @@ export default function BackToTopButton() {
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const y = window.scrollY;
+        const y = getAppScrollTop();
         setVisible((v) => (v ? y > HIDE_AT_PX : y > SHOW_AT_PX));
       });
     };
     onScroll(); // page may mount already scrolled (e.g. back-navigation restore)
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    // Listens on #app-scroll (the real scroll container); its scroll events
+    // do not bubble to window, so a window listener would never fire.
+    return onAppScroll(onScroll);
   }, []);
 
   if (!visible) return null;
@@ -43,9 +45,7 @@ export default function BackToTopButton() {
   return (
     <button
       type="button"
-      onClick={() =>
-        window.scrollTo({ top: 0, behavior: preferredScrollBehavior() })
-      }
+      onClick={() => scrollAppToTop(preferredScrollBehavior())}
       aria-label="חזרה לראש הדף"
       // z-40 sits below the header/bottom-nav (z-50) and every overlay
       // (z-[70]+) so the button never floats above a drawer or modal.

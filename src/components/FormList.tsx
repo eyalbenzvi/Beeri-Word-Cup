@@ -107,7 +107,7 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
 
   return (
     <div>
-      <div className="sticky top-16 z-10 bg-bg pb-3 pt-1">
+      <div className="sticky top-0 z-10 bg-bg pb-3 pt-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-extrabold text-ink tracking-tight">הטפסים שלך</h1>
           <button

@@ -186,6 +186,7 @@ run_test "118. Form Prediction View (others' forms = group tables + bracket, sha
 run_test "119. R32 Slot Placeholder (show '1A'/'מקום 3' instead of 'טרם נקבע')" "data/test-r32-slot-placeholder.mjs" "yes"
 run_test "120. Bracket Display Order (DFS tree order: feeders adjacent + BracketView wiring)" "data/test-bracket-display-order.mjs" "yes"
 run_test "121. Form Metrics (admin טפסים table: registry + advancing/exact derivations + sort)" "scoring/test-form-metrics.mjs" "yes"
+run_test "122. Frozen Chrome (app-shell inner-scroll: frozen header/footer, safe-area, scroll routing)" "ui/test-frozen-chrome.mjs" "no"
 
 echo ""
 echo "==========================================="

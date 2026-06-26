@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { scrollAppToTop } from '../utils/appScroll';
 
 const NavigationContext = createContext<any>(null);
 
@@ -92,7 +93,7 @@ export function NavigationProvider({ children }: { children: any }) {
       const next = readInitialFromURL();
       setPage(next.page);
       setParams(next.params);
-      try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* noop */ }
+      scrollAppToTop("auto");
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -108,7 +109,7 @@ export function NavigationProvider({ children }: { children: any }) {
     setPage(p);
     setParams(nextParams || {});
     writeURL(p, nextParams || {}, { replace: !!options.replace });
-    if (options.scroll !== false) window.scrollTo({ top: 0, behavior: "auto" });
+    if (options.scroll !== false) scrollAppToTop("auto");
   }, []);
 
   // Merge a partial param patch into the current params, preserving the page.
@@ -129,7 +130,7 @@ export function NavigationProvider({ children }: { children: any }) {
           return curPage;
         });
         if (options.scroll === true) {
-          try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* noop */ }
+          scrollAppToTop("auto");
         }
         return next;
       });

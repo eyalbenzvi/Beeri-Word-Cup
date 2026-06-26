@@ -24,6 +24,7 @@ import FormSummaryLines from "../components/FormSummaryLines";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
 import { preferredScrollBehavior } from "../utils/helpers";
+import { scrollAppToTop } from "../utils/appScroll";
 import { LABELS } from "../constants/messages";
 import BestCasePanel from "../components/BestCasePanel";
 import AchievementBadges from "../components/AchievementBadges";
@@ -252,7 +253,7 @@ export default function Leaderboard({
   // scroll offset of the row they tapped. Skipped in embedded admin preview.
   useEffect(() => {
     if (embedded || !selectedForm) return;
-    window.scrollTo({ top: 0, behavior: "auto" });
+    scrollAppToTop("auto");
   }, [selectedForm, embedded]);
 
   // Rank delta: compare current rank per formId with the rank we saw last

@@ -23,10 +23,11 @@ if (/TrendingUp|TrendingDown|rankDelta|previousRank/.test(src)) {
 
 // --- Selecting a form must reset scroll to top (regression lock) ---
 // Without this, opening a form deep in the leaderboard leaves the user
-// scrolled past the form header.
+// scrolled past the form header. Scroll is routed through the #app-scroll
+// container via scrollAppToTop (the document/body no longer scrolls).
 assert(
-  /selectedForm[\s\S]*window\.scrollTo|scrollTo\([^)]*top:\s*0/.test(src),
-  "selecting a form scrolls window to top",
+  /selectedForm[\s\S]*scrollAppToTop|scrollAppToTop\(/.test(src),
+  "selecting a form scrolls the app container to top (scrollAppToTop)",
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

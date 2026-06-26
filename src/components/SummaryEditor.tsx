@@ -662,7 +662,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
   // admin sees exactly what readers will. We strip the page chrome
   // (banners, prev/next, archive) — those aren't part of the post itself.
   const previewColumn = (
-    <div className="bg-bg rounded-2xl border-2 border-border p-4 md:p-6 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+    <div className="bg-bg rounded-2xl border-2 border-border p-4 md:p-6 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto">
       <div className="text-2xs font-extrabold text-ink-light uppercase tracking-wider mb-3">
         {BLOG.editor.tabPreview}
       </div>

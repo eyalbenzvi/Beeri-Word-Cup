@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { getAppScrollMetrics, onAppScroll } from "../utils/appScroll";
 
 // Hide once the user has scrolled past this — beyond here BackToTopButton
 // owns the same corner, and "down" is no longer the helpful direction.
@@ -46,9 +47,8 @@ export default function ScrollToBottomButton({
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const y = window.scrollY;
-        const scrollable =
-          document.documentElement.scrollHeight - window.innerHeight;
+        const { scrollTop: y, scrollHeight, clientHeight } = getAppScrollMetrics();
+        const scrollable = scrollHeight - clientHeight;
         const nearBottom = y >= scrollable - NEAR_BOTTOM_PX;
         if (scrollable < MIN_SCROLLABLE_PX || nearBottom) {
           setVisible(false);
@@ -61,15 +61,12 @@ export default function ScrollToBottomButton({
       });
     };
     evaluate(); // page may mount already scrolled (e.g. back-navigation restore)
-    window.addEventListener("scroll", evaluate, { passive: true });
-    // Content height changes (e.g. "show more" expanding the list, or a
-    // viewport rotate) don't emit a scroll event — re-evaluate on resize so
-    // the button correctly hides once the page is no longer scrollable.
-    window.addEventListener("resize", evaluate, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", evaluate);
-      window.removeEventListener("resize", evaluate);
-    };
+    // Listens on #app-scroll (the real scroll container); its scroll events
+    // do not bubble to window. Content height changes (e.g. "show more"
+    // expanding the list, or a viewport rotate) don't emit a scroll event —
+    // resize:true re-evaluates so the button correctly hides once the page is
+    // no longer scrollable.
+    return onAppScroll(evaluate, { resize: true });
   }, []);
 
   if (!visible) return null;
