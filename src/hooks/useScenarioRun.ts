@@ -14,16 +14,23 @@ const DEFAULT_SEED = 0x9e3779b9;
 export type RunOptions = { simCount: number; useBetting: boolean };
 
 // Fetch outright betting odds → implied champion probabilities. Soft: any
-// failure (no key, network, disabled) yields {} → the simulator uses pure Elo.
+// failure (no key, network, disabled, TIMEOUT) yields {} → the simulator uses
+// pure Elo. The 8s timeout guarantees a stalled odds API can never trap the
+// admin on the progress bar (the worker only starts after this resolves).
+const BETTING_FETCH_TIMEOUT_MS = 8000;
 async function fetchBettingOdds(): Promise<Record<string, number>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BETTING_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch("/.netlify/functions/get-betting-odds");
+    const res = await fetch("/.netlify/functions/get-betting-odds", { signal: controller.signal });
     if (!res.ok) return {};
     const data = await res.json();
     const probs = data?.impliedProbs;
     return probs && typeof probs === "object" ? probs : {};
   } catch {
     return {};
+  } finally {
+    clearTimeout(timer);
   }
 }
 

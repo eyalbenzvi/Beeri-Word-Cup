@@ -72,7 +72,15 @@ async function fetchOdds() {
   const sport = process.env.ODDS_API_SPORT || "soccer_fifa_world_cup_winner";
   const url = `${ODDS_BASE}/sports/${encodeURIComponent(sport)}/odds?regions=eu&markets=outrights&oddsFormat=decimal&apiKey=${encodeURIComponent(key)}`;
 
-  const res = await fetch(url);
+  // Bound the upstream call so a stalled odds API can't hang the function.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  let res;
+  try {
+    res = await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`odds API ${res.status}`);
   const data = await res.json();
 
