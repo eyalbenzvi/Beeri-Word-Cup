@@ -16,6 +16,7 @@ export type ScenarioRunState = {
   result: ScenarioRunResult | null;
   error: boolean;
   loadedFromStore: boolean; // result came from a previous persisted run
+  saveError: boolean; // computed OK but persisting to Firestore failed
 };
 
 export function useScenarioRun(simCount: number = DEFAULT_SIM_COUNT): {
@@ -36,6 +37,7 @@ export function useScenarioRun(simCount: number = DEFAULT_SIM_COUNT): {
     result: null,
     error: false,
     loadedFromStore: false,
+    saveError: false,
   });
 
   const safeSet = useCallback(
@@ -70,50 +72,52 @@ export function useScenarioRun(simCount: number = DEFAULT_SIM_COUNT): {
   const reset = useCallback(() => {
     workerRef.current?.terminate();
     workerRef.current = null;
-    safeSet({ loading: false, percent: 0, result: null, error: false, loadedFromStore: false });
+    safeSet({ loading: false, percent: 0, result: null, error: false, loadedFromStore: false, saveError: false });
   }, [safeSet]);
 
   const compute = useCallback(() => {
     workerRef.current?.terminate();
-    safeSet({ loading: true, percent: 0, result: null, error: false, loadedFromStore: false });
+    safeSet({ loading: true, percent: 0, result: null, error: false, loadedFromStore: false, saveError: false });
 
-    const worker = new Worker(
-      new URL("../workers/scenarioWorker.ts", import.meta.url),
-      { type: "module" },
-    );
-    workerRef.current = worker;
-
+    let worker: Worker;
     const fail = () => {
-      safeSet({ loading: false, percent: 0, result: null, error: true, loadedFromStore: false });
-      worker.terminate();
+      safeSet({ loading: false, percent: 0, result: null, error: true, loadedFromStore: false, saveError: false });
+      worker?.terminate();
       workerRef.current = null;
     };
 
-    worker.onmessage = (e: MessageEvent) => {
-      const { type } = e.data;
-      if (type === "progress") {
-        const pct = e.data.total ? Math.round((e.data.done / e.data.total) * 100) : 0;
-        safeSet((s) => ({ ...s, percent: pct }));
-      } else if (type === "result") {
-        const result = e.data.result as ScenarioRunResult;
-        safeSet({ loading: false, percent: 100, result, error: false, loadedFromStore: false });
-        worker.terminate();
-        workerRef.current = null;
-        // Persist (fire-and-forget; admin-gated inside).
-        saveScenarioRun(result);
-      } else if (type === "error") {
-        fail();
-      }
-    };
-    worker.onerror = fail;
+    // Worker construction or the structured-clone of the (large) payload can
+    // throw synchronously; without this guard the UI would be stuck on the
+    // progress bar forever (see CLAUDE.md failure-path rule).
+    try {
+      worker = new Worker(new URL("../workers/scenarioWorker.ts", import.meta.url), { type: "module" });
+      workerRef.current = worker;
 
-    worker.postMessage({
-      allPredictions,
-      results,
-      actualBonuses,
-      simCount,
-      seed: DEFAULT_SEED,
-    });
+      worker.onmessage = (e: MessageEvent) => {
+        const { type } = e.data;
+        if (type === "progress") {
+          const pct = e.data.total ? Math.round((e.data.done / e.data.total) * 100) : 0;
+          safeSet((s) => ({ ...s, percent: pct }));
+        } else if (type === "result") {
+          const result = e.data.result as ScenarioRunResult;
+          safeSet({ loading: false, percent: 100, result, error: false, loadedFromStore: false, saveError: false });
+          worker.terminate();
+          workerRef.current = null;
+          // Persist and SURFACE failure — the admin must not believe a 2-minute
+          // run was saved when it wasn't (it would silently vanish on reload).
+          saveScenarioRun(result).then((ok) =>
+            safeSet((s) => ({ ...s, saveError: !ok })),
+          );
+        } else if (type === "error") {
+          fail();
+        }
+      };
+      worker.onerror = fail;
+
+      worker.postMessage({ allPredictions, results, actualBonuses, simCount, seed: DEFAULT_SEED });
+    } catch {
+      fail();
+    }
   }, [allPredictions, results, actualBonuses, simCount, safeSet]);
 
   return { state, compute, reset };

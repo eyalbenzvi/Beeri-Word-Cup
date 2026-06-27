@@ -1,14 +1,19 @@
 // Admin-only persistence for the Monte-Carlo scenario run.
 //
-// The run is a ~100 KB summarized snapshot (see scenarioSim.ScenarioRunResult).
+// The run is a summarized snapshot (see scenarioSim.ScenarioRunResult): for
+// ~250 forms and up to 60 champion+runner-up tables the JSON is ~250–300 KB —
+// comfortably under Firestore's 1 MB doc limit, but it does scale with form
+// count × scenario count, so it is capped at the source (MAX_SCENARIOS).
 // It is deliberately NOT wired into the realtime cache/listener set: the
 // feature is admin-only and the payload is large, so every page visitor must
 // not pay to stream it. Instead the admin tab does a one-off getDoc on open
 // and a setDoc after each compute. Stored at gameData/scenarioRun as
-// { data: <run> } to match the existing gameData doc envelope.
+// { data: <run> } to match the existing gameData doc envelope. Writes route
+// through retryOnPermissionDenied so a freshly-minted/expired admin token
+// recovers (the same protection writeGameDoc gives the other gameData docs).
 
 import { getDoc, setDoc } from "firebase/firestore";
-import { gameDocRef, safeClone, withTimeout } from "./firestoreClient";
+import { gameDocRef, safeClone, withTimeout, retryOnPermissionDenied } from "./firestoreClient";
 import { requireAdmin } from "./usersRepo";
 import { writeAuditLog } from "./audit";
 import { captureClientError } from "../sentry";
@@ -24,9 +29,9 @@ export async function saveScenarioRun(run: ScenarioRunResult): Promise<boolean> 
     formCount: run.meta.formCount,
   });
   try {
-    await withTimeout(
-      setDoc(gameDocRef(SCENARIO_DOC), { data: safeClone(run) }),
-      15000,
+    await retryOnPermissionDenied(
+      () => setDoc(gameDocRef(SCENARIO_DOC), { data: safeClone(run) }),
+      { timeoutMs: 15000 },
     );
     return true;
   } catch (err: any) {

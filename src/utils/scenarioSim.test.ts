@@ -38,16 +38,25 @@ describe("runScenarioSimulation", () => {
     expect(JSON.stringify(strip(run()))).toBe(JSON.stringify(strip(run())));
   });
 
-  it("excludes non-submitted forms", () => {
+  it("excludes non-submitted forms (forms map holds only eligible labels)", () => {
     const res = run();
     expect(res.forms["draft__1"]).toBeUndefined();
     expect(res.meta.formCount).toBe(20);
+    expect(Object.keys(res.forms).length).toBe(20);
   });
 
-  it("win probabilities across forms sum to ~1 (one winner per sim)", () => {
-    const res = run();
-    const total = Object.values(res.forms).reduce((s, f) => s + f.winProb, 0);
-    expect(total).toBeCloseTo(1, 5);
+  it("returns a valid empty run when there are no eligible forms", () => {
+    const res = runScenarioSimulation({
+      allPredictions: { draft__1: { userId: "d", formName: "D", status: "draft", matches: {} } },
+      results,
+      actualBonuses: { topScorers: [] },
+      simCount: 100,
+      seed: 1,
+    });
+    expect(res.meta.formCount).toBe(0);
+    expect(res.formOrder).toEqual([]);
+    expect(res.scenarios).toEqual([]);
+    expect(res.champions).toEqual([]);
   });
 
   it("champion probabilities sum to ~1 and are sorted descending", () => {
@@ -56,18 +65,6 @@ describe("runScenarioSimulation", () => {
     expect(total).toBeCloseTo(1, 5);
     for (let i = 1; i < res.champions.length; i++) {
       expect(res.champions[i - 1].prob).toBeGreaterThanOrEqual(res.champions[i].prob);
-    }
-  });
-
-  it("produces finite, JSON-safe stats (no NaN) with median within IQR", () => {
-    const res = run();
-    const json = JSON.stringify(res);
-    expect(json).not.toContain("null,null"); // sanity: structure intact
-    for (const f of Object.values(res.forms)) {
-      expect(Number.isFinite(f.winProb)).toBe(true);
-      expect(Number.isFinite(f.meanRank)).toBe(true);
-      expect(f.q25).toBeLessThanOrEqual(f.medianRank);
-      expect(f.medianRank).toBeLessThanOrEqual(f.q75);
     }
   });
 
@@ -92,10 +89,14 @@ describe("runScenarioSimulation", () => {
       const sum = sc.winProb.reduce((s, p) => s + p, 0);
       expect(sum).toBeGreaterThan(0.98);
       expect(sum).toBeLessThan(1.02);
-      // averages are within sane bounds.
-      for (const r of sc.avgRank) {
-        expect(r).toBeGreaterThanOrEqual(1);
-        expect(r).toBeLessThanOrEqual(res.formOrder.length);
+      // averages are within sane bounds and JSON-safe (no NaN/Infinity, which
+      // safeClone would silently turn into null → break the UI's toFixed).
+      for (let i = 0; i < sc.avgRank.length; i++) {
+        expect(Number.isFinite(sc.avgRank[i])).toBe(true);
+        expect(Number.isFinite(sc.avgPoints[i])).toBe(true);
+        expect(Number.isFinite(sc.winProb[i])).toBe(true);
+        expect(sc.avgRank[i]).toBeGreaterThanOrEqual(1);
+        expect(sc.avgRank[i]).toBeLessThanOrEqual(res.formOrder.length);
       }
     }
   });
