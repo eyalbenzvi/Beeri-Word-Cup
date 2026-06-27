@@ -102,7 +102,7 @@ service cloud.firestore {
       // else is any-auth.
       allow read: if (
         docId == 'settings' ||
-        (docId == 'users' || docId == 'uidMigrationMap' ? isAdmin() : isAuth())
+        (docId == 'users' || docId == 'uidMigrationMap' || docId == 'scenarioRun' ? isAdmin() : isAuth())
       );
 
       // Users document: first creation allowed; updates restricted
@@ -140,7 +140,7 @@ service cloud.firestore {
       // Admin-only documents. uidMigrationMap is written exclusively by the
       // Admin SDK (migration script + phone-verify-otp); listing it here
       // documents that browser clients must never write it directly.
-      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap'];
+      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap', 'scenarioRun'];
     }
 
     // userPrivate/{uid} — per-user private record (email, isAdmin,

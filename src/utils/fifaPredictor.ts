@@ -15,11 +15,11 @@ const OUTCOME_TIERS = [
 ];
 
 // Mid-table fallback for teams missing from FIFA_RANK (≈ middle of 48 finalists).
-const DEFAULT_RANK = 25;
+export const DEFAULT_RANK = 25;
 
 // Probability the lower-ranked team advances when a knockout match is drawn.
 // Models penalty-shootout variance without making it a coin flip.
-const KNOCKOUT_DRAW_UPSET_CHANCE = 0.20;
+export const KNOCKOUT_DRAW_UPSET_CHANCE = 0.20;
 
 function getOutcomeProbabilities(rankHome, rankAway) {
   const diff = Math.abs(rankHome - rankAway);
@@ -43,9 +43,11 @@ const UPSET_SCORES = [
   [0,1,32], [1,2,28], [0,2,16], [1,3,10], [0,3,6], [2,3,5], [1,4,3],
 ];
 
-function pickWeighted(options) {
+// `rng` defaults to Math.random so existing callers are unaffected; the
+// scenario simulator injects a SEEDED rng for reproducible runs.
+function pickWeighted(options, rng: () => number = Math.random) {
   const total = options.reduce((s, o) => s + o[o.length - 1], 0);
-  let r = Math.random() * total;
+  let r = rng() * total;
   for (const o of options) {
     r -= o[o.length - 1];
     if (r <= 0) return o;
@@ -53,27 +55,42 @@ function pickWeighted(options) {
   return options[0];
 }
 
+// Sample a scoreline GIVEN an outcome: 0 = home win, 1 = draw, 2 = away win.
+// Pulls from the real-WC score distributions. Shared by the FIFA-rank path
+// (predictScoreline) and the scenario simulator's Elo path (eloModel) so both
+// produce realistic scorelines from the SAME validated tables.
+export function scorelineFromOutcome(outcome: 0 | 1 | 2, rng: () => number = Math.random) {
+  if (outcome === 0) {
+    const [h, a] = pickWeighted(WIN_SCORES, rng);
+    return { homeScore: h, awayScore: a };
+  }
+  if (outcome === 1) {
+    const [h, a] = pickWeighted(DRAW_SCORES, rng);
+    return { homeScore: h, awayScore: a };
+  }
+  const [h, a] = pickWeighted(UPSET_SCORES, rng);
+  return { homeScore: h, awayScore: a };
+}
+
+// Sample a scoreline from two (possibly EFFECTIVE) FIFA ranks. Lower rank =
+// stronger team. Used by the AI auto-fill; the scenario tool uses the Elo
+// model instead.
+export function predictScoreline(
+  rankH: number,
+  rankA: number,
+  rng: () => number = Math.random,
+) {
+  const probs = getOutcomeProbabilities(rankH, rankA);
+  const roll = rng();
+  const outcome = roll < probs.homeWin ? 0 : roll < probs.homeWin + probs.draw ? 1 : 2;
+  return scorelineFromOutcome(outcome, rng);
+}
+
 // Predict a single match
-export function predictMatch(homeTeam, awayTeam) {
+export function predictMatch(homeTeam, awayTeam, rng: () => number = Math.random) {
   const rankH = FIFA_RANK[homeTeam] || DEFAULT_RANK;
   const rankA = FIFA_RANK[awayTeam] || DEFAULT_RANK;
-  const probs = getOutcomeProbabilities(rankH, rankA);
-
-  const roll = Math.random();
-  let homeScore, awayScore;
-
-  if (roll < probs.homeWin) {
-    const [h, a] = pickWeighted(WIN_SCORES);
-    homeScore = h; awayScore = a;
-  } else if (roll < probs.homeWin + probs.draw) {
-    const [h, a] = pickWeighted(DRAW_SCORES);
-    homeScore = h; awayScore = a;
-  } else {
-    const [h, a] = pickWeighted(UPSET_SCORES);
-    homeScore = h; awayScore = a;
-  }
-
-  return { homeScore, awayScore };
+  return predictScoreline(rankH, rankA, rng);
 }
 
 // Treat a prediction as "already filled" only when BOTH scores are numbers.
@@ -96,6 +113,7 @@ export function predictAllMatches(
   knockoutMatches,
   calcBracketTeams,
   existingPreds = {},
+  rng: () => number = Math.random,
 ) {
   const allPreds = {};
 
@@ -105,7 +123,7 @@ export function predictAllMatches(
     if (isFilled(existing)) {
       allPreds[m.id] = { ...existing };
     } else {
-      allPreds[m.id] = predictMatch(m.homeTeam, m.awayTeam);
+      allPreds[m.id] = predictMatch(m.homeTeam, m.awayTeam, rng);
     }
   }
 
@@ -122,14 +140,14 @@ export function predictAllMatches(
       }
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
-      const pred: any = predictMatch(teams.home, teams.away);
+      const pred: any = predictMatch(teams.home, teams.away, rng);
       if (pred.homeScore === pred.awayScore) {
         const rankH = FIFA_RANK[teams.home] || DEFAULT_RANK;
         const rankA = FIFA_RANK[teams.away] || DEFAULT_RANK;
         const favored = rankH <= rankA ? teams.home : teams.away;
         const underdog = favored === teams.home ? teams.away : teams.home;
         pred.advancingTeam =
-          Math.random() < KNOCKOUT_DRAW_UPSET_CHANCE ? underdog : favored;
+          rng() < KNOCKOUT_DRAW_UPSET_CHANCE ? underdog : favored;
       }
       allPreds[m.id] = pred;
     }
