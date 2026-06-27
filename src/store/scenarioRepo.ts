@@ -7,7 +7,7 @@
 // into the realtime cache: the payload is large and only the "data" tab needs
 // it, so the tab does a one-off getDoc.
 
-import { getDoc } from "firebase/firestore";
+import { getDoc, onSnapshot } from "firebase/firestore";
 import { gameDocRef, withTimeout } from "./firestoreClient";
 import { captureClientError } from "../sentry";
 import type { ScenarioRunResult } from "../utils/scenarioSim";
@@ -26,6 +26,22 @@ export async function loadScenarioRun(): Promise<ScenarioRunResult | null> {
     captureClientError(err, { source: "loadScenarioRun", code: err?.code });
     return null;
   }
+}
+
+// Live subscription so the "נתונים" tab auto-updates the moment the server
+// finishes a recompute (no stale numbers after a result). Returns unsubscribe.
+export function subscribeScenarioRun(
+  onData: (run: ScenarioRunResult | null) => void,
+  onError?: (err: any) => void,
+): () => void {
+  return onSnapshot(
+    gameDocRef(SCENARIO_DOC),
+    (snap) => onData(snap.exists() ? ((snap.data()?.data as ScenarioRunResult) ?? null) : null),
+    (err) => {
+      captureClientError(err, { source: "subscribeScenarioRun", code: err?.code });
+      onError?.(err);
+    },
+  );
 }
 
 // Fire-and-forget poke to recompute scenarios after a result changes. The

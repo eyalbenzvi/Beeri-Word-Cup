@@ -126,7 +126,7 @@ export {
   isSettingsServerConfirmed,
   updateSettings,
 } from "./resultsRepo";
-export { loadScenarioRun, triggerScenarioRecompute } from "./scenarioRepo";
+export { loadScenarioRun, subscribeScenarioRun, triggerScenarioRecompute } from "./scenarioRepo";
 export { maybeTriggerAutoFill } from "./autoFill";
 export {
   BACKUP_SCHEMA_VERSION,

@@ -333,3 +333,25 @@ export function runScenarioSimulation(opts: {
 
   return { meta, formOrder: formIds, forms, champions, scenarios };
 }
+
+// Firestore caps a document at 1 MiB. A run is normally ~170–300 KB, but the
+// scenario tables grow with formCount × scenarioCount, so before persisting we
+// guard against the hard limit by dropping the LEAST-likely finals (scenarios
+// are sorted by samples desc) until the serialized run fits a conservative
+// budget. Returns the (possibly trimmed) run + whether anything was dropped so
+// the caller can alert. Pure — unit-tested.
+export const SCENARIO_DOC_MAX_BYTES = 900_000;
+export function fitScenarioRunToDoc(
+  run: ScenarioRunResult,
+  maxBytes: number = SCENARIO_DOC_MAX_BYTES,
+): { run: ScenarioRunResult; trimmed: number } {
+  let scenarios = run.scenarios;
+  let current = run;
+  let trimmed = 0;
+  while (scenarios.length > 1 && JSON.stringify(current).length > maxBytes) {
+    scenarios = scenarios.slice(0, scenarios.length - 1);
+    current = { ...run, scenarios };
+    trimmed += 1;
+  }
+  return { run: current, trimmed };
+}

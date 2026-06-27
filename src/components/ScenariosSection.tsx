@@ -7,7 +7,7 @@ import Spinner from "./Spinner";
 // explorer. Shared by the user "נתונים" tab and the admin tab (the latter
 // passes showRecompute to expose a manual "recompute now" poke).
 export default function ScenariosSection({ showRecompute = false }: { showRecompute?: boolean }) {
-  const { state, refresh, recompute } = useScenarioData();
+  const { state, recompute } = useScenarioData();
   const { user } = useCurrentUser();
   const run = state.result;
 
@@ -29,16 +29,11 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
             סימולציה של שארית הטורניר. בחרו גמר וראו מי צפוי להוביל.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={refresh} disabled={state.loading} className="btn-duo btn-duo-ghost btn-duo-sm">
-            רענן
+        {showRecompute && (
+          <button onClick={recompute} className="btn-duo btn-duo-blue btn-duo-sm shrink-0" title="מפעיל חישוב מחדש בשרת (כדקות)">
+            חשב מחדש
           </button>
-          {showRecompute && (
-            <button onClick={recompute} className="btn-duo btn-duo-blue btn-duo-sm" title="מפעיל חישוב מחדש בשרת (כדקות)">
-              חשב מחדש
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {state.loading ? (

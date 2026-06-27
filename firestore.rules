@@ -101,11 +101,16 @@ service cloud.firestore {
       // would leak PII back if any authed user could read it); everything
       // else is any-auth.
       // settings is public; users + uidMigrationMap are admin-only; scenarioRun
-      // (server-computed simulation summary) is readable by any authed user;
-      // everything else is any-auth.
+      // (server-computed simulation summary) contains formIds — which embed
+      // phone-derived UIDs — so it is gated exactly like the predictions
+      // collection: any authed user once predictions are LOCKED (by which point
+      // the same formIds are already readable via predictions), or any admin.
+      // Everything else is any-auth.
       allow read: if (
-        docId == 'settings' ||
-        (docId == 'users' || docId == 'uidMigrationMap' ? isAdmin() : isAuth())
+        docId == 'settings' ? true :
+        (docId == 'users' || docId == 'uidMigrationMap') ? isAdmin() :
+        docId == 'scenarioRun' ? (isAdmin() || (isAuth() && isLocked())) :
+        isAuth()
       );
 
       // Users document: first creation allowed; updates restricted

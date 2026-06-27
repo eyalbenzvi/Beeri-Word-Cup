@@ -3,7 +3,7 @@ import { groupMatches, knockoutMatches } from "../data/matches";
 import { calcBracketTeams } from "./bracket";
 import { predictAllMatches, predictScoreline } from "./fifaPredictor";
 import { FIFA_RANK_DENSE } from "../data/fifaRanking";
-import { mulberry32, runScenarioSimulation } from "./scenarioSim";
+import { mulberry32, runScenarioSimulation, fitScenarioRunToDoc } from "./scenarioSim";
 
 function buildFixture(nForms: number) {
   const rng = mulberry32(1);
@@ -101,4 +101,19 @@ describe("runScenarioSimulation", () => {
     }
   });
 
+  it("fitScenarioRunToDoc leaves a small run untouched and trims a huge one", () => {
+    const res = runScenarioSimulation({
+      allPredictions, results, actualBonuses: { topScorers: [] }, simCount: 3000, seed: 7, minScenarioSamples: 30,
+    });
+    const big = fitScenarioRunToDoc(res, 5_000_000);
+    expect(big.trimmed).toBe(0);
+    expect(big.run.scenarios.length).toBe(res.scenarios.length);
+
+    const tiny = fitScenarioRunToDoc(res, 1000);
+    expect(tiny.run.scenarios.length).toBeLessThanOrEqual(1);
+    expect(tiny.trimmed).toBeGreaterThan(0);
+    if (tiny.run.scenarios.length === 1) {
+      expect(tiny.run.scenarios[0].samples).toBe(res.scenarios[0].samples);
+    }
+  });
 });

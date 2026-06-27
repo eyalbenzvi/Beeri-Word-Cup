@@ -10,7 +10,7 @@
 //
 // Bundled by esbuild (netlify.toml), which compiles the imported TS compute.
 import admin from "firebase-admin";
-import { runScenarioSimulation } from "../../src/utils/scenarioSim";
+import { runScenarioSimulation, fitScenarioRunToDoc } from "../../src/utils/scenarioSim";
 import { canAcquireLock, shouldRerun, SCENARIO_LOCK_TTL_MS } from "../../src/utils/scenarioLock";
 
 const SIM_COUNT = Number(process.env.SCENARIO_SIM_COUNT) || 100000;
@@ -39,12 +39,22 @@ async function acquireLock(db) {
       tx.set(ref, { rerunRequested: true }, { merge: true });
       return false;
     }
+    // A non-null lockedAt that we're allowed to take = a STALE lock (a prior
+    // run was killed mid-flight, e.g. hit Netlify's 15-min limit). Surface it.
+    if (lock && lock.lockedAt) {
+      console.error(
+        `scenario-recompute: reclaiming STALE lock (held ${Math.round((Date.now() - lock.lockedAt) / 1000)}s) — a prior run likely crashed/timed out`,
+      );
+    }
     tx.set(ref, { lockedAt: Date.now(), rerunRequested: false });
     return true;
   });
 }
 
-// Release the lock; return whether a rerun was requested while we ran.
+// Release the lock; return whether a rerun was requested while we ran. Runs in
+// a transaction, so a concurrent acquireLock that set rerunRequested either
+// commits before our get (we see it → rerun) or conflicts with our write
+// (Firestore retries our tx, we re-read, we see it) — the flag is never lost.
 async function releaseLock(db) {
   const ref = gameDoc(db, "scenarioLock");
   return db.runTransaction(async (tx) => {
@@ -91,12 +101,18 @@ export const handler = async () => {
 
     try {
       const { allPredictions, results, actualBonuses } = await readInputs(db);
-      const run = runScenarioSimulation({
+      const full = runScenarioSimulation({
         allPredictions,
         results,
         actualBonuses,
         simCount: SIM_COUNT,
       });
+      // Guard Firestore's 1 MiB doc limit: trim the least-likely finals until
+      // the run fits. Loud if anything was dropped (a scaling signal).
+      const { run, trimmed } = fitScenarioRunToDoc(full);
+      if (trimmed > 0) {
+        console.error(`scenario-recompute: trimmed ${trimmed} scenario(s) to fit the 1MB doc limit (formCount=${run.meta.formCount})`);
+      }
       await gameDoc(db, "scenarioRun").set({ data: run });
     } finally {
       const rerun = await releaseLock(db);

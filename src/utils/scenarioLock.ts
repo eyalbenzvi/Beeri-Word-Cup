@@ -12,7 +12,12 @@
 // This collapses a burst of result entries into "run now + one more run after",
 // always converging on the latest data without piling up concurrent runs.
 
-export const SCENARIO_LOCK_TTL_MS = 20 * 60 * 1000; // > worst-case run time
+// TTL window for a held lock. It must sit ABOVE the realistic worst-case run
+// time (100k sims ≈ 3 min, a few min even for a large pool) so a still-running
+// job is never reclaimed mid-run, and BELOW Netlify's 15-min background-function
+// hard kill so a crashed/killed holder is always reclaimable by the next poke
+// (otherwise the lock would wedge recompute forever). 10 min satisfies both.
+export const SCENARIO_LOCK_TTL_MS = 10 * 60 * 1000;
 
 export type ScenarioLock = { lockedAt: number | null; rerunRequested?: boolean };
 

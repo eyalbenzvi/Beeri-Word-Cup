@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ScenarioRunResult } from "../utils/scenarioSim";
-import { loadScenarioRun, triggerScenarioRecompute } from "../store";
+import { subscribeScenarioRun, triggerScenarioRecompute } from "../store";
 
 // Read-only access to the SERVER-computed scenario run (gameData/scenarioRun),
 // which is recomputed automatically after every result entry. The client never
-// runs the simulation anymore — it just loads the latest summary. Admins can
-// poke a recompute, but normally it happens on its own.
+// runs the simulation — it subscribes so the view auto-refreshes the instant the
+// server writes a new run (no stale numbers after a result). Admins can poke a
+// recompute, but normally it happens on its own.
 
 export type ScenarioDataState = {
   loading: boolean;
@@ -15,42 +16,31 @@ export type ScenarioDataState = {
 
 export function useScenarioData(): {
   state: ScenarioDataState;
-  refresh: () => void;
   recompute: () => void;
 } {
-  const mountedRef = useRef(true);
   const [state, setState] = useState<ScenarioDataState>({
     loading: true,
     result: null,
     error: false,
   });
 
-  const load = useCallback(() => {
-    setState((s) => ({ ...s, loading: true }));
-    loadScenarioRun()
-      .then((run) => {
-        if (!mountedRef.current) return;
-        setState({ loading: false, result: run, error: false });
-      })
-      .catch(() => {
-        if (!mountedRef.current) return;
-        setState({ loading: false, result: null, error: true });
-      });
+  useEffect(() => {
+    let active = true;
+    const unsub = subscribeScenarioRun(
+      (run) => active && setState({ loading: false, result: run, error: false }),
+      () => active && setState((s) => ({ ...s, loading: false, error: true })),
+    );
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    load();
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [load]);
-
-  // Admin-only convenience: kick a server recompute, then (optimistically) the
-  // admin can refresh in ~a few minutes to see the new run.
+  // Admin-only convenience: kick a server recompute. The subscription will pick
+  // up the new run automatically once the (~3 min) job finishes.
   const recompute = useCallback(() => {
     triggerScenarioRecompute();
   }, []);
 
-  return { state, refresh: load, recompute };
+  return { state, recompute };
 }
