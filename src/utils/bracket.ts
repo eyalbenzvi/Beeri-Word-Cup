@@ -24,6 +24,7 @@ const ROUND_PARENT = { R16: "R32", QF: "R16", SF: "QF", F: "SF" };
 import { isScoreValid } from "./helpers";
 import { triggerAutoFillCheck } from "./autoFillTrigger";
 import { computeThirdPlaceCertainty, isGroupComplete } from "./thirdPlaceCertainty";
+import { computeCertainGroupWinners } from "./groupWinnerCertainty";
 
 const ALL_TEAMS_MAP = {};
 for (const [groupName, teams] of Object.entries(GROUPS)) {
@@ -336,23 +337,37 @@ export function calcBracketTeams(matchPredictions: Record<string, any>, gatingOn
     thirdSlotTeam = (matchId) => thirdAssignments[matchId] || null;
   }
 
+  // Early group-WINNER display: in the gated bracket a 1st-place slot may fill
+  // before its group finishes, once that winner is mathematically clinched
+  // (typically after matchday 2 — see groupWinnerCertainty.ts). Computed only in
+  // the gated path; the ungated (prediction) path resolves everything anyway.
+  const certainWinners = gatingOnResults ? computeCertainGroupWinners(matchPredictions) : {};
+
+  // Can a group-position slot (1X / 2X) be filled yet?
+  //  • ungated: always (full hypothetical bracket).
+  //  • gated + group complete: yes (final standings).
+  //  • gated + group incomplete: ONLY a 1st-place slot whose winner is already
+  //    clinched. Runner-up (2X) has no sound early criterion, so it waits for the
+  //    group to complete.
+  const groupSlotReady = (code: string): boolean => {
+    if (!gatingOnResults) return true;
+    const group = code[1];
+    if (completedGroupMatches[group] === 6) return true;
+    return code[0] === "1" && !!certainWinners[group];
+  };
+
   for (const match of R32_MATCHES) {
     let home = null,
       away = null;
 
-    // Group-position slots (1A, 2B, …): fill when that group is complete.
-    const homeCompleted = !gatingOnResults || (match.home.match(/^[12][A-L]$/) ?
-      completedGroupMatches[match.home[1]] === 6 : true); // non-position home slots always ready
-    const awayCompleted = !gatingOnResults ||
-      (match.away.match(/^[12][A-L]$/) ? completedGroupMatches[match.away[1]] === 6 : true);
-
-    if (homeCompleted && match.home.match(/^[12][A-L]$/)) {
+    // Group-position slots (1A, 2B, …): fill per groupSlotReady gating.
+    if (match.home.match(/^[12][A-L]$/) && groupSlotReady(match.home)) {
       home = resolvePosition(match.home, standings);
     }
 
     if (match.away === "3rd") {
       away = thirdSlotTeam(match.id);
-    } else if (awayCompleted && match.away.match(/^[12][A-L]$/)) {
+    } else if (match.away.match(/^[12][A-L]$/) && groupSlotReady(match.away)) {
       away = resolvePosition(match.away, standings);
     }
 
