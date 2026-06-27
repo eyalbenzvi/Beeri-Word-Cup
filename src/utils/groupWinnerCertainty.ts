@@ -8,41 +8,46 @@
 // guaranteed, so the bracket can show that team in its R32 "1X" slot early
 // (see calcBracketTeams in bracket.ts).
 //
+// FIFA 2026 GROUP TIEBREAKERS (this is a CHANGE from earlier tournaments):
+//   1. points
+//   2. HEAD-TO-HEAD points  ┐ among the teams level on (1)
+//   3. head-to-head GD       │  ← head-to-head now ranks ABOVE overall GD
+//   4. head-to-head GF       ┘
+//   5. overall GD
+//   6. overall GF
+//   7. disciplinary (fair-play) points
+//   8. FIFA/Coca-Cola World Ranking, then drawing of lots  (this codebase uses
+//      the deterministic FIFA ranking, mirroring calcGroupStandings — see
+//      bracket.ts sortTiedGroup)
+//
+// Because head-to-head POINTS now outrank overall goal difference, a winner can
+// be clinched early even while a rival could still draw LEVEL on points — as long
+// as the leader has already beaten, head-to-head, every rival that can still
+// reach its total. (Real example: 2026 Group J — Argentina beat Algeria and
+// Austria, so after matchday 2 it had 6 pts; Jordan could not reach 6, and
+// whichever of Algeria/Austria might reach 6 had already lost to Argentina
+// head-to-head, so Argentina had clinched 1st before matchday 3.)
+//
 // SOUNDNESS IS THE CONTRACT: never declare a winner that some valid completion
-// of the unplayed matches could overturn. Where information is missing we stay
-// conservative — at worst a true clinch is surfaced a match or two late, never a
-// wrong one.
+// of the unplayed matches could overturn.
 //
-// THE CRITERION — strict points domination:
-//   Team X is the certain group winner ⇔ X.currentPoints > Y.currentPoints +
-//   3 × Y.remainingMatches  for EVERY other team Y in the group.
-//
-// Why this is the right (and only sound) early test while matches remain:
-//   • A team's own points depend only on its own results, so Y.maxPoints =
-//     Y.current + 3·Y.remaining is an exact, independent upper bound and
-//     X.minPoints = X.current (X may lose its remaining game). If X.current
-//     beats every rival's max, X finishes strictly top on POINTS ALONE in every
-//     completion — tiebreakers never even engage, so no false positive. This
-//     holds even when X and Y still meet (X losing that game IS Y winning it,
-//     already inside Y.max).
-//   • Strict ">" is required: a possible POINTS TIE throws the group to FIFA
-//     tiebreakers — overall goal difference, then overall goals for — both
-//     UNBOUNDED while any match is unplayed (a remaining game can be won by any
-//     margin). So a team that can merely draw level on points cannot be
-//     separated with certainty and must not be declared a winner.
-//
-// DELIBERATELY NOT DETECTED: a winner could in rare cases be secured early via a
-// head-to-head result even while a rival can still draw level on points. We do
-// NOT detect these — proving them requires sweeping every completion against the
-// full tiebreaker chain (overall GD/GF first, then H2H), and this game records
-// no fair-play/disciplinary data (a real FIFA tiebreaker step), so a knife-edge
-// case may be genuinely unresolvable. Conservative-by-design: such clinches are
-// simply surfaced once the group completes, never declared wrong.
-//
-// (For reference, FIFA 2026 group tiebreakers in order: points → overall GD →
-// overall GF → head-to-head pts/GD/GF → fair-play points → drawing of lots. This
-// codebase substitutes the deterministic FIFA ranking for the final lots draw,
-// but the winner-clinch test above never reaches any tiebreaker by construction.)
+// HOW WE STAY SOUND OVER UNBOUNDED MARGINS. Goal counts in the remaining matches
+// are unbounded, so any tiebreaker that depends on goals (head-to-head GD/GF,
+// overall GD/GF) cannot be relied on while a match is unplayed. We therefore only
+// ever decide 1st place by the two MARGIN-INDEPENDENT criteria — POINTS and
+// HEAD-TO-HEAD POINTS — both of which depend only on match OUTCOMES (W/D/L), not
+// scorelines. We enumerate every outcome-completion of the unplayed matches
+// (3^k, k ≤ 6 ⇒ ≤ 729) and, in each, identify the winner ONLY when it is decided
+// by points or head-to-head points:
+//   • unique most points                                  → that team wins, OR
+//   • tied on most points but UNIQUE most head-to-head     → that team wins, ELSE
+//   • the top is still level on head-to-head points        → undecided here
+//     (a goal-based criterion would decide it, and goals are unbounded).
+// A group's winner is certain iff EVERY outcome-completion yields the SAME such
+// winner. If any completion is undecided or names a different team, we declare
+// nothing — conservative: at worst a true clinch surfaces a match late, never a
+// wrong one. The winner we return is always the team calcGroupStandings (same
+// tiebreaker order) will rank 1st once the group completes, in every completion.
 
 import { GROUPS } from "../data/teams";
 import { groupMatches } from "../data/matches";
@@ -57,13 +62,57 @@ for (const m of groupMatches) {
   if (GROUP_MATCHES[m.group]) GROUP_MATCHES[m.group].push(m);
 }
 
+// A match reduced to its OUTCOME (margins are deliberately discarded — see the
+// soundness note above): result ∈ { "H" home win, "A" away win, "D" draw }.
+type OutcomeMatch = { home: string; away: string; result: "H" | "A" | "D" };
+
+// The team that 1st place is decided to belong to in a single fully-determined
+// (outcome-wise) group, using ONLY points then head-to-head points. Returns the
+// winner's code, or null when the top is still level on both (a goal-based
+// tiebreaker — unbounded while matches remain — would be needed).
+function pointsHeadToHeadWinner(codes: string[], matches: OutcomeMatch[]): string | null {
+  const award = (acc: Record<string, number>, m: OutcomeMatch) => {
+    if (m.result === "H") acc[m.home] += 3;
+    else if (m.result === "A") acc[m.away] += 3;
+    else {
+      acc[m.home] += 1;
+      acc[m.away] += 1;
+    }
+  };
+
+  const pts: Record<string, number> = {};
+  for (const c of codes) pts[c] = 0;
+  for (const m of matches) award(pts, m);
+
+  let maxPts = -1;
+  for (const c of codes) if (pts[c] > maxPts) maxPts = pts[c];
+  const topSet = codes.filter((c) => pts[c] === maxPts);
+  if (topSet.length === 1) return topSet[0];
+
+  // Tied on points → head-to-head POINTS among exactly the tied set.
+  const set = new Set(topSet);
+  const h2h: Record<string, number> = {};
+  for (const c of topSet) h2h[c] = 0;
+  for (const m of matches) {
+    if (!set.has(m.home) || !set.has(m.away)) continue;
+    award(h2h, m);
+  }
+  let maxH2H = -1;
+  for (const c of topSet) if (h2h[c] > maxH2H) maxH2H = h2h[c];
+  const h2hLeaders = topSet.filter((c) => h2h[c] === maxH2H);
+  if (h2hLeaders.length === 1) return h2hLeaders[0];
+
+  return null; // undecided without a goal-based tiebreaker
+}
+
 /**
  * Groups whose 1st-place team is mathematically guaranteed from partial results.
  *
  * @param results match-id → { homeScore, awayScore, ... } (any subset played).
  * @returns map of group letter → certain winner's team code. A group is absent
- *          unless its winner is clinched. Soundness: every returned team finishes
- *          1st in EVERY completion of that group's unplayed matches.
+ *          unless its winner is clinched. Soundness: every returned team is the
+ *          1st-placed team in EVERY outcome-completion of that group's unplayed
+ *          matches, decided by points / head-to-head points alone.
  */
 export function computeCertainGroupWinners(
   results: Record<string, any>,
@@ -75,57 +124,54 @@ export function computeCertainGroupWinners(
     if (!matches || matches.length === 0) continue;
 
     const codes = GROUPS[g as keyof typeof GROUPS].map((t) => t.code);
-    const pts: Record<string, number> = {};
-    const remaining: Record<string, number> = {};
-    for (const c of codes) {
-      pts[c] = 0;
-      remaining[c] = 0;
-    }
+    const played: OutcomeMatch[] = [];
+    const remaining: Array<{ home: string; away: string }> = [];
 
-    let anyPlayed = false;
     for (const m of matches) {
       const pred = results[m.id];
-      if (isScoreValid(pred)) {
-        anyPlayed = true;
-        const h = Number(pred.homeScore);
-        const a = Number(pred.awayScore);
-        if (h > a) pts[m.homeTeam] += 3;
-        else if (a > h) pts[m.awayTeam] += 3;
-        else {
-          pts[m.homeTeam] += 1;
-          pts[m.awayTeam] += 1;
-        }
+      const h = pred ? Number(pred.homeScore) : NaN;
+      const a = pred ? Number(pred.awayScore) : NaN;
+      if (isScoreValid(pred) && Number.isFinite(h) && Number.isFinite(a)) {
+        played.push({
+          home: m.homeTeam,
+          away: m.awayTeam,
+          result: h > a ? "H" : a > h ? "A" : "D",
+        });
       } else {
-        remaining[m.homeTeam] += 1;
-        remaining[m.awayTeam] += 1;
+        remaining.push({ home: m.homeTeam, away: m.awayTeam });
       }
     }
-    if (!anyPlayed) continue; // nothing decided yet
+    if (played.length === 0) continue; // nothing decided yet
 
-    // Unique points leader is the only possible certain winner.
-    let leader: string | null = null;
-    let uniqueMax = false;
-    for (const c of codes) {
-      if (leader === null || pts[c] > pts[leader]) {
-        leader = c;
-        uniqueMax = true;
-      } else if (pts[c] === pts[leader]) {
-        uniqueMax = false;
+    // Enumerate every outcome-completion of the unplayed matches (3^k). The
+    // winner is certain iff all completions agree on a points/H2H-decided team.
+    const k = remaining.length;
+    const total = 3 ** k;
+    let winner: string | null | undefined = undefined;
+    let certain = true;
+    const RESULTS: Array<"H" | "A" | "D"> = ["H", "A", "D"];
+
+    for (let mask = 0; mask < total; mask++) {
+      const all = played.slice();
+      let tmp = mask;
+      for (const r of remaining) {
+        const o = tmp % 3;
+        tmp = Math.floor(tmp / 3);
+        all.push({ home: r.home, away: r.away, result: RESULTS[o] });
       }
-    }
-    if (!leader || !uniqueMax) continue;
-
-    // Strict points domination: leader's current points exceed every rival's
-    // best reachable points (current + 3 per remaining match).
-    let clinched = true;
-    for (const c of codes) {
-      if (c === leader) continue;
-      if (pts[leader] <= pts[c] + 3 * remaining[c]) {
-        clinched = false;
+      const w = pointsHeadToHeadWinner(codes, all);
+      if (w === null) {
+        certain = false;
+        break;
+      }
+      if (winner === undefined) winner = w;
+      else if (winner !== w) {
+        certain = false;
         break;
       }
     }
-    if (clinched) out[g] = leader;
+
+    if (certain && winner) out[g] = winner;
   }
 
   return out;

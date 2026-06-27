@@ -264,6 +264,105 @@ console.log('--- Test 7: per-team remaining count (uneven games played) ---');
   }
 }
 
+// ── Test 8: head-to-head clinch (2026 rules) — the Argentina / Group J case ──
+// FIFA 2026 ranks HEAD-TO-HEAD points ABOVE overall goal difference. So a leader
+// on 6 pts after matchday 2 has clinched 1st when every rival that can still
+// reach 6 has already lost to it head-to-head — even though those rivals can draw
+// LEVEL on points. (Real 2026 Group J: Argentina beat Algeria & Austria → 6 pts;
+// Jordan could not reach 6; Algeria/Austria meet in MD3 so only one reaches 6 and
+// both already lost to Argentina → Argentina clinched before MD3.)
+//
+// The OLD "strict points domination" rule could NOT see this: it required the
+// leader's points to strictly exceed every rival's max (6 > 6 is false), so it
+// missed every head-to-head clinch — the bug this fix repairs.
+console.log('--- Test 8: head-to-head clinch (Argentina / Group J shape) ---');
+{
+  for (const g of GROUP_NAMES) {
+    const teams = GROUPS[g].map((t) => t.code);
+    const leader = teams[0]; // "Argentina"
+
+    // The leader's matchday-3 opponent ("Jordan"): the team it meets in MD3.
+    let md3Opp = null;
+    for (const m of matchesByGroup[g]) {
+      if (m.matchday !== 3) continue;
+      if (m.homeTeam === leader) md3Opp = m.awayTeam;
+      else if (m.awayTeam === leader) md3Opp = m.homeTeam;
+    }
+    assert(!!md3Opp, `group ${g}: found leader's MD3 opponent`);
+
+    // Play matchdays 1-2: leader wins its two games; in the other two games the
+    // MD3 opponent loses both (so it sits on 0, cannot reach 6). The remaining
+    // two non-leader teams therefore sit on 3 each, having lost to the leader.
+    const results = {};
+    for (const m of matchesByGroup[g]) {
+      if (m.matchday === 3) continue; // MD3 unplayed (leader vs md3Opp, plus the two rivals meet)
+      const teamsIn = [m.homeTeam, m.awayTeam];
+      if (teamsIn.includes(leader)) {
+        results[m.id] = m.homeTeam === leader
+          ? { homeScore: 1, awayScore: 0, stage: 'group' }
+          : { homeScore: 0, awayScore: 1, stage: 'group' };
+      } else {
+        // non-leader MD1/2 game — both such games involve md3Opp; make it lose.
+        results[m.id] = m.homeTeam === md3Opp
+          ? { homeScore: 0, awayScore: 1, stage: 'group' }
+          : { homeScore: 1, awayScore: 0, stage: 'group' };
+      }
+    }
+
+    const st = calcGroupStandings(results);
+    assert(st[g][0].code === leader && st[g][0].pts === 6,
+      `${g}: leader ${leader} on 6 pts after MD2 (got ${st[g][0].code}/${st[g][0].pts})`);
+    // A rival can still reach 6 (the two on 3 pts meet in MD3) → strict-points
+    // domination would NOT fire here; head-to-head is what clinches it.
+    assert(st[g][1].pts === 3, `${g}: runner-up on 3 pts can still reach 6 (got ${st[g][1].pts})`);
+
+    const certain = computeCertainGroupWinners(results);
+    assert(certain[g] === leader,
+      `${g}: head-to-head clinch → leader ${leader} certain (got ${certain[g]})`);
+
+    // And it shows in the gated R32 1X slot.
+    const gated = calcBracketTeams(results, true);
+    const slot = slotFor('1' + g);
+    assert(gated[slot.id]?.[slot.side] === leader,
+      `${g}: R32 ${slot.id}.${slot.side} (1${g}) should be ${leader}, got ${gated[slot.id]?.[slot.side]}`);
+  }
+}
+
+// ── Test 9: head-to-head is computed ONLY among the points-tied set ─────────
+// Classic tiebreaker bug guard: when the top two are level on points, the winner
+// must be decided by their head-to-head result alone — NOT by counting wins over
+// the bottom teams. Group where W and X both finish on 6, W has beaten both
+// bottom teams, but X beat W head-to-head → X must be 1st. (If H2H were wrongly
+// computed over ALL matches, W's wins over the minnows would mask X's H2H edge.)
+console.log('--- Test 9: head-to-head only among the tied set ---');
+{
+  const g = 'F';
+  const [W, X, Y, Z] = GROUPS[g].map((t) => t.code);
+  // Desired winner per unordered pair (X beats W head-to-head; W sweeps Y, Z).
+  const pairWinner = new Map([
+    [[W, X].sort().join('|'), X], // X beats W (the decisive head-to-head)
+    [[W, Y].sort().join('|'), W],
+    [[W, Z].sort().join('|'), W],
+    [[X, Y].sort().join('|'), X],
+    [[X, Z].sort().join('|'), Z],
+    [[Y, Z].sort().join('|'), Y],
+  ]);
+  const results = {};
+  for (const m of matchesByGroup[g]) {
+    const key = [m.homeTeam, m.awayTeam].sort().join('|');
+    const winnerCode = pairWinner.get(key);
+    results[m.id] = m.homeTeam === winnerCode
+      ? { homeScore: 1, awayScore: 0, stage: 'group' }
+      : { homeScore: 0, awayScore: 1, stage: 'group' };
+  }
+  const st = calcGroupStandings(results);
+  assert(st[g][0].pts === 6 && st[g][1].pts === 6, `${g}: W and X both on 6 (got ${st[g][0].pts}/${st[g][1].pts})`);
+  assert(st[g][0].code === X, `${g}: standings rank X (head-to-head winner) 1st, got ${st[g][0].code}`);
+  const certain = computeCertainGroupWinners(results);
+  assert(certain[g] === X,
+    `${g}: certain winner must be X via head-to-head among the tied set (got ${certain[g]})`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error('\nFailures:\n' + failures.map((f) => '  - ' + f).join('\n'));
