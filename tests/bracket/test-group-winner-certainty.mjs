@@ -211,6 +211,59 @@ console.log('--- Test 6: full completion parity (regression) ---');
   assert(mismatches === 0, `all R32 group-position slots match final standings (${mismatches} mismatches)`);
 }
 
+// ── Test 7: uneven games-played within a group (per-team `remaining`) ────────
+// The detector counts each team's OWN remaining matches, not a uniform matchday
+// assumption. Build a state where the leader has played all 3 games but a rival
+// has played only 1 — a uniform "1 game left each" shortcut would mis-rule here.
+console.log('--- Test 7: per-team remaining count (uneven games played) ---');
+{
+  const g = 'E';
+  const [t0, t1, t2, t3] = GROUPS[g].map((t) => t.code);
+
+  // --- 7a: NOT clinched. Leader plays all 3 (beats t2, t3; draws t1) → 7 pts,
+  // 0 remaining. t1 drew the leader (1 pt) but still has 2 games left → can
+  // reach 7 and force a tiebreak, so no clinch. (Uniform-1-remaining would wrongly clinch.)
+  {
+    const res = {};
+    for (const m of matchesByGroup[g]) {
+      const teams = [m.homeTeam, m.awayTeam];
+      const involvesLeader = teams.includes(t0);
+      if (!involvesLeader) continue; // leave the three non-leader games unplayed
+      if (teams.includes(t1)) {
+        res[m.id] = { homeScore: 1, awayScore: 1, stage: 'group' }; // t0 vs t1 draw
+      } else {
+        // t0 vs t2 or t0 vs t3 → t0 wins
+        res[m.id] = m.homeTeam === t0
+          ? { homeScore: 1, awayScore: 0, stage: 'group' }
+          : { homeScore: 0, awayScore: 1, stage: 'group' };
+      }
+    }
+    const st = calcGroupStandings(res);
+    assert(st[g][0].code === t0 && st[g][0].pts === 7, `7a leader ${t0} on 7 pts (got ${st[g][0].code}/${st[g][0].pts})`);
+    const certain = computeCertainGroupWinners(res);
+    assert(certain[g] === undefined,
+      `7a: rival with 2 games left can still reach 7 → no clinch (got ${certain[g]})`);
+  }
+
+  // --- 7b: clinched. Leader wins all 3 → 9 pts; every rival has played only its
+  // game vs the leader (0 pts, 2 remaining) → max 6 < 9 → clinched.
+  {
+    const res = {};
+    for (const m of matchesByGroup[g]) {
+      const teams = [m.homeTeam, m.awayTeam];
+      if (!teams.includes(t0)) continue;
+      res[m.id] = m.homeTeam === t0
+        ? { homeScore: 1, awayScore: 0, stage: 'group' }
+        : { homeScore: 0, awayScore: 1, stage: 'group' };
+    }
+    const certain = computeCertainGroupWinners(res);
+    assert(certain[g] === t0, `7b: leader on 9 pts, rivals max 6 → clinched (got ${certain[g]})`);
+    // Direct parity: the certain code equals the current standings leader.
+    const st = calcGroupStandings(res);
+    assert(certain[g] === st[g][0].code, `7b: certain winner === standings[${g}][0] (${st[g][0].code})`);
+  }
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.error('\nFailures:\n' + failures.map((f) => '  - ' + f).join('\n'));
