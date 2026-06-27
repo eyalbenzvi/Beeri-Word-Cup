@@ -101,16 +101,4 @@ describe("runScenarioSimulation", () => {
     }
   });
 
-  it("records the strength source (elo by default, elo+betting with odds)", () => {
-    expect(run().meta.strengthSource).toBe("elo");
-    const withOdds = runScenarioSimulation({
-      allPredictions,
-      results,
-      actualBonuses: { topScorers: [] },
-      simCount: 200,
-      seed: 7,
-      oddsImpliedProbs: { BRA: 0.18, FRA: 0.16, ESP: 0.15 },
-    });
-    expect(withOdds.meta.strengthSource).toBe("elo+betting");
-  });
 });

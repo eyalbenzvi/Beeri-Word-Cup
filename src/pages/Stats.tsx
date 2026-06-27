@@ -15,6 +15,7 @@ import { getCachedChampion, getCachedBracket } from "../utils/bracketCache";
 import { r32SlotLabel } from "../utils/matchSlot";
 import { normalizeStatus } from "../utils/helpers";
 import SimulatorPanel from "../components/SimulatorPanel";
+import ScenariosSection from "../components/ScenariosSection";
 import PageHeader from "../components/PageHeader";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, getPlayerByEitherName, resolvePlayerList } from "../utils/playerSearch";
@@ -22,7 +23,7 @@ import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter, BracketEntry } from "../utils/matchPredictionStats";
 import { Bar, VoterList, VoterBarList, AdvancingVoterBreakdown } from "../components/VoterList";
 
-const VALID_TABS = new Set(["matches", "teams", "forms"]);
+const VALID_TABS = new Set(["matches", "teams", "forms", "scenarios"]);
 
 const allMatches = [...groupMatches, ...knockoutMatches];
 
@@ -634,6 +635,7 @@ export default function Stats() {
                 { id: "matches", label: "📊 משחקים" },
                 { id: "teams", label: "🏆 קבוצות" },
                 { id: "forms", label: "📋 טפסים" },
+                { id: "scenarios", label: "🎲 תרחישים" },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -678,6 +680,7 @@ export default function Stats() {
                 {activeTab === "forms" && (
                   <GeneralStats forms={submittedForms} results={results} />
                 )}
+                {activeTab === "scenarios" && <ScenariosSection />}
               </>
             )}
           </div>

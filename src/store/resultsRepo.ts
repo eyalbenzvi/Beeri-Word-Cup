@@ -10,6 +10,7 @@
 import { writeAuditLog } from "./audit";
 import { cache } from "./cache";
 import { requireAdmin, writeGameDoc } from "./usersRepo";
+import { triggerScenarioRecompute } from "./scenarioRepo";
 
 const EMPTY_OBJ: Record<string, any> = {};
 const DEFAULT_BONUSES = { champion: null as string | null, topScorers: [] as string[] };
@@ -23,7 +24,13 @@ const DEFAULT_SETTINGS: Record<string, any> = {
 export function clearMatchResults() {
   if (!requireAdmin()) return;
   writeAuditLog("clear-match-results");
-  writeGameDoc("matchResults", {}, { force: true });
+  recomputeScenariosAfter(writeGameDoc("matchResults", {}, { force: true }));
+}
+
+// Poke the server-side scenario recompute once a result write has SETTLED (so
+// the background function reads the new state, not the pre-write one).
+function recomputeScenariosAfter(write: any) {
+  Promise.resolve(write).then(() => triggerScenarioRecompute()).catch(() => {});
 }
 
 export function getMatchResults() {
@@ -42,14 +49,14 @@ export function saveMatchResult(matchId: string, result: any) {
     source: "admin",
     updatedAt: new Date().toISOString(),
   };
-  writeGameDoc("matchResults", results);
+  recomputeScenariosAfter(writeGameDoc("matchResults", results));
 }
 
 export function deleteMatchResult(matchId: string) {
   if (!requireAdmin()) return;
   const results = { ...getMatchResults() };
   delete results[matchId];
-  writeGameDoc("matchResults", results);
+  recomputeScenariosAfter(writeGameDoc("matchResults", results));
 }
 
 // ============ ACTUAL BONUSES (admin) ============

@@ -100,9 +100,12 @@ service cloud.firestore {
       // (uidMigrationMap stores legacy phone-UID → hashed-UID pairs and
       // would leak PII back if any authed user could read it); everything
       // else is any-auth.
+      // settings is public; users + uidMigrationMap are admin-only; scenarioRun
+      // (server-computed simulation summary) is readable by any authed user;
+      // everything else is any-auth.
       allow read: if (
         docId == 'settings' ||
-        (docId == 'users' || docId == 'uidMigrationMap' || docId == 'scenarioRun' ? isAdmin() : isAuth())
+        (docId == 'users' || docId == 'uidMigrationMap' ? isAdmin() : isAuth())
       );
 
       // Users document: first creation allowed; updates restricted
@@ -140,7 +143,9 @@ service cloud.firestore {
       // Admin-only documents. uidMigrationMap is written exclusively by the
       // Admin SDK (migration script + phone-verify-otp); listing it here
       // documents that browser clients must never write it directly.
-      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap', 'scenarioRun'];
+      // scenarioRun + scenarioLock are written ONLY by the recompute background
+      // function via the Admin SDK (which bypasses these rules); no client write.
+      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap'];
     }
 
     // userPrivate/{uid} — per-user private record (email, isAdmin,

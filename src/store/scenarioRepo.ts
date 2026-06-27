@@ -1,46 +1,21 @@
-// Admin-only persistence for the Monte-Carlo scenario run.
+// Client access to the scenario run.
 //
-// The run is a summarized snapshot (see scenarioSim.ScenarioRunResult): for
-// ~250 forms and up to 60 champion+runner-up tables the JSON is ~250–300 KB —
-// comfortably under Firestore's 1 MB doc limit, but it does scale with form
-// count × scenario count, so it is capped at the source (MAX_SCENARIOS).
-// It is deliberately NOT wired into the realtime cache/listener set: the
-// feature is admin-only and the payload is large, so every page visitor must
-// not pay to stream it. Instead the admin tab does a one-off getDoc on open
-// and a setDoc after each compute. Stored at gameData/scenarioRun as
-// { data: <run> } to match the existing gameData doc envelope. Writes route
-// through retryOnPermissionDenied so a freshly-minted/expired admin token
-// recovers (the same protection writeGameDoc gives the other gameData docs).
+// The run is now COMPUTED SERVER-SIDE (netlify/functions/scenario-recompute-
+// background) after every result entry and written to gameData/scenarioRun by
+// the Admin SDK. The client only READS it (any authenticated user) and POKES
+// the recompute after an admin writes a result. It is deliberately not wired
+// into the realtime cache: the payload is large and only the "data" tab needs
+// it, so the tab does a one-off getDoc.
 
-import { getDoc, setDoc } from "firebase/firestore";
-import { gameDocRef, safeClone, withTimeout, retryOnPermissionDenied } from "./firestoreClient";
-import { requireAdmin } from "./usersRepo";
-import { writeAuditLog } from "./audit";
+import { getDoc } from "firebase/firestore";
+import { gameDocRef, withTimeout } from "./firestoreClient";
 import { captureClientError } from "../sentry";
 import type { ScenarioRunResult } from "../utils/scenarioSim";
 
 const SCENARIO_DOC = "scenarioRun";
+const RECOMPUTE_FN = "/.netlify/functions/scenario-recompute-background";
 
-// Persist a freshly computed run. Admin-gated. Returns true on success.
-export async function saveScenarioRun(run: ScenarioRunResult): Promise<boolean> {
-  if (!requireAdmin()) return false;
-  writeAuditLog("save-scenario-run", {
-    simCount: run.meta.simCount,
-    formCount: run.meta.formCount,
-  });
-  try {
-    await retryOnPermissionDenied(
-      () => setDoc(gameDocRef(SCENARIO_DOC), { data: safeClone(run) }),
-      { timeoutMs: 15000 },
-    );
-    return true;
-  } catch (err: any) {
-    captureClientError(err, { source: "saveScenarioRun", code: err?.code });
-    return false;
-  }
-}
-
-// Load the last persisted run (or null if none / on error). One-off read.
+// Load the latest server-computed run (or null if none / on error). One-off read.
 export async function loadScenarioRun(): Promise<ScenarioRunResult | null> {
   try {
     const snap = await withTimeout(getDoc(gameDocRef(SCENARIO_DOC)), 15000);
@@ -50,5 +25,16 @@ export async function loadScenarioRun(): Promise<ScenarioRunResult | null> {
   } catch (err: any) {
     captureClientError(err, { source: "loadScenarioRun", code: err?.code });
     return null;
+  }
+}
+
+// Fire-and-forget poke to recompute scenarios after a result changes. The
+// background function self-serialises via a lock, so spamming this is safe
+// (at most one run at a time + one queued rerun). Never throws.
+export function triggerScenarioRecompute(): void {
+  try {
+    fetch(RECOMPUTE_FN, { method: "POST" }).catch(() => {});
+  } catch {
+    /* fetch unavailable (e.g. SSR/test) — ignore */
   }
 }
