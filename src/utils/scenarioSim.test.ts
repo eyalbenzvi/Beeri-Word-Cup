@@ -3,7 +3,7 @@ import { groupMatches, knockoutMatches } from "../data/matches";
 import { calcBracketTeams } from "./bracket";
 import { predictAllMatches, predictScoreline } from "./fifaPredictor";
 import { FIFA_RANK_DENSE } from "../data/fifaRanking";
-import { mulberry32, runScenarioSimulation, computeEffectiveRanks } from "./scenarioSim";
+import { mulberry32, runScenarioSimulation } from "./scenarioSim";
 
 function buildFixture(nForms: number) {
   const rng = mulberry32(1);
@@ -101,11 +101,16 @@ describe("runScenarioSimulation", () => {
     }
   });
 
-  it("effective ranks stay within [1,48]", () => {
-    const eff = computeEffectiveRanks(results);
-    for (const r of Object.values(eff)) {
-      expect(r).toBeGreaterThanOrEqual(1);
-      expect(r).toBeLessThanOrEqual(48);
-    }
+  it("records the strength source (elo by default, elo+betting with odds)", () => {
+    expect(run().meta.strengthSource).toBe("elo");
+    const withOdds = runScenarioSimulation({
+      allPredictions,
+      results,
+      actualBonuses: { topScorers: [] },
+      simCount: 200,
+      seed: 7,
+      oddsImpliedProbs: { BRA: 0.18, FRA: 0.16, ESP: 0.15 },
+    });
+    expect(withOdds.meta.strengthSource).toBe("elo+betting");
   });
 });

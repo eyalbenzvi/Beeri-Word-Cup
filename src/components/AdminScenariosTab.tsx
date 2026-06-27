@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useScenarioRun } from "../hooks/useScenarioRun";
+import { useScenarioRun, DEFAULT_SIM_COUNT, MIN_SIM_COUNT, MAX_SIM_COUNT } from "../hooks/useScenarioRun";
 import { useUsers } from "../hooks/useStore";
 import { getTeamByCode } from "../data/teams";
 import type { ScenarioRunResult, Scenario } from "../utils/scenarioSim";
@@ -95,6 +95,8 @@ export default function AdminScenariosTab() {
 
   const [pickChampion, setPickChampion] = useState<string | null>(null);
   const [pickRunnerUp, setPickRunnerUp] = useState<string | null>(null);
+  const [simCountInput, setSimCountInput] = useState<number>(DEFAULT_SIM_COUNT);
+  const [useBetting, setUseBetting] = useState<boolean>(false);
 
   const runnerUpOptions = useMemo(
     () =>
@@ -136,10 +138,43 @@ export default function AdminScenariosTab() {
               בחר את הגמר, וקבל לכל טופס דירוג ממוצע, נקודות ממוצעות וסיכוי למקום ראשון.
             </p>
           </div>
-          <button onClick={compute} disabled={state.loading} className="btn-duo btn-duo-primary btn-duo-sm shrink-0">
+          <button
+            onClick={() => compute({ simCount: simCountInput, useBetting })}
+            disabled={state.loading}
+            className="btn-duo btn-duo-primary btn-duo-sm shrink-0"
+          >
             {state.loading ? "מריץ…" : run ? "הרץ מחדש" : "הרץ סימולציה"}
           </button>
         </div>
+
+        <div className="flex items-end gap-4 flex-wrap mt-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-2xs text-ink-muted font-extrabold">מספר הרצות</span>
+            <input
+              type="number"
+              min={MIN_SIM_COUNT}
+              max={MAX_SIM_COUNT}
+              step={1000}
+              value={simCountInput}
+              disabled={state.loading}
+              onChange={(e) => setSimCountInput(Number(e.target.value))}
+              className="input-duo input-duo-sm w-32"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer pb-1.5">
+            <input
+              type="checkbox"
+              checked={useBetting}
+              disabled={state.loading}
+              onChange={(e) => setUseBetting(e.target.checked)}
+              className="w-4 h-4 accent-primary"
+            />
+            <span className="text-xs font-bold text-ink">שילוב הימורים (ניסיוני)</span>
+          </label>
+        </div>
+        <p className="text-3xs text-ink-light font-medium mt-1">
+          יותר הרצות = דיוק גבוה יותר וזמן ארוך יותר (50,000 ≈ כדקה-שתיים). מודל הבסיס: Elo.
+        </p>
 
         {state.loading && (
           <div className="mt-3" aria-live="polite">
@@ -157,9 +192,17 @@ export default function AdminScenariosTab() {
         {run && !state.loading && (
           <>
             <p className="text-2xs text-ink-light font-bold mt-3">
-              חושב: {generatedAt} · {run.meta.simCount.toLocaleString("he-IL")} תרחישים · {run.meta.formCount} טפסים
+              חושב: {generatedAt} · {run.meta.simCount.toLocaleString("he-IL")} תרחישים · {run.meta.formCount} טפסים ·{" "}
+              מודל: {run.meta.strengthSource === "elo+betting" ? "Elo + הימורים" : "Elo"}
               {state.loadedFromStore && " · נטען מחישוב קודם"}
             </p>
+            {state.bettingUnavailable && (
+              <div className="alert-accent-soft rounded-2xl p-2.5 mt-2">
+                <span className="text-xs font-bold text-accent-text">
+                  הימורים לא היו זמינים — החישוב רץ על מודל Elo בלבד.
+                </span>
+              </div>
+            )}
             {state.saveError && (
               <div className="alert-danger-soft rounded-2xl p-2.5 mt-2">
                 <span className="text-xs font-bold text-danger">

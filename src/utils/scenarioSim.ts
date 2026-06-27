@@ -3,30 +3,24 @@
  *
  * Pure + side-effect-free → safe for Web Workers and the node test harness.
  * ALL scoring / standings / bracket / champion arithmetic is delegated to the
- * existing canonical utilities (scoring.ts, bracket.ts, fifaPredictor.ts), so
- * a simulated tournament is scored through the EXACT same call path as the
- * live leaderboard. This file only adds: a seeded RNG, an in-tournament form
- * blend for match probabilities, the sampling loop, and aggregation.
+ * existing canonical utilities (scoring.ts, bracket.ts), so a simulated
+ * tournament is scored through the EXACT same call path as the live
+ * leaderboard. Match outcomes are sampled from the Elo model (eloModel.ts),
+ * optionally blended with betting odds (bettingOdds.ts).
  *
- * Concept: real results so far are FIXED. The remaining matches (the 6 group
+ * Concept: real results so far are FIXED. The remaining matches (any group
  * games still to play + the whole knockout) are sampled thousands of times.
- * Every simulated tournament ranks all forms; we aggregate per-form win/podium
- * probabilities and bucket the runs by CHAMPION and by FINALIST PAIR (the two
- * scenario anchors the product asked for).
+ * Every simulated tournament ranks all forms; we aggregate, per (champion,
+ * runner-up) final, each form's average rank, average points, and win %.
  */
 
 import { groupMatches, knockoutMatches } from "../data/matches";
-import { GROUPS } from "../data/teams";
-import { FIFA_RANK_DENSE } from "../data/fifaRanking";
-import {
-  predictScoreline,
-  DEFAULT_RANK,
-  KNOCKOUT_DRAW_UPSET_CHANCE,
-} from "./fifaPredictor";
-import { calcGroupStandings, calcBracketTeams, deriveActualAdvancing, deriveChampion } from "./bracket";
+import { calcBracketTeams, deriveActualAdvancing, deriveChampion } from "./bracket";
 import { compareTiebreaker } from "./scoring";
 import { buildFormBracketMap } from "./leaderboardCore";
 import { isScoreValid } from "./helpers";
+import { computeCurrentElo, sampleEloMatch, shootoutHomeAdvances, DEFAULT_ELO } from "./eloModel";
+import { blendEloWithOdds } from "./bettingOdds";
 import { precomputeForms, scoreFormFast, makeScratchScore, FormFast, FastScore } from "./scenarioScore";
 
 // ─── Seeded RNG ────────────────────────────────────────────────────
@@ -43,51 +37,16 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-// ─── In-tournament form blend ──────────────────────────────────────
-// A team's match probability is driven by an EFFECTIVE rank: its static FIFA
-// rank, nudged by how it ACTUALLY performed in the group stage (points/game
-// and goal difference/game). Better-than-its-rank form → lower (=stronger)
-// effective rank, and vice-versa. Bounded to [1,48] so it always feeds the
-// validated OUTCOME_TIERS without producing out-of-range probabilities.
-const BASELINE_PPG = 1.35; // ≈ average points-per-game across group play
-const BLEND_K_PPG = 4.0; // rank-units shifted per point-per-game above baseline
-const BLEND_K_GD = 1.5; // rank-units shifted per goal-difference-per-game
-
-export function computeEffectiveRanks(
-  fixedResults: Record<string, any>,
-): Record<string, number> {
-  const standings = calcGroupStandings(fixedResults);
-  const eff: Record<string, number> = {};
-  for (const teams of Object.values(GROUPS)) {
-    for (const team of teams) {
-      eff[team.code] = FIFA_RANK_DENSE[team.code] || DEFAULT_RANK;
-    }
-  }
-  for (const sorted of Object.values(standings)) {
-    for (const t of sorted as any[]) {
-      const base = FIFA_RANK_DENSE[t.code] || DEFAULT_RANK;
-      if (!t.played) {
-        eff[t.code] = base;
-        continue;
-      }
-      const ppg = t.pts / t.played;
-      const gdpg = (t.gf - t.ga) / t.played;
-      const delta = BLEND_K_PPG * (ppg - BASELINE_PPG) + BLEND_K_GD * gdpg;
-      // delta>0 → stronger form → LOWER effective rank.
-      eff[t.code] = Math.min(48, Math.max(1, base - delta));
-    }
-  }
-  return eff;
-}
-
 // ─── One simulated tournament ──────────────────────────────────────
-// Returns a full results map (real results kept verbatim, the rest sampled).
+// Returns a full results map (real results kept verbatim, the rest sampled
+// from the Elo model). `elo` is the current Elo per team (computeCurrentElo,
+// optionally betting-blended).
 const KNOCKOUT_STAGES = ["R32", "R16", "QF", "SF", "3RD", "F"];
 
 export function simulateTournament(
   rng: () => number,
   fixedResults: Record<string, any>,
-  effRanks: Record<string, number>,
+  elo: Record<string, number>,
 ): Record<string, any> {
   const sim: Record<string, any> = {};
 
@@ -98,9 +57,11 @@ export function simulateTournament(
       sim[m.id] = fixed;
       continue;
     }
-    const rh = effRanks[m.homeTeam] ?? DEFAULT_RANK;
-    const ra = effRanks[m.awayTeam] ?? DEFAULT_RANK;
-    const { homeScore, awayScore } = predictScoreline(rh, ra, rng);
+    const { homeScore, awayScore } = sampleEloMatch(
+      elo[m.homeTeam] ?? DEFAULT_ELO,
+      elo[m.awayTeam] ?? DEFAULT_ELO,
+      rng,
+    );
     sim[m.id] = {
       homeTeam: m.homeTeam,
       awayTeam: m.awayTeam,
@@ -124,9 +85,9 @@ export function simulateTournament(
       }
       const teams = bracket[m.id];
       if (!teams?.home || !teams?.away) continue;
-      const rh = effRanks[teams.home] ?? DEFAULT_RANK;
-      const ra = effRanks[teams.away] ?? DEFAULT_RANK;
-      const { homeScore, awayScore } = predictScoreline(rh, ra, rng);
+      const eH = elo[teams.home] ?? DEFAULT_ELO;
+      const eA = elo[teams.away] ?? DEFAULT_ELO;
+      const { homeScore, awayScore } = sampleEloMatch(eH, eA, rng);
       const entry: any = {
         homeTeam: teams.home,
         awayTeam: teams.away,
@@ -136,10 +97,7 @@ export function simulateTournament(
         played: true,
       };
       if (homeScore === awayScore) {
-        const favored = rh <= ra ? teams.home : teams.away;
-        const underdog = favored === teams.home ? teams.away : teams.home;
-        entry.advancingTeam =
-          rng() < KNOCKOUT_DRAW_UPSET_CHANCE ? underdog : favored;
+        entry.advancingTeam = shootoutHomeAdvances(eH, eA, rng) ? teams.home : teams.away;
       }
       sim[m.id] = entry;
     }
@@ -228,6 +186,7 @@ export type ScenarioRunResult = {
     generatedAt: number;
     formCount: number;
     minScenarioSamples: number; // below this a final is too rare to table
+    strengthSource: "elo" | "elo+betting"; // match-strength model used
   };
   formOrder: string[]; // index basis for every Scenario's parallel arrays
   forms: Record<string, ScenarioFormInfo>; // display labels only
@@ -250,6 +209,11 @@ export function runScenarioSimulation(opts: {
   simCount: number;
   seed?: number;
   minScenarioSamples?: number;
+  // Optional betting-odds calibration: implied champion probabilities per team
+  // code. When present (and non-empty) the Elo ratings are blended toward them;
+  // otherwise the run is pure Elo (the default + fallback).
+  oddsImpliedProbs?: Record<string, number> | null;
+  oddsWeight?: number;
   onProgress?: ProgressFn;
 }): ScenarioRunResult {
   const {
@@ -259,11 +223,18 @@ export function runScenarioSimulation(opts: {
     simCount,
     seed = 0x9e3779b9,
     minScenarioSamples = MIN_SCENARIO_SAMPLES,
+    oddsImpliedProbs = null,
+    oddsWeight = 0.5,
     onProgress,
   } = opts;
 
   const rng = mulberry32(seed);
-  const effRanks = computeEffectiveRanks(results);
+  // Match-strength: current Elo (base ratings updated by played results),
+  // optionally blended with betting-market implied champion probabilities.
+  const usedBetting = !!oddsImpliedProbs && Object.keys(oddsImpliedProbs).length > 0;
+  let elo = computeCurrentElo(results);
+  if (usedBetting) elo = blendEloWithOdds(elo, oddsImpliedProbs as Record<string, number>, oddsWeight);
+
   const formBracketMap = buildFormBracketMap(allPredictions);
   const fixedTopScorers = Array.isArray(actualBonuses?.topScorers)
     ? actualBonuses.topScorers
@@ -278,6 +249,7 @@ export function runScenarioSimulation(opts: {
     generatedAt: Date.now(),
     formCount: nForms,
     minScenarioSamples,
+    strengthSource: (usedBetting ? "elo+betting" : "elo") as "elo" | "elo+betting",
   };
   const forms: ScenarioRunResult["forms"] = {};
   for (const ff of fastForms) forms[ff.formId] = { userId: ff.userId, formName: ff.formName };
@@ -317,7 +289,7 @@ export function runScenarioSimulation(opts: {
   };
 
   for (let s = 0; s < simCount; s++) {
-    const sim = simulateTournament(rng, results, effRanks);
+    const sim = simulateTournament(rng, results, elo);
     const { ranked, champion, finalists } = scoreSim(sim, fastForms, scratch, order);
 
     if (champion) champSamples[champion] = (champSamples[champion] || 0) + 1;

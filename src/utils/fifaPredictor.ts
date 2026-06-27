@@ -55,32 +55,35 @@ function pickWeighted(options, rng: () => number = Math.random) {
   return options[0];
 }
 
+// Sample a scoreline GIVEN an outcome: 0 = home win, 1 = draw, 2 = away win.
+// Pulls from the real-WC score distributions. Shared by the FIFA-rank path
+// (predictScoreline) and the scenario simulator's Elo path (eloModel) so both
+// produce realistic scorelines from the SAME validated tables.
+export function scorelineFromOutcome(outcome: 0 | 1 | 2, rng: () => number = Math.random) {
+  if (outcome === 0) {
+    const [h, a] = pickWeighted(WIN_SCORES, rng);
+    return { homeScore: h, awayScore: a };
+  }
+  if (outcome === 1) {
+    const [h, a] = pickWeighted(DRAW_SCORES, rng);
+    return { homeScore: h, awayScore: a };
+  }
+  const [h, a] = pickWeighted(UPSET_SCORES, rng);
+  return { homeScore: h, awayScore: a };
+}
+
 // Sample a scoreline from two (possibly EFFECTIVE) FIFA ranks. Lower rank =
-// stronger team. Extracted from predictMatch so the scenario simulator can
-// feed in-tournament-adjusted ranks and a seeded rng through the SAME
-// validated tier + score-distribution machinery.
+// stronger team. Used by the AI auto-fill; the scenario tool uses the Elo
+// model instead.
 export function predictScoreline(
   rankH: number,
   rankA: number,
   rng: () => number = Math.random,
 ) {
   const probs = getOutcomeProbabilities(rankH, rankA);
-
   const roll = rng();
-  let homeScore, awayScore;
-
-  if (roll < probs.homeWin) {
-    const [h, a] = pickWeighted(WIN_SCORES, rng);
-    homeScore = h; awayScore = a;
-  } else if (roll < probs.homeWin + probs.draw) {
-    const [h, a] = pickWeighted(DRAW_SCORES, rng);
-    homeScore = h; awayScore = a;
-  } else {
-    const [h, a] = pickWeighted(UPSET_SCORES, rng);
-    homeScore = h; awayScore = a;
-  }
-
-  return { homeScore, awayScore };
+  const outcome = roll < probs.homeWin ? 0 : roll < probs.homeWin + probs.draw ? 1 : 2;
+  return scorelineFromOutcome(outcome, rng);
 }
 
 // Predict a single match

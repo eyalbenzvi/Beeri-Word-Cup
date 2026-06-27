@@ -5,7 +5,8 @@ import { calculateFullScore } from "./scoring";
 import { buildFormBracketMap } from "./leaderboardCore";
 import { predictAllMatches, predictScoreline } from "./fifaPredictor";
 import { FIFA_RANK_DENSE } from "../data/fifaRanking";
-import { mulberry32, simulateTournament, computeEffectiveRanks } from "./scenarioSim";
+import { mulberry32, simulateTournament } from "./scenarioSim";
+import { computeCurrentElo } from "./eloModel";
 import { precomputeForms, scoreFormFast } from "./scenarioScore";
 
 // The lean scorer MUST produce numerically identical results to the canonical
@@ -81,11 +82,11 @@ function assertEquivalence(results: Record<string, any>, topScorers: string[], s
   const allPredictions = buildForms();
   const formBracketMap = buildFormBracketMap(allPredictions);
   const fastForms = precomputeForms(allPredictions, formBracketMap, results, topScorers);
-  const effRanks = computeEffectiveRanks(results);
+  const elo = computeCurrentElo(results);
 
   let comparisons = 0;
   for (let s = 0; s < sims; s++) {
-    const sim = simulateTournament(rng, results, effRanks);
+    const sim = simulateTournament(rng, results, elo);
     const simBracket = calcBracketTeams(sim);
     const actualAdvancing = deriveActualAdvancing(simBracket, sim);
     const champion = deriveChampion(sim, simBracket);

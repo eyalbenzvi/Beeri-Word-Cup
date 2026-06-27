@@ -5,7 +5,7 @@
 import { runScenarioSimulation } from "../utils/scenarioSim";
 
 self.onmessage = (e: MessageEvent) => {
-  const { allPredictions, results, actualBonuses, simCount, seed } = e.data;
+  const { allPredictions, results, actualBonuses, simCount, seed, oddsImpliedProbs } = e.data;
   try {
     const result = runScenarioSimulation({
       allPredictions,
@@ -13,6 +13,7 @@ self.onmessage = (e: MessageEvent) => {
       actualBonuses,
       simCount,
       seed,
+      oddsImpliedProbs,
       onProgress: (done, total) =>
         self.postMessage({ type: "progress", done, total }),
     });
