@@ -71,6 +71,35 @@ describe("runScenarioSimulation", () => {
     }
   });
 
+  it("emits champion+runner-up scenario tables aligned to formOrder", () => {
+    // More sims + a low sample floor so several scenarios clear the threshold.
+    const res = runScenarioSimulation({
+      allPredictions,
+      results,
+      actualBonuses: { topScorers: [] },
+      simCount: 3000,
+      seed: 7,
+      minScenarioSamples: 30,
+    });
+    expect(res.scenarios.length).toBeGreaterThan(0);
+    expect(res.formOrder.length).toBe(res.meta.formCount);
+    for (const sc of res.scenarios) {
+      expect(sc.champion).not.toBe(sc.runnerUp);
+      expect(sc.avgRank.length).toBe(res.formOrder.length);
+      expect(sc.avgPoints.length).toBe(res.formOrder.length);
+      expect(sc.winProb.length).toBe(res.formOrder.length);
+      // exactly one winner per sim → within-scenario win probs sum to ~1.
+      const sum = sc.winProb.reduce((s, p) => s + p, 0);
+      expect(sum).toBeGreaterThan(0.98);
+      expect(sum).toBeLessThan(1.02);
+      // averages are within sane bounds.
+      for (const r of sc.avgRank) {
+        expect(r).toBeGreaterThanOrEqual(1);
+        expect(r).toBeLessThanOrEqual(res.formOrder.length);
+      }
+    }
+  });
+
   it("effective ranks stay within [1,48]", () => {
     const eff = computeEffectiveRanks(results);
     for (const r of Object.values(eff)) {

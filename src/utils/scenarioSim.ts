@@ -198,12 +198,10 @@ function scoreSim(
 }
 
 // ─── Aggregation across N sims ─────────────────────────────────────
-// Storage-friendly: a single run is small enough for one Firestore doc
-// (~250 forms × a handful of fields + trimmed scenario lists). The big raw
-// conditional maps stay internal to the reducer; only per-form "root for" +
-// rival, and top-N contenders per scenario, are emitted.
-export type RootForEvent = { type: "champion" | "finalist"; code: string; lift: number; condWinProb: number };
-export type TopForm = { formId: string; withinWinProb: number };
+// Storage-friendly: a single run fits one Firestore doc (~250 forms ×
+// a handful of global fields + a capped list of champion+runner-up scenario
+// tables aligned to `formOrder`).
+export type RootForEvent = { type: "champion"; code: string; lift: number; condWinProb: number };
 
 export type ScenarioFormStat = {
   formId: string;
@@ -219,6 +217,22 @@ export type ScenarioFormStat = {
   rootFor: RootForEvent[];
 };
 
+// A "scenario" = a specific FINAL: `champion` beat `runnerUp`. The per-form
+// tables are parallel arrays aligned to the run's `formOrder` (index i is the
+// i-th form id). Each form's three headline metrics within the scenario:
+//   avgRank[i]   — its average leaderboard position
+//   avgPoints[i] — its average total points
+//   winProb[i]   — its probability of finishing 1st (P(rank 1 | scenario))
+export type Scenario = {
+  champion: string;
+  runnerUp: string;
+  prob: number;
+  samples: number;
+  avgRank: number[];
+  avgPoints: number[];
+  winProb: number[];
+};
+
 export type ScenarioRunResult = {
   meta: {
     seed: number;
@@ -227,18 +241,19 @@ export type ScenarioRunResult = {
     formCount: number;
     minScenarioSamples: number; // below this a scenario is "indicative only"
   };
+  formOrder: string[]; // index basis for every Scenario's parallel arrays
   forms: Record<string, ScenarioFormStat>;
-  champions: { code: string; prob: number; samples: number; topForms: TopForm[] }[];
-  finalPairs: { teams: [string, string]; prob: number; samples: number; topForms: TopForm[] }[];
+  champions: { code: string; prob: number; samples: number }[]; // marginal, for the 1st picker
+  scenarios: Scenario[]; // champion+runner-up tables (capped, sorted by prob)
 };
 
 // Scenarios with fewer supporting sims than this are flagged "indicative only"
-// (their per-form tables are noise). See expert review.
+// (their per-form averages are noisy) and not emitted as full tables.
 const MIN_SCENARIO_SAMPLES = 200;
 // Minimum positive lift to surface a "root for" event (avoid trivia).
 const MIN_ROOTFOR_LIFT = 0.01;
-// Cap on stored finalist pairs (the long tail is irrelevant + bloats the doc).
-const MAX_FINAL_PAIRS = 40;
+// Cap on stored scenario tables (the long tail is rare + bloats the doc).
+const MAX_SCENARIOS = 60;
 
 function statsFromHist(hist: Int32Array, total: number) {
   // median / q25 / q75 from a rank histogram (index = rank, 1-based).
@@ -263,6 +278,7 @@ export function runScenarioSimulation(opts: {
   simCount: number;
   seed?: number;
   rivalTopK?: number;
+  minScenarioSamples?: number;
   onProgress?: ProgressFn;
 }): ScenarioRunResult {
   const {
@@ -272,6 +288,7 @@ export function runScenarioSimulation(opts: {
     simCount,
     seed = 0x9e3779b9,
     rivalTopK = 12,
+    minScenarioSamples = MIN_SCENARIO_SAMPLES,
     onProgress,
   } = opts;
 
@@ -298,14 +315,29 @@ export function runScenarioSimulation(opts: {
   const rankSum = new Float64Array(nForms);
   const hist: Int32Array[] = formIds.map(() => new Int32Array(nForms + 2));
 
-  // Scenario buckets + conditional win counts.
+  // Champion marginal (for the 1st picker + "root for") and the win counts
+  // per champion that drive root-for lift.
   const champSamples: Record<string, number> = {};
   const championWin: Record<string, Record<string, number>> = {};
-  const finalSamples: Record<string, number> = {};
-  const finalPairWin: Record<string, Record<string, number>> = {};
-  const finalistWin: Record<string, Record<string, number>> = {};
-  const finalistAppear: Record<string, number> = {};
   const adjacency: Record<string, number> = {}; // "a b" -> count
+
+  // Per-scenario (champion+runner-up) accumulators, lazily allocated. Each
+  // holds per-form running sums so we can emit avg rank / avg points / win %.
+  type ScenAcc = { samples: number; rankSum: Float64Array; pointsSum: Float64Array; winCount: Float64Array };
+  const scenAcc: Map<string, ScenAcc> = new Map();
+  const getScen = (key: string): ScenAcc => {
+    let a = scenAcc.get(key);
+    if (!a) {
+      a = {
+        samples: 0,
+        rankSum: new Float64Array(nForms),
+        pointsSum: new Float64Array(nForms),
+        winCount: new Float64Array(nForms),
+      };
+      scenAcc.set(key, a);
+    }
+    return a;
+  };
 
   const bump = (
     obj: Record<string, Record<string, number>>,
@@ -323,27 +355,32 @@ export function runScenarioSimulation(opts: {
 
     const winner = ranked[0].formId;
     winCount[idx[winner]] += 1;
+
+    // Identify the scenario (final): champion beat runnerUp.
+    const [fa, fb] = finalists;
+    let scen: ScenAcc | null = null;
+    if (champion && fa && fb) {
+      const runnerUp = champion === fa ? fb : fa;
+      scen = getScen(champion + ">" + runnerUp);
+      scen.samples += 1;
+    }
+
     for (let i = 0; i < ranked.length; i++) {
       const fi = idx[ranked[i].formId];
       const rank = i + 1;
       rankSum[fi] += rank;
       hist[fi][rank] += 1;
       if (i < 3) podiumCount[fi] += 1;
+      if (scen) {
+        scen.rankSum[fi] += rank;
+        scen.pointsSum[fi] += ranked[i].totalPoints;
+        if (i === 0) scen.winCount[fi] += 1;
+      }
     }
 
     if (champion) {
       champSamples[champion] = (champSamples[champion] || 0) + 1;
       bump(championWin, champion, winner);
-    }
-    const [fa, fb] = finalists;
-    if (fa && fb) {
-      const pairKey = [fa, fb].sort().join(" ");
-      finalSamples[pairKey] = (finalSamples[pairKey] || 0) + 1;
-      bump(finalPairWin, pairKey, winner);
-      for (const t of [fa, fb]) {
-        finalistAppear[t] = (finalistAppear[t] || 0) + 1;
-        bump(finalistWin, t, winner);
-      }
     }
 
     const kMax = Math.min(rivalTopK, ranked.length - 1);
@@ -360,32 +397,33 @@ export function runScenarioSimulation(opts: {
   }
 
   // ── Reduce to the storage-friendly result shape ──
-  const topFormsFrom = (wins: Record<string, number>, samples: number, n = 10) =>
-    Object.entries(wins)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, n)
-      .map(([formId, w]) => ({ formId, withinWinProb: w / samples }));
+  const round = (x: number, dp: number) => {
+    const m = 10 ** dp;
+    return Math.round(x * m) / m;
+  };
 
   const champions = Object.entries(champSamples)
     .sort((a, b) => b[1] - a[1])
-    .map(([code, samples]) => ({
-      code,
-      prob: samples / simCount,
-      samples,
-      topForms: topFormsFrom(championWin[code] || {}, samples),
-    }));
+    .map(([code, samples]) => ({ code, prob: samples / simCount, samples }));
 
-  const finalPairs = Object.entries(finalSamples)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, MAX_FINAL_PAIRS)
-    .map(([key, samples]) => {
-      const [t1, t2] = key.split(" ");
-      return {
-        teams: [t1, t2] as [string, string],
-        prob: samples / simCount,
-        samples,
-        topForms: topFormsFrom(finalPairWin[key] || {}, samples),
-      };
+  // Champion+runner-up scenario tables: top by frequency, ≥ min samples (so
+  // the per-form averages are stable), each emitting a full per-form table
+  // aligned to `formOrder`.
+  const scenarios: Scenario[] = [...scenAcc.entries()]
+    .filter(([, a]) => a.samples >= minScenarioSamples)
+    .sort((a, b) => b[1].samples - a[1].samples)
+    .slice(0, MAX_SCENARIOS)
+    .map(([key, a]) => {
+      const [champion, runnerUp] = key.split(">");
+      const avgRank: number[] = new Array(nForms);
+      const avgPoints: number[] = new Array(nForms);
+      const winProb: number[] = new Array(nForms);
+      for (let i = 0; i < nForms; i++) {
+        avgRank[i] = round(a.rankSum[i] / a.samples, 1);
+        avgPoints[i] = round(a.pointsSum[i] / a.samples, 1);
+        winProb[i] = round(a.winCount[i] / a.samples, 4);
+      }
+      return { champion, runnerUp, prob: a.samples / simCount, samples: a.samples, avgRank, avgPoints, winProb };
     });
 
   // Rival = the form most often adjacent in the standings.
@@ -396,23 +434,16 @@ export function runScenarioSimulation(opts: {
     if (!adjBySide[b] || count > adjBySide[b].count) adjBySide[b] = { formId: a, count };
   }
 
-  // "Root for" per form = the champion/finalist events that most LIFT this
-  // form's win probability above its baseline (filtered for sample support).
+  // "Root for" per form = the champions that most LIFT this form's win
+  // probability above its baseline (filtered for sample support).
   const rootForOf = (formId: string, baseline: number): RootForEvent[] => {
     const cands: RootForEvent[] = [];
     for (const [code, samples] of Object.entries(champSamples)) {
-      if (samples < MIN_SCENARIO_SAMPLES) continue;
+      if (samples < minScenarioSamples) continue;
       const wins = championWin[code]?.[formId] || 0;
       const condWinProb = wins / samples;
       const lift = condWinProb - baseline;
       if (lift >= MIN_ROOTFOR_LIFT) cands.push({ type: "champion", code, lift, condWinProb });
-    }
-    for (const [code, appear] of Object.entries(finalistAppear)) {
-      if (appear < MIN_SCENARIO_SAMPLES) continue;
-      const wins = finalistWin[code]?.[formId] || 0;
-      const condWinProb = wins / appear;
-      const lift = condWinProb - baseline;
-      if (lift >= MIN_ROOTFOR_LIFT) cands.push({ type: "finalist", code, lift, condWinProb });
     }
     return cands.sort((a, b) => b.lift - a.lift).slice(0, 3);
   };
@@ -443,10 +474,11 @@ export function runScenarioSimulation(opts: {
       simCount,
       generatedAt: Date.now(),
       formCount: nForms,
-      minScenarioSamples: MIN_SCENARIO_SAMPLES,
+      minScenarioSamples,
     },
+    formOrder: formIds,
     forms,
     champions,
-    finalPairs,
+    scenarios,
   };
 }
