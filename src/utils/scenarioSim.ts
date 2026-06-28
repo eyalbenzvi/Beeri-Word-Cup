@@ -20,7 +20,6 @@ import { compareTiebreaker } from "./scoring";
 import { buildFormBracketMap } from "./leaderboardCore";
 import { isScoreValid } from "./helpers";
 import { computeCurrentElo, sampleEloMatch, shootoutHomeAdvances, DEFAULT_ELO } from "./eloModel";
-import { blendEloWithOdds } from "./bettingOdds";
 import { precomputeForms, scoreFormFast, makeScratchScore, FormFast, FastScore } from "./scenarioScore";
 
 // ─── Seeded RNG ────────────────────────────────────────────────────
@@ -186,7 +185,6 @@ export type ScenarioRunResult = {
     generatedAt: number;
     formCount: number;
     minScenarioSamples: number; // below this a final is too rare to table
-    strengthSource: "elo" | "elo+betting"; // match-strength model used
   };
   formOrder: string[]; // index basis for every Scenario's parallel arrays
   forms: Record<string, ScenarioFormInfo>; // display labels only
@@ -209,11 +207,6 @@ export function runScenarioSimulation(opts: {
   simCount: number;
   seed?: number;
   minScenarioSamples?: number;
-  // Optional betting-odds calibration: implied champion probabilities per team
-  // code. When present (and non-empty) the Elo ratings are blended toward them;
-  // otherwise the run is pure Elo (the default + fallback).
-  oddsImpliedProbs?: Record<string, number> | null;
-  oddsWeight?: number;
   onProgress?: ProgressFn;
 }): ScenarioRunResult {
   const {
@@ -223,17 +216,12 @@ export function runScenarioSimulation(opts: {
     simCount,
     seed = 0x9e3779b9,
     minScenarioSamples = MIN_SCENARIO_SAMPLES,
-    oddsImpliedProbs = null,
-    oddsWeight = 0.5,
     onProgress,
   } = opts;
 
   const rng = mulberry32(seed);
-  // Match-strength: current Elo (base ratings updated by played results),
-  // optionally blended with betting-market implied champion probabilities.
-  const usedBetting = !!oddsImpliedProbs && Object.keys(oddsImpliedProbs).length > 0;
-  let elo = computeCurrentElo(results);
-  if (usedBetting) elo = blendEloWithOdds(elo, oddsImpliedProbs as Record<string, number>, oddsWeight);
+  // Match-strength: current Elo (base ratings updated by every played result).
+  const elo = computeCurrentElo(results);
 
   const formBracketMap = buildFormBracketMap(allPredictions);
   const fixedTopScorers = Array.isArray(actualBonuses?.topScorers)
@@ -249,7 +237,6 @@ export function runScenarioSimulation(opts: {
     generatedAt: Date.now(),
     formCount: nForms,
     minScenarioSamples,
-    strengthSource: (usedBetting ? "elo+betting" : "elo") as "elo" | "elo+betting",
   };
   const forms: ScenarioRunResult["forms"] = {};
   for (const ff of fastForms) forms[ff.formId] = { userId: ff.userId, formName: ff.formName };
@@ -345,4 +332,26 @@ export function runScenarioSimulation(opts: {
     });
 
   return { meta, formOrder: formIds, forms, champions, scenarios };
+}
+
+// Firestore caps a document at 1 MiB. A run is normally ~170–300 KB, but the
+// scenario tables grow with formCount × scenarioCount, so before persisting we
+// guard against the hard limit by dropping the LEAST-likely finals (scenarios
+// are sorted by samples desc) until the serialized run fits a conservative
+// budget. Returns the (possibly trimmed) run + whether anything was dropped so
+// the caller can alert. Pure — unit-tested.
+export const SCENARIO_DOC_MAX_BYTES = 900_000;
+export function fitScenarioRunToDoc(
+  run: ScenarioRunResult,
+  maxBytes: number = SCENARIO_DOC_MAX_BYTES,
+): { run: ScenarioRunResult; trimmed: number } {
+  let scenarios = run.scenarios;
+  let current = run;
+  let trimmed = 0;
+  while (scenarios.length > 1 && JSON.stringify(current).length > maxBytes) {
+    scenarios = scenarios.slice(0, scenarios.length - 1);
+    current = { ...run, scenarios };
+    trimmed += 1;
+  }
+  return { run: current, trimmed };
 }
