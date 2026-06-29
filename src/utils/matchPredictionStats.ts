@@ -29,13 +29,13 @@ export type BracketEntry = { home: string | null; away: string | null };
 export type Voter = { formId: string; name: string; advancingTeam?: string | null };
 
 // Check if a match is a knockout match (not group stage)
-function isKnockoutMatch(matchId: string): boolean {
+export function isKnockoutMatch(matchId: string): boolean {
   return !matchId.startsWith("group-");
 }
 
 // Check if a form's bracket matches the actual bracket for a knockout match.
 // Returns true if it's a group match, or if both home/away teams match.
-function bracketMatchesActual(
+export function bracketMatchesActual(
   formBracket: BracketEntry | null | undefined,
   actualBracket: BracketEntry | null | undefined,
   matchId: string,

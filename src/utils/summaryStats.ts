@@ -2,6 +2,7 @@
 // compute how many predicted home/draw/away, the exact-score distribution,
 // the most-common predicted scoreline, and who got the exact score right.
 import { POINTS } from "./scoring";
+import { bracketMatchesActual, isKnockoutMatch, type BracketEntry } from "./matchPredictionStats";
 
 // Editorial thresholds for the "piquant" hooks that drive the suggestion
 // panel in the admin editor. Tuned to surface roughly one or two hooks per
@@ -59,16 +60,49 @@ function getFormPrediction(form, matchId) {
  *   actualScoreCount,                   // # of forms that predicted the exact actual scoreline
  *   actualScorePct,
  * }
+ *
+ * Knockout matchup gating
+ * -----------------------
+ * For a knockout match the schedule slot ("מנצחת 73") is filled with DIFFERENT
+ * teams in different forms — a form's score for that slot describes whatever
+ * teams ITS bracket sent there, not necessarily the teams that actually played.
+ * Folding those in pollutes every aggregate below (outcome %s, exact-hit names,
+ * "who got it right"). When the caller supplies the bracket inputs we therefore
+ * count ONLY forms whose bracket seated the same matchup that actually occurred
+ * — exactly the rule scoring.ts uses (`wrongMatchup`) and the Stats/Results
+ * pages already apply via matchPredictionStats. Group matches are seated
+ * identically for everyone, so the filter is a no-op for them. Legacy callers
+ * (and the pure tests) pass no bracket inputs and keep the original behaviour.
  */
 export function computeMatchStats({
   matchId,
   result,
   allPredictions,
   users,
+  actualBracketTeams,
+  getFormBracketTeams,
+}: {
+  matchId: string;
+  result?: any;
+  allPredictions?: Record<string, any>;
+  users?: Record<string, any>;
+  actualBracketTeams?: Record<string, BracketEntry> | null;
+  getFormBracketTeams?: ((form: any) => Record<string, BracketEntry>) | null;
 }) {
   const actualOutcome = result
     ? outcomeOf(result.homeScore, result.awayScore)
     : null;
+
+  // Only enforce matchup alignment on knockout matches, and only when the
+  // caller actually handed us the bracket inputs needed to check it.
+  const enforceMatchup =
+    !!actualBracketTeams && !!getFormBracketTeams && isKnockoutMatch(matchId);
+  const actualEntry = enforceMatchup ? actualBracketTeams![matchId] : null;
+  const passesMatchup = (form: any): boolean => {
+    if (!enforceMatchup) return true;
+    const formBracket = getFormBracketTeams!(form) || {};
+    return bracketMatchesActual(formBracket[matchId], actualEntry, matchId);
+  };
 
   const outcomeCounts = { home: 0, draw: 0, away: 0 };
   const scoreCounts = new Map(); // "h-a" -> count
@@ -79,6 +113,8 @@ export function computeMatchStats({
   for (const [formId, fAny] of Object.entries(allPredictions || {})) {
     const form = fAny as any;
     if (!isScorableForm(form)) continue;
+    // Knockout: skip forms that predicted a different matchup for this slot.
+    if (!passesMatchup(form)) continue;
     totalForms++;
     const pred = getFormPrediction(form, matchId);
     if (!pred) continue;
@@ -145,6 +181,8 @@ export function computeMatchStats({
     for (const [formId, fAny] of Object.entries(allPredictions || {})) {
       const form = fAny as any;
       if (!isScorableForm(form)) continue;
+      // Same knockout matchup gate as the main pass.
+      if (!passesMatchup(form)) continue;
       const pred = getFormPrediction(form, matchId);
       if (!pred) continue;
       if (outcomeOf(pred.homeScore, pred.awayScore) === actualOutcome) {

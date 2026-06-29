@@ -51,10 +51,14 @@ export default function MatchDigest({
   note,
   allPredictions,
   users,
+  actualBracketTeams,
+  getFormBracketTeams,
 }) {
   // Memo MUST be called unconditionally — keep it above the early return.
   // A missing `match` becomes a null id; computeMatchStats still returns
   // empty aggregates, which are never rendered because we bail below.
+  // actualBracketTeams + getFormBracketTeams let computeMatchStats restrict a
+  // knockout match to forms that predicted the correct matchup.
   const stats = useMemo(
     () =>
       computeMatchStats({
@@ -62,18 +66,22 @@ export default function MatchDigest({
         result,
         allPredictions,
         users,
+        actualBracketTeams,
+        getFormBracketTeams,
       }),
-    [match?.id, result, allPredictions, users],
+    [match?.id, result, allPredictions, users, actualBracketTeams, getFormBracketTeams],
   );
 
   if (!match) return null;
 
   // Knockout fixtures ship with null teams on the schedule object — the real
-  // participants are only known once earlier rounds resolve. A recorded result
-  // stores the actual team codes, so prefer those; this keeps a published
-  // knockout digest showing the real teams instead of a "מנצחת 73" slot label.
-  const homeCode = match.homeTeam || result?.homeTeam || null;
-  const awayCode = match.awayTeam || result?.awayTeam || null;
+  // participants are only known once earlier rounds resolve. Prefer the actual
+  // results-gated bracket slot (the same source Stats/Results use), then any
+  // team codes stored on the result; this keeps a published knockout digest
+  // showing the real teams instead of a "מנצחת 73" slot label.
+  const actualSlot = actualBracketTeams?.[match.id];
+  const homeCode = match.homeTeam || actualSlot?.home || result?.homeTeam || null;
+  const awayCode = match.awayTeam || actualSlot?.away || result?.awayTeam || null;
   const home = homeCode ? getTeamByCode(homeCode) : null;
   const away = awayCode ? getTeamByCode(awayCode) : null;
 

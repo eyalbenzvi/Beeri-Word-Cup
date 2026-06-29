@@ -95,18 +95,23 @@ function pushFormListChip(out, namedFormIds, {
  *
  * Returns: [{ id, label, text, kind }] — `text` is what gets inserted.
  */
-export function getMatchSuggestions({ match, result, allPredictions, users }) {
+export function getMatchSuggestions({ match, result, allPredictions, users, actualBracketTeams, getFormBracketTeams }) {
   if (!match || !result) return [];
   const stats = computeMatchStats({
     matchId: match.id,
     result,
     allPredictions,
     users,
+    actualBracketTeams,
+    getFormBracketTeams,
   });
   if (stats.totalForms === 0) return [];
 
-  const home = teamName(match.homeTeam);
-  const away = teamName(match.awayTeam);
+  // Knockout fixtures carry null homeTeam/awayTeam — fall back to the actual
+  // results-gated bracket so the chip copy names the real teams.
+  const slot = actualBracketTeams?.[match.id];
+  const home = teamName(match.homeTeam || slot?.home);
+  const away = teamName(match.awayTeam || slot?.away);
   const out = [];
 
   // 1. Lone bullseye (1 form nailed it)
@@ -191,13 +196,14 @@ export function getMatchSuggestions({ match, result, allPredictions, users }) {
  * post. Useful for intro and conclusion. `coveredMatches` is an array of
  * `{ match, result }` for each covered match.
  */
-export function getGlobalSuggestions({ coveredMatches = [], allPredictions, users }) {
+export function getGlobalSuggestions({ coveredMatches = [], allPredictions, users, actualBracketTeams, getFormBracketTeams }) {
   const out = [];
   const matchesWithResults = coveredMatches.filter((cm) => !!cm.result);
 
   if (matchesWithResults.length === 0) return [];
 
-  // Collect per-match stats once.
+  // Collect per-match stats once. Knockout matches are gated on matchup
+  // alignment via the bracket inputs (no-op for group matches).
   const allStats = matchesWithResults.map((cm) => ({
     match: cm.match,
     result: cm.result,
@@ -206,6 +212,8 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
       result: cm.result,
       allPredictions,
       users,
+      actualBracketTeams,
+      getFormBracketTeams,
     }),
   }));
 
@@ -254,8 +262,9 @@ export function getGlobalSuggestions({ coveredMatches = [], allPredictions, user
     null,
   );
   if (bestMatch && bestMatch.stats.exactHitCount >= EASY_CALL_MIN_HITS) {
-    const home = teamName(bestMatch.match.homeTeam);
-    const away = teamName(bestMatch.match.awayTeam);
+    const slot = actualBracketTeams?.[bestMatch.match.id];
+    const home = teamName(bestMatch.match.homeTeam || slot?.home);
+    const away = teamName(bestMatch.match.awayTeam || slot?.away);
     out.push({
       id: "easy-call",
       label: `✅ ${bestMatch.stats.exactHitCount} קלעו ${home}–${away} בול`,

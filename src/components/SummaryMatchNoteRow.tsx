@@ -3,7 +3,7 @@ import { Sparkles, Plus } from "lucide-react";
 import { BLOG } from "../constants/messages";
 import { getMatchById, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
-import { getCachedBracket } from "../utils/bracketCache";
+import { getCachedBracket, getFormBracketTeams } from "../utils/bracketCache";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getMatchSuggestions } from "../utils/statStarters";
 
@@ -91,15 +91,39 @@ export default function SummaryMatchNoteRow({
 }) {
   const m = getMatchById(mid);
   const r = matchResults[mid];
+  // Actual results-gated bracket — used to gate knockout stats to the forms
+  // that predicted the correct matchup (same rule the published digest uses).
+  const actualBracketTeams = useMemo(
+    () => getCachedBracket(matchResults || {}, true),
+    [matchResults],
+  );
   const stats = useMemo(
-    () => computeMatchStats({ matchId: mid, result: r, allPredictions, users }),
-    [mid, r, allPredictions, users],
+    () =>
+      computeMatchStats({
+        matchId: mid,
+        result: r,
+        allPredictions,
+        users,
+        actualBracketTeams,
+        getFormBracketTeams,
+      }),
+    [mid, r, allPredictions, users, actualBracketTeams],
   );
   // Piquancy chips for THIS match — same memo deps as stats since they're
   // a derivative of it.
   const suggestions = useMemo(
-    () => (m && r ? getMatchSuggestions({ match: m, result: r, allPredictions, users }) : []),
-    [m, r, allPredictions, users],
+    () =>
+      m && r
+        ? getMatchSuggestions({
+            match: m,
+            result: r,
+            allPredictions,
+            users,
+            actualBracketTeams,
+            getFormBracketTeams,
+          })
+        : [],
+    [m, r, allPredictions, users, actualBracketTeams],
   );
   if (!m) return null;
   const teams = resolveEditorMatchTeams(m, matchResults);
