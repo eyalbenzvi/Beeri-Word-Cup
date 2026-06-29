@@ -78,6 +78,17 @@ export function getCachedChampion(matches) {
   return champ;
 }
 
+// Stable (module-level) resolver: a form → its full bracket-teams map.
+// Passed to the prediction-stats aggregators that need to verify, per form,
+// whether the form's bracket seated the SAME teams into a knockout slot as
+// actually happened. Defined once here (not as an inline arrow at call sites)
+// so it keeps a stable identity across renders — callers can safely list it
+// in useMemo dependency arrays without retriggering. Reads form.matches and
+// rides the same cached-bracket LRU as everything else.
+export function getFormBracketTeams(form) {
+  return getCachedBracket(form?.matches || {});
+}
+
 // Hook for components that need bracket for a single form
 export function useBracket(matches) {
   return useMemo(() => getCachedBracket(matches), [matches]);

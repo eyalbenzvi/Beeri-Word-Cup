@@ -392,6 +392,128 @@ console.log("--- 17. backwards compat: existing fields untouched ---");
   assert("actualScorePct" in s, "still has actualScorePct");
 }
 
+// ============ NEW: knockout matchup gating ============
+// In a knockout slot ("R32-1" = "מנצחת 73"), different forms seat DIFFERENT
+// teams. A form's score for that slot describes ITS predicted matchup, so the
+// blog must count only forms whose bracket produced the matchup that actually
+// happened. When actualBracketTeams + getFormBracketTeams are supplied, the
+// aggregator filters knockout forms by bracket alignment (no-op for group ids).
+
+// A getFormBracketTeams resolver for tests: each form carries its own
+// `_bracket` map ({ matchId: { home, away } }).
+const formBracket = (f) => f._bracket || {};
+
+console.log("--- 24. knockout: only matching-matchup forms count ---");
+{
+  const allPredictions = {
+    // Predicted BRA-ARG (the matchup that happened) — counts. Exact 2-1.
+    f1: { ...mkForm("u1", { "R32-1": { homeScore: 2, awayScore: 1 } }, "submitted", "אלון"),
+          _bracket: { "R32-1": { home: "BRA", away: "ARG" } } },
+    // Predicted GER-FRA in this slot — DIFFERENT game — must be excluded even
+    // though its score (2-1) equals the actual scoreline.
+    f2: { ...mkForm("u2", { "R32-1": { homeScore: 2, awayScore: 1 } }, "submitted", "דנה"),
+          _bracket: { "R32-1": { home: "GER", away: "FRA" } } },
+    // Predicted BRA-ARG (matches) but a draw — counts toward totals, not exact.
+    f3: { ...mkForm("u3", { "R32-1": { homeScore: 0, awayScore: 0 } }, "submitted", "יוסי"),
+          _bracket: { "R32-1": { home: "BRA", away: "ARG" } } },
+  };
+  const args = {
+    matchId: "R32-1",
+    result: { homeScore: 2, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+    actualBracketTeams: { "R32-1": { home: "BRA", away: "ARG" } },
+    getFormBracketTeams: formBracket,
+  };
+  const s = computeMatchStats(args);
+  assert(s.totalForms === 2, `knockout: totalForms excludes wrong matchup, got ${s.totalForms}`);
+  assert(s.exactHitCount === 1, `knockout: only the matching form is an exact hit, got ${s.exactHitCount}`);
+  assert(s.exactHitForms[0]?.formName === "אלון", "knockout: exact hit is the BRA-ARG form");
+  assert(s.outcomeCounts.home === 1 && s.outcomeCounts.draw === 1 && s.outcomeCounts.away === 0,
+    `knockout: outcome counts only matching forms, got ${JSON.stringify(s.outcomeCounts)}`);
+
+  // Without the bracket inputs, the OLD (buggy) behaviour: all 3 count, 2 exacts.
+  const sNoGate = computeMatchStats({
+    matchId: args.matchId, result: args.result, allPredictions, users: USERS,
+  });
+  assert(sNoGate.totalForms === 3, "no bracket inputs → unfiltered (back-compat)");
+  assert(sNoGate.exactHitCount === 2, "no bracket inputs → counts wrong-matchup exact too");
+}
+
+console.log("--- 25. knockout: unresolved actual slot → no forms credited ---");
+{
+  const allPredictions = {
+    f1: { ...mkForm("u1", { "R32-1": { homeScore: 2, awayScore: 1 } }, "submitted", "אלון"),
+          _bracket: { "R32-1": { home: "BRA", away: "ARG" } } },
+  };
+  // actualBracketTeams has no entry for R32-1 (feeding results missing) → we
+  // can't know the real teams, so nothing is attributed.
+  const s = computeMatchStats({
+    matchId: "R32-1",
+    result: { homeScore: 2, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+    actualBracketTeams: {},
+    getFormBracketTeams: formBracket,
+  });
+  assert(s.totalForms === 0, `unresolved actual slot → 0 forms, got ${s.totalForms}`);
+  assert(s.exactHitCount === 0, "unresolved actual slot → 0 exacts");
+}
+
+console.log("--- 26. group match: bracket inputs are a no-op ---");
+{
+  const allPredictions = {
+    // Even with a divergent _bracket, a GROUP id must never be filtered.
+    f1: { ...mkForm("u1", { "group-A-1": { homeScore: 1, awayScore: 0 } }, "submitted", "אלון"),
+          _bracket: { "group-A-1": { home: "XXX", away: "YYY" } } },
+    f2: { ...mkForm("u2", { "group-A-1": { homeScore: 1, awayScore: 0 } }, "submitted", "דנה"),
+          _bracket: {} },
+  };
+  const s = computeMatchStats({
+    matchId: "group-A-1",
+    result: { homeScore: 1, awayScore: 0 },
+    allPredictions,
+    users: USERS,
+    actualBracketTeams: { "group-A-1": { home: "BRA", away: "ARG" } },
+    getFormBracketTeams: formBracket,
+  });
+  assert(s.totalForms === 2, `group id: all forms counted despite brackets, got ${s.totalForms}`);
+  assert(s.exactHitCount === 2, "group id: both forms are exact hits");
+}
+
+console.log("--- 27. knockout: underdogHeroes respects matchup gate ---");
+{
+  // 9 forms predicted BRA-ARG home win; 1 (רותם) predicted BRA-ARG away win.
+  // Plus a wrong-matchup form that ALSO predicted an away win — it must not
+  // pollute the underdog count or names.
+  const allPredictions = {};
+  for (let i = 1; i <= 9; i++) {
+    allPredictions[`f${i}`] = {
+      ...mkForm(`u${i}`, { "R32-1": { homeScore: 2, awayScore: 0 } }, "submitted", `H${i}`),
+      _bracket: { "R32-1": { home: "BRA", away: "ARG" } },
+    };
+  }
+  allPredictions["f10"] = {
+    ...mkForm("u4", { "R32-1": { homeScore: 0, awayScore: 3 } }, "submitted", "רותם"),
+    _bracket: { "R32-1": { home: "BRA", away: "ARG" } },
+  };
+  allPredictions["f11"] = {
+    ...mkForm("u4", { "R32-1": { homeScore: 0, awayScore: 3 } }, "submitted", "מתחזה"),
+    _bracket: { "R32-1": { home: "GER", away: "FRA" } },
+  };
+  const s = computeMatchStats({
+    matchId: "R32-1",
+    result: { homeScore: 0, awayScore: 1 },
+    allPredictions,
+    users: USERS,
+    actualBracketTeams: { "R32-1": { home: "BRA", away: "ARG" } },
+    getFormBracketTeams: formBracket,
+  });
+  assert(s.totalForms === 10, `underdog gate: totalForms excludes impostor, got ${s.totalForms}`);
+  assert(s.underdogHeroes.length === 1, `underdog gate: 1 hero, got ${s.underdogHeroes.length}`);
+  assert(s.underdogHeroes[0].formName === "רותם", "underdog gate: hero is רותם, not the impostor");
+}
+
 // ============ NEW: form-level day aggregates ============
 // `computeFormDayAggregates` powers the new "who shone today" suggestions
 // in the blog editor. It buckets per-match correctness up by formId across

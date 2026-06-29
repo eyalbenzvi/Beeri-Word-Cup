@@ -79,7 +79,14 @@ const editor = readMigratedSrc("src/components/SummaryEditor.jsx");
 assert(/resolveEditorMatchTeams/.test(editor), "selection list resolves teams via the shared helper");
 assert(/matchResults=\{matchResults\}/.test(editor), "MatchRow receives the full results map for resolution");
 const digest = readMigratedSrc("src/components/MatchDigest.jsx");
-assert(/match\.homeTeam \|\| result\?\.homeTeam/.test(digest), "published digest prefers the result's real team codes for knockout");
+// Knockout teams are resolved from the actual results-gated bracket slot first
+// (the same source Stats/Results use), then any team codes stored on the result.
+assert(/match\.homeTeam \|\| actualSlot\?\.home \|\| result\?\.homeTeam/.test(digest),
+  "published digest resolves knockout teams from the actual bracket slot, then the result codes");
+// And the digest must thread the bracket inputs into computeMatchStats so a
+// knockout digest only counts forms that predicted the correct matchup.
+assert(/actualBracketTeams/.test(digest) && /getFormBracketTeams/.test(digest),
+  "digest threads bracket inputs into computeMatchStats for knockout matchup gating");
 
 // ---- #11: admin run-count + recompute control -------------------------------
 console.log("--- #11 Admin: run-count + recompute ---");

@@ -8,6 +8,7 @@
 // page wrapper, not the article itself.
 import MatchDigest from "./MatchDigest";
 import { getMatchById } from "../data/matches";
+import { getCachedBracket, getFormBracketTeams } from "../utils/bracketCache";
 import { BLOG } from "../constants/messages";
 
 function formatDateHe(iso) {
@@ -35,6 +36,12 @@ export default function SummaryArticle({
   if (!summary) return null;
 
   const coveredIds = summary.coveredMatchIds || [];
+  // Actual results-gated bracket — the single source of truth for which teams
+  // really played each knockout slot. Threaded into every digest so knockout
+  // stats only count forms that predicted the correct matchup (and so the
+  // headline shows the real teams, not a "מנצחת 73" slot label). getCachedBracket
+  // is LRU-memoized by results hash, so this is cheap to call on each render.
+  const actualBracketTeams = getCachedBracket(matchResults || {}, true);
   // For a draft preview, publishedAt is null — fall back to "now" via
   // updatedAt/createdAt so the byline strip never reads as broken.
   const dateLabel = formatDateHe(
@@ -86,6 +93,8 @@ export default function SummaryArticle({
               note={summary.matchNotes?.[mid]}
               allPredictions={allPredictions}
               users={users}
+              actualBracketTeams={actualBracketTeams}
+              getFormBracketTeams={getFormBracketTeams}
             />
           );
         })}

@@ -11,7 +11,7 @@ import {
 } from "../store";
 import { useMatchResults, useUserDirectory, useAllPredictions, useSummaries } from "../hooks/useStore";
 import { ALL_MATCHES, getMatchById, STAGES } from "../data/matches";
-import { getCachedBracket } from "../utils/bracketCache";
+import { getCachedBracket, getFormBracketTeams } from "../utils/bracketCache";
 import { getMatchKickoffUTC } from "../utils/matchTime";
 import { getGlobalSuggestions, pairCoveredMatches } from "../utils/statStarters";
 import SummaryArticle from "./SummaryArticle";
@@ -240,14 +240,23 @@ export default function SummaryEditor({ summaryId, onClose }) {
     [existing, dfTitle, dfSubtitle, dfIntro, dfConclusion, coveredMatchIds, dfMatchNotes],
   );
 
+  // Actual results-gated bracket — gates knockout stats/suggestions to forms
+  // that predicted the correct matchup (same source the published digest uses).
+  const actualBracketTeams = useMemo(
+    () => getCachedBracket(matchResults || {}, true),
+    [matchResults],
+  );
+
   // Global ("cross-match") piquancy suggestions for the whole post.
   const globalSuggestions = useMemo(
     () => getGlobalSuggestions({
       coveredMatches: pairCoveredMatches(coveredMatchIds, matchResults),
       allPredictions,
       users,
+      actualBracketTeams,
+      getFormBracketTeams,
     }),
-    [coveredMatchIds, matchResults, allPredictions, users],
+    [coveredMatchIds, matchResults, allPredictions, users, actualBracketTeams],
   );
 
   const toggleMatch = (matchId, checked) => {
@@ -410,10 +419,20 @@ export default function SummaryEditor({ summaryId, onClose }) {
       result: r,
       allPredictions,
       users,
+      actualBracketTeams,
+      getFormBracketTeams,
     });
+    // Knockout fixtures carry null teams — resolve real participants from the
+    // actual results-gated bracket so the AI writes about the right teams.
+    const slot = actualBracketTeams?.[mid];
     const res = await runAI(`m:${mid}`, () =>
       summaryAI.matchCommentary({
-        match: { home: m.homeTeam, away: m.awayTeam, stage: m.stage, group: m.group },
+        match: {
+          home: m.homeTeam || slot?.home || null,
+          away: m.awayTeam || slot?.away || null,
+          stage: m.stage,
+          group: m.group,
+        },
         result: r,
         stats,
         currentNote: matchNotes[mid] || "",
