@@ -33,6 +33,16 @@ assert(/entry\.advancingTeam = home|advancingTeam = away/.test(c), "decisive kno
 // Projection = current rank vs hypothetical rank, for EVERY form the user owns.
 assert(/entry\.rank - hypoEntry\.rank/.test(c), "delta = current rank − projected rank");
 assert(/livePoints/.test(c), "shows provisional points from the live matches");
+// livePoints must be the TOTAL-points delta (so a decisive live game's advancing
+// bonus is counted), not just the sum of per-match outcome/exact points.
+assert(
+  /const livePoints = \(hypoEntry\.totalPoints \|\| 0\) - \(entry\.totalPoints \|\| 0\)/.test(c),
+  "livePoints = projected total minus current total (includes advancing bonus)",
+);
+assert(
+  !/livePoints \+= .*matchScores/.test(c),
+  "livePoints no longer sums matchScores alone (that dropped advancing points)",
+);
 assert(/\.filter\(\(e\) => e\.userId === user\.id\)/.test(c), "projects all of the user's forms, not just the best one");
 assert(/impacts\.map\(/.test(c), "renders one projection row per form");
 
