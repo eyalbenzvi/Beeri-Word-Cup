@@ -148,9 +148,11 @@ service cloud.firestore {
       // Admin-only documents. uidMigrationMap is written exclusively by the
       // Admin SDK (migration script + phone-verify-otp); listing it here
       // documents that browser clients must never write it directly.
-      // scenarioRun + scenarioLock are written ONLY by the recompute background
-      // function via the Admin SDK (which bypasses these rules); no client write.
-      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap'];
+      // scenarioRun is written by EITHER the recompute background function
+      // (Admin SDK, bypasses rules) OR the admin's in-browser "local" recompute
+      // fallback (a direct client write — needs the rule below). scenarioLock is
+      // server-only (the local path doesn't use it), so it stays off this list.
+      allow write: if isAdmin() && docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap', 'scenarioRun'];
     }
 
     // userPrivate/{uid} — per-user private record (email, isAdmin,

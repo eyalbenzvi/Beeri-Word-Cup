@@ -338,6 +338,54 @@ for (const f of migrated) {
   );
 }
 
+// ---------- scenarioRun: server primary + admin local fallback ----------
+// The scenario run is computed server-side (Netlify background fn, Admin SDK)
+// AND, as a backup, in-browser by an admin who then writes the same doc. That
+// local write needs the rules to allow an admin client to write scenarioRun.
+console.log("--- scenarioRun server + local fallback ---");
+
+const gameDataWriteBlock =
+  rules.match(/allow\s+write:\s*if\s+isAdmin\(\)\s*&&\s*docId\s+in\s*\[[^\]]*\]/)?.[0] || "";
+assert(
+  /['"]scenarioRun['"]/.test(gameDataWriteBlock),
+  "rules: admin client may write gameData/scenarioRun (local-recompute fallback)",
+);
+// scenarioLock must stay server-only — the local path never touches it.
+assert(
+  !/['"]scenarioLock['"]/.test(gameDataWriteBlock),
+  "rules: scenarioLock stays off the admin client-write list (server-only)",
+);
+// Read of scenarioRun must remain gated (admin or after lock), not broadened.
+const gameDataReadBlockScenario =
+  rules.match(/match\s+\/gameData\/\{docId\}[\s\S]+?allow\s+read:[\s\S]+?;/)?.[0] || "";
+assert(
+  /docId\s*==\s*['"]scenarioRun['"]\s*\?\s*\(isAdmin\(\)\s*\|\|\s*\(isAuth\(\)\s*&&\s*isLocked\(\)\)\)/.test(
+    gameDataReadBlockScenario,
+  ),
+  "rules: scenarioRun read stays gated (isAdmin || locked)",
+);
+
+const scenarioRepoSrc = readMigratedSrc(resolve(ROOT, "src/store/scenarioRepo.ts"), "utf8");
+const saveBlock = scenarioRepoSrc.match(/export async function saveScenarioRun[\s\S]+?\n\}/)?.[0] || "";
+assert(
+  /requireAdmin\(\)/.test(saveBlock) && /setDoc\(/.test(saveBlock),
+  "store: saveScenarioRun is admin-gated and writes the scenarioRun doc",
+);
+assert(
+  /fitScenarioRunToDoc\(/.test(saveBlock),
+  "store: saveScenarioRun applies the 1MB doc-fit trim before writing",
+);
+
+const scenarioHookSrc = readMigratedSrc(resolve(ROOT, "src/hooks/useScenarioRun.ts"), "utf8");
+assert(
+  /computeLocal/.test(scenarioHookSrc) && /scenarioWorker/.test(scenarioHookSrc),
+  "hook: useScenarioData exposes computeLocal driving the in-browser worker",
+);
+assert(
+  /saveScenarioRun/.test(scenarioHookSrc),
+  "hook: local compute persists via saveScenarioRun",
+);
+
 // ---------- summary ----------
 console.log("");
 console.log(`=== FIRESTORE RULES PII RESULTS: ${passed} passed, ${failed} failed ===`);
