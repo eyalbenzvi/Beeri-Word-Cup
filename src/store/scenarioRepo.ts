@@ -80,7 +80,7 @@ export async function saveScenarioRun(run: ScenarioRunResult): Promise<boolean> 
 // (at most one run at a time + one queued rerun). Never throws.
 //
 // `simCount` (admin-only override): when provided, the server runs that many
-// Monte-Carlo simulations instead of the default 100k. The automatic
+// Monte-Carlo simulations instead of the default 35k. The automatic
 // post-result poke omits it so it keeps using the default.
 export function triggerScenarioRecompute(simCount?: number): void {
   try {

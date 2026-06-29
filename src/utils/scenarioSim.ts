@@ -193,8 +193,15 @@ export type ScenarioRunResult = {
 };
 
 // A final must occur in at least this many sims to be tabled (so its per-form
-// averages are stable rather than noise).
-const MIN_SCENARIO_SAMPLES = 200;
+// averages are stable rather than noise). Lowered 200→100: this mainly widens
+// the tail for the high-N MANUAL/local run (100k sims → ~0.10% probability
+// floor); for the automatic 35k run the implied floor is ~0.29% (100/35000),
+// so the effective set of tabled finals barely changes there. At 100 samples a
+// final's per-form win% carries a sampling SE of up to ~5pp (vs ~3.5pp at 200),
+// but win% is displayed as an INTEGER % and any final with <1000 samples is
+// flagged "משוערים" in the UI (ScenarioExplorer LOW_SAMPLE), so users aren't
+// shown false precision. MAX_SCENARIOS still caps the table count.
+const MIN_SCENARIO_SAMPLES = 100;
 // Cap on stored scenario tables (the long tail is rare + bloats the doc).
 const MAX_SCENARIOS = 60;
 

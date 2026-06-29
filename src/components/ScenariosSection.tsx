@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useScenarioData,
   DEFAULT_SIM_COUNT,
+  AUTO_SIM_COUNT,
   MIN_SIM_COUNT,
   MAX_SIM_COUNT,
 } from "../hooks/useScenarioRun";
@@ -113,8 +114,8 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
       {showRecompute && (
         <p className="text-3xs text-ink-light font-medium mb-1">
           {mode === "server"
-            ? `שרת: רץ ברקע (כדקות), זמין לכל המכשירים. רץ אוטומטית אחרי כל תוצאה. ברירת מחדל: ${DEFAULT_SIM_COUNT.toLocaleString("he-IL")} הרצות.`
-            : `מקומי: רץ בדפדפן הזה (גיבוי לכשהשרת לא זמין). השאירו את הדף פתוח עד הסיום. ברירת מחדל: ${DEFAULT_SIM_COUNT.toLocaleString("he-IL")} הרצות.`}
+            ? `שרת: רץ ברקע (כדקות), זמין לכל המכשירים. רץ אוטומטית אחרי כל תוצאה (${AUTO_SIM_COUNT.toLocaleString("he-IL")} הרצות).`
+            : `מקומי: רץ בדפדפן הזה (גיבוי לכשהשרת לא זמין). השאירו את הדף פתוח עד הסיום.`}
         </p>
       )}
       {showRecompute && local.error && (
