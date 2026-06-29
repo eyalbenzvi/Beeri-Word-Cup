@@ -194,6 +194,7 @@ run_test "125. Source Orientation Helper (90'+ET+penalties swap together)" "stor
 run_test "126. Breakdown Sources (ESPN/FD ET+penalty extraction + consensus reconcile)" "store/test-breakdown-sources.mjs" "no"
 run_test "127. Breakdown Scoring Invariance (golden: ET/penalties never change points/bracket)" "scoring/test-breakdown-invariance.mjs" "yes"
 run_test "128. Result Breakdown Display (shared component wired across all result surfaces)" "ui/test-result-breakdown-display.mjs" "no"
+run_test "129. Advancing Points Breakdown (נקודות עליה: per-round team count × rate + totals)" "ui/test-advancing-points-breakdown.mjs" "no"
 
 echo ""
 echo "==========================================="
