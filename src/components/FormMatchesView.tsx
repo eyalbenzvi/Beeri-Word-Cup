@@ -4,6 +4,7 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { getCachedBracket } from "../utils/bracketCache";
 import { r32SlotLabel } from "../utils/matchSlot";
+import { RESULT } from "../constants/messages";
 
 // Compact list of all 104 matches with their (predicted or actual) results,
 // grouped by group letter (A–L) and KO stage. Used by both AllForms (to view
@@ -56,7 +57,7 @@ export function MatchRow({
       </div>
       {isTie && (
         <div className="text-3xs text-ink-muted font-bold text-center mt-0.5">
-          בעיטות הכרעה: {getTeamByCode(prediction!.advancingTeam!)?.name}
+          {RESULT.predictedAdvancing(getTeamByCode(prediction!.advancingTeam!)?.name || prediction!.advancingTeam!)}
         </div>
       )}
     </div>

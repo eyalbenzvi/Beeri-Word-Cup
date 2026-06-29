@@ -27,6 +27,7 @@ import {
   resolveMatchTeams,
 } from "../utils/predictionAlign";
 import Score from "./Score";
+import ResultBreakdown from "./ResultBreakdown";
 import { FINISHED, LIVE } from "../constants/messages";
 
 // How many finished matches render expanded before the rest collapse into a
@@ -206,6 +207,9 @@ function FinishedBlock({ match, actualTeams, forms, formBrackets }) {
         awayCode={actualTeams.away}
         result={match.result}
       />
+      <div className="text-center mt-0.5">
+        <ResultBreakdown result={match.result} variant="line" />
+      </div>
       {forms.length > 0 && (
         <VerdictSection
           forms={forms}

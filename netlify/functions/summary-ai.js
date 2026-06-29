@@ -260,6 +260,19 @@ async function matchCommentary({ match, result, stats, currentNote }) {
     stage: match?.stage || "",
     group: match?.group || null,
     score: result ? `${result.homeScore}-${result.awayScore}` : "לא שוחק",
+    // Knockout tie epilogue (presentation only — never the scoring score). The
+    // 90' score above can be a draw even though someone advanced; without this
+    // the model would describe a decided knockout as "a draw".
+    decidedBy: result?.decidedBy || "regular",
+    extraTimeScore:
+      result?.etHomeScore != null && result?.etAwayScore != null
+        ? `${result.etHomeScore}-${result.etAwayScore}`
+        : null,
+    penaltyScore:
+      result?.penHomeScore != null && result?.penAwayScore != null
+        ? `${result.penHomeScore}-${result.penAwayScore}`
+        : null,
+    advancingTeam: result?.advancingTeam || null,
     outcomePct: stats?.outcomePct || null,
     outcomeHitCount: stats?.outcomeHitCount ?? null,
     exactHitCount: stats?.exactHitCount ?? null,
@@ -278,6 +291,7 @@ async function matchCommentary({ match, result, stats, currentNote }) {
 5. אם actualScorePct מעל 50% — טון של "כולם ידעו".
 
 אם editorNote קיים — שפר את הזווית שלו, אל תכתוב מחדש.
+אם decidedBy הוא "extra_time" — התיקו ב-90 דקות הוכרע בהארכה (extraTimeScore); אם "penalties" — הוכרע בבעיטות הכרעה (penaltyScore). אל תתאר משחק כזה כ"תיקו"; ציין שהקבוצה advancingTeam עלתה.
 רק עובדות מ-FACTS. אל תמציא שמות, מספרים, שחקנים או דרמה שלא קרתה.
 
 אורך: 2-3 משפטים. מקסימום 50 מילים. בלי כותרות, בלי אימוג'י, בלי קלישאות עיתונאיות.

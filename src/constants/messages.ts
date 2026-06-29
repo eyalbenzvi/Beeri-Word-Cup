@@ -63,6 +63,7 @@ export const LIVE = {
   liveChip: "לייב",
   halftime: "מחצית",
   extraTime: "הארכה",
+  penalties: "פנדלים",
   finished: "נגמר",
   playingNow: "משוחק עכשיו",
   minuteMark: (m) => `${m}׳`,
@@ -113,6 +114,26 @@ export const FINISHED = {
   badge: "הסתיים",
   finalScore: "תוצאה סופית",
   showMore: (n) => `עוד ${n} תוצאות`,
+};
+
+// Knockout extra-time / penalty result presentation. Centralised so the
+// results page, bracket, blog and live card all describe a decided tie the
+// SAME way. Score NUMBERS are never embedded here — they render via <Score>;
+// these are only the surrounding labels.
+export const RESULT = {
+  reg90: "תום 90 דקות",
+  afterET: "לאחר הארכה",
+  penalties: "בעיטות הכרעה",
+  // Compact headline tags shown next to the 90' scoreline / in the bracket.
+  tagET: "הארכה",
+  tagPens: "פנדלים",
+  // Who advanced (used when exact numbers are unknown, and as the winner line).
+  advanced: (name) => `עלתה: ${name}`,
+  decidedInET: "הוכרע בהארכה",
+  decidedInPens: "הוכרע בבעיטות הכרעה",
+  // Prediction side: the user predicts only WHO advances, not how — so the
+  // wording is deliberately neutral (matches UpcomingMatches' "מעפילה").
+  predictedAdvancing: (name) => `מעפילה: ${name}`,
 };
 
 export const SCORE_STRIP = {

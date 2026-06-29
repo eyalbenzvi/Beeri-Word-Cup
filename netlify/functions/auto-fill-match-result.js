@@ -23,6 +23,7 @@ import { fetchMatchResult as fetchFootballData } from "./_sources/footballData.j
 import { getMatchById } from "../../src/data/matches.js";
 import { getMatchKickoffUTC } from "../../src/utils/matchTime.js";
 import { calcBracketTeams } from "../../src/utils/bracket.js";
+import { buildResultRecord, validateResultBreakdown } from "../../src/utils/resultBreakdown.js";
 
 let adminInitialized = false;
 function initAdmin() {
@@ -350,6 +351,29 @@ async function autoFillHandler(event) {
       return json(202, headers, { ok: false, decision: "ambiguous" });
     }
 
+    // Presentation-only ET/penalty breakdown (ZERO scoring effect — scoring
+    // reads only homeScore/awayScore=90' + advancingTeam). Built through the
+    // shared canonical serializer so the shape is identical to the admin path,
+    // with every key present (null for N/A) — never `undefined`, which the
+    // { merge: true } write below would otherwise leave stale. If the captured
+    // numbers are internally inconsistent we keep decidedBy but drop the
+    // numbers; the core result is never blocked by a cosmetic glitch.
+    let breakdown = buildResultRecord({
+      decidedBy: consensus.decidedBy,
+      etHomeScore: consensus.etHomeScore,
+      etAwayScore: consensus.etAwayScore,
+      penHomeScore: consensus.penHomeScore,
+      penAwayScore: consensus.penAwayScore,
+      breakdownSource: consensus.breakdownSource,
+    });
+    const validateCtx = { isKnockout, homeTeam, awayTeam };
+    if (!validateResultBreakdown({ homeScore, awayScore, advancingTeam, ...breakdown }, validateCtx).valid) {
+      breakdown = buildResultRecord({
+        decidedBy: consensus.decidedBy,
+        breakdownSource: consensus.breakdownSource,
+      });
+    }
+
     const nowIso = new Date().toISOString();
     const writeObj = {
       homeTeam,
@@ -360,6 +384,7 @@ async function autoFillHandler(event) {
       awayScore,
       played: true,
       advancingTeam,
+      ...breakdown,
       source: "auto",
       // ISO strings (not serverTimestamp): the client rewrites the whole
       // matchResults map through JSON-clone on later admin edits, which would

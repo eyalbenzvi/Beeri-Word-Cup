@@ -3,6 +3,7 @@ import { computeMatchStats } from "../utils/summaryStats";
 import { getTeamByCode } from "../data/teams";
 import { STAGES } from "../data/matches";
 import { r32SlotLabel } from "../utils/matchSlot";
+import ResultBreakdown from "./ResultBreakdown";
 import { BLOG } from "../constants/messages";
 
 // How many exact-hit names to show inline above the fold before
@@ -119,11 +120,7 @@ export default function MatchDigest({
         <span className={awayWin ? "text-primary" : "text-ink-muted"}>
           {Number.isFinite(result?.awayScore) ? result.awayScore : "–"}
         </span>
-        {result && result.homeScore === result.awayScore && result.advancingTeam && (
-          <span className="text-xs font-bold text-ink-muted ms-2">
-            (פנדלים: {getTeamByCode(result.advancingTeam)?.name || result.advancingTeam})
-          </span>
-        )}
+        {result && <ResultBreakdown result={result} variant="inline" className="ms-2" />}
       </div>
 
       {/* Admin commentary — soft tinted callout. Text stays in default ink;

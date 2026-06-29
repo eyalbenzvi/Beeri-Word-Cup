@@ -71,12 +71,17 @@ export function mapLiveEntriesToMatches(entries, matches, actualBracket) {
       }
     }
     const flipped = entry.homeCode === teams.away;
+    const penH = entry.penHome ?? null;
+    const penA = entry.penAway ?? null;
     out[match.id] = {
       status: entry.status || null,
       minute: Number.isInteger(entry.minute) ? entry.minute : null,
       duration: entry.duration || null,
       homeScore: flipped ? entry.awayScore : entry.homeScore,
       awayScore: flipped ? entry.homeScore : entry.awayScore,
+      // Penalty tally (presentation only), oriented to OUR home/away.
+      penHome: flipped ? penA : penH,
+      penAway: flipped ? penH : penA,
     };
   }
   return out;

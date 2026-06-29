@@ -57,11 +57,31 @@ declare global {
     reopenedAt?: string;
   }
 
-  /** Tournament-wide actual result. */
+  /** How a knockout tie at 90' was ultimately decided. Absent ⇒ "regular"
+   *  (every group game and every legacy result). */
+  type DecidedBy = "regular" | "extra_time" | "penalties";
+
+  /** Tournament-wide actual result.
+   *
+   * `homeScore`/`awayScore` are ALWAYS the END-OF-90-MINUTES (regulation)
+   * score — the sole input to scoring, never overwritten by ET/penalties.
+   * The fields below are presentation-only enrichment so the site can show
+   * the full story of a knockout tie; they have ZERO effect on points. */
   interface MatchResult {
     homeScore: number | null;
     awayScore: number | null;
     advancingTeam?: TeamCode | null;
+    /** Authoritative decision kind (presentation only). */
+    decidedBy?: DecidedBy | null;
+    /** Cumulative score at the END OF EXTRA TIME (incl. the 90'), e.g. 2–2.
+     *  Present only when decidedBy is "extra_time" or "penalties". */
+    etHomeScore?: number | null;
+    etAwayScore?: number | null;
+    /** Penalty-shootout tally, e.g. 4–3. Present only for "penalties". */
+    penHomeScore?: number | null;
+    penAwayScore?: number | null;
+    /** Which feed supplied the ET/penalty breakdown (audit only). */
+    breakdownSource?: string | null;
   }
 
   /** A user record stored under gameData/users.data[uid]. */

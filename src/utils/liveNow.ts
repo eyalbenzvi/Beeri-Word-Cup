@@ -9,7 +9,7 @@ import { FD_FINISHED_STATUS } from "./liveScores";
 import { MINUTE_MS } from "./constants";
 
 export interface LiveStatusInfo {
-  kind: "live" | "half" | "et" | "finished" | "fallback";
+  kind: "live" | "half" | "et" | "pens" | "finished" | "fallback";
   minute?: number;
 }
 
@@ -19,10 +19,13 @@ export function liveStatusInfo(live: any, stage: string): LiveStatusInfo {
   if (live.status === FD_FINISHED_STATUS) return { kind: "finished" };
   if (live.status === "PAUSED") return { kind: "half" };
   if (live.status === "IN_PLAY") {
-    // ET only exists in knockout; a group-stage minute > 90 is stoppage
-    // time and must NOT be labelled "הארכה". Same dual signal as the
+    // ET / penalties only exist in knockout; a group-stage minute > 90 is
+    // stoppage time and must NOT be labelled "הארכה". Same dual signal as the
     // verdict suppression in computeLiveVerdict: duration when present,
     // minute > 90 as fallback.
+    if (stage !== "group" && live.duration === "PENALTY_SHOOTOUT") {
+      return { kind: "pens" };
+    }
     if (
       stage !== "group" &&
       ((live.duration && live.duration !== "REGULAR") ||

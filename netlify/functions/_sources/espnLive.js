@@ -68,6 +68,10 @@ export function normalizeEspnEvents(events) {
       st === "IN_PLAY" || st === "PAUSED" || st === "FINISHED"
         ? espnDuration(status)
         : null;
+    // Live penalty tally (presentation only) so the card can show "פנדלים 3–2"
+    // while the shootout is under way. Only meaningful once it's a shootout.
+    const penHome = duration === "PENALTY_SHOOTOUT" ? espnGoals(home.shootoutScore) : null;
+    const penAway = duration === "PENALTY_SHOOTOUT" ? espnGoals(away.shootoutScore) : null;
     out.push({
       homeCode,
       awayCode,
@@ -76,6 +80,8 @@ export function normalizeEspnEvents(events) {
       duration,
       homeScore: espnGoals(home.score),
       awayScore: espnGoals(away.score),
+      penHome,
+      penAway,
       utcDate:
         typeof (comp.date || ev.date) === "string" ? comp.date || ev.date : null,
     });

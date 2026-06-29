@@ -4,6 +4,7 @@ import { useMatchResults, useCurrentUser, useAllPredictions, useSettings } from 
 import { computeConsensusMap } from "../utils/matchPredictionStats";
 import { normalizeStatus } from "../utils/helpers";
 import MatchConsensusLine from "../components/MatchConsensusLine";
+import ResultBreakdown from "../components/ResultBreakdown";
 import BracketView from "../components/BracketView";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
@@ -92,15 +93,7 @@ function ResultMatchCard({ match, result, bracketTeams, chronological, consensus
               {result.awayScore}
             </span>
           </div>
-          {isKnockout &&
-            result.homeScore === result.awayScore &&
-            result.advancingTeam && (
-              <div className="text-xs text-ink-muted text-center mt-2 pt-2 border-t border-border font-bold">
-                בעיטות הכרעה:{" "}
-                {getTeamByCode(result.advancingTeam)?.name ||
-                  result.advancingTeam}
-              </div>
-            )}
+          {isKnockout && <ResultBreakdown result={result} variant="full" />}
         </div>
       ) : (
         <div>
