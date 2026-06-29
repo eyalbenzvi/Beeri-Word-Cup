@@ -66,7 +66,9 @@ export default function ResultBreakdown({
   const ariaLabel = (() => {
     if (!winnerName) return undefined;
     const how = isPens ? RESULT.decidedInPens : isET ? RESULT.decidedInET : "";
-    const nums = decisive ? ` ${decisive.away}–${decisive.home}` : "";
+    // Spoken summary uses logical home–away order (the visible <Score> handles
+    // the RTL visual flip separately).
+    const nums = decisive ? ` ${decisive.home}–${decisive.away}` : "";
     return `${RESULT.advanced(winnerName)}${how ? `, ${how}${nums}` : ""}`;
   })();
 

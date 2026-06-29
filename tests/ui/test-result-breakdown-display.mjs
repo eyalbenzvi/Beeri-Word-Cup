@@ -74,6 +74,7 @@ assert(!formMatches.includes("בעיטות הכרעה:"), "FormMatchesView predi
 const admin = readMigratedSrc("src/components/AdminResultsTab.jsx");
 assert(/buildResultRecord/.test(admin) && /validateResultBreakdown/.test(admin), "AdminResultsTab builds + validates via the shared module");
 assert(/KnockoutTieEditor/.test(admin), "AdminResultsTab has the knockout tie editor");
+assert(/scoreChanged/.test(admin) && /etHomeScore: null/.test(admin), "AdminResultsTab clears stale ET/penalty breakdown when a tie's 90' score is re-edited");
 
 // --- AI prompt is fed the decision context (server .js, read directly) ---
 const ai = fs.readFileSync("/home/user/Beeri-World-Cup/netlify/functions/summary-ai.js", "utf8");

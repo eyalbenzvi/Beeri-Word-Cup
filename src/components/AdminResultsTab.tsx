@@ -259,11 +259,27 @@ export default function AdminResultsTab() {
         setEditScores({ homeScore: "", awayScore: "" });
         return;
       }
+      // Editing the 90' score of an already-resolved tie: if the score changed,
+      // the recorded ET/penalty breakdown can no longer be trusted (e.g. old ET
+      // 1–1 but new 90' 2–2 would violate "ET ≥ 90'"), so clear it and let the
+      // tie editor re-collect it. advancingTeam is kept for the admin to confirm.
+      const scoreChanged =
+        existing.homeScore !== homeScore || existing.awayScore !== awayScore;
       saveWithUndo(match.id, {
         ...existing,
         homeScore,
         awayScore,
         played: true,
+        ...(scoreChanged
+          ? {
+              decidedBy: null,
+              etHomeScore: null,
+              etAwayScore: null,
+              penHomeScore: null,
+              penAwayScore: null,
+              breakdownSource: null,
+            }
+          : {}),
       });
       setEditingMatch(null);
       setEditScores({ homeScore: "", awayScore: "" });
