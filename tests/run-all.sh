@@ -188,6 +188,7 @@ run_test "119. R32 Slot Placeholder (show '1A'/'מקום 3' instead of 'טרם �
 run_test "120. Bracket Display Order (DFS tree order: feeders adjacent + BracketView wiring)" "data/test-bracket-display-order.mjs" "yes"
 run_test "121. Form Metrics (admin טפסים table: registry + advancing/exact derivations + sort)" "scoring/test-form-metrics.mjs" "yes"
 run_test "122. Frozen Chrome (app-shell inner-scroll: frozen header/footer, safe-area, scroll routing)" "ui/test-frozen-chrome.mjs" "no"
+run_test "123. UI + Data Fixes (home box, my-forms tree, scenarios, leaderboard detail, blog teams, admin runs, auto-recompute)" "ui/test-ui-data-fixes.mjs" "no"
 
 echo ""
 echo "==========================================="

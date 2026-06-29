@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from "react";
-import { useUsers } from "../hooks/useStore";
+import { useMemo, useState } from "react";
 import { getTeamByCode } from "../data/teams";
+import { useNavigation } from "../hooks/useNavigation";
+import ClickableName from "./ClickableName";
 import type { ScenarioRunResult, Scenario } from "../utils/scenarioSim";
 
 // ── formatting (clarity-first, per the UX review) ──
@@ -19,6 +20,10 @@ const LOW_SAMPLE = 1000;
 const DEFAULT_ROWS = 25;
 
 type Row = { formId: string; winProb: number; avgRank: number; avgPoints: number };
+// How the ranking table is ordered. Default stays "win" (% chance to win) so
+// the table opens the same way it always has; the user can re-sort by average
+// points or average position.
+type SortKey = "win" | "points" | "rank";
 
 function ScenarioTable({
   scenario,
@@ -29,15 +34,13 @@ function ScenarioTable({
   run: ScenarioRunResult;
   currentUserId?: string | null;
 }) {
-  const users = useUsers();
+  const { navigate } = useNavigation();
   const [showAll, setShowAll] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>("win");
 
-  const label = (formId: string) => {
-    const f = run.forms[formId];
-    const owner = f ? users[f.userId]?.displayName : null;
-    const name = f?.formName || "טופס";
-    return owner ? `${name} · ${owner}` : name;
-  };
+  // Form name only — no owner/username (the table is about the form, and the
+  // owner is reachable by tapping through to the form view).
+  const label = (formId: string) => run.forms[formId]?.formName || "טופס";
   const isMine = (formId: string) =>
     !!currentUserId && run.forms[formId]?.userId === currentUserId;
 
@@ -48,11 +51,22 @@ function ScenarioTable({
       avgRank: scenario.avgRank[i],
       avgPoints: scenario.avgPoints[i],
     }));
-    r.sort((a, b) => b.winProb - a.winProb || a.avgRank - b.avgRank);
+    // Each sort falls back to win% so ties resolve consistently. Lower avgRank
+    // is better (1 = first place), so rank sorts ascending.
+    if (sortBy === "points") {
+      r.sort((a, b) => b.avgPoints - a.avgPoints || b.winProb - a.winProb);
+    } else if (sortBy === "rank") {
+      r.sort((a, b) => a.avgRank - b.avgRank || b.winProb - a.winProb);
+    } else {
+      r.sort((a, b) => b.winProb - a.winProb || a.avgRank - b.avgRank);
+    }
     return r;
-  }, [scenario, run.formOrder]);
+  }, [scenario, run.formOrder, sortBy]);
 
-  const maxWin = rows.length ? Math.max(rows[0].winProb, 0.0001) : 1;
+  const maxWin = useMemo(
+    () => run.formOrder.reduce((m, _f, i) => Math.max(m, scenario.winProb[i]), 0.0001),
+    [scenario, run.formOrder],
+  );
   const myBest = useMemo(() => {
     const idx = rows.findIndex((r) => isMine(r.formId));
     return idx >= 0 ? { ...rows[idx], position: idx + 1 } : null;
@@ -70,8 +84,13 @@ function ScenarioTable({
         <span className={`w-6 text-center font-bold shrink-0 ${podium ? `${podium} rounded-md` : "text-ink-light"}`}>
           {position}
         </span>
-        <span className="flex-1 font-bold text-ink truncate">
-          {label(r.formId)}
+        <span className="flex-1 min-w-0 font-bold text-ink truncate">
+          <ClickableName
+            onClick={() => navigate("leaderboard", { form: r.formId })}
+            title={`פתח את ${label(r.formId)}`}
+          >
+            {label(r.formId)}
+          </ClickableName>
           {mine && <span className="text-primary-dark"> · אתה</span>}
         </span>
         <span className="w-16 shrink-0 relative">
@@ -83,6 +102,22 @@ function ScenarioTable({
       </div>
     );
   };
+
+  // Render helper (not a nested component) so re-renders don't remount the
+  // header buttons — matches the file's renderRow style.
+  const sortHeader = (k: SortKey, className: string, children: any) => (
+    <button
+      type="button"
+      key={k}
+      onClick={() => setSortBy(k)}
+      aria-pressed={sortBy === k}
+      className={`${className} bg-transparent border-none cursor-pointer font-extrabold text-3xs ${
+        sortBy === k ? "text-primary-dark" : "text-ink-light hover:text-ink-muted"
+      }`}
+    >
+      {sortBy === k ? "▾ " : ""}{children}
+    </button>
+  );
 
   return (
     <div className="mt-3">
@@ -98,12 +133,12 @@ function ScenarioTable({
         </div>
       )}
 
-      <div className="flex items-center gap-2 text-3xs text-ink-light font-extrabold pb-1.5 border-b-2 border-border">
-        <span className="w-6 text-center shrink-0">#</span>
-        <span className="flex-1">טופס</span>
-        <span className="w-16 shrink-0">סיכוי לזכייה</span>
-        <span className="w-12 text-left shrink-0">דירוג ממוצע</span>
-        <span className="w-12 text-left shrink-0">נק׳ ממוצע</span>
+      <div className="flex items-center gap-2 pb-1.5 border-b-2 border-border">
+        <span className="w-6 text-center shrink-0 text-3xs text-ink-light font-extrabold">#</span>
+        <span className="flex-1 text-3xs text-ink-light font-extrabold">טופס</span>
+        {sortHeader("win", "w-16 shrink-0 text-right", "סיכוי לזכייה")}
+        {sortHeader("rank", "w-12 shrink-0 text-left", "דירוג ממוצע")}
+        {sortHeader("points", "w-12 shrink-0 text-left", "נק׳ ממוצע")}
       </div>
       <div className="mt-1">
         {(showAll ? rows : rows.slice(0, DEFAULT_ROWS)).map((r, i) => renderRow(r, i + 1))}
@@ -142,15 +177,8 @@ export default function ScenarioExplorer({
     [run, champion],
   );
 
-  // Default to the single most likely final so the table is populated on load.
-  useEffect(() => {
-    if (champion || pickableChampions.length === 0) return;
-    const topChamp = pickableChampions[0].code;
-    const tops = run.scenarios.filter((s) => s.champion === topChamp).sort((a, b) => b.prob - a.prob);
-    setChampion(topChamp);
-    setRunnerUp(tops[0]?.runnerUp || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run]);
+  // No default pick — the champion/runner-up selectors start empty so the user
+  // makes the choice deliberately (the table appears once a final is picked).
 
   const selected = useMemo(
     () => runnerUpOptions.find((s) => s.runnerUp === runnerUp) || null,
@@ -159,8 +187,8 @@ export default function ScenarioExplorer({
 
   const lowSample = selected && selected.samples < LOW_SAMPLE;
 
-  // Narrative line: who is most helped by this exact final.
-  const users = useUsers();
+  // Narrative line: which FORM is most helped by this exact final. Form name
+  // only — no owner/username.
   const narrative = useMemo(() => {
     if (!selected) return null;
     let bestI = 0;
@@ -169,10 +197,8 @@ export default function ScenarioExplorer({
     }
     const f = run.forms[run.formOrder[bestI]];
     if (!f || selected.winProb[bestI] <= 0) return null;
-    const owner = users[f.userId]?.displayName;
-    const who = owner ? `${f.formName} · ${owner}` : f.formName;
-    return { who, p: selected.winProb[bestI] };
-  }, [selected, run, users]);
+    return { who: f.formName || "טופס", p: selected.winProb[bestI] };
+  }, [selected, run]);
 
   return (
     <div className="space-y-3">
@@ -188,7 +214,7 @@ export default function ScenarioExplorer({
             <option value="">בחרו אלופה</option>
             {pickableChampions.map((c) => (
               <option key={c.code} value={c.code}>
-                {teamLabel(c.code)} — אלוף ב-{intPct(c.prob)}
+                {teamLabel(c.code)} — {intPct(c.prob)}
               </option>
             ))}
           </select>

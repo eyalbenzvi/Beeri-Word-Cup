@@ -66,7 +66,9 @@ assert(!/id:\s*"simulate"/.test(stats), "Stats no longer has simulate tab");
 assert(!/id:\s*"search"/.test(stats), "Stats no longer has search tab");
 assert(/id:\s*"matches"/.test(stats), "Stats keeps matches tab");
 assert(/id:\s*"teams"/.test(stats), "Stats keeps teams tab");
-assert(/id:\s*"forms"/.test(stats), "Stats keeps forms tab");
+// The "טפסים" sub-tab was removed (its GeneralStats card lives on the matches
+// tab); the data tab no longer offers a dedicated forms category.
+assert(!/id:\s*"forms"/.test(stats), "Stats no longer has forms tab");
 assert(/searchQuery/.test(stats), "Stats has global searchQuery state");
 assert(/externalQuery/.test(stats), "SearchStats accepts externalQuery prop");
 

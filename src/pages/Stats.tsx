@@ -23,7 +23,7 @@ import { aggregateMatchPredictions } from "../utils/matchPredictionStats";
 import type { Voter, BracketEntry } from "../utils/matchPredictionStats";
 import { Bar, VoterList, VoterBarList, AdvancingVoterBreakdown } from "../components/VoterList";
 
-const VALID_TABS = new Set(["matches", "teams", "forms", "scenarios"]);
+const VALID_TABS = new Set(["matches", "teams", "scenarios"]);
 
 const allMatches = [...groupMatches, ...knockoutMatches];
 
@@ -634,7 +634,6 @@ export default function Stats() {
               {[
                 { id: "matches", label: "📊 משחקים" },
                 { id: "teams", label: "🏆 קבוצות" },
-                { id: "forms", label: "📋 טפסים" },
                 { id: "scenarios", label: "🎲 תרחישים" },
               ].map(tab => (
                 <button
@@ -676,9 +675,6 @@ export default function Stats() {
                     <ChampionStats forms={submittedForms} />
                     <TopScorerStats forms={submittedForms} playerList={playerList} />
                   </>
-                )}
-                {activeTab === "forms" && (
-                  <GeneralStats forms={submittedForms} results={results} />
                 )}
                 {activeTab === "scenarios" && <ScenariosSection />}
               </>

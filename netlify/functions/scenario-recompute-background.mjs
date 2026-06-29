@@ -13,7 +13,26 @@ import admin from "firebase-admin";
 import { runScenarioSimulation, fitScenarioRunToDoc } from "../../src/utils/scenarioSim";
 import { canAcquireLock, shouldRerun, SCENARIO_LOCK_TTL_MS } from "../../src/utils/scenarioLock";
 
-const SIM_COUNT = Number(process.env.SCENARIO_SIM_COUNT) || 100000;
+const DEFAULT_SIM_COUNT = Number(process.env.SCENARIO_SIM_COUNT) || 100000;
+// Admin recompute requests can override the run count within these bounds.
+// Floor keeps the tables statistically meaningful; ceiling keeps a run inside
+// Netlify's 15-min background budget.
+const MIN_SIM_COUNT = 1000;
+const MAX_SIM_COUNT = 200000;
+
+// Parse + clamp an admin-supplied run count from the trigger's POST body.
+// Anything missing/invalid falls back to the default so the automatic
+// post-result poke (no body) keeps using 100k.
+function resolveSimCount(event) {
+  try {
+    if (!event?.body) return DEFAULT_SIM_COUNT;
+    const n = Number(JSON.parse(event.body)?.simCount);
+    if (!Number.isFinite(n) || n <= 0) return DEFAULT_SIM_COUNT;
+    return Math.min(MAX_SIM_COUNT, Math.max(MIN_SIM_COUNT, Math.round(n)));
+  } catch {
+    return DEFAULT_SIM_COUNT;
+  }
+}
 
 let adminInitialized = false;
 function initAdmin() {
@@ -78,17 +97,22 @@ async function readInputs(db) {
   return { allPredictions, results, actualBonuses };
 }
 
-function selfReTrigger() {
+function selfReTrigger(simCount) {
   // Background functions are invoked by hitting their URL; this returns 202
-  // immediately and the new invocation runs the next pass.
+  // immediately and the new invocation runs the next pass. Carry the same run
+  // count forward so a queued rerun keeps an admin's chosen precision.
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL;
   if (!base) return;
   // Fire-and-forget; never await (we're about to return).
-  fetch(`${base}/.netlify/functions/scenario-recompute-background`, { method: "POST" })
-    .catch((err) => console.error("scenario self-retrigger failed:", err?.message || err));
+  fetch(`${base}/.netlify/functions/scenario-recompute-background`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ simCount }),
+  }).catch((err) => console.error("scenario self-retrigger failed:", err?.message || err));
 }
 
-export const handler = async () => {
+export const handler = async (event) => {
+  const simCount = resolveSimCount(event);
   try {
     initAdmin();
     const db = admin.firestore();
@@ -105,7 +129,7 @@ export const handler = async () => {
         allPredictions,
         results,
         actualBonuses,
-        simCount: SIM_COUNT,
+        simCount,
       });
       // Guard Firestore's 1 MiB doc limit: trim the least-likely finals until
       // the run fits. Loud if anything was dropped (a scaling signal).
@@ -116,7 +140,7 @@ export const handler = async () => {
       await gameDoc(db, "scenarioRun").set({ data: run });
     } finally {
       const rerun = await releaseLock(db);
-      if (rerun) selfReTrigger();
+      if (rerun) selfReTrigger(simCount);
     }
 
     return { statusCode: 200, body: "ok" };

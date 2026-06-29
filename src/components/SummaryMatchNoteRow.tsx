@@ -3,6 +3,7 @@ import { Sparkles, Plus } from "lucide-react";
 import { BLOG } from "../constants/messages";
 import { getMatchById, STAGES } from "../data/matches";
 import { getTeamByCode } from "../data/teams";
+import { getCachedBracket } from "../utils/bracketCache";
 import { computeMatchStats } from "../utils/summaryStats";
 import { getMatchSuggestions } from "../utils/statStarters";
 
@@ -18,6 +19,26 @@ import { getMatchSuggestions } from "../utils/statStarters";
 export function teamLabel(code) {
   const t = getTeamByCode(code);
   return t ? `${t.flag} ${t.name}` : code || "—";
+}
+
+// Resolve a match's DISPLAY team codes for the blog editor. Group fixtures
+// carry their teams on the match object, but knockout templates ship with
+// homeTeam/awayTeam = null (the participants are only known once earlier
+// rounds resolve). Without this, every knockout row in the editor rendered
+// "— נגד —". We seat knockout slots from the actual results-gated bracket
+// (the same source the Results/Stats pages use), falling back to whatever the
+// recorded result stored.
+export function resolveEditorMatchTeams(match, matchResults) {
+  if (!match) return { home: null, away: null };
+  if (match.stage && match.stage !== "group") {
+    const slot = getCachedBracket(matchResults || {}, true)[match.id];
+    const result = (matchResults || {})[match.id];
+    return {
+      home: slot?.home || result?.homeTeam || match.homeTeam || null,
+      away: slot?.away || result?.awayTeam || match.awayTeam || null,
+    };
+  }
+  return { home: match.homeTeam, away: match.awayTeam };
 }
 
 // Append a suggestion text onto an existing field, separated by a blank
@@ -81,11 +102,12 @@ export default function SummaryMatchNoteRow({
     [m, r, allPredictions, users],
   );
   if (!m) return null;
+  const teams = resolveEditorMatchTeams(m, matchResults);
   return (
     <div className="border-2 border-border rounded-2xl p-3 bg-bg-soft/40">
       <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <span className="text-sm font-extrabold text-ink">
-          {teamLabel(m.homeTeam)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(m.awayTeam)}
+          {teamLabel(teams.home)} {r ? `${r.homeScore}–${r.awayScore}` : "–"} {teamLabel(teams.away)}
         </span>
         <span className="text-2xs font-bold text-ink-muted">
           {STAGES[m.stage] || m.stage} · {stats.exactHitCount}/{stats.totalForms} מדויקים
