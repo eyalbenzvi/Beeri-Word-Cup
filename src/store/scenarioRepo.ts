@@ -47,9 +47,20 @@ export function subscribeScenarioRun(
 // Fire-and-forget poke to recompute scenarios after a result changes. The
 // background function self-serialises via a lock, so spamming this is safe
 // (at most one run at a time + one queued rerun). Never throws.
-export function triggerScenarioRecompute(): void {
+//
+// `simCount` (admin-only override): when provided, the server runs that many
+// Monte-Carlo simulations instead of the default 100k. The automatic
+// post-result poke omits it so it keeps using the default.
+export function triggerScenarioRecompute(simCount?: number): void {
   try {
-    fetch(RECOMPUTE_FN, { method: "POST" }).catch(() => {});
+    const body =
+      simCount && Number.isFinite(simCount)
+        ? JSON.stringify({ simCount })
+        : undefined;
+    fetch(RECOMPUTE_FN, {
+      method: "POST",
+      ...(body ? { headers: { "Content-Type": "application/json" }, body } : {}),
+    }).catch(() => {});
   } catch {
     /* fetch unavailable (e.g. SSR/test) — ignore */
   }

@@ -11,6 +11,7 @@ import {
 } from "../store";
 import { useMatchResults, useUserDirectory, useAllPredictions, useSummaries } from "../hooks/useStore";
 import { ALL_MATCHES, getMatchById, STAGES } from "../data/matches";
+import { getCachedBracket } from "../utils/bracketCache";
 import { getMatchKickoffUTC } from "../utils/matchTime";
 import { getGlobalSuggestions, pairCoveredMatches } from "../utils/statStarters";
 import SummaryArticle from "./SummaryArticle";
@@ -19,7 +20,7 @@ import { useConfirm } from "./ConfirmModal";
 // MatchNoteRow + helpers moved out so a keystroke in one row doesn't
 // re-render the 800-line editor body. teamLabel + appendSuggestion are
 // re-exported because the global suggestion panel below also uses them.
-import MatchNoteRow, { teamLabel, appendSuggestion } from "./SummaryMatchNoteRow";
+import MatchNoteRow, { teamLabel, appendSuggestion, resolveEditorMatchTeams } from "./SummaryMatchNoteRow";
 
 // Global piquancy panel — shown above intro / conclusion. Each chip has TWO
 // insertion targets (intro/conclusion) since the cross-match observations
@@ -61,9 +62,12 @@ function GlobalSuggestionPanel({ suggestions, onInsertIntro, onInsertConclusion 
   );
 }
 
-function MatchRow({ match, result, selected, isAlreadyCovered, onToggle }) {
-  const home = teamLabel(match.homeTeam);
-  const away = teamLabel(match.awayTeam);
+function MatchRow({ match, matchResults, result, selected, isAlreadyCovered, onToggle }) {
+  // Knockout fixtures carry null teams on the schedule object; resolve the real
+  // participants from the results-gated bracket so the row never reads "— נגד —".
+  const teams = resolveEditorMatchTeams(match, matchResults);
+  const home = teamLabel(teams.home);
+  const away = teamLabel(teams.away);
   const scoreText = result
     ? `${result.homeScore}–${result.awayScore}`
     : "אין תוצאה";
@@ -558,6 +562,7 @@ export default function SummaryEditor({ summaryId, onClose }) {
             <MatchRow
               key={m.id}
               match={m}
+              matchResults={matchResults}
               result={matchResults[m.id]}
               selected={coveredMatchIds.includes(m.id)}
               isAlreadyCovered={otherSummariesCovered.has(m.id)}

@@ -1,15 +1,30 @@
-import { useScenarioData } from "../hooks/useScenarioRun";
+import { useState } from "react";
+import {
+  useScenarioData,
+  DEFAULT_SIM_COUNT,
+  MIN_SIM_COUNT,
+  MAX_SIM_COUNT,
+} from "../hooks/useScenarioRun";
 import { useCurrentUser } from "../hooks/useStore";
+import { useToast } from "./Toast";
 import ScenarioExplorer from "./ScenarioExplorer";
 import Spinner from "./Spinner";
 
 // Read-only scenarios view: loads the server-computed run and renders the
 // explorer. Shared by the user "נתונים" tab and the admin tab (the latter
-// passes showRecompute to expose a manual "recompute now" poke).
+// passes showRecompute to expose a run-count input + a "recompute now" poke).
 export default function ScenariosSection({ showRecompute = false }: { showRecompute?: boolean }) {
   const { state, recompute } = useScenarioData();
   const { user } = useCurrentUser();
+  const showToast = useToast();
+  const [simCount, setSimCount] = useState<number>(DEFAULT_SIM_COUNT);
   const run = state.result;
+
+  const handleRecompute = () => {
+    const n = Math.min(MAX_SIM_COUNT, Math.max(MIN_SIM_COUNT, Math.round(simCount) || DEFAULT_SIM_COUNT));
+    recompute(n);
+    showToast(`החישוב נשלח לשרת (${n.toLocaleString("he-IL")} הרצות) — יתעדכן בעוד כדקות`);
+  };
 
   const generatedAt = run
     ? new Date(run.meta.generatedAt).toLocaleString("he-IL", {
@@ -30,11 +45,35 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
           </p>
         </div>
         {showRecompute && (
-          <button onClick={recompute} className="btn-duo btn-duo-blue btn-duo-sm shrink-0" title="מפעיל חישוב מחדש בשרת (כדקות)">
-            חשב מחדש
-          </button>
+          <div className="flex items-end gap-2 shrink-0">
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs text-ink-muted font-extrabold">מספר הרצות</span>
+              <input
+                type="number"
+                min={MIN_SIM_COUNT}
+                max={MAX_SIM_COUNT}
+                step={1000}
+                value={simCount}
+                onChange={(e) => setSimCount(Number(e.target.value))}
+                className="input-duo input-duo-sm w-28"
+                aria-label="מספר הרצות לסימולציה"
+              />
+            </label>
+            <button
+              onClick={handleRecompute}
+              className="btn-duo btn-duo-blue btn-duo-sm"
+              title={`מפעיל חישוב מחדש בשרת (${MIN_SIM_COUNT.toLocaleString("he-IL")}–${MAX_SIM_COUNT.toLocaleString("he-IL")} הרצות, כדקות)`}
+            >
+              חשב מחדש
+            </button>
+          </div>
         )}
       </div>
+      {showRecompute && (
+        <p className="text-3xs text-ink-light font-medium mb-1">
+          יותר הרצות = דיוק גבוה יותר וזמן ארוך יותר. ברירת מחדל: {DEFAULT_SIM_COUNT.toLocaleString("he-IL")} (רץ אוטומטית אחרי כל תוצאה).
+        </p>
+      )}
 
       {state.loading ? (
         <div className="py-10 flex justify-center"><Spinner /></div>

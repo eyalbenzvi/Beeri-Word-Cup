@@ -72,6 +72,24 @@ function json(statusCode, headers, payload) {
   return { statusCode, headers, body: JSON.stringify(payload) };
 }
 
+// Fire-and-forget poke to the server-side scenario recompute after a result is
+// auto-filled. The manual admin path triggers this from the client, but
+// auto-filled results are written here (Admin SDK) and never pass through the
+// client, so without this the scenario tables would go stale after every
+// automatically-recorded match. The background function self-serialises via a
+// lock, so spamming it is safe (at most one run + one queued rerun). Never
+// throws — a recompute failure must not fail the result write.
+function triggerScenarioRecompute() {
+  const base = process.env.URL || process.env.DEPLOY_PRIME_URL;
+  if (!base) return;
+  try {
+    fetch(`${base}/.netlify/functions/scenario-recompute-background`, { method: "POST" })
+      .catch((err) => console.error("scenario recompute trigger failed:", err?.message || err));
+  } catch (err) {
+    console.error("scenario recompute trigger threw:", err?.message || err);
+  }
+}
+
 // Compact, audit-friendly view of a source result.
 function sourceSummary(r) {
   if (!r) return { name: null, status: "missing" };
@@ -365,6 +383,9 @@ async function autoFillHandler(event) {
     );
 
     await writeAuditLog(db, { matchId, uid, decision: "agreed", sources });
+    // A new official result landed — refresh the server-computed scenario
+    // tables so the "תרחישים" tab reflects it (fire-and-forget; see helper).
+    triggerScenarioRecompute();
     return json(200, headers, { ok: true, decision: "agreed" });
   } catch (err) {
     console.error("auto-fill failed:", err?.message || err);

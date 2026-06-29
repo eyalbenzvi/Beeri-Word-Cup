@@ -14,9 +14,15 @@ export type ScenarioDataState = {
   error: boolean;
 };
 
+// Admin run-count bounds (kept in lockstep with the background function's
+// clamp). Surfaced here so the admin UI's input can advertise the same range.
+export const DEFAULT_SIM_COUNT = 100000;
+export const MIN_SIM_COUNT = 1000;
+export const MAX_SIM_COUNT = 200000;
+
 export function useScenarioData(): {
   state: ScenarioDataState;
-  recompute: () => void;
+  recompute: (simCount?: number) => void;
 } {
   const [state, setState] = useState<ScenarioDataState>({
     loading: true,
@@ -36,10 +42,11 @@ export function useScenarioData(): {
     };
   }, []);
 
-  // Admin-only convenience: kick a server recompute. The subscription will pick
-  // up the new run automatically once the (~3 min) job finishes.
-  const recompute = useCallback(() => {
-    triggerScenarioRecompute();
+  // Admin-only convenience: kick a server recompute, optionally with a custom
+  // run count. The subscription will pick up the new run automatically once the
+  // (~3 min) job finishes.
+  const recompute = useCallback((simCount?: number) => {
+    triggerScenarioRecompute(simCount);
   }, []);
 
   return { state, recompute };

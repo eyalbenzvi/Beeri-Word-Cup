@@ -68,8 +68,14 @@ export default function MatchDigest({
 
   if (!match) return null;
 
-  const home = match.homeTeam ? getTeamByCode(match.homeTeam) : null;
-  const away = match.awayTeam ? getTeamByCode(match.awayTeam) : null;
+  // Knockout fixtures ship with null teams on the schedule object — the real
+  // participants are only known once earlier rounds resolve. A recorded result
+  // stores the actual team codes, so prefer those; this keeps a published
+  // knockout digest showing the real teams instead of a "מנצחת 73" slot label.
+  const homeCode = match.homeTeam || result?.homeTeam || null;
+  const awayCode = match.awayTeam || result?.awayTeam || null;
+  const home = homeCode ? getTeamByCode(homeCode) : null;
+  const away = awayCode ? getTeamByCode(awayCode) : null;
 
   const homeWin = !!result && result.homeScore > result.awayScore;
   const awayWin = !!result && result.awayScore > result.homeScore;

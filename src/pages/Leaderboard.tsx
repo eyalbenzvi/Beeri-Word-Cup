@@ -21,6 +21,7 @@ import Score from "../components/Score";
 import PageHeader from "../components/PageHeader";
 import FormAvatar from "../components/FormAvatar";
 import FormSummaryLines from "../components/FormSummaryLines";
+import FormPredictionView from "../components/FormPredictionView";
 import LoginPrompt from "../components/LoginPrompt";
 import { getPlayerDisplayName, normalizeSearch, resolvePlayerList } from "../utils/playerSearch";
 import { preferredScrollBehavior } from "../utils/helpers";
@@ -104,12 +105,16 @@ export default function Leaderboard({
 
   // Head-to-head comparison (#3) toggle for the open form detail.
   const [comparing, setComparing] = useState(false);
+  // "עץ הניחושים" toggle: reveal the form's full prediction tree (group
+  // standings + knockout bracket) inside the detail view. Reset on form switch.
+  const [showTree, setShowTree] = useState(false);
 
   // Closing the detail also clears the URL param, so Back/refresh return to
   // the ranked list rather than re-opening the form.
   const closeForm = () => {
     setSelectedForm(null);
     setComparing(false);
+    setShowTree(false);
     if (!embedded && params?.form) setParamsPatch({ form: null });
   };
 
@@ -256,6 +261,12 @@ export default function Leaderboard({
     scrollAppToTop("auto");
   }, [selectedForm, embedded]);
 
+  // Collapse the prediction tree whenever the open form changes, so switching
+  // forms never inherits the previous form's expanded tree.
+  useEffect(() => {
+    setShowTree(false);
+  }, [selectedForm]);
+
   // Rank delta: compare current rank per formId with the rank we saw last
   // visit. Stored in localStorage under "beeri:prevRanks". Deltas show for 3s
   // before we overwrite the snapshot.
@@ -295,6 +306,16 @@ export default function Leaderboard({
     const bracketData = formBracketMap[selectedForm];
     const predBracket = bracketData?.predBracket || {};
     const derivedChampion = bracketData?.champion || null;
+    // Runner-up = the other finalist in the predicted final (match "F-1"). Only
+    // meaningful once a champion is derived (an incomplete final has no winner,
+    // so naming a "runner-up" would be arbitrary).
+    const finalSlot = predBracket["F-1"];
+    const derivedRunnerUp =
+      finalSlot && derivedChampion
+        ? finalSlot.home === derivedChampion
+          ? finalSlot.away
+          : finalSlot.home
+        : null;
     const scored = scoredForms.find((e) => e.formId === selectedForm);
     const score = scored || {
       totalPoints: 0,
@@ -486,6 +507,14 @@ export default function Leaderboard({
               {score.correctChampion ? " ✅" : ""}
             </span>
           </div>
+          <div className="flex justify-between py-1.5 border-b border-border">
+            <span className="text-ink-muted font-bold">סגנית:</span>
+            <span className="font-extrabold text-ink">
+              {derivedRunnerUp
+                ? getTeamByCode(derivedRunnerUp)?.name || "טרם נקבע"
+                : "אין"}
+            </span>
+          </div>
           <div className="flex justify-between py-1.5">
             <span className="text-ink-muted font-bold">{LABELS.guessTopScorer}:</span>
             <span className="font-extrabold text-ink">
@@ -496,6 +525,26 @@ export default function Leaderboard({
           {predData.status === "submitted" || predData.status === "approved" ? (
             <BestCasePanel formId={selectedForm} />
           ) : null}
+        </div>
+
+        {/* Prediction tree — the same stages⇄bracket view used in "כל הטפסים".
+            Lets the viewer inspect the form's full predictions (group standings
+            + knockout tree), not just the played-match cards below. */}
+        <div className="card-duo mb-4">
+          <button
+            type="button"
+            onClick={() => setShowTree((v) => !v)}
+            aria-expanded={showTree}
+            className="w-full flex items-center justify-between gap-2 bg-transparent border-none cursor-pointer p-0 text-right"
+          >
+            <span className="text-sm font-extrabold text-ink">🌳 עץ הניחושים של הטופס</span>
+            <span className="text-ink-muted text-sm font-bold">{showTree ? "▾" : "▸"}</span>
+          </button>
+          {showTree && (
+            <div className="mt-3 pt-3 border-t-2 border-border">
+              <FormPredictionView predictions={predData.matches || {}} />
+            </div>
+          )}
         </div>
 
         {/* Upcoming matches (next 24h, not finished) shown ABOVE the finished

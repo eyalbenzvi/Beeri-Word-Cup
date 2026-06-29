@@ -12,6 +12,7 @@ import { useConfirm } from "./ConfirmModal";
 import ExportFormButtons from "./ExportFormButtons";
 import FormAvatar from "./FormAvatar";
 import FormSummaryLines from "./FormSummaryLines";
+import FormPredictionView from "./FormPredictionView";
 import ClickableName from "./ClickableName";
 import EmptyState from "./EmptyState";
 import StatusOnboarding from "./StatusOnboarding";
@@ -34,6 +35,10 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
   const locked = !!settings?.predictionsLocked;
   const [showNewForm, setShowNewForm] = useState(false);
   const [newFormName, setNewFormName] = useState("");
+  // Single-open accordion for the inline prediction tree (mirrors AllForms):
+  // at most one form's predictions are expanded at a time so the bracket
+  // compute stays bounded even with many forms.
+  const [expandedFormId, setExpandedFormId] = useState<string | null>(null);
   const playerList = useMemo(
     () => resolvePlayerList(settings?.topScorerPlayers),
     [settings?.topScorerPlayers],
@@ -196,6 +201,15 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
                 </span>
               </div>
               <div className="flex gap-2 mt-3 justify-end flex-wrap">
+                <button
+                  onClick={() =>
+                    setExpandedFormId((cur) => (cur === form.formId ? null : form.formId))
+                  }
+                  aria-expanded={expandedFormId === form.formId}
+                  className="btn-duo btn-duo-ghost btn-duo-sm"
+                >
+                  {expandedFormId === form.formId ? "הסתר עץ ▴" : "עץ ניחושים ▾"}
+                </button>
                 <button onClick={() => navigate("predict", { form: form.formId })} className="btn-duo btn-duo-primary btn-duo-sm min-w-[120px]">
                   {formStatus === "draft" ? "עריכה" : "צפייה"}
                 </button>
@@ -225,6 +239,15 @@ export default function FormList({ forms, user, settings, onShowAllForms }: {
                   <ExportFormButtons form={form} compact={true} />
                 )}
               </div>
+
+              {/* Inline prediction tree — the same stages⇄bracket view used in
+                  "כל הטפסים", so a user can inspect a form's full predictions
+                  (group standings + knockout tree) without leaving the list. */}
+              {expandedFormId === form.formId && (
+                <div className="mt-3 pt-3 border-t-2 border-border">
+                  <FormPredictionView predictions={form.matches || {}} />
+                </div>
+              )}
             </div>
           );
         })}
