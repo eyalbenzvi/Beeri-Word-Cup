@@ -122,6 +122,9 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets }) {
         stage: match.stage || "group",
         predTeams: formEntry,
         actualTeams: match.stage !== "group" ? actualTeams : null,
+        // `live` here is the OFFICIAL recorded result (forced REGULAR/FINISHED),
+        // so it is the 90' score and is judged directly.
+        official: true,
       });
       const predDisplay =
         pred && pred.homeScore != null && pred.awayScore != null &&

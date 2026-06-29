@@ -100,6 +100,33 @@ const POST = (name, detail, period) => ({ type: { state: "post", completed: true
   eq(r.advancingTeam, "ESP", "ESPN ET: advancing");
 }
 
+// ---------- ESPN: IN-PROGRESS extra time (provisional 90' auto-fill input) ----------
+// A knockout still being played in ET (state "in", period 3): the live final
+// score already includes the ET goal (2-1), but the 90' must read 1-1 from the
+// linescores. This is exactly the data the provisional auto-fill consumes to
+// record the 90' tie WHILE the match is still live.
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "in", completed: false, name: "STATUS_IN_PROGRESS" }, period: 3, displayClock: "98'" },
+    competitors: [
+      { homeAway: "home", score: "1", team: { displayName: "Paraguay", abbreviation: "PAR" },
+        linescores: [{ period: 1, value: 0 }, { period: 2, value: 1 }] },
+      { homeAway: "away", score: "2", team: { displayName: "Germany", abbreviation: "GER" },
+        linescores: [{ period: 1, value: 1 }, { period: 2, value: 0 }] },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 90, homeTeam: "PAR", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN in-progress ET: not finished");
+  eq(r.duration, "EXTRA_TIME", "ESPN in-progress ET: duration EXTRA_TIME");
+  eq(r.home90, 1, "ESPN in-progress ET: 90' home from linescores (not ET-inclusive)");
+  eq(r.away90, 1, "ESPN in-progress ET: 90' away from linescores (not ET-inclusive)");
+  const provisionalFires =
+    r.finished === false &&
+    (r.duration === "EXTRA_TIME" || r.duration === "PENALTY_SHOOTOUT") &&
+    Number.isInteger(r.home90) && Number.isInteger(r.away90) && r.home90 === r.away90;
+  assert(provisionalFires, "ESPN in-progress ET: provisional 90' auto-fill condition holds");
+}
+
 // ---------- ESPN: penalties (shootoutScore) ----------
 {
   mockFetchOnce(espnEvent({

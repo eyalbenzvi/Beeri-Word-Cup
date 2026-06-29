@@ -146,6 +146,24 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   }
 }
 
+// --- 4c. Provisional 90' for a knockout still in extra time / penalties ---
+{
+  const fn = read("netlify/functions/auto-fill-match-result.js");
+  // The already-played guard must let an unresolved knockout tie through so the
+  // match can be FINALIZED once it ends (not short-circuit as already-filled).
+  assert(/isUnresolvedKnockoutTie/.test(fn), "auto-fill recognises an unresolved knockout tie (finalize path)");
+  // It records a provisional 90' tie while the match is still in ET/penalties.
+  assert(/decision === "not-finished"/.test(fn) && /EXTRA_TIME|PENALTY_SHOOTOUT/.test(fn) && /result\.home90 === result\.away90/.test(fn),
+    "auto-fill writes a provisional 90' tie during extra time / penalties");
+  assert(/decision: "provisional"/.test(fn), "provisional write is audited");
+
+  // The client trigger keeps polling an unresolved (auto) tie so it finalizes,
+  // but leaves admin-owned and fully-resolved results alone.
+  const client = read("src/store/autoFill.ts");
+  assert(/isUnresolvedKnockoutTie/.test(client) && /awaitingFinalize/.test(client),
+    "client keeps polling an unresolved knockout tie until it is finalized");
+}
+
 // --- 5. Firestore rules ---
 {
   const rules = read("firestore.rules");

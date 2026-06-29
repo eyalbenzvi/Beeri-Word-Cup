@@ -128,8 +128,36 @@ console.log("--- 2. Extra-time suppression ---");
     predTeams: KNOCKOUT_TEAMS,
     actualTeams: KNOCKOUT_TEAMS,
   });
-  assert(etNullBoth.kind === "exact",
-    "knockout with BOTH signals absent keeps verdict (documented residual risk)");
+  assert(etNullBoth.kind === "suppressed",
+    "knockout with BOTH signals absent is now SUPPRESSED (fail-safe: never assert a 90' verdict off an unconfirmable feed)");
+
+  // The AUTHORITATIVE recorded 90' result bypasses the feed guard: even with no
+  // minute/duration it is judged directly (this is how the finished-match card
+  // and a recorded-but-still-live knockout tie show the correct 90' verdict).
+  const officialTie = computeLiveVerdict({
+    prediction: { homeScore: 1, awayScore: 1 },
+    live: { homeScore: 1, awayScore: 1, status: "FINISHED", minute: null, duration: "REGULAR" },
+    stage: "R16",
+    predTeams: KNOCKOUT_TEAMS,
+    actualTeams: KNOCKOUT_TEAMS,
+    official: true,
+  });
+  assert(officialTie.kind === "exact",
+    "official recorded 90' result is judged directly (extra-time feed goals do not affect it)");
+
+  // An extra-time goal on the FEED carrying the ET signal (duration EXTRA_TIME
+  // and/or minute>90) is suppressed — never reported as 'no points' for a 90'
+  // prediction. (The pathological no-signal reset case can only be caught by the
+  // recorded 90' result, which the live card judges via official=true.)
+  const etGoalFeed = computeLiveVerdict({
+    prediction: { homeScore: 1, awayScore: 1 },
+    live: { homeScore: 2, awayScore: 1, status: "IN_PLAY", minute: 96, duration: "EXTRA_TIME" },
+    stage: "R16",
+    predTeams: KNOCKOUT_TEAMS,
+    actualTeams: KNOCKOUT_TEAMS,
+  });
+  assert(etGoalFeed.kind === "suppressed",
+    "extra-time feed goal (ET signal present) never reports 'no points' for a 90' prediction");
 }
 
 // ---- 3. Edge kinds ----
