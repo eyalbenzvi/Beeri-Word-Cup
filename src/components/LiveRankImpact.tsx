@@ -81,12 +81,14 @@ export default function LiveRankImpact() {
     for (const entry of mine) {
       const hypoEntry = hypo.rankedLeaderboard.find((e) => e.formId === entry.formId);
       if (!hypoEntry) continue;
-      // Provisional points this form picks up from the live matches.
-      let livePoints = 0;
-      const hypoScored = hypo.scoredForms.find((e) => e.formId === entry.formId);
-      for (const m of liveMatches) {
-        livePoints += hypoScored?.matchScores?.[m.id]?.points || 0;
-      }
+      // Provisional points this form picks up if the live matches ended now.
+      // Use the TOTAL-points delta (hypothetical minus current), not just the
+      // per-match outcome/exact points: a decisive live knockout (or group)
+      // game also flips advancing predictions, so the form gains the advancing
+      // bonus on top of the match score (e.g. Brazil winning a R32 game earns
+      // הכרעה+תוצאה AND the "advanced to R16" points). Summing matchScores alone
+      // dropped that advancing bonus and under-reported the projected gain.
+      const livePoints = (hypoEntry.totalPoints || 0) - (entry.totalPoints || 0);
       rows.push({
         formId: entry.formId,
         formName: entry.formName,
@@ -97,7 +99,7 @@ export default function LiveRankImpact() {
       });
     }
     return rows;
-  }, [user?.id, current.rankedLeaderboard, hypo.rankedLeaderboard, hypo.scoredForms, liveMatches]);
+  }, [user?.id, current.rankedLeaderboard, hypo.rankedLeaderboard]);
 
   if (scoredLiveCount === 0 || impacts.length === 0) return null;
 
