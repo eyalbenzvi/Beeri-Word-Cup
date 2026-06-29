@@ -5,6 +5,11 @@ import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
 import { calcBracketTeams } from "../utils/bracket";
 import { r32SlotLabel } from "../utils/matchSlot";
+import {
+  buildResultRecord,
+  validateResultBreakdown,
+  DECIDED_BY,
+} from "../utils/resultBreakdown";
 import { randomScore, flipMatchLabelForRtl } from "../utils/helpers";
 import { formatMatchDateShort, formatMatchClock } from "../utils/userTime";
 import { KNOCKOUT_STAGE_ORDER } from "../utils/constants";
@@ -13,6 +18,147 @@ import GroupSelector from "./GroupSelector";
 import { useConfirm } from "./ConfirmModal";
 
 const ADMIN_STAGES = { all: "הכל", ...STAGES };
+
+function TieScoreInput({ value, onChange, label }) {
+  return (
+    <input
+      type="number"
+      min="0"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-12 h-8 text-center border-2 border-border rounded-xl text-sm"
+      placeholder="0"
+      aria-label={label}
+    />
+  );
+}
+
+// Knockout-tie completion editor: 90' was level, so the admin records HOW the
+// tie was decided (extra time / penalties) and the exact scores. The advancing
+// team is DERIVED from the decisive score (ET aggregate, or shootout) — no
+// separate "who advances" pick to contradict the numbers. Everything is built
+// through the shared canonical serializer + validator, so a manually-entered
+// result is shaped and checked exactly like an auto-filled one. None of this
+// touches scoring (which reads only the 90' homeScore/awayScore + advancing).
+function KnockoutTieEditor({ result, derived, homeTeam, awayTeam, onSave }) {
+  const [decidedBy, setDecidedBy] = useState(
+    result?.decidedBy === DECIDED_BY.PENALTIES ? DECIDED_BY.PENALTIES : DECIDED_BY.EXTRA_TIME,
+  );
+  const [et, setEt] = useState({
+    home: result?.etHomeScore ?? "",
+    away: result?.etAwayScore ?? "",
+  });
+  const [pens, setPens] = useState({
+    home: result?.penHomeScore ?? "",
+    away: result?.penAwayScore ?? "",
+  });
+
+  const isPens = decidedBy === DECIDED_BY.PENALTIES;
+  const num = (v) => (v === "" || v == null ? null : Number(v));
+  // The decisive line names who advances: the shootout for penalties, else ET.
+  const decisive = isPens ? pens : et;
+  const dh = num(decisive.home);
+  const da = num(decisive.away);
+  const advancingTeam =
+    dh != null && da != null && dh !== da ? (dh > da ? derived.home : derived.away) : null;
+
+  const record = buildResultRecord({
+    decidedBy,
+    etHomeScore: et.home,
+    etAwayScore: et.away,
+    penHomeScore: pens.home,
+    penAwayScore: pens.away,
+    breakdownSource: "admin",
+  });
+  const candidate = {
+    homeScore: result?.homeScore,
+    awayScore: result?.awayScore,
+    advancingTeam,
+    ...record,
+  };
+  const validation = validateResultBreakdown(candidate, {
+    isKnockout: true,
+    homeTeam: derived.home,
+    awayTeam: derived.away,
+  });
+  const canSave = !!advancingTeam && validation.valid;
+
+  const toggleCls = (active) =>
+    `px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+      active ? "bg-primary text-white" : "bg-bg-soft text-ink-muted hover:bg-border"
+    }`;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border space-y-2">
+      <div className="text-xs text-ink-muted text-center">איך הוכרע התיקו?</div>
+      <div className="flex gap-2 justify-center">
+        <button type="button" onClick={() => setDecidedBy(DECIDED_BY.EXTRA_TIME)} className={toggleCls(!isPens)}>
+          הארכה
+        </button>
+        <button type="button" onClick={() => setDecidedBy(DECIDED_BY.PENALTIES)} className={toggleCls(isPens)}>
+          בעיטות הכרעה
+        </button>
+      </div>
+
+      <div>
+        <div className="text-xs text-ink-muted text-center mb-1">תוצאה בתום ההארכה</div>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">{homeTeam?.name || "בית"}</span>
+            <TieScoreInput value={et.home} onChange={(v) => setEt((s) => ({ ...s, home: v }))} label={`${homeTeam?.name || "בית"} בתום ההארכה`} />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">{awayTeam?.name || "חוץ"}</span>
+            <TieScoreInput value={et.away} onChange={(v) => setEt((s) => ({ ...s, away: v }))} label={`${awayTeam?.name || "חוץ"} בתום ההארכה`} />
+          </div>
+        </div>
+      </div>
+
+      {isPens && (
+        <div>
+          <div className="text-xs text-ink-muted text-center mb-1">תוצאת בעיטות ההכרעה</div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{homeTeam?.name || "בית"}</span>
+              <TieScoreInput value={pens.home} onChange={(v) => setPens((s) => ({ ...s, home: v }))} label={`${homeTeam?.name || "בית"} פנדלים`} />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{awayTeam?.name || "חוץ"}</span>
+              <TieScoreInput value={pens.away} onChange={(v) => setPens((s) => ({ ...s, away: v }))} label={`${awayTeam?.name || "חוץ"} פנדלים`} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="text-xs text-center">
+        {advancingTeam ? (
+          <span className="text-primary-dark font-bold">
+            עלתה: {getTeamByCode(advancingTeam)?.name || advancingTeam}
+          </span>
+        ) : (
+          <span className="text-danger font-medium">הזינו תוצאה שמכריעה מי עולה</span>
+        )}
+      </div>
+      {!validation.valid && advancingTeam && (
+        <div className="text-xs text-danger text-center">{validation.reason}</div>
+      )}
+      <div className="flex justify-center">
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={() => onSave({ advancingTeam, ...record })}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold ${
+            canSave ? "bg-primary text-white" : "bg-bg-soft text-ink-light cursor-not-allowed"
+          }`}
+        >
+          שמור הכרעה
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminResultsTab() {
   const results = useMatchResults();
@@ -182,8 +328,29 @@ export default function AdminResultsTab() {
         if (r.homeScore === r.awayScore) {
           const teams = bracket[match.id];
           if (teams?.home && teams?.away) {
-            r.advancingTeam = Math.random() < 0.5 ? teams.home : teams.away;
-            saveMatchResult(match.id, r);
+            // Produce a CONSISTENT random tie-break (ET or penalties) so the
+            // randomized data exercises the full breakdown display too.
+            const winnerHome = Math.random() < 0.5;
+            const advancingTeam = winnerHome ? teams.home : teams.away;
+            const breakdown =
+              Math.random() < 0.5
+                ? buildResultRecord({
+                    decidedBy: DECIDED_BY.PENALTIES,
+                    etHomeScore: r.homeScore,
+                    etAwayScore: r.awayScore,
+                    penHomeScore: winnerHome ? 4 : 3,
+                    penAwayScore: winnerHome ? 3 : 4,
+                    breakdownSource: "admin",
+                  })
+                : buildResultRecord({
+                    decidedBy: DECIDED_BY.EXTRA_TIME,
+                    etHomeScore: r.homeScore + (winnerHome ? 1 : 0),
+                    etAwayScore: r.awayScore + (winnerHome ? 0 : 1),
+                    breakdownSource: "admin",
+                  });
+            const full = { ...r, advancingTeam, ...breakdown };
+            allResults[match.id] = full;
+            saveMatchResult(match.id, full);
           }
         }
       }
@@ -417,49 +584,13 @@ export default function AdminResultsTab() {
                 )}
               </div>
               {isKnockout && isTie && derived.home && derived.away && (
-                <div className="mt-2 pt-2 border-t border-border">
-                  <div className="text-xs text-ink-muted text-center mb-1.5">
-                    מי עולה? (בעיטות הכרעה)
-                  </div>
-                  {!result?.advancingTeam && (
-                    <div className="text-xs text-danger text-center mb-1.5 font-medium">
-                      חובה לבחור מי עולה
-                    </div>
-                  )}
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        saveWithUndo(match.id, {
-                          ...result,
-                          advancingTeam: derived.home,
-                        })
-                      }
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        result?.advancingTeam === derived.home
-                          ? "bg-primary text-white"
-                          : "bg-bg-soft text-ink-muted hover:bg-border"
-                      }`}
-                    >
-                      {homeTeam?.name || "טרם נקבע"}
-                    </button>
-                    <button
-                      onClick={() =>
-                        saveMatchResult(match.id, {
-                          ...result,
-                          advancingTeam: derived.away,
-                        })
-                      }
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        result?.advancingTeam === derived.away
-                          ? "bg-primary text-white"
-                          : "bg-bg-soft text-ink-muted hover:bg-border"
-                      }`}
-                    >
-                      {awayTeam?.name || "טרם נקבע"}
-                    </button>
-                  </div>
-                </div>
+                <KnockoutTieEditor
+                  result={result}
+                  derived={derived}
+                  homeTeam={homeTeam}
+                  awayTeam={awayTeam}
+                  onSave={(partial) => saveWithUndo(match.id, { ...result, ...partial })}
+                />
               )}
             </div>
           );

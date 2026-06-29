@@ -3,6 +3,7 @@ import { getTeamByCode } from "../data/teams";
 import { r32SlotLabel } from "../utils/matchSlot";
 import { useTeamModal } from "./TeamModal";
 import ClickableName from "./ClickableName";
+import ResultBreakdown from "./ResultBreakdown";
 
 // Visual knockout tree (#5). The classic connected-bracket layout is hostile to
 // narrow screens, so this renders one horizontally-scrollable column per round
@@ -41,15 +42,12 @@ function BracketCell({ match, result, derived }: { match: any; result: any; deri
     else if (result.homeScore > result.awayScore) winner = derived.home;
     else if (result.awayScore > result.homeScore) winner = derived.away;
   }
-  const koPens = hasResult && result.homeScore === result.awayScore && result.advancingTeam;
   return (
     <div className={`rounded-xl border-2 p-2 text-xs bg-card ${hasResult ? "border-primary/60" : "border-border"}`}>
       {side(derived.home, hasResult ? result.homeScore : null, winner === derived.home, openTeam, r32SlotLabel(match, "home"))}
       <div className="h-px bg-border my-1" />
       {side(derived.away, hasResult ? result.awayScore : null, winner === derived.away, openTeam, r32SlotLabel(match, "away"))}
-      {koPens && (
-        <div className="text-xs text-ink-light text-center mt-1">פנדלים</div>
-      )}
+      <ResultBreakdown result={result} variant="badge" />
     </div>
   );
 }

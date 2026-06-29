@@ -74,6 +74,13 @@ function StatusChip({ info }) {
       </span>
     );
   }
+  if (info.kind === "pens") {
+    return (
+      <span className="badge-duo badge-duo-accent text-xs font-extrabold">
+        {LIVE.penalties}
+      </span>
+    );
+  }
   if (info.kind === "finished") {
     return (
       <span className="badge-duo badge-duo-muted text-xs font-extrabold">
@@ -175,32 +182,43 @@ function TeamsScoreLine({ homeCode, awayCode, live, large = false }) {
   const home = homeCode ? getTeamByCode(homeCode) : null;
   const away = awayCode ? getTeamByCode(awayCode) : null;
   const hasScore = live && live.homeScore != null && live.awayScore != null;
+  // Live penalty ticker (presentation only): shown while/after the shootout so
+  // the running 90'/ET score above isn't mistaken for the final outcome.
+  const hasPens = live && live.penHome != null && live.penAway != null;
   const nameCls = large
     ? "font-heading font-extrabold text-lg md:text-xl"
     : "text-sm font-bold";
   return (
-    <div className="flex items-center justify-center gap-2">
-      <div className="flex-1 min-w-0 text-center">
-        <div className={`${nameCls} truncate ${home ? "text-ink" : "text-ink-muted italic"}`}>
-          <bdi>{home?.name || "טרם נקבע"}</bdi>
+    <div>
+      <div className="flex items-center justify-center gap-2">
+        <div className="flex-1 min-w-0 text-center">
+          <div className={`${nameCls} truncate ${home ? "text-ink" : "text-ink-muted italic"}`}>
+            <bdi>{home?.name || "טרם נקבע"}</bdi>
+          </div>
+        </div>
+        <div className={`shrink-0 ${large ? "text-xl md:text-2xl" : "text-sm"} font-black text-ink`}>
+          {hasScore ? (
+            <Score
+              home={live.homeScore}
+              away={live.awayScore}
+              className="tabular-nums"
+            />
+          ) : (
+            <span className="text-ink-muted">–</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0 text-center">
+          <div className={`${nameCls} truncate ${away ? "text-ink" : "text-ink-muted italic"}`}>
+            <bdi>{away?.name || "טרם נקבע"}</bdi>
+          </div>
         </div>
       </div>
-      <div className={`shrink-0 ${large ? "text-xl md:text-2xl" : "text-sm"} font-black text-ink`}>
-        {hasScore ? (
-          <Score
-            home={live.homeScore}
-            away={live.awayScore}
-            className="tabular-nums"
-          />
-        ) : (
-          <span className="text-ink-muted">–</span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0 text-center">
-        <div className={`${nameCls} truncate ${away ? "text-ink" : "text-ink-muted italic"}`}>
-          <bdi>{away?.name || "טרם נקבע"}</bdi>
+      {hasPens && (
+        <div className="text-center text-xs font-bold text-ink-muted mt-0.5">
+          {LIVE.penalties}{" "}
+          <Score home={live.penHome} away={live.penAway} className="tabular-nums" />
         </div>
-      </div>
+      )}
     </div>
   );
 }

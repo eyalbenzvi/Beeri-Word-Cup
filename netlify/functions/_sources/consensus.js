@@ -39,6 +39,55 @@ function normCode(c) {
   return typeof c === "string" ? c.trim().toUpperCase() : "";
 }
 
+// Source "duration" -> our decidedBy. Inlined (not imported) to keep this
+// module dependency-free and unit-testable in isolation.
+function decidedByFrom(duration) {
+  if (duration === "PENALTY_SHOOTOUT") return "penalties";
+  if (duration === "EXTRA_TIME") return "extra_time";
+  return "regular";
+}
+
+function intOrNull(n) {
+  return Number.isInteger(n) ? n : null;
+}
+
+// The presentation-only breakdown a single source contributes. Pure pass-through
+// of the (already sanity-checked) source fields; carries ZERO scoring weight.
+function breakdownOf(s, isTie) {
+  return {
+    decidedBy: isTie ? decidedByFrom(s.duration) : "regular",
+    etHomeScore: intOrNull(s.etHome),
+    etAwayScore: intOrNull(s.etAway),
+    penHomeScore: intOrNull(s.penHome),
+    penAwayScore: intOrNull(s.penAway),
+    breakdownSource: intOrNull(s.etHome) != null || intOrNull(s.penHome) != null ? s.name : null,
+  };
+}
+
+// Reconcile two sources' breakdowns: agree-or-drop per field (a wrong shootout
+// score must never be shown), so disagreement degrades to "we know it went to
+// ET/pens but not the exact numbers" rather than an arbitrary pick.
+function reconcileBreakdown(a, b) {
+  const pick = (x, y) => (x == null ? y : y == null ? x : x === y ? x : null);
+  const decidedBy =
+    a.decidedBy === b.decidedBy
+      ? a.decidedBy
+      : // exactly one non-regular -> trust it; otherwise fall back to regular
+        a.decidedBy !== "regular" && b.decidedBy === "regular"
+        ? a.decidedBy
+        : b.decidedBy !== "regular" && a.decidedBy === "regular"
+          ? b.decidedBy
+          : "regular";
+  return {
+    decidedBy,
+    etHomeScore: pick(a.etHomeScore, b.etHomeScore),
+    etAwayScore: pick(a.etAwayScore, b.etAwayScore),
+    penHomeScore: pick(a.penHomeScore, b.penHomeScore),
+    penAwayScore: pick(a.penAwayScore, b.penAwayScore),
+    breakdownSource: a.breakdownSource || b.breakdownSource || null,
+  };
+}
+
 // Evaluate ONE source against the expected fixture. Returns the same decision
 // shape used by callers. "agreed" here means: this source alone is finished,
 // has a valid 90' score, the teams match, and (for a knockout tie) names a
@@ -75,11 +124,13 @@ function evaluateOne(expected, s) {
     }
     advancingTeam = s.advancingTeam;
   }
+  const isTie = s.home90 === s.away90;
   return {
     decision: "agreed",
     homeScore: s.home90,
     awayScore: s.away90,
     advancingTeam,
+    ...breakdownOf(s, expected?.isKnockout && isTie),
     reason: `${s.name} finished with a valid 90' score`,
   };
 }
@@ -135,6 +186,7 @@ export function computeConsensus(expected, sources) {
     homeScore: ra.homeScore,
     awayScore: ra.awayScore,
     advancingTeam: ra.advancingTeam,
+    ...reconcileBreakdown(ra, rb),
     reason: "both sources finished and agree on 90' score" +
       (ra.advancingTeam ? " and advancing team" : ""),
   };

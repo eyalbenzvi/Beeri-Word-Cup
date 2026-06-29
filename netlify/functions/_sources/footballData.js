@@ -16,6 +16,7 @@
 
 import { norm, ourCode } from "./fdCodes.js";
 import { getJson, dayWindow } from "./http.js";
+import { orientToExpected } from "./orient.js";
 
 const NAME = "football-data";
 const BASE = "https://api.football-data.org/v4";
@@ -84,6 +85,7 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
   //     they are unaffected.
   const ft = match?.score?.fullTime || {};
   const reg = match?.score?.regularTime || null;
+  const pens = match?.score?.penalties || null;
   let home90 = null;
   let away90 = null;
   if (reg && typeof reg.home === "number" && typeof reg.away === "number") {
@@ -93,16 +95,52 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     home90 = typeof ft.home === "number" ? ft.home : null;
     away90 = typeof ft.away === "number" ? ft.away : null;
   }
+
+  // Presentation-only breakdown (never affects scoring). In football-data v4
+  // score.fullTime is the END-OF-EXTRA-TIME cumulative score (penalties live
+  // separately in score.penalties), so fullTime IS the ET aggregate when the
+  // match went beyond 90'.
+  let etHome = null;
+  let etAway = null;
+  if (duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT") {
+    if (typeof ft.home === "number" && typeof ft.away === "number") {
+      etHome = ft.home;
+      etAway = ft.away;
+    }
+  }
+  let penHome = null;
+  let penAway = null;
+  if (duration === "PENALTY_SHOOTOUT" && pens) {
+    if (typeof pens.home === "number" && typeof pens.away === "number") {
+      penHome = pens.home;
+      penAway = pens.away;
+    }
+  }
+
   let homeCode = ourCode(match?.homeTeam?.tla) || null;
   let awayCode = ourCode(match?.awayTeam?.tla) || null;
 
-  // Orient to OUR schedule's home/away. football-data may list the fixture in
-  // the opposite order (nominal "home" is arbitrary for neutral-venue and
-  // knockout games); if so, swap both the score and the codes so downstream
-  // consensus compares like-for-like and never records a reversed score.
-  if (norm(homeCode) === norm(awayTeam) && norm(awayCode) === norm(homeTeam)) {
-    [home90, away90] = [away90, home90];
-    [homeCode, awayCode] = [awayCode, homeCode];
+  // Orient EVERYTHING to OUR schedule's home/away in one shared step (90' +
+  // ET + penalties + codes), so a reversed-fixture feed can never leak a
+  // flipped score into any of them.
+  ({ home90, away90, homeCode, awayCode, etHome, etAway, penHome, penAway } =
+    orientToExpected(
+      { home90, away90, homeCode, awayCode, etHome, etAway, penHome, penAway },
+      homeTeam,
+      awayTeam,
+    ));
+
+  // Breakdown sanity (best-effort): ET is cumulative so it must be >= the 90'
+  // score on each side; penalties must name a winner. Anything off -> drop the
+  // cosmetic field, never the core result.
+  if (home90 == null || away90 == null || etHome == null || etAway == null ||
+      etHome < home90 || etAway < away90) {
+    etHome = null;
+    etAway = null;
+  }
+  if (penHome == null || penAway == null || penHome === penAway) {
+    penHome = null;
+    penAway = null;
   }
 
   // FINISHED but no clean 90' score -> can't isolate regulation.
@@ -125,6 +163,10 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     awayCode,
     advancingTeam,
     duration,
+    etHome,
+    etAway,
+    penHome,
+    penAway,
     regulationAmbiguous,
   };
 }

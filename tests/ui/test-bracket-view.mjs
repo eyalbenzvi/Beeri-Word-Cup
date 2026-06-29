@@ -23,7 +23,7 @@ assert(/knockoutMatches\s*\.filter\(\(m\) => m\.stage === stage\)/.test(b), "eac
 assert(/BRACKET_DISPLAY_ORDER/.test(b) && /\.sort\(\(a, b\) => order\.indexOf/.test(b), "columns stack in bracket order (feeders adjacent), not raw FIFA order");
 assert(/bracketTeams\[m\.id\]\?\.home/.test(b), "teams resolved from the actual bracket");
 assert(/result\.advancingTeam/.test(b), "advancing side honours the explicit advancing team (penalties)");
-assert(/פנדלים/.test(b), "penalty shootout is labelled");
+assert(/ResultBreakdown/.test(b), "extra-time / penalty outcome shown via the shared ResultBreakdown component");
 assert(/overflow-x-auto/.test(b), "round columns scroll horizontally on narrow screens");
 assert(/ClickableName/.test(b) && /useTeamModal/.test(b), "team names remain clickable to the team modal");
 assert(/stage === "3RD"/.test(b), "third-place match included");

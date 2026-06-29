@@ -25,6 +25,20 @@
 import { getJson, dayWindow } from "./http.js";
 import { espnTeamCode } from "./espnTeams.js";
 import { espnIsFinished, espnDuration, espnGoals } from "./espnStatus.js";
+import { orientToExpected } from "./orient.js";
+
+// Goals scored in a specific ESPN period (1/2 halves, 3/4 ET halves, 5 pens)
+// from a competitor's linescores. Used to recover the penalty tally when ESPN
+// doesn't expose competitor.shootoutScore. Returns null if absent.
+function periodGoals(linescores, period) {
+  if (!Array.isArray(linescores)) return null;
+  for (const e of linescores) {
+    if (e && typeof e === "object" && Number.isInteger(e.period) && e.period === period) {
+      return espnGoals(e);
+    }
+  }
+  return null;
+}
 
 const NAME = "espn";
 const BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
@@ -118,15 +132,49 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     away90 = regulationGoals(away.linescores);
   }
 
-  // Orient to OUR schedule's home/away. We matched by team identity, so the
-  // codes are reliable; if ESPN lists the pair reversed, swap score + codes +
-  // winner so downstream consensus compares like-for-like.
+  // Presentation-only breakdown (never affects scoring). ESPN's
+  // competitor.score is the post-ET final (penalties excluded); the shootout
+  // tally is competitor.shootoutScore, or period 5 of the linescores.
+  let etHome = null;
+  let etAway = null;
+  if (duration !== "REGULAR") {
+    etHome = espnGoals(home.score);
+    etAway = espnGoals(away.score);
+  }
+  let penHome = null;
+  let penAway = null;
+  if (duration === "PENALTY_SHOOTOUT") {
+    penHome = espnGoals(home.shootoutScore);
+    penAway = espnGoals(away.shootoutScore);
+    if (penHome == null || penAway == null) {
+      penHome = periodGoals(home.linescores, 5);
+      penAway = periodGoals(away.linescores, 5);
+    }
+  }
+
+  // Orient EVERYTHING to OUR schedule's home/away in one shared step. We
+  // matched by team identity, so the codes are reliable; if ESPN lists the
+  // pair reversed, the helper swaps score + ET + penalties + codes + winner
+  // flags together so downstream consensus compares like-for-like.
   let homeWinner = home.winner === true;
   let awayWinner = away.winner === true;
-  if (norm(homeCode) === norm(awayTeam) && norm(awayCode) === norm(homeTeam)) {
-    [home90, away90] = [away90, home90];
-    [homeCode, awayCode] = [awayCode, homeCode];
-    [homeWinner, awayWinner] = [awayWinner, homeWinner];
+  ({ home90, away90, homeCode, awayCode, etHome, etAway, penHome, penAway, homeWinner, awayWinner } =
+    orientToExpected(
+      { home90, away90, homeCode, awayCode, etHome, etAway, penHome, penAway, homeWinner, awayWinner },
+      homeTeam,
+      awayTeam,
+    ));
+
+  // Breakdown sanity (best-effort): ET is cumulative (>= 90' each side);
+  // penalties must name a winner. Off -> drop the cosmetic field, keep core.
+  if (home90 == null || away90 == null || etHome == null || etAway == null ||
+      etHome < home90 || etAway < away90) {
+    etHome = null;
+    etAway = null;
+  }
+  if (penHome == null || penAway == null || penHome === penAway) {
+    penHome = null;
+    penAway = null;
   }
 
   // Invariant: a match only goes to extra time / penalties if it was LEVEL at
@@ -158,6 +206,10 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
     awayCode,
     advancingTeam,
     duration,
+    etHome,
+    etAway,
+    penHome,
+    penAway,
     regulationAmbiguous,
   };
 }

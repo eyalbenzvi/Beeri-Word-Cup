@@ -189,6 +189,11 @@ run_test "120. Bracket Display Order (DFS tree order: feeders adjacent + Bracket
 run_test "121. Form Metrics (admin טפסים table: registry + advancing/exact derivations + sort)" "scoring/test-form-metrics.mjs" "yes"
 run_test "122. Frozen Chrome (app-shell inner-scroll: frozen header/footer, safe-area, scroll routing)" "ui/test-frozen-chrome.mjs" "no"
 run_test "123. UI + Data Fixes (home box, my-forms tree, scenarios, leaderboard detail, blog teams, admin runs, auto-recompute)" "ui/test-ui-data-fixes.mjs" "no"
+run_test "124. Result Breakdown Module (decidedBy/ET/penalties serializer + validator + decision)" "data/test-result-breakdown.mjs" "yes"
+run_test "125. Source Orientation Helper (90'+ET+penalties swap together)" "store/test-orient.mjs" "no"
+run_test "126. Breakdown Sources (ESPN/FD ET+penalty extraction + consensus reconcile)" "store/test-breakdown-sources.mjs" "no"
+run_test "127. Breakdown Scoring Invariance (golden: ET/penalties never change points/bracket)" "scoring/test-breakdown-invariance.mjs" "yes"
+run_test "128. Result Breakdown Display (shared component wired across all result surfaces)" "ui/test-result-breakdown-display.mjs" "no"
 
 echo ""
 echo "==========================================="

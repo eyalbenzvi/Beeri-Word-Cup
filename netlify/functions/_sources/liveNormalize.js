@@ -38,6 +38,7 @@ export function normalizeFdMatches(fdMatches) {
     // drop it rather than ship an unmatchable entry.
     if (!homeCode || !awayCode || homeCode === awayCode) continue;
     const ft = m?.score?.fullTime || {};
+    const pens = m?.score?.penalties || {};
     out.push({
       homeCode,
       awayCode,
@@ -46,6 +47,9 @@ export function normalizeFdMatches(fdMatches) {
       duration: typeof m?.score?.duration === "string" ? m.score.duration : null,
       homeScore: intOrNull(ft.home),
       awayScore: intOrNull(ft.away),
+      // Live penalty tally (presentation only) for the shootout ticker.
+      penHome: intOrNull(pens.home),
+      penAway: intOrNull(pens.away),
       utcDate: typeof m?.utcDate === "string" ? m.utcDate : null,
     });
   }

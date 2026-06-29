@@ -121,7 +121,7 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
 {
   const fd = read("netlify/functions/_sources/footballData.js");
   assert(fd.includes("regularTime"), "FD reads regularTime for the 90' score (not ET-inclusive fullTime)");
-  assert(/\[home90, away90\] = \[away90, home90\]/.test(fd), "FD normalizes orientation (swaps score)");
+  assert(fd.includes("orientToExpected"), "FD normalizes orientation via the shared orient helper (90' + ET + penalties together)");
   // Live-data fix: football-data uses CUW/URY where we use CUR/URU. The map
   // moved to the shared _sources/fdCodes.js (also used by the live-scores
   // endpoint) — assert the mapping still exists AND footballData consumes it.
@@ -152,7 +152,7 @@ console.log("=== AUTO-FILL TRIGGER WIRING TESTS ===\n");
   assert(/match \/autoFillLocks\/\{matchId\}/.test(rules), "rules add autoFillLocks");
   assert(/match \/autoFillLog\/\{logId\}/.test(rules), "rules add autoFillLog");
   // matchResults write rule must stay admin-only (not relaxed).
-  assert(rules.includes("docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap']"),
+  assert(rules.includes("docId in ['matchResults', 'settings', 'actualBonuses', 'actualAdvancing', 'uidMigrationMap', 'scenarioRun']"),
     "matchResults write rule unchanged (admin-only)");
 }
 
