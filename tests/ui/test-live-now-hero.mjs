@@ -110,10 +110,13 @@ assert(/playingNow/.test(hero), "schedule fallback ('משוחק עכשיו') whe
 // show the prediction itself — only the verdict claim is omitted.
 assert(/verdict\.kind !== "no-data" && \(/.test(hero),
   "single-form no-data: prediction stays visible, only the verdict line is omitted");
-// Review fix (expert finding 4): ET suppression keys on FD's score.duration
-// (authoritative) with minute>90 as fallback — minute alone is plan-dependent.
-assert(/duration && live\.duration !== "REGULAR"/.test(util),
-  "verdict suppression uses score.duration as the primary ET/pens signal");
+// Knockout verdict only trusts a LIVE feed while clearly in regulation
+// (duration regular/absent + a real minute <= 90); the authoritative recorded
+// 90' result bypasses the guard via official=true. This is the fail-safe that
+// stops an extra-time feed goal from flipping a correct 90' prediction to
+// "no points".
+assert(/live\.duration === "REGULAR"/.test(util) && /official/.test(util),
+  "knockout verdict trusts the feed only in regulation, with an official-result bypass");
 assert(/getMatchKickoffUTC/.test(util),
   "duplicate team-pair entries disambiguated by kickoff proximity (rematch guard)");
 assert(/apiDownNote/.test(hero) && /staleNote/.test(hero) && /refreshNote/.test(hero),

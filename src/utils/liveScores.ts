@@ -109,29 +109,38 @@ export function computeLiveVerdict({
   stage,
   predTeams,
   actualTeams,
+  official = false,
 }: {
   prediction: any;
   live: any;
   stage: string;
   predTeams?: any;
   actualTeams?: any;
+  /** true when `live` is the AUTHORITATIVE recorded 90' result (not a live
+   *  feed reading) — e.g. the finished-match card, or a knockout whose 90'
+   *  result is already recorded. Such a score IS the 90' and is judged as-is. */
+  official?: boolean;
 }) {
   if (!live || live.homeScore == null || live.awayScore == null) {
     return { kind: "no-data", points: 0 };
   }
-  // Knockout beyond regulation: official scoring records the 90' score,
-  // but the live fullTime score keeps counting ET goals — asserting
-  // "+10 if it stays" against an ET-inclusive score would be a false
-  // promise. Two signals, either suffices: FD's score.duration (authoritative
-  // when present) and minute > 90 (fallback — minute is plan-dependent and
-  // may be null). Group matches never have ET; minute > 90 there is
-  // stoppage time and must not suppress.
-  if (
-    stage !== "group" &&
-    ((live.duration && live.duration !== "REGULAR") ||
-      (Number.isInteger(live.minute) && live.minute > 90))
-  ) {
-    return { kind: "suppressed", points: 0 };
+  // Knockout scoring is on the 90' score, which a LIVE FEED cannot reliably
+  // isolate once the match reaches 90': the fullTime score keeps counting extra-
+  // time goals, and some feeds even reset the ET clock to a low number — so a
+  // feed reading of "2-1 at minute 5, duration REGULAR" can actually be an ET
+  // score. We therefore only trust a knockout feed as the 90' score while it is
+  // CLEARLY still in regulation (duration regular/absent AND a real minute
+  // <= 90); anything else is suppressed, so an extra-time goal can never flip a
+  // correct 90' prediction to "no points". The authoritative recorded 90'
+  // result is judged with official=true and bypasses this guard.
+  if (stage !== "group" && !official) {
+    const clearlyInRegulation =
+      (!live.duration || live.duration === "REGULAR") &&
+      Number.isInteger(live.minute) &&
+      live.minute <= 90;
+    if (!clearlyInRegulation) {
+      return { kind: "suppressed", points: 0 };
+    }
   }
   const result = calculateMatchPoints(
     prediction,

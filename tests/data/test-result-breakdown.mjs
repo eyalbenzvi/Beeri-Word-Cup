@@ -10,6 +10,7 @@ import {
   buildResultRecord,
   validateResultBreakdown,
   getResultDecision,
+  isUnresolvedKnockoutTie,
 } from "../../src/utils/resultBreakdown.js";
 
 let passed = 0, failed = 0;
@@ -138,6 +139,16 @@ assert(validateResultBreakdown({ homeScore: 1, awayScore: 1, advancingTeam: "ESP
   const d = getResultDecision({ homeScore: null, awayScore: null });
   assert(!d.played, "unplayed -> not played");
 }
+
+// ---------- isUnresolvedKnockoutTie (still-being-decided detector) ----------
+// A knockout level at 90' with no advancing team yet = still in ET/penalties:
+// must keep showing live and keep being polled, NOT treated as a final result.
+assert(isUnresolvedKnockoutTie({ homeScore: 1, awayScore: 1 }, true), "KO 1-1 no advancing -> unresolved");
+assert(!isUnresolvedKnockoutTie({ homeScore: 1, awayScore: 1, advancingTeam: "ESP" }, true), "KO tie WITH advancing -> resolved");
+assert(!isUnresolvedKnockoutTie({ homeScore: 2, awayScore: 1 }, true), "KO decisive -> resolved");
+assert(!isUnresolvedKnockoutTie({ homeScore: 1, awayScore: 1 }, false), "group tie -> not a knockout tie");
+assert(!isUnresolvedKnockoutTie({ homeScore: null, awayScore: null }, true), "no score -> not unresolved");
+assert(!isUnresolvedKnockoutTie(null, true), "no result -> not unresolved");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failures.length) { console.error("\nFailures:\n  - " + failures.join("\n  - ")); process.exit(1); }

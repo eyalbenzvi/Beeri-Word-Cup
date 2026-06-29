@@ -184,6 +184,18 @@ export function validateResultBreakdown(result: any, ctx: ValidateContext): { va
   return { valid: true };
 }
 
+// A knockout result whose 90' was LEVEL but whose winner is not yet recorded —
+// i.e. the match is still being decided in extra time / penalties (or an admin
+// entered the 90' score before picking who advanced). Such a match is NOT over:
+// it must keep showing as live and keep being polled for auto-fill, NOT drop
+// into "finished". Group ties never qualify (no advancing concept there).
+export function isUnresolvedKnockoutTie(result: any, isKnockout: boolean): boolean {
+  if (!result || !isKnockout) return false;
+  const h = toIntOrNull(result.homeScore);
+  const a = toIntOrNull(result.awayScore);
+  return h != null && a != null && h === a && !result.advancingTeam;
+}
+
 export interface ResultDecision {
   /** has a usable 90' score */
   played: boolean;

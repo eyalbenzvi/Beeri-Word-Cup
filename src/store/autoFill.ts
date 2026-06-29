@@ -22,6 +22,7 @@ import { cache } from "./cache";
 import { auth } from "./firestoreClient";
 import { ALL_MATCHES } from "../data/matches";
 import { getMatchKickoffUTC } from "../utils/matchTime";
+import { isUnresolvedKnockoutTie } from "../utils/resultBreakdown";
 
 // Minimum age since kickoff before we ask the server to record a result.
 // 1h55m: opens right as a regular-time match ends (90' + HT + stoppage ≈
@@ -83,7 +84,16 @@ function findEarliestMissingPastMatch(now: number) {
   let targetKickoff = Infinity;
   for (const m of ALL_MATCHES) {
     const existing = (results as any)[m.id];
-    if (existing?.played) continue;
+    // Keep polling a knockout still being decided — an AUTO-recorded 90' tie
+    // with no advancing team yet must be FINALIZED (advancing + ET/penalty
+    // breakdown) once the match ends. A resolved result, or an admin-owned one
+    // (the admin completes it via the tie editor), is left alone.
+    const isKO = !!m.stage && m.stage !== "group";
+    const awaitingFinalize =
+      existing?.played &&
+      existing.source !== "admin" &&
+      isUnresolvedKnockoutTie(existing, isKO);
+    if (existing?.played && !awaitingFinalize) continue;
     const kickoff = getMatchKickoffUTC(m);
     if (kickoff == null) continue; // placeholder knockout rows w/o date/time
     if (now < kickoff + MIN_MATCH_AGE_MS) continue;

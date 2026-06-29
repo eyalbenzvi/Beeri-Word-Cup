@@ -504,6 +504,28 @@ console.log("--- 25. Live and finished are disjoint ---");
   assert(finished.some(m => m.id === first.id), "With result: present in finished selector");
 }
 
+// ---- 26. Unresolved knockout tie stays LIVE, not finished ----
+console.log("--- 26. Unresolved knockout tie keeps showing live ---");
+{
+  const ko = knockoutMatches.find((m) => getMatchKickoffUTC(m) !== null);
+  const kickoff = getMatchKickoffUTC(ko);
+  const now = kickoff + 100 * 60000; // ~100 min in (extra time)
+  // 90' recorded as a tie, but no advancing team yet (still being decided).
+  const res = { [ko.id]: { homeScore: 1, awayScore: 1, stage: ko.stage, played: true } };
+  assert(selectUpcomingMatches(ALL_MATCHES, res, now).some((m) => m.id === ko.id && m.isLive), "Unresolved KO tie: still LIVE");
+  assert(!selectRecentlyFinishedMatches(ALL_MATCHES, res, now).some((m) => m.id === ko.id), "Unresolved KO tie: NOT in finished");
+
+  // Once the advancing team is recorded it becomes final -> finished, not live.
+  const resolved = { [ko.id]: { ...res[ko.id], advancingTeam: ko.homeTeam || "ARG" } };
+  assert(!selectUpcomingMatches(ALL_MATCHES, resolved, now).some((m) => m.id === ko.id), "Resolved KO tie: leaves live");
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, resolved, now).some((m) => m.id === ko.id), "Resolved KO tie: appears in finished");
+
+  // A decisive knockout (no tie) is final immediately.
+  const decisive = { [ko.id]: { homeScore: 2, awayScore: 1, stage: ko.stage, played: true } };
+  assert(!selectUpcomingMatches(ALL_MATCHES, decisive, now).some((m) => m.id === ko.id), "Decisive KO: not live");
+  assert(selectRecentlyFinishedMatches(ALL_MATCHES, decisive, now).some((m) => m.id === ko.id), "Decisive KO: finished");
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) {
   console.error("\nFailures:");

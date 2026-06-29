@@ -1,4 +1,14 @@
 import { getMatchKickoffUTC, israelHour, nextIsraelHourUTC } from "./matchTime";
+import { isUnresolvedKnockoutTie } from "./resultBreakdown";
+
+// A knockout match level at 90' but with no advancing team yet is STILL being
+// played (extra time / penalties), so for the home-page widgets it counts as
+// "no final result yet" — it stays on the live card and out of the finished
+// band until the winner is recorded.
+function hasFinalResult(result, match) {
+  if (!result) return false;
+  return !isUnresolvedKnockoutTie(result, match.stage && match.stage !== "group");
+}
 
 // Window size for the home-page widget: matches kicking off in the next 24h.
 export const UPCOMING_WINDOW_MS = 24 * 3600000;
@@ -68,7 +78,10 @@ export function selectUpcomingMatches(allMatches, matchResults, now) {
     const kickoff = getMatchKickoffUTC(match);
     if (kickoff === null) continue;
     if (kickoff > windowEnd) continue;
-    if (matchResults && matchResults[match.id]) continue;
+    // A recorded FINAL result removes the match; but a knockout still being
+    // decided (90' level, no advancing team yet) is NOT final — keep it live
+    // through extra time / penalties until the winner is recorded.
+    if (hasFinalResult(matchResults?.[match.id], match)) continue;
     if (kickoff <= now) {
       // Already kicked off: show as live until a result is recorded,
       // but not beyond the live window.
@@ -108,7 +121,9 @@ export function selectRecentlyFinishedMatches(allMatches, matchResults, now) {
   const candidates = [];
   for (const match of allMatches) {
     const result = matchResults[match.id];
-    if (!result) continue;
+    // Only matches with a FINAL result belong here — an unresolved knockout tie
+    // is still being played (extra time / penalties) and stays on the live card.
+    if (!hasFinalResult(result, match)) continue;
     const kickoff = getMatchKickoffUTC(match);
     if (kickoff === null) continue;
     if (kickoff > now) continue; // not started yet (defensive)

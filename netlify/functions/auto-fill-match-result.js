@@ -23,7 +23,7 @@ import { fetchMatchResult as fetchFootballData } from "./_sources/footballData.j
 import { getMatchById } from "../../src/data/matches.js";
 import { getMatchKickoffUTC } from "../../src/utils/matchTime.js";
 import { calcBracketTeams } from "../../src/utils/bracket.js";
-import { buildResultRecord, validateResultBreakdown } from "../../src/utils/resultBreakdown.js";
+import { buildResultRecord, validateResultBreakdown, isUnresolvedKnockoutTie } from "../../src/utils/resultBreakdown.js";
 
 let adminInitialized = false;
 function initAdmin() {
@@ -234,11 +234,14 @@ async function autoFillHandler(event) {
 
   const existing = resultsMap[matchId];
   // Existence check, then admin-ownership guard (never overwrite admin), then
-  // already-played guard.
+  // already-played guard. EXCEPTION: an auto-recorded knockout 90' tie with no
+  // advancing team yet is only PROVISIONAL (the match is still in extra time /
+  // penalties) — let it through so this call can FINALIZE it (advancing +
+  // ET/penalty breakdown) once the match ends.
   if (existing?.source === "admin") {
     return json(409, headers, { error: "Result is admin-owned" });
   }
-  if (existing?.played) {
+  if (existing?.played && !isUnresolvedKnockoutTie(existing, isKnockout)) {
     return json(200, headers, { ok: true, decision: "already-filled" });
   }
 
@@ -319,6 +322,70 @@ async function autoFillHandler(event) {
         result = fd;
         consensus = fdConsensus;
       }
+    }
+
+    // PROVISIONAL 90' for a knockout still being decided. The match has NOT
+    // finished (so we can't fill the winner yet), but it has clearly gone to
+    // extra time / penalties — which means the 90' score is locked AND was a
+    // tie. Record that 90' tie now (advancing + breakdown left null) so the
+    // 90'-based scoring locks in and the match keeps showing live; a later call
+    // finalizes it once the whistle blows. The 90' tie is read from the source's
+    // reconstructed home90/away90 (ESPN linescores), guarded by home90===away90
+    // so a bad reconstruction can never be written.
+    if (
+      consensus.decision === "not-finished" &&
+      isKnockout &&
+      result && !result.error &&
+      (result.duration === "EXTRA_TIME" || result.duration === "PENALTY_SHOOTOUT") &&
+      Number.isInteger(result.home90) && Number.isInteger(result.away90) &&
+      result.home90 === result.away90 &&
+      result.home90 >= 0 && result.home90 <= 20
+    ) {
+      const alreadyProvisional =
+        existing?.played &&
+        existing.homeScore === result.home90 &&
+        existing.awayScore === result.away90 &&
+        !existing.advancingTeam;
+      if (alreadyProvisional) {
+        // 202 (not 200): the 90' is already recorded; signal the client to keep
+        // its 60s back-off cadence rather than re-polling every few seconds for
+        // the whole extra-time period (each poll is a Firestore read + lock).
+        return json(202, headers, { ok: true, decision: "provisional-unchanged" });
+      }
+      const nowIso = new Date().toISOString();
+      const provObj = {
+        homeTeam,
+        awayTeam,
+        stage: match.stage || "group",
+        group,
+        homeScore: result.home90,
+        awayScore: result.away90,
+        played: true,
+        advancingTeam: null,
+        // Explicit nulls (not buildResultRecord, which would default decidedBy
+        // to "regular"): the decision is genuinely unknown until the match ends.
+        decidedBy: null,
+        etHomeScore: null,
+        etAwayScore: null,
+        penHomeScore: null,
+        penAwayScore: null,
+        breakdownSource: null,
+        source: "auto",
+        autoFilledAt: nowIso,
+        autoFilledBy: uid.startsWith("phone_") ? "phone_user" : uid,
+        sourcesUsed: [result.name],
+        updatedAt: nowIso,
+      };
+      await db.collection("gameData").doc("matchResults").set(
+        { data: { [matchId]: provObj } },
+        { merge: true },
+      );
+      await writeAuditLog(db, { matchId, uid, decision: "provisional", sources });
+      triggerScenarioRecompute();
+      // 202: the provisional 90' was written (and propagates via the matchResults
+      // listener), but it is NOT the final result — the client backs off 60s and
+      // keeps polling until the match ends and this finalizes to "agreed".
+      return json(202, headers, { ok: true, decision: "provisional" });
     }
 
     if (consensus.decision !== "agreed") {

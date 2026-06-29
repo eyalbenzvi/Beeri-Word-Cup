@@ -227,7 +227,14 @@ function TeamsScoreLine({ homeCode, awayCode, live, large = false }) {
 // matches UpcomingMatches (1 inline / 2-4 rows / 5+ summary + details) so
 // the two surfaces feel like one system. Never an unnamed verdict when the
 // user has more than one form.
-function VerdictSection({ forms, match, live, actualTeams, formBrackets, finished }) {
+function VerdictSection({ forms, match, live, actualTeams, formBrackets, finished, recorded }) {
+  // When an official 90' result is already recorded (e.g. a knockout tie still
+  // playing extra time), the verdict is judged on THAT 90' score — not the live
+  // feed, whose extra-time goals would otherwise mislead the points claim.
+  const verdictLive = recorded
+    ? { homeScore: recorded.homeScore, awayScore: recorded.awayScore }
+    : live;
+  const official = !!recorded;
   const rows = useMemo(() => {
     return forms.map((form) => {
       const pred = form.matches?.[match.id];
@@ -235,10 +242,11 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets, finishe
         match.stage !== "group" ? formBrackets[form.formId]?.[match.id] : null;
       const verdict = computeLiveVerdict({
         prediction: pred,
-        live,
+        live: verdictLive,
         stage: match.stage || "group",
         predTeams: formEntry,
         actualTeams: match.stage !== "group" ? actualTeams : null,
+        official,
       });
       // Align the displayed prediction to the actual home/away seating
       // (knockout slots may seat the same teams swapped).
@@ -251,7 +259,7 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets, finishe
           : null;
       return { form, verdict, predDisplay };
     });
-  }, [forms, match, live, actualTeams, formBrackets]);
+  }, [forms, match, verdictLive, official, actualTeams, formBrackets]);
 
   if (rows.length === 0) return null;
 
@@ -327,9 +335,14 @@ function VerdictSection({ forms, match, live, actualTeams, formBrackets, finishe
 // Compact one-line row for simultaneous-kickoff days. Single form shows its
 // verdict word; multiple forms show only the count chip ("✓ 2/8") — an
 // unattributed "מדויק" with 8 forms would be a lie.
-function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, expanded }) {
+function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, expanded, recorded }) {
   const info = liveStatusInfo(live, match.stage || "group");
   const finished = info.kind === "finished";
+  // Judge on the recorded 90' result when present (see VerdictSection).
+  const verdictLive = recorded
+    ? { homeScore: recorded.homeScore, awayScore: recorded.awayScore }
+    : live;
+  const official = !!recorded;
   // Memoized: compact mode exists exactly for busy days (4 live matches ×
   // many forms), where recomputing every verdict on each 60s clock tick
   // adds up. Recomputes only when a poll actually changes `live`.
@@ -338,14 +351,15 @@ function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, e
       forms.map((form) =>
         computeLiveVerdict({
           prediction: form.matches?.[match.id],
-          live,
+          live: verdictLive,
           stage: match.stage || "group",
           predTeams:
             match.stage !== "group" ? formBrackets[form.formId]?.[match.id] : null,
           actualTeams: match.stage !== "group" ? actualTeams : null,
+          official,
         }),
       ),
-    [forms, live, match, formBrackets, actualTeams],
+    [forms, verdictLive, official, match, formBrackets, actualTeams],
   );
   const { scoring, total } = summarizeVerdicts(verdicts);
 
@@ -392,6 +406,7 @@ function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, e
           actualTeams={actualTeams}
           formBrackets={formBrackets}
           finished={finished}
+          recorded={recorded}
         />
       )}
     </div>
@@ -399,7 +414,7 @@ function CompactRow({ match, actualTeams, live, forms, formBrackets, onToggle, e
 }
 
 // Full block for one live match (the non-compact layout).
-function MatchLiveBlock({ match, actualTeams, live, forms, formBrackets }) {
+function MatchLiveBlock({ match, actualTeams, live, forms, formBrackets, recorded }) {
   const info = liveStatusInfo(live, match.stage || "group");
   const finished = info.kind === "finished";
   const stageLabel = STAGES[match.stage] || "";
@@ -438,6 +453,7 @@ function MatchLiveBlock({ match, actualTeams, live, forms, formBrackets }) {
         actualTeams={actualTeams}
         formBrackets={formBrackets}
         finished={finished}
+        recorded={recorded}
       />
     </div>
   );
@@ -601,6 +617,14 @@ export default function LiveNowCard({ matchResultsOverride }: { matchResultsOver
         {liveMatches.map((match) => {
           const actualTeams = resolveMatchTeams(match, actualBracket);
           const live = scores[match.id] || null;
+          // A recorded result on a still-live match = a knockout whose 90' is
+          // locked (tie awaiting extra time / penalties). Its verdict is judged
+          // on that 90', not the live feed.
+          const stored = results?.[match.id];
+          const recorded =
+            stored && stored.homeScore != null && stored.awayScore != null
+              ? stored
+              : null;
           return compact ? (
             <CompactRow
               key={match.id}
@@ -613,6 +637,7 @@ export default function LiveNowCard({ matchResultsOverride }: { matchResultsOver
               onToggle={() =>
                 setExpandedId((cur) => (cur === match.id ? null : match.id))
               }
+              recorded={recorded}
             />
           ) : (
             <MatchLiveBlock
@@ -622,6 +647,7 @@ export default function LiveNowCard({ matchResultsOverride }: { matchResultsOver
               live={live}
               forms={forms}
               formBrackets={formBrackets}
+              recorded={recorded}
             />
           );
         })}
