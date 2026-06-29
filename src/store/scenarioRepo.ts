@@ -7,9 +7,12 @@
 // into the realtime cache: the payload is large and only the "data" tab needs
 // it, so the tab does a one-off getDoc.
 
-import { getDoc, onSnapshot } from "firebase/firestore";
-import { gameDocRef, withTimeout } from "./firestoreClient";
+import { getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { gameDocRef, withTimeout, safeClone, retryOnPermissionDenied } from "./firestoreClient";
+import { requireAdmin } from "./usersRepo";
+import { writeAuditLog } from "./audit";
 import { captureClientError } from "../sentry";
+import { fitScenarioRunToDoc } from "../utils/scenarioSim";
 import type { ScenarioRunResult } from "../utils/scenarioSim";
 
 const SCENARIO_DOC = "scenarioRun";
@@ -42,6 +45,34 @@ export function subscribeScenarioRun(
       onError?.(err);
     },
   );
+}
+
+// Persist a run computed IN-BROWSER (the admin "local" recompute fallback).
+// Admin-gated; the rules allow an admin client to write gameData/scenarioRun.
+// Writes the SAME { data: run } envelope the background function uses, so every
+// reader's subscription refreshes identically regardless of who computed it.
+// Applies the same 1 MB doc-fit trim as the server before writing. Returns true
+// on success; surfaces failure so the admin isn't told a 1–2 min run was saved
+// when it wasn't. Routes through retryOnPermissionDenied so a freshly-minted /
+// expired admin token recovers, exactly like the other gameData writes.
+export async function saveScenarioRun(run: ScenarioRunResult): Promise<boolean> {
+  if (!requireAdmin()) return false;
+  const { run: fitted, trimmed } = fitScenarioRunToDoc(run);
+  writeAuditLog("save-scenario-run-local", {
+    simCount: fitted.meta.simCount,
+    formCount: fitted.meta.formCount,
+    trimmed,
+  });
+  try {
+    await retryOnPermissionDenied(
+      () => setDoc(gameDocRef(SCENARIO_DOC), { data: safeClone(fitted) }),
+      { timeoutMs: 15000 },
+    );
+    return true;
+  } catch (err: any) {
+    captureClientError(err, { source: "saveScenarioRun", code: err?.code });
+    return false;
+  }
 }
 
 // Fire-and-forget poke to recompute scenarios after a result changes. The

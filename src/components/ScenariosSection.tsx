@@ -12,18 +12,29 @@ import Spinner from "./Spinner";
 
 // Read-only scenarios view: loads the server-computed run and renders the
 // explorer. Shared by the user "נתונים" tab and the admin tab (the latter
-// passes showRecompute to expose a run-count input + a "recompute now" poke).
+// passes showRecompute to expose a run-count input + a recompute control with
+// a server/local toggle).
+type RunMode = "server" | "local";
+
 export default function ScenariosSection({ showRecompute = false }: { showRecompute?: boolean }) {
-  const { state, recompute } = useScenarioData();
+  const { state, recompute, computeLocal, local } = useScenarioData();
   const { user } = useCurrentUser();
   const showToast = useToast();
   const [simCount, setSimCount] = useState<number>(DEFAULT_SIM_COUNT);
+  // Default to LOCAL: it runs entirely in the browser, so it works even when
+  // the Netlify background function isn't available — the reliable manual path.
+  const [mode, setMode] = useState<RunMode>("local");
   const run = state.result;
 
   const handleRecompute = () => {
     const n = Math.min(MAX_SIM_COUNT, Math.max(MIN_SIM_COUNT, Math.round(simCount) || DEFAULT_SIM_COUNT));
-    recompute(n);
-    showToast(`החישוב נשלח לשרת (${n.toLocaleString("he-IL")} הרצות) — יתעדכן בעוד כדקות`);
+    if (mode === "server") {
+      recompute(n);
+      showToast(`החישוב נשלח לשרת (${n.toLocaleString("he-IL")} הרצות) — יתעדכן בעוד כדקות`);
+    } else {
+      computeLocal(n);
+      showToast(`מריץ חישוב מקומי (${n.toLocaleString("he-IL")} הרצות) — אל תסגרו את הדף`);
+    }
   };
 
   const generatedAt = run
@@ -47,6 +58,31 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
         {showRecompute && (
           <div className="flex items-end gap-2 shrink-0">
             <label className="flex flex-col gap-1">
+              <span className="text-2xs text-ink-muted font-extrabold">איפה לחשב</span>
+              <div className="flex rounded-lg overflow-hidden border border-ink/10">
+                <button
+                  type="button"
+                  onClick={() => setMode("local")}
+                  className={`px-2.5 py-1.5 text-2xs font-extrabold transition-colors ${
+                    mode === "local" ? "bg-blue-600 text-white" : "bg-white text-ink-muted"
+                  }`}
+                  aria-pressed={mode === "local"}
+                >
+                  מקומי
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("server")}
+                  className={`px-2.5 py-1.5 text-2xs font-extrabold transition-colors ${
+                    mode === "server" ? "bg-blue-600 text-white" : "bg-white text-ink-muted"
+                  }`}
+                  aria-pressed={mode === "server"}
+                >
+                  שרת
+                </button>
+              </div>
+            </label>
+            <label className="flex flex-col gap-1">
               <span className="text-2xs text-ink-muted font-extrabold">מספר הרצות</span>
               <input
                 type="number"
@@ -61,18 +97,31 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
             </label>
             <button
               onClick={handleRecompute}
-              className="btn-duo btn-duo-blue btn-duo-sm"
-              title={`מפעיל חישוב מחדש בשרת (${MIN_SIM_COUNT.toLocaleString("he-IL")}–${MAX_SIM_COUNT.toLocaleString("he-IL")} הרצות, כדקות)`}
+              disabled={local.running}
+              className="btn-duo btn-duo-blue btn-duo-sm disabled:opacity-60"
+              title={
+                mode === "server"
+                  ? `שולח חישוב מחדש לשרת (${MIN_SIM_COUNT.toLocaleString("he-IL")}–${MAX_SIM_COUNT.toLocaleString("he-IL")} הרצות, כדקות)`
+                  : `מריץ חישוב מחדש בדפדפן (${MIN_SIM_COUNT.toLocaleString("he-IL")}–${MAX_SIM_COUNT.toLocaleString("he-IL")} הרצות, כדקה-שתיים)`
+              }
             >
-              חשב מחדש
+              {local.running ? `מחשב… ${local.percent}%` : "חשב מחדש"}
             </button>
           </div>
         )}
       </div>
       {showRecompute && (
         <p className="text-3xs text-ink-light font-medium mb-1">
-          יותר הרצות = דיוק גבוה יותר וזמן ארוך יותר. ברירת מחדל: {DEFAULT_SIM_COUNT.toLocaleString("he-IL")} (רץ אוטומטית אחרי כל תוצאה).
+          {mode === "server"
+            ? `שרת: רץ ברקע (כדקות), זמין לכל המכשירים. רץ אוטומטית אחרי כל תוצאה. ברירת מחדל: ${DEFAULT_SIM_COUNT.toLocaleString("he-IL")} הרצות.`
+            : `מקומי: רץ בדפדפן הזה (גיבוי לכשהשרת לא זמין). השאירו את הדף פתוח עד הסיום. ברירת מחדל: ${DEFAULT_SIM_COUNT.toLocaleString("he-IL")} הרצות.`}
         </p>
+      )}
+      {showRecompute && local.error && (
+        <p className="text-3xs text-red-600 font-bold mb-1">החישוב המקומי נכשל. נסו שוב או עברו לשרת.</p>
+      )}
+      {showRecompute && local.saveError && (
+        <p className="text-3xs text-red-600 font-bold mb-1">החישוב הסתיים אך השמירה נכשלה — התוצאה לא נשמרה. נסו שוב.</p>
       )}
 
       {state.loading ? (
