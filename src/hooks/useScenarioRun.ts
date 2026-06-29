@@ -38,9 +38,14 @@ export type LocalRunState = {
 
 // Admin run-count bounds (kept in lockstep with the background function's
 // clamp). Surfaced here so the admin UI's input can advertise the same range.
+// DEFAULT_SIM_COUNT is the admin recompute INPUT default (manual runs).
 export const DEFAULT_SIM_COUNT = 100000;
 export const MIN_SIM_COUNT = 1000;
 export const MAX_SIM_COUNT = 200000;
+// What the SERVER runs automatically after every result entry. Display-only
+// here; the source of truth is the background function's DEFAULT_SIM_COUNT —
+// keep these two in lockstep.
+export const AUTO_SIM_COUNT = 35000;
 // A FIXED default seed makes a local run reproducible/auditable: re-running on
 // the same inputs yields the same numbers. Mirrors the simulator default.
 const DEFAULT_SEED = 0x9e3779b9;

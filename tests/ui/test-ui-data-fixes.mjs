@@ -104,6 +104,11 @@ const bg = readMigratedSrc("netlify/functions/scenario-recompute-background.mjs"
 assert(/function resolveSimCount/.test(bg), "background function parses + clamps the requested run count");
 assert(/Math\.min\(MAX_SIM_COUNT, Math\.max\(MIN_SIM_COUNT/.test(bg), "run count is clamped to safe bounds");
 assert(/simCount,?\n/.test(bg) || /simCount\s*}\)/.test(bg) || /simCount\b/.test(bg), "the resolved simCount feeds the simulation");
+// Tuning: automatic post-result run = 35k; scenario table floor = 100 samples.
+assert(/\|\|\s*35000\b/.test(bg), "automatic run defaults to 35,000 sims");
+assert(/export const AUTO_SIM_COUNT\s*=\s*35000\b/.test(hook), "hook advertises the 35k automatic count (in lockstep with the server)");
+const sim = readMigratedSrc("src/utils/scenarioSim.js");
+assert(/const MIN_SCENARIO_SAMPLES\s*=\s*100\b/.test(sim), "scenario table sample floor lowered to 100");
 
 // ---- #12: auto-fill triggers a server-side recompute ------------------------
 console.log("--- #12 Auto-fill: recompute trigger ---");

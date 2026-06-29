@@ -1,6 +1,6 @@
 // Server-side scenario recompute (Netlify BACKGROUND function — async, up to
 // 15 min). Triggered after every result entry; runs the Monte-Carlo
-// simulation (default 100,000 sims, ~3 min) via firebase-admin and writes the
+// simulation (default 35,000 sims, ~3 min) via firebase-admin and writes the
 // summarized result to gameData/scenarioRun for ALL users to read.
 //
 // Concurrency: a single lock doc (gameData/scenarioLock) ensures at most one
@@ -13,7 +13,11 @@ import admin from "firebase-admin";
 import { runScenarioSimulation, fitScenarioRunToDoc } from "../../src/utils/scenarioSim";
 import { canAcquireLock, shouldRerun, SCENARIO_LOCK_TTL_MS } from "../../src/utils/scenarioLock";
 
-const DEFAULT_SIM_COUNT = Number(process.env.SCENARIO_SIM_COUNT) || 100000;
+// Automatic post-result run count. 35k ≈ ~3 min at the current form count,
+// comfortably inside the 10-min lock TTL and the 15-min Netlify kill, while
+// still statistically ample (Monte-Carlo SE ≈ 1/√N ≈ 0.5%). Override per-env
+// with SCENARIO_SIM_COUNT; admins can request a higher count from the UI.
+const DEFAULT_SIM_COUNT = Number(process.env.SCENARIO_SIM_COUNT) || 35000;
 // Admin recompute requests can override the run count within these bounds.
 // Floor keeps the tables statistically meaningful; ceiling keeps a run inside
 // Netlify's 15-min background budget.
@@ -22,7 +26,7 @@ const MAX_SIM_COUNT = 200000;
 
 // Parse + clamp an admin-supplied run count from the trigger's POST body.
 // Anything missing/invalid falls back to the default so the automatic
-// post-result poke (no body) keeps using 100k.
+// post-result poke (no body) keeps using the 35k default.
 function resolveSimCount(event) {
   try {
     if (!event?.body) return DEFAULT_SIM_COUNT;
