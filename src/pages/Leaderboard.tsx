@@ -14,6 +14,7 @@ import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { useUpcomingMatches } from "../hooks/useUpcomingMatches";
 import { useNavigation } from "../hooks/useNavigation";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
+import { POINTS } from "../utils/scoring";
 import { getMatchSortTime } from "../utils/chronologicalSchedule";
 import { getTeamByCode } from "../data/teams";
 import MatchCard from "../components/MatchCard";
@@ -65,6 +66,19 @@ const ADVANCING_POINTS_LABELS = [
   ["SF", "חצי"],
   ["F", "גמר"],
 ];
+
+// Per-team value of a correct "advancing" pick for each knockout round, keyed
+// the same way as score.advancingPoints. A correct pick is worth the PREVIOUS
+// stage's `advancing` rate (nailing who reaches R32 is scored at the group
+// rate, who reaches R16 at the R32 rate, …). Derived from POINTS so the
+// count-from-points division below can't drift if the rules table changes.
+const ADVANCING_PTS_PER_TEAM: Record<string, number> = {
+  R32: POINTS.group.advancing,
+  R16: POINTS.R32.advancing,
+  QF: POINTS.R16.advancing,
+  SF: POINTS.QF.advancing,
+  F: POINTS.SF.advancing,
+};
 
 export default function Leaderboard({
   embedded = false,
@@ -475,27 +489,58 @@ export default function Leaderboard({
 
         <AchievementBadges scored={scored} />
 
-        {Object.values(score.advancingPoints).some((v) => v > 0) && (
-          <div className="card-duo mb-4 text-sm">
-            <div className="text-sm font-extrabold text-ink mb-2">
-              נקודות עליה:
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {ADVANCING_POINTS_LABELS.map(([round, label]) => {
-                const pts = score.advancingPoints[round] || 0;
-                if (!pts) return null;
-                return (
-                  <span
-                    key={round}
-                    className="bg-primary text-white font-extrabold px-2.5 py-1 rounded-full"
-                  >
-                    {label}: <bdi>+{pts}</bdi>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {Object.values(score.advancingPoints).some((v) => v > 0) &&
+          (() => {
+            // Each round's points are a multiple of a fixed per-team rate, so we
+            // can recover the team count (e.g. 54 = 27 teams × 2). Show that
+            // breakdown explicitly — the old chips only showed the total, which
+            // left users unable to tell how many teams they'd nailed.
+            const rows = ADVANCING_POINTS_LABELS.map(([round, label]) => {
+              const pts = score.advancingPoints[round] || 0;
+              const perTeam = ADVANCING_PTS_PER_TEAM[round] || 0;
+              const count = perTeam ? Math.round(pts / perTeam) : 0;
+              return { round, label, pts, perTeam, count };
+            }).filter((r) => r.pts > 0);
+            const totalTeams = rows.reduce((s, r) => s + r.count, 0);
+            const totalPts = rows.reduce((s, r) => s + r.pts, 0);
+            return (
+              <div className="card-duo mb-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-sm font-extrabold text-ink">
+                    נקודות עליה
+                  </div>
+                  <div className="text-2xs text-ink-muted font-bold whitespace-nowrap">
+                    {totalTeams}{" "}
+                    {totalTeams === 1 ? "ניחוש נכון" : "ניחושים נכונים"} ·{" "}
+                    <bdi>+{totalPts}</bdi> נק׳
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {rows.map((r) => (
+                    <div
+                      key={r.round}
+                      className="flex items-center justify-between gap-2 bg-bg-soft rounded-xl px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                        <span className="font-extrabold text-ink text-sm">
+                          {r.label}
+                        </span>
+                        <span className="text-2xs text-ink-muted font-bold">
+                          <bdi>{r.count}</bdi>{" "}
+                          {r.count === 1 ? "קבוצה" : "קבוצות"}
+                          {" × "}
+                          <bdi>{r.perTeam}</bdi> נק׳
+                        </span>
+                      </div>
+                      <span className="badge-duo badge-duo-primary shrink-0 tabular-nums">
+                        <bdi>+{r.pts}</bdi>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
         <div className="card-duo mb-4 text-sm">
           <div className="flex justify-between py-1.5 border-b border-border">
