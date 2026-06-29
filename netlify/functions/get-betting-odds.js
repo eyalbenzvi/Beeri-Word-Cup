@@ -13,6 +13,8 @@
 // ODDS_API_SPORT (default soccer_fifa_world_cup_winner),
 // BETTING_ODDS_DISABLED=true to hard-off.
 
+import { buildCorsHeaders, resolveAllowedOrigins } from "./_lib/cors.js";
+
 const ODDS_BASE = "https://api.the-odds-api.com/v4";
 const CACHE_TTL_MS = 10 * 60 * 1000; // odds move slowly; 10 min is plenty
 let cached = null; // { at, payload }
@@ -36,13 +38,14 @@ const NAME_TO_CODE = {
   haiti: "HAI", "new zealand": "NZL", scotland: "SCO",
 };
 
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
+
 function getCorsHeaders(event) {
-  const origin = event.headers?.origin || event.headers?.Origin || "";
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Content-Type": "application/json",
-  };
+  return buildCorsHeaders(event, {
+    allowedOrigins: ALLOWED_ORIGINS,
+    methods: "GET, OPTIONS",
+    allowHeaders: "Content-Type",
+  });
 }
 
 function json(statusCode, headers, body) {
@@ -109,7 +112,7 @@ async function fetchOdds() {
   };
 }
 
-exports.handler = async function (event) {
+export const handler = async function (event) {
   const headers = getCorsHeaders(event);
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers };
   if (event.httpMethod !== "GET") return json(405, headers, { error: "Method Not Allowed" });
