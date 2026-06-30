@@ -52,19 +52,26 @@ assert(sel.finals.length === 2, `>10% yields 2 finals (got ${sel.finals.length})
 assert(sel.finals[0].champion === 'BRA' && sel.finals[0].runnerUp === 'ESP', 'finals sorted by prob desc');
 assert(sel.finals[0].rank === 1 && sel.finals[1].rank === 2, 'ranks are 1-based in order');
 
-// 2. Favorite form = max winProb.
-assert(sel.finals[0].favoriteFormId === 'fB', `BRA>ESP favorite is fB (got ${sel.finals[0].favoriteFormId})`);
-assert(sel.finals[0].favoriteFormName === 'הניחושים של דנה', 'favorite form name resolved');
-assert(Math.abs(sel.finals[0].favoriteWinProb - 0.5) < 1e-9, 'favorite win prob carried through');
-assert(sel.finals[1].favoriteFormId === 'fA', `ESP>BRA favorite is fA (got ${sel.finals[1].favoriteFormId})`);
-assert(sel.finals[1].favoriteIsMine === true, 'currentUser uA owns fA → favoriteIsMine');
-assert(sel.finals[0].favoriteIsMine === false, 'fB not owned by current user');
+// 2. Leading form (forms[0]) = max winProb; default = 1 form per scenario.
+assert(sel.finals[0].forms.length === 1, 'default surfaces one leading form');
+assert(sel.finals[0].forms[0].formId === 'fB', `BRA>ESP leader is fB (got ${sel.finals[0].forms[0].formId})`);
+assert(sel.finals[0].forms[0].formName === 'הניחושים של דנה', 'leader form name resolved');
+assert(Math.abs(sel.finals[0].forms[0].winProb - 0.5) < 1e-9, 'leader win prob carried through');
+assert(sel.finals[1].forms[0].formId === 'fA', `ESP>BRA leader is fA (got ${sel.finals[1].forms[0].formId})`);
+assert(sel.finals[1].forms[0].isMine === true, 'currentUser uA owns fA → isMine');
+assert(sel.finals[0].forms[0].isMine === false, 'fB not owned by current user');
+
+// 2b. formsPerScenario = 2 surfaces the top-2 forms, ordered by win prob.
+const sel2 = selectLikelyScenarios(run, { threshold: 0.1, formsPerScenario: 2, currentUserId: 'uA' });
+assert(sel2.finals[0].forms.length === 2, `2 forms requested → 2 returned (got ${sel2.finals[0].forms.length})`);
+assert(sel2.finals[0].forms[0].formId === 'fB' && sel2.finals[0].forms[1].formId === 'fA', 'BRA>ESP top-2 = fB then fA (0.5 > 0.3)');
+assert(sel2.finals[0].forms[0].winProb >= sel2.finals[0].forms[1].winProb, 'forms ordered by win prob desc');
 
 // 3. Residual = 1 − Σ shown.
 assert(Math.abs(sel.residual - (1 - 0.14 - 0.11)) < 1e-9, `residual = 0.75 (got ${sel.residual})`);
 
 // 4. Stable color per form (here all distinct, so all differ).
-assert(sel.finals[0].color !== sel.finals[1].color, 'distinct favorite forms get distinct colors');
+assert(sel.finals[0].forms[0].color !== sel.finals[1].forms[0].color, 'distinct leading forms get distinct colors');
 
 // 5. Fallback when none clear the bar.
 const selHigh = selectLikelyScenarios(run, { threshold: 0.5, minShown: 3 });
@@ -79,7 +86,9 @@ assert(svg.includes('הניחושים של דנה') && svg.includes('נבחרת 
 assert(svg.includes('ברזיל') && svg.includes('ספרד'), 'svg embeds team labels (he names)');
 assert((svg.match(/data:image\/svg\+xml;base64,/g) || []).length >= 4, 'svg embeds flag images (base64) for the teams');
 assert(svg.includes('14%') && svg.includes('11%'), 'svg embeds per-final probabilities');
-assert(svg.includes('כל שאר התרחישים') && svg.includes('75%'), 'svg embeds residual bar + value');
+assert(svg.includes('מההרצות'), 'svg labels the final-probability chip');
+assert(svg.includes('לזכות בתרחיש'), 'svg labels the form win-% as scenario-conditional');
+assert(!svg.includes('כל שאר התרחישים'), 'svg no longer shows the residual bar');
 assert(svg.includes('התרחישים הסבירים ביותר'), 'svg embeds title');
 assert(svg.includes('width="100%"'), 'preview svg is responsive (width=100%)');
 

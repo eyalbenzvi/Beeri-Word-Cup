@@ -22,6 +22,8 @@ import { FLAG_DATA_URIS } from "../data/flagAssets";
 const BRAND = {
   primary: "#58CC02",
   primaryDark: "#46A302",
+  primarySoft: "#F0FFE4",
+  goldSoft: "#FFF3CC",
   secondary: "#1CB0F6",
   accent: "#FF9600",
   purple: "#CE82FF",
@@ -52,17 +54,22 @@ const FORM_COLORS = [
   "#A568CC",
 ];
 
+// One form's standing within a scenario (leader = forms[0]).
+export type FavoriteForm = {
+  formId: string;
+  formName: string;
+  winProb: number; // P(form finishes 1st | this final)
+  isMine: boolean;
+  color: string; // pill/name color (stable per form across the graphic)
+};
+
 export type LikelyFinal = {
   rank: number; // 1-based display rank
   champion: string;
   runnerUp: string;
   prob: number; // P(this exact final) = scenario.prob
   samples: number;
-  favoriteFormId: string;
-  favoriteFormName: string;
-  favoriteWinProb: number; // P(form finishes 1st | this final)
-  favoriteIsMine: boolean;
-  color: string; // pill color (stable per form)
+  forms: FavoriteForm[]; // top-N leading forms (N = formsPerScenario), best first
 };
 
 export type LikelySelection = {
@@ -76,17 +83,9 @@ export type SelectOptions = {
   threshold?: number; // default 0.10 (>10%)
   minShown?: number; // fallback floor when too few clear the bar (default 3)
   maxShown?: number; // hard cap on rows (default 8)
+  formsPerScenario?: number; // leading forms to surface per final (default 1)
   currentUserId?: string | null;
 };
-
-// Index of the form with the highest win probability in a scenario.
-function favoriteIndex(winProb: number[]): number {
-  let best = 0;
-  for (let i = 1; i < winProb.length; i++) {
-    if (winProb[i] > winProb[best]) best = i;
-  }
-  return best;
-}
 
 export function selectLikelyScenarios(
   run: ScenarioRunResult,
@@ -95,6 +94,7 @@ export function selectLikelyScenarios(
   const threshold = opts.threshold ?? 0.1;
   const minShown = opts.minShown ?? 3;
   const maxShown = opts.maxShown ?? 8;
+  const formsPerScenario = Math.max(1, Math.min(2, opts.formsPerScenario ?? 1));
   const myId = opts.currentUserId ?? null;
 
   const byProb = [...run.scenarios].sort((a, b) => b.prob - a.prob);
@@ -118,20 +118,30 @@ export function selectLikelyScenarios(
   };
 
   const finals: LikelyFinal[] = chosen.map((s, i) => {
-    const fi = favoriteIndex(s.winProb);
-    const favoriteFormId = run.formOrder[fi] ?? "";
-    const info = run.forms[favoriteFormId];
+    // Form indices ordered by win probability within this final, best first.
+    const order = s.winProb.map((_, k) => k).sort((a, b) => (s.winProb[b] || 0) - (s.winProb[a] || 0));
+    const forms: FavoriteForm[] = [];
+    for (const idx of order) {
+      if (forms.length >= formsPerScenario) break;
+      // Always show the leader; don't pad with extra zero-probability forms.
+      if (forms.length > 0 && (s.winProb[idx] || 0) <= 0) break;
+      const formId = run.formOrder[idx] ?? "";
+      const info = run.forms[formId];
+      forms.push({
+        formId,
+        formName: info?.formName || "טופס",
+        winProb: s.winProb[idx] || 0,
+        isMine: !!myId && info?.userId === myId,
+        color: colorFor(formId),
+      });
+    }
     return {
       rank: i + 1,
       champion: s.champion,
       runnerUp: s.runnerUp,
       prob: s.prob,
       samples: s.samples,
-      favoriteFormId,
-      favoriteFormName: info?.formName || "טופס",
-      favoriteWinProb: s.winProb[fi] ?? 0,
-      favoriteIsMine: !!myId && info?.userId === myId,
-      color: colorFor(favoriteFormId),
+      forms,
     };
   });
 
@@ -144,16 +154,14 @@ export function selectLikelyScenarios(
 // ── SVG builder ──
 const W = 1080;
 const PAD = 44;
-const CP = 26; // inner card padding
-const HEADER_H = 200;
-const META_H = 60;
-const ROW_H = 172;
-const ROW_GAP = 20;
-const RESIDUAL_H = 96;
+const CP = 28; // inner card padding
+const HEADER_H = 132;
+const META_H = 56;
+const ROW_GAP = 18;
 const FOOTER_H = 84;
 const BLOCK_GAP = 24;
-const FLAG_W = 42;
-const FLAG_H = 28;
+const FLAG_W = 44;
+const FLAG_H = 30;
 
 const esc = (s: string) =>
   s
@@ -192,89 +200,116 @@ function flagImg(code: string, x: number, y: number): string {
 const FONT_HEAD = "Heebo, Rubik, 'Segoe UI', system-ui, sans-serif";
 const FONT_BODY = "Rubik, Heebo, 'Segoe UI', system-ui, sans-serif";
 
-function rankColor(rank: number): { fill: string; text: string } {
-  if (rank === 1) return { fill: BRAND.gold, text: BRAND.ink };
-  if (rank === 2) return { fill: BRAND.silver, text: BRAND.white };
-  if (rank === 3) return { fill: BRAND.bronze, text: BRAND.white };
-  return { fill: BRAND.border, text: BRAND.inkMuted };
+// Attributes that right-align a text element's RIGHT edge at its x, for EITHER
+// script. "end"+direction="rtl" anchors the left edge (grows right) for RTL,
+// while a Latin name in an RTL line drifts — so we pick the base direction from
+// the first strong character: Hebrew → rtl+start (right edge at x), Latin →
+// ltr+end (right edge at x). Both land the right edge on x with no drift.
+function rightAlign(s: string): string {
+  for (const ch of s) {
+    if (ch >= "a" && ch <= "z") return 'text-anchor="end" direction="ltr"';
+    if (ch >= "A" && ch <= "Z") return 'text-anchor="end" direction="ltr"';
+    if (ch >= "֐" && ch <= "׿") return 'text-anchor="start" direction="rtl"';
+  }
+  return 'text-anchor="start" direction="rtl"';
 }
 
-// One scenario row (RTL). Top: rank chip (far right) · champion flag+name · a
-// "vs" pill · runner-up flag+name. Middle: probability bar (grows from the
-// right; % attached to its tip). Bottom: a fixed-width win% chip on the left +
-// the favorite form name (color-coded) on the right. `maxProb` scales the bar.
-function renderRow(f: LikelyFinal, y: number, maxProb: number): string {
+// Row layout: a fixed "final" tier on top, then 1–2 stacked form lines.
+const TIER1_H = 82; // top zone (matchup + prob chip)
+const FORM_LINE_H = 44;
+const ROW_BOT = 14;
+const rowHeight = (f: LikelyFinal): number => TIER1_H + Math.max(1, f.forms.length) * FORM_LINE_H + ROW_BOT;
+
+// Unicode isolates: wrap a (possibly LTR) run so the surrounding RTL line never
+// reorders it. FSI auto-detects the run's own direction; PDI closes it. This is
+// what makes "Hugo" and "47%" sit in the right place with zero width math.
+const FSI = "⁦";
+const PDI = "⁩";
+const iso = (s: string) => `${FSI}${s}${PDI}`;
+
+// One leading-form line, rendered as a SINGLE right-aligned RTL text so the
+// text engine does all spacing — no width estimation, so it can't drift or
+// overlap in any font (the bug with manually-placed Latin names). Reads, from
+// the right: [★ if mine] form-name · win% · "לזכות בתרחיש". The name and its
+// win% share the form color and sit adjacent, so the number is clearly tied to
+// the form and labelled as scenario-conditional.
+function formLine(form: FavoriteForm, baseY: number, RR: number): string {
+  const name = form.formName.length > 26 ? form.formName.slice(0, 25) + "…" : form.formName;
+  const star = form.isMine ? `<tspan fill="${BRAND.gold}">★ </tspan>` : "";
+  return `
+    <text x="${RR}" y="${baseY}" font-family="${FONT_HEAD}" font-size="25" text-anchor="start" direction="rtl">${star}<tspan font-weight="800" fill="${form.color}">${iso(esc(name))}</tspan><tspan font-weight="700" fill="${BRAND.inkLight}">  ·  </tspan><tspan font-weight="800" fill="${form.color}">${iso(winPct(form.winProb))}</tspan><tspan font-weight="700" fill="${BRAND.inkLight}" font-size="18"> לזכות בתרחיש</tspan></text>`;
+}
+
+// One scenario row (RTL). Tier 1 (the final): a left-side "X% מההרצות" chip,
+// then — laid out from the right — the CHAMPION on a gold plate with a 🏆
+// (the universal "this one won" cue), a "vs" pill, and the runner-up muted.
+// A quiet grey rank number sits far right (gold is reserved for the champion).
+// Below: one line per leading form (1–2, by admin choice).
+function renderRow(f: LikelyFinal, y: number): string {
   const L = PAD;
   const R = W - PAD;
   const innerW = R - L;
   const LL = L + CP;
   const RR = R - CP;
-  const rc = rankColor(f.rank);
+  const h = rowHeight(f);
 
-  // Rank chip — rounded square at the top-right corner.
-  const rcz = 48;
-  const rcx = R - CP - rcz;
-  const rcy = y + 22;
+  // Quiet rank number (no medal colors — gold means "champion" here).
+  const rcz = 36;
+  const rcx = RR - rcz;
+  const rcCx = rcx + rcz / 2;
+  const rcCy = y + 18 + rcz / 2;
 
-  // Matchup — laid out from the right, just left of the rank chip.
-  const my = y + 50; // text baseline
-  const fy = y + 28; // flag top (centred on the text)
-  const fs = 30;
+  // ── Tier 1: the final ──
+  const my = y + 52; // name baseline
+  const fy = y + 30; // flag top
+  const nfs = 30;
   const champ = teamName(f.champion);
-  const champFlagX = rcx - 18 - FLAG_W;
-  const champNameRight = champFlagX - 8;
-  const champNameLeft = champNameRight - approxWidth(champ, fs);
-  const vsR = 18;
-  const vsCx = champNameLeft - 16 - vsR;
   const ru = teamName(f.runnerUp);
-  const ruFlagX = vsCx - vsR - 16 - FLAG_W;
+
+  // Champion block: [🏆][flag][name] on a gold plate, right→left.
+  const trophyRight = rcx - 16;
+  const champFlagX = trophyRight - 32 - FLAG_W;
+  const champNameRight = champFlagX - 8;
+  const champNameLeft = champNameRight - approxWidth(champ, nfs);
+  const plateX = champNameLeft - 16;
+  const plateRight = trophyRight + 8;
+
+  // vs separator + runner-up block (muted), continuing left.
+  const vsR = 17;
+  const vsCx = plateX - 14 - vsR;
+  const ruFlagX = vsCx - vsR - 14 - FLAG_W;
   const ruNameRight = ruFlagX - 8;
 
-  // Probability bar (grows from the RIGHT).
-  const barY = y + 88;
-  const barH = 22;
-  const trackW = innerW - 2 * CP;
-  const fillW = Math.max(10, trackW * (f.prob / Math.max(maxProb, 0.0001)));
-  const fillX = RR - fillW;
-  // % attached to the bar's tip — a plain number (latin), so text-anchor "end"
-  // = right edge at x, growing left (no bidi ambiguity). White inside a wide
-  // fill, ink just left of the tip when the fill is too short to hold it.
-  const wide = fillW > 90;
-  const pctTag = wide
-    ? `<text x="${RR - 12}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.white}" text-anchor="end">${pct(f.prob)}</text>`
-    : `<text x="${fillX - 10}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.primaryDark}" text-anchor="end">${pct(f.prob)}</text>`;
+  // Final-probability chip (replaces the old bar) — far left of tier 1.
+  const pcW = 132;
+  const pcH = 48;
+  const pcX = LL;
+  const pcY = y + 16;
 
-  // Favorite-form line. Truncate the name so the dot/star never collide.
-  const subY = y + 145;
-  const chipW = 104;
-  const chipH = 34;
-  const chipY = y + 126;
-  const starW = f.favoriteIsMine ? 32 : 0;
-  const name = f.favoriteFormName.length > 30 ? f.favoriteFormName.slice(0, 29) + "…" : f.favoriteFormName;
-  const nameRight = RR - starW;
-  const nameLeft = nameRight - approxWidth(name, 26);
+  // Leading-form lines.
+  let formLines = "";
+  f.forms.forEach((form, k) => {
+    formLines += formLine(form, y + TIER1_H + k * FORM_LINE_H + 28, RR);
+  });
 
   return `
   <g>
-    <rect x="${L}" y="${y + 4}" width="${innerW}" height="${ROW_H}" rx="24" fill="${BRAND.border}" opacity="0.45"/>
-    <rect x="${L}" y="${y}" width="${innerW}" height="${ROW_H}" rx="24" fill="${BRAND.bg}" stroke="${BRAND.border}" stroke-width="2"/>
-    <rect x="${rcx}" y="${rcy}" width="${rcz}" height="${rcz}" rx="14" fill="${rc.fill}"/>
-    <text x="${rcx + rcz / 2}" y="${rcy + rcz / 2 + 11}" font-family="${FONT_HEAD}" font-size="30" font-weight="800" fill="${rc.text}" text-anchor="middle">${f.rank}</text>
+    <rect x="${L}" y="${y + 4}" width="${innerW}" height="${h}" rx="24" fill="${BRAND.border}" opacity="0.4"/>
+    <rect x="${L}" y="${y}" width="${innerW}" height="${h}" rx="24" fill="${BRAND.bg}" stroke="${BRAND.border}" stroke-width="2"/>
+    <circle cx="${rcCx}" cy="${rcCy}" r="${rcz / 2}" fill="${BRAND.bgSoft}"/>
+    <text x="${rcCx}" y="${rcCy + 8}" font-family="${FONT_HEAD}" font-size="22" font-weight="800" fill="${BRAND.inkLight}" text-anchor="middle">${f.rank}</text>
+    <rect x="${plateX}" y="${y + 22}" width="${plateRight - plateX}" height="44" rx="22" fill="${BRAND.goldSoft}"/>
+    <text x="${trophyRight}" y="${my}" font-family="${FONT_BODY}" font-size="26" text-anchor="end">🏆</text>
     ${flagImg(f.champion, champFlagX, fy)}
-    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.ink}" text-anchor="start" direction="rtl">${esc(champ)}</text>
-    <circle cx="${vsCx}" cy="${y + 38}" r="${vsR}" fill="${BRAND.bgSoft}"/>
-    <text x="${vsCx}" y="${y + 44}" font-family="${FONT_BODY}" font-size="17" font-weight="700" fill="${BRAND.inkLight}" text-anchor="middle">vs</text>
+    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="800" fill="${BRAND.ink}" ${rightAlign(champ)}>${esc(champ)}</text>
+    <circle cx="${vsCx}" cy="${y + 44}" r="${vsR}" fill="${BRAND.bgSoft}"/>
+    <text x="${vsCx}" y="${y + 49}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="middle">vs</text>
     ${flagImg(f.runnerUp, ruFlagX, fy)}
-    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="start" direction="rtl">${esc(ru)}</text>
-    <rect x="${LL}" y="${barY}" width="${trackW}" height="${barH}" rx="${barH / 2}" fill="${BRAND.bgSoft}"/>
-    <rect x="${fillX}" y="${barY}" width="${fillW}" height="${barH}" rx="${barH / 2}" fill="${BRAND.primary}"/>
-    ${pctTag}
-    <rect x="${LL}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="${f.color}"/>
-    <text x="${LL + chipW / 2}" y="${chipY + 23}" font-family="${FONT_BODY}" font-size="22" font-weight="800" fill="${BRAND.white}" text-anchor="middle">${winPct(f.favoriteWinProb)}</text>
-    <text x="${LL + chipW + 14}" y="${subY}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="end" direction="rtl">סיכוי הטופס לזכייה</text>
-    <circle cx="${nameLeft - 14}" cy="${subY - 8}" r="7" fill="${f.color}"/>
-    <text x="${nameRight}" y="${subY}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${f.color}" text-anchor="start" direction="rtl">${esc(name)}</text>
-    ${f.favoriteIsMine ? `<text x="${RR}" y="${subY}" font-family="${FONT_BODY}" font-size="26" font-weight="800" fill="${BRAND.gold}" text-anchor="end">★</text>` : ""}
+    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="700" fill="${BRAND.inkLight}" ${rightAlign(ru)}>${esc(ru)}</text>
+    <rect x="${pcX}" y="${pcY}" width="${pcW}" height="${pcH}" rx="14" fill="${BRAND.primarySoft}"/>
+    <text x="${pcX + pcW / 2}" y="${pcY + 24}" font-family="${FONT_HEAD}" font-size="24" font-weight="800" fill="${BRAND.primaryDark}" text-anchor="middle">${pct(f.prob)}</text>
+    <text x="${pcX + pcW / 2}" y="${pcY + 40}" font-family="${FONT_BODY}" font-size="13" font-weight="700" fill="${BRAND.primaryDark}" text-anchor="middle" direction="rtl">מההרצות</text>
+    ${formLines}
   </g>`;
 }
 
@@ -283,16 +318,9 @@ export function buildInfographicSvg(
   selection: LikelySelection,
   opts: { generatedAt?: number } = {},
 ): { svg: string; width: number; height: number } {
-  const { finals, residual, thresholdMet, threshold } = selection;
-  const n = finals.length;
+  const { finals } = selection;
 
   const rowsTop = HEADER_H + META_H + BLOCK_GAP;
-  const rowsBlock = n > 0 ? n * ROW_H + (n - 1) * ROW_GAP : 0;
-  const residualTop = rowsTop + rowsBlock + BLOCK_GAP;
-  const footerTop = residualTop + RESIDUAL_H + BLOCK_GAP;
-  const H = footerTop + FOOTER_H;
-
-  const maxProb = finals.reduce((m, f) => Math.max(m, f.prob), 0.0001);
 
   const generatedAt = opts.generatedAt ?? run.meta.generatedAt;
   const dateStr = new Date(generatedAt).toLocaleString("he-IL", {
@@ -303,48 +331,22 @@ export function buildInfographicSvg(
     minute: "2-digit",
   });
 
-  const subtitle = thresholdMet
-    ? `הגמרים עם יותר מ-${pct(threshold)} סיכוי · והטופס שמוביל בכל אחד`
-    : `${pct(threshold)}+ סיכוי לא הושג עדיין — מוצגים ${n} הגמרים הסבירים ביותר`;
-
-  // Rows.
+  // Rows (each as tall as its form-line count).
   let rows = "";
   let y = rowsTop;
   for (const f of finals) {
-    rows += renderRow(f, y, maxProb);
-    y += ROW_H + ROW_GAP;
+    rows += renderRow(f, y);
+    y += rowHeight(f) + ROW_GAP;
   }
-
-  // Residual ("all other finals") bar — honesty about the long tail. Uses the
-  // ABSOLUTE probability mass (not normalised), so it reads against the rows.
-  const resLeft = PAD;
-  const resW = W - 2 * PAD;
-  const resBarY = residualTop + 52;
-  const resBarH = 22;
-  const resFillW = Math.max(10, resW * residual);
-  const resFillX = W - PAD - resFillW;
-  const resWide = resFillW > 130;
-
-  const residualBlock = `
-  <g>
-    <text x="${W - PAD}" y="${residualTop + 36}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="start" direction="rtl">כל שאר התרחישים</text>
-    <rect x="${resLeft}" y="${resBarY}" width="${resW}" height="${resBarH}" rx="${resBarH / 2}" fill="${BRAND.bgSoft}"/>
-    <rect x="${resFillX}" y="${resBarY}" width="${resFillW}" height="${resBarH}" rx="${resBarH / 2}" fill="${BRAND.silver}"/>
-    ${
-      resWide
-        ? `<text x="${W - PAD - 12}" y="${resBarY + resBarH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.white}" text-anchor="end">${pct(residual)}</text>`
-        : `<text x="${resFillX - 10}" y="${resBarY + resBarH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="end">${pct(residual)}</text>`
-    }
-  </g>`;
+  const footerTop = (finals.length > 0 ? y - ROW_GAP : rowsTop) + BLOCK_GAP;
+  const H = footerTop + FOOTER_H;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMin meet" font-family="${FONT_BODY}" style="display:block">
   <rect x="0" y="0" width="${W}" height="${H}" fill="${BRAND.bgSoft}"/>
   <rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="${BRAND.primary}"/>
-  <text x="${W / 2}" y="90" font-family="${FONT_HEAD}" font-size="54" font-weight="800" fill="${BRAND.white}" text-anchor="middle" direction="rtl">🏆 התרחישים הסבירים ביותר</text>
-  <text x="${W / 2}" y="142" font-family="${FONT_BODY}" font-size="27" font-weight="700" fill="${BRAND.white}" text-anchor="middle" direction="rtl" opacity="0.92">${esc(subtitle)}</text>
-  <text x="${W / 2}" y="${HEADER_H + 38}" font-family="${FONT_BODY}" font-size="22" font-weight="700" fill="${BRAND.inkMuted}" text-anchor="middle" direction="rtl">מבוסס על ${run.meta.simCount.toLocaleString("he-IL")} הרצות · עודכן ${esc(dateStr)}</text>
+  <text x="${W / 2}" y="84" font-family="${FONT_HEAD}" font-size="50" font-weight="800" fill="${BRAND.white}" text-anchor="middle" direction="rtl">🏆 התרחישים הסבירים ביותר</text>
+  <text x="${W / 2}" y="${HEADER_H + 36}" font-family="${FONT_BODY}" font-size="22" font-weight="700" fill="${BRAND.inkMuted}" text-anchor="middle" direction="rtl">מבוסס על ${run.meta.simCount.toLocaleString("he-IL")} הרצות · עודכן ${esc(dateStr)}</text>
   ${rows}
-  ${residualBlock}
   <rect x="0" y="${footerTop}" width="${W}" height="${FOOTER_H}" fill="${BRAND.primaryDark}"/>
   <text x="${W / 2}" y="${footerTop + 50}" font-family="${FONT_HEAD}" font-size="30" font-weight="800" fill="${BRAND.white}" text-anchor="middle" direction="rtl">⚽ מונדיאל בארי 2026</text>
 </svg>`;
