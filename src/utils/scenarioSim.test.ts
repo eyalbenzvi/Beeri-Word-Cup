@@ -101,6 +101,38 @@ describe("runScenarioSimulation", () => {
     }
   });
 
+  it("emits a 'no-scenario' overall table pooled over every sim", () => {
+    const res = run();
+    expect(res.overall).toBeDefined();
+    const ov = res.overall!;
+    expect(ov.samples).toBe(500);
+    expect(ov.avgRank.length).toBe(res.formOrder.length);
+    expect(ov.avgPoints.length).toBe(res.formOrder.length);
+    expect(ov.winProb.length).toBe(res.formOrder.length);
+    // Every sim crowns exactly one winning form → overall win probs sum to ~1.
+    const sum = ov.winProb.reduce((s, p) => s + p, 0);
+    expect(sum).toBeGreaterThan(0.98);
+    expect(sum).toBeLessThan(1.02);
+    for (let i = 0; i < ov.avgRank.length; i++) {
+      expect(Number.isFinite(ov.avgRank[i])).toBe(true);
+      expect(Number.isFinite(ov.avgPoints[i])).toBe(true);
+      expect(Number.isFinite(ov.winProb[i])).toBe(true);
+      expect(ov.avgRank[i]).toBeGreaterThanOrEqual(1);
+      expect(ov.avgRank[i]).toBeLessThanOrEqual(res.formOrder.length);
+    }
+  });
+
+  it("the empty run carries an empty overall aggregate", () => {
+    const res = runScenarioSimulation({
+      allPredictions: { draft__1: { userId: "d", formName: "D", status: "draft", matches: {} } },
+      results,
+      actualBonuses: { topScorers: [] },
+      simCount: 100,
+      seed: 1,
+    });
+    expect(res.overall).toEqual({ samples: 0, avgRank: [], avgPoints: [], winProb: [] });
+  });
+
   it("fitScenarioRunToDoc leaves a small run untouched and trims a huge one", () => {
     const res = runScenarioSimulation({
       allPredictions, results, actualBonuses: { topScorers: [] }, simCount: 3000, seed: 7, minScenarioSamples: 30,
@@ -109,9 +141,13 @@ describe("runScenarioSimulation", () => {
     expect(big.trimmed).toBe(0);
     expect(big.run.scenarios.length).toBe(res.scenarios.length);
 
+    // Trimming drops scenarios but must preserve the overall aggregate.
+    expect(big.run.overall).toEqual(res.overall);
+
     const tiny = fitScenarioRunToDoc(res, 1000);
     expect(tiny.run.scenarios.length).toBeLessThanOrEqual(1);
     expect(tiny.trimmed).toBeGreaterThan(0);
+    expect(tiny.run.overall).toEqual(res.overall);
     if (tiny.run.scenarios.length === 1) {
       expect(tiny.run.scenarios[0].samples).toBe(res.scenarios[0].samples);
     }

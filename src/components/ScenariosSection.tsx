@@ -8,7 +8,7 @@ import {
 } from "../hooks/useScenarioRun";
 import { useCurrentUser } from "../hooks/useStore";
 import { useToast } from "./Toast";
-import ScenarioExplorer from "./ScenarioExplorer";
+import ScenarioExplorer, { ScenarioOverallTable } from "./ScenarioExplorer";
 import Spinner from "./Spinner";
 
 // Read-only scenarios view: loads the server-computed run and renders the
@@ -25,6 +25,9 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
   // Default to LOCAL: it runs entirely in the browser, so it works even when
   // the Netlify background function isn't available — the reliable manual path.
   const [mode, setMode] = useState<RunMode>("local");
+  // Admin-only "no-scenario" overall table, hidden behind a toggle so it's an
+  // additional option rather than always on.
+  const [showOverall, setShowOverall] = useState(false);
   const run = state.result;
 
   const handleRecompute = () => {
@@ -48,6 +51,7 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
     : null;
 
   return (
+    <>
     <div className="card-duo">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
         <div>
@@ -145,5 +149,30 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
         </>
       )}
     </div>
+
+    {showRecompute && run && run.formOrder.length > 0 && (
+      <div className="card-duo">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <div>
+            <h3 className="font-extrabold text-base text-ink">📋 טבלה כללית (ללא תרחיש)</h3>
+            <p className="text-xs text-ink-muted font-medium mt-0.5">
+              כל ההרצות יחד: לכל טופס סיכוי למקום ראשון, דירוג ממוצע וניקוד ממוצע.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOverall((v) => !v)}
+            aria-pressed={showOverall}
+            className="btn-duo btn-duo-blue btn-duo-sm shrink-0"
+          >
+            {showOverall ? "הסתר" : "הצג טבלה"}
+          </button>
+        </div>
+        {showOverall && (
+          <ScenarioOverallTable run={run} currentUserId={user?.id || null} />
+        )}
+      </div>
+    )}
+    </>
   );
 }

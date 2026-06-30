@@ -178,6 +178,20 @@ export type Scenario = {
   winProb: number[];
 };
 
+// The "no-scenario" aggregate: the same three per-form metrics as a Scenario,
+// but pooled over EVERY simulated tournament (not conditioned on a particular
+// final). `samples` equals the run's simCount. Parallel arrays aligned to
+// `formOrder` exactly like a Scenario, so it drives the same table UI.
+//   avgRank[i]   — the form's average leaderboard position across all sims
+//   avgPoints[i] — its average total points across all sims
+//   winProb[i]   — its probability of finishing 1st overall (P(rank 1))
+export type OverallAggregate = {
+  samples: number;
+  avgRank: number[];
+  avgPoints: number[];
+  winProb: number[];
+};
+
 export type ScenarioRunResult = {
   meta: {
     seed: number;
@@ -190,6 +204,9 @@ export type ScenarioRunResult = {
   forms: Record<string, ScenarioFormInfo>; // display labels only
   champions: { code: string; prob: number; samples: number }[]; // for the picker
   scenarios: Scenario[]; // champion+runner-up tables (capped, sorted by prob)
+  // Pooled "no-scenario" table over all sims (admin-only view). Optional so
+  // runs persisted before this field existed still parse.
+  overall?: OverallAggregate;
 };
 
 // A final must occur in at least this many sims to be tabled (so its per-form
@@ -251,7 +268,14 @@ export function runScenarioSimulation(opts: {
   // No eligible forms → return a valid empty run rather than crash. Avoids the
   // ranked[0] deref and 50k pointless sims when nothing is submitted yet.
   if (nForms === 0) {
-    return { meta, formOrder: [], forms, champions: [], scenarios: [] };
+    return {
+      meta,
+      formOrder: [],
+      forms,
+      champions: [],
+      scenarios: [],
+      overall: { samples: 0, avgRank: [], avgPoints: [], winProb: [] },
+    };
   }
 
   const idx: Record<string, number> = {};
@@ -263,6 +287,12 @@ export function runScenarioSimulation(opts: {
 
   // Champion marginal (drives the picker order).
   const champSamples: Record<string, number> = {};
+
+  // "No-scenario" pooled accumulators: per-form running sums over EVERY sim
+  // (unconditioned on the final), for the admin overall table.
+  const overallRankSum = new Float64Array(nForms);
+  const overallPointsSum = new Float64Array(nForms);
+  const overallWinCount = new Float64Array(nForms);
 
   // Per-scenario (champion+runner-up) accumulators, lazily allocated. Each
   // holds per-form running sums so we can emit avg rank / avg points / win %.
@@ -287,6 +317,14 @@ export function runScenarioSimulation(opts: {
     const { ranked, champion, finalists } = scoreSim(sim, fastForms, scratch, order);
 
     if (champion) champSamples[champion] = (champSamples[champion] || 0) + 1;
+
+    // Pooled over every sim: each form's rank/points + whether it finished 1st.
+    for (let i = 0; i < ranked.length; i++) {
+      const fi = idx[ranked[i].formId];
+      overallRankSum[fi] += i + 1;
+      overallPointsSum[fi] += ranked[i].totalPoints;
+      if (i === 0) overallWinCount[fi] += 1;
+    }
 
     // The scenario is the final: champion beat runnerUp. Accumulate per-form
     // rank/points/win only for valid (resolved) finals.
@@ -338,7 +376,21 @@ export function runScenarioSimulation(opts: {
       return { champion, runnerUp, prob: a.samples / simCount, samples: a.samples, avgRank, avgPoints, winProb };
     });
 
-  return { meta, formOrder: formIds, forms, champions, scenarios };
+  // Pooled "no-scenario" table: divide the running sums by simCount (every sim
+  // ranks every form, so simCount is the sample size for all three metrics).
+  const overall: OverallAggregate = {
+    samples: simCount,
+    avgRank: new Array(nForms),
+    avgPoints: new Array(nForms),
+    winProb: new Array(nForms),
+  };
+  for (let i = 0; i < nForms; i++) {
+    overall.avgRank[i] = round(overallRankSum[i] / simCount, 1);
+    overall.avgPoints[i] = round(overallPointsSum[i] / simCount, 1);
+    overall.winProb[i] = round(overallWinCount[i] / simCount, 4);
+  }
+
+  return { meta, formOrder: formIds, forms, champions, scenarios, overall };
 }
 
 // Firestore caps a document at 1 MiB. A run is normally ~170–300 KB, but the
