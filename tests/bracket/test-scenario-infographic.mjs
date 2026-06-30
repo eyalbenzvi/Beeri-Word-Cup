@@ -77,6 +77,7 @@ const { svg, width, height } = buildInfographicSvg(run, sel);
 assert(width === 1080 && height > 0, `svg has dimensions (got ${width}x${height})`);
 assert(svg.includes('הניחושים של דנה') && svg.includes('נבחרת אלון'), 'svg embeds favorite form names');
 assert(svg.includes('ברזיל') && svg.includes('ספרד'), 'svg embeds team labels (he names)');
+assert((svg.match(/data:image\/svg\+xml;base64,/g) || []).length >= 4, 'svg embeds flag images (base64) for the teams');
 assert(svg.includes('14%') && svg.includes('11%'), 'svg embeds per-final probabilities');
 assert(svg.includes('כל שאר התרחישים') && svg.includes('75%'), 'svg embeds residual bar + value');
 assert(svg.includes('התרחישים הסבירים ביותר'), 'svg embeds title');
