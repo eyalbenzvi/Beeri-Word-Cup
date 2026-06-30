@@ -79,7 +79,9 @@ assert(svg.includes('הניחושים של דנה') && svg.includes('נבחרת 
 assert(svg.includes('ברזיל') && svg.includes('ספרד'), 'svg embeds team labels (he names)');
 assert((svg.match(/data:image\/svg\+xml;base64,/g) || []).length >= 4, 'svg embeds flag images (base64) for the teams');
 assert(svg.includes('14%') && svg.includes('11%'), 'svg embeds per-final probabilities');
-assert(svg.includes('כל שאר התרחישים') && svg.includes('75%'), 'svg embeds residual bar + value');
+assert(svg.includes('מההרצות'), 'svg labels the final-probability chip');
+assert(svg.includes('מוביל בתרחיש'), 'svg frames the leading form per-scenario');
+assert(!svg.includes('כל שאר התרחישים'), 'svg no longer shows the residual bar');
 assert(svg.includes('התרחישים הסבירים ביותר'), 'svg embeds title');
 assert(svg.includes('width="100%"'), 'preview svg is responsive (width=100%)');
 
