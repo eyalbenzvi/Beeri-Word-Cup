@@ -130,6 +130,21 @@ export async function fetchMatchResult({ homeTeam, awayTeam, kickoffIso }) {
   } else {
     home90 = regulationGoals(home.linescores);
     away90 = regulationGoals(away.linescores);
+    // LIVE extra time / penalties without per-period linescores: ESPN usually
+    // does NOT expose the per-half linescores until the match is over, so the
+    // reconstruction above yields null all through a live ET — which is why the
+    // provisional 90' tie was never recorded while the match was still being
+    // played. While the match is STILL IN PROGRESS, though, the running score
+    // still EQUALS the 90' score until the first extra-time goal lands (a match
+    // only reaches ET from a level score). So fall back to the live score here.
+    // This is consumed ONLY by the provisional path, which is guarded by
+    // home90===away90: the instant an ET goal makes the score diverge this is
+    // ignored and we wait for the post-match linescores to isolate the real 90'.
+    // NEVER do this once finished — a finished ET/pens score INCLUDES ET goals.
+    if (!finished && (home90 == null || away90 == null)) {
+      home90 = espnGoals(home.score);
+      away90 = espnGoals(away.score);
+    }
   }
 
   // Presentation-only breakdown (never affects scoring). ESPN's

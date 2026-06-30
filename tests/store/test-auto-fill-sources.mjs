@@ -366,6 +366,43 @@ const POST = (name, detail, period) => ({
   eq(r.advancingTeam, "ESP", "ESPN pens: advancing = pen winner");
 }
 
+// --- ESPN 3c. LIVE extra time, still level, WITHOUT per-period linescores
+// (ESPN exposes them only once the match ends): the 90' tie is taken from the
+// running live score so the PROVISIONAL 90' can be recorded mid-ET. A match
+// only reaches ET from a level score, so while it stays level the live score
+// still IS the 90' score. ---
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "in", name: "STATUS_FIRST_EXTRA_TIME" }, period: 3, displayClock: "98'" },
+    competitors: [
+      { homeAway: "home", score: "1", team: { displayName: "Spain", abbreviation: "ESP" } },
+      { homeAway: "away", score: "1", team: { displayName: "Germany", abbreviation: "GER" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN live ET: not finished");
+  eq(r.duration, "EXTRA_TIME", "ESPN live ET: duration EXTRA_TIME");
+  eq(r.home90, 1, "ESPN live ET no-linescores: 90' home from live score (1)");
+  eq(r.away90, 1, "ESPN live ET no-linescores: 90' away from live score (1) -> provisional tie");
+}
+
+// --- ESPN 3d. LIVE extra time AFTER an ET goal (score has diverged): the live
+// score no longer equals the 90' tie, so home90 != away90 and the provisional
+// guard (home90===away90) rejects it — we wait for the post-match linescores to
+// isolate the true 90'. ---
+{
+  mockFetchOnce(espnEvent({
+    status: { type: { state: "in", name: "STATUS_SECOND_EXTRA_TIME" }, period: 4, displayClock: "112'" },
+    competitors: [
+      { homeAway: "home", score: "2", team: { displayName: "Spain", abbreviation: "ESP" } },
+      { homeAway: "away", score: "1", team: { displayName: "Germany", abbreviation: "GER" } },
+    ],
+  }));
+  const r = await fetchESPN({ fifaMatch: 89, homeTeam: "ESP", awayTeam: "GER", kickoffIso: KICK });
+  eq(r.finished, false, "ESPN live ET (after ET goal): not finished");
+  eq(r.home90 === r.away90, false, "ESPN live ET (after ET goal): diverged -> provisional guard rejects");
+}
+
 // --- ESPN 4. Not finished (in play) ---
 {
   mockFetchOnce(espnEvent({
