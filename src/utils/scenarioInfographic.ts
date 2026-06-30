@@ -236,19 +236,23 @@ function renderRow(f: LikelyFinal, y: number, maxProb: number): string {
   const trackW = innerW - 2 * CP;
   const fillW = Math.max(10, trackW * (f.prob / Math.max(maxProb, 0.0001)));
   const fillX = RR - fillW;
-  const wide = fillW > 130;
+  // % attached to the bar's tip — a plain number (latin), so text-anchor "end"
+  // = right edge at x, growing left (no bidi ambiguity). White inside a wide
+  // fill, ink just left of the tip when the fill is too short to hold it.
+  const wide = fillW > 90;
   const pctTag = wide
-    ? `<text x="${RR - 12}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.white}" text-anchor="end" direction="rtl">${pct(f.prob)} מהתרחישים</text>`
-    : `<text x="${fillX - 10}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.primaryDark}" text-anchor="end" direction="rtl">${pct(f.prob)} מהתרחישים</text>`;
+    ? `<text x="${RR - 12}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.white}" text-anchor="end">${pct(f.prob)}</text>`
+    : `<text x="${fillX - 10}" y="${barY + barH - 5}" font-family="${FONT_BODY}" font-size="18" font-weight="800" fill="${BRAND.primaryDark}" text-anchor="end">${pct(f.prob)}</text>`;
 
-  // Favorite-form line.
+  // Favorite-form line. Truncate the name so the dot/star never collide.
   const subY = y + 145;
   const chipW = 104;
   const chipH = 34;
   const chipY = y + 126;
-  const starW = f.favoriteIsMine ? 30 : 0;
+  const starW = f.favoriteIsMine ? 32 : 0;
+  const name = f.favoriteFormName.length > 30 ? f.favoriteFormName.slice(0, 29) + "…" : f.favoriteFormName;
   const nameRight = RR - starW;
-  const nameLeft = nameRight - approxWidth(f.favoriteFormName, 26);
+  const nameLeft = nameRight - approxWidth(name, 26);
 
   return `
   <g>
@@ -257,19 +261,19 @@ function renderRow(f: LikelyFinal, y: number, maxProb: number): string {
     <rect x="${rcx}" y="${rcy}" width="${rcz}" height="${rcz}" rx="14" fill="${rc.fill}"/>
     <text x="${rcx + rcz / 2}" y="${rcy + rcz / 2 + 11}" font-family="${FONT_HEAD}" font-size="30" font-weight="800" fill="${rc.text}" text-anchor="middle">${f.rank}</text>
     ${flagImg(f.champion, champFlagX, fy)}
-    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.ink}" text-anchor="end" direction="rtl">${esc(champ)}</text>
+    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.ink}" text-anchor="start" direction="rtl">${esc(champ)}</text>
     <circle cx="${vsCx}" cy="${y + 38}" r="${vsR}" fill="${BRAND.bgSoft}"/>
     <text x="${vsCx}" y="${y + 44}" font-family="${FONT_BODY}" font-size="17" font-weight="700" fill="${BRAND.inkLight}" text-anchor="middle">vs</text>
     ${flagImg(f.runnerUp, ruFlagX, fy)}
-    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="end" direction="rtl">${esc(ru)}</text>
+    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="start" direction="rtl">${esc(ru)}</text>
     <rect x="${LL}" y="${barY}" width="${trackW}" height="${barH}" rx="${barH / 2}" fill="${BRAND.bgSoft}"/>
     <rect x="${fillX}" y="${barY}" width="${fillW}" height="${barH}" rx="${barH / 2}" fill="${BRAND.primary}"/>
     ${pctTag}
     <rect x="${LL}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="${f.color}"/>
     <text x="${LL + chipW / 2}" y="${chipY + 23}" font-family="${FONT_BODY}" font-size="22" font-weight="800" fill="${BRAND.white}" text-anchor="middle">${winPct(f.favoriteWinProb)}</text>
-    <text x="${LL + chipW + 12}" y="${subY}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="start" direction="rtl">סיכוי הטופס לזכייה</text>
+    <text x="${LL + chipW + 14}" y="${subY}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="end" direction="rtl">סיכוי הטופס לזכייה</text>
     <circle cx="${nameLeft - 14}" cy="${subY - 8}" r="7" fill="${f.color}"/>
-    <text x="${nameRight}" y="${subY}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${f.color}" text-anchor="end" direction="rtl">${esc(f.favoriteFormName)}</text>
+    <text x="${nameRight}" y="${subY}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${f.color}" text-anchor="start" direction="rtl">${esc(name)}</text>
     ${f.favoriteIsMine ? `<text x="${RR}" y="${subY}" font-family="${FONT_BODY}" font-size="26" font-weight="800" fill="${BRAND.gold}" text-anchor="end">★</text>` : ""}
   </g>`;
 }
@@ -323,7 +327,7 @@ export function buildInfographicSvg(
 
   const residualBlock = `
   <g>
-    <text x="${W - PAD}" y="${residualTop + 36}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="end" direction="rtl">כל שאר התרחישים</text>
+    <text x="${W - PAD}" y="${residualTop + 36}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${BRAND.inkMuted}" text-anchor="start" direction="rtl">כל שאר התרחישים</text>
     <rect x="${resLeft}" y="${resBarY}" width="${resW}" height="${resBarH}" rx="${resBarH / 2}" fill="${BRAND.bgSoft}"/>
     <rect x="${resFillX}" y="${resBarY}" width="${resFillW}" height="${resBarH}" rx="${resBarH / 2}" fill="${BRAND.silver}"/>
     ${

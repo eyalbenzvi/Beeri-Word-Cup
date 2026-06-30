@@ -130,6 +130,9 @@ export default function ScenarioInfographicPanel() {
           </button>
         </div>
       </div>
+      <p className="text-3xs text-ink-light font-medium mb-2">
+        מציג גמרים (אלופה + סגנית) עם סיכוי גבוה מהסף. ברירת המחדל 10% — שנו את הסף כדי להציג יותר או פחות תרחישים.
+      </p>
 
       {state.loading ? (
         <div className="py-10 flex justify-center"><Spinner /></div>
