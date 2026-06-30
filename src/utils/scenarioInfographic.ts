@@ -54,17 +54,22 @@ const FORM_COLORS = [
   "#A568CC",
 ];
 
+// One form's standing within a scenario (leader = forms[0]).
+export type FavoriteForm = {
+  formId: string;
+  formName: string;
+  winProb: number; // P(form finishes 1st | this final)
+  isMine: boolean;
+  color: string; // pill/name color (stable per form across the graphic)
+};
+
 export type LikelyFinal = {
   rank: number; // 1-based display rank
   champion: string;
   runnerUp: string;
   prob: number; // P(this exact final) = scenario.prob
   samples: number;
-  favoriteFormId: string;
-  favoriteFormName: string;
-  favoriteWinProb: number; // P(form finishes 1st | this final)
-  favoriteIsMine: boolean;
-  color: string; // pill color (stable per form)
+  forms: FavoriteForm[]; // top-N leading forms (N = formsPerScenario), best first
 };
 
 export type LikelySelection = {
@@ -78,17 +83,9 @@ export type SelectOptions = {
   threshold?: number; // default 0.10 (>10%)
   minShown?: number; // fallback floor when too few clear the bar (default 3)
   maxShown?: number; // hard cap on rows (default 8)
+  formsPerScenario?: number; // leading forms to surface per final (default 1)
   currentUserId?: string | null;
 };
-
-// Index of the form with the highest win probability in a scenario.
-function favoriteIndex(winProb: number[]): number {
-  let best = 0;
-  for (let i = 1; i < winProb.length; i++) {
-    if (winProb[i] > winProb[best]) best = i;
-  }
-  return best;
-}
 
 export function selectLikelyScenarios(
   run: ScenarioRunResult,
@@ -97,6 +94,7 @@ export function selectLikelyScenarios(
   const threshold = opts.threshold ?? 0.1;
   const minShown = opts.minShown ?? 3;
   const maxShown = opts.maxShown ?? 8;
+  const formsPerScenario = Math.max(1, Math.min(2, opts.formsPerScenario ?? 1));
   const myId = opts.currentUserId ?? null;
 
   const byProb = [...run.scenarios].sort((a, b) => b.prob - a.prob);
@@ -120,20 +118,30 @@ export function selectLikelyScenarios(
   };
 
   const finals: LikelyFinal[] = chosen.map((s, i) => {
-    const fi = favoriteIndex(s.winProb);
-    const favoriteFormId = run.formOrder[fi] ?? "";
-    const info = run.forms[favoriteFormId];
+    // Form indices ordered by win probability within this final, best first.
+    const order = s.winProb.map((_, k) => k).sort((a, b) => (s.winProb[b] || 0) - (s.winProb[a] || 0));
+    const forms: FavoriteForm[] = [];
+    for (const idx of order) {
+      if (forms.length >= formsPerScenario) break;
+      // Always show the leader; don't pad with extra zero-probability forms.
+      if (forms.length > 0 && (s.winProb[idx] || 0) <= 0) break;
+      const formId = run.formOrder[idx] ?? "";
+      const info = run.forms[formId];
+      forms.push({
+        formId,
+        formName: info?.formName || "טופס",
+        winProb: s.winProb[idx] || 0,
+        isMine: !!myId && info?.userId === myId,
+        color: colorFor(formId),
+      });
+    }
     return {
       rank: i + 1,
       champion: s.champion,
       runnerUp: s.runnerUp,
       prob: s.prob,
       samples: s.samples,
-      favoriteFormId,
-      favoriteFormName: info?.formName || "טופס",
-      favoriteWinProb: s.winProb[fi] ?? 0,
-      favoriteIsMine: !!myId && info?.userId === myId,
-      color: colorFor(favoriteFormId),
+      forms,
     };
   });
 
@@ -149,7 +157,6 @@ const PAD = 44;
 const CP = 28; // inner card padding
 const HEADER_H = 132;
 const META_H = 56;
-const ROW_H = 150;
 const ROW_GAP = 18;
 const FOOTER_H = 84;
 const BLOCK_GAP = 24;
@@ -193,18 +200,62 @@ function flagImg(code: string, x: number, y: number): string {
 const FONT_HEAD = "Heebo, Rubik, 'Segoe UI', system-ui, sans-serif";
 const FONT_BODY = "Rubik, Heebo, 'Segoe UI', system-ui, sans-serif";
 
+// Attributes that right-align a text element's RIGHT edge at its x, for EITHER
+// script. "end"+direction="rtl" anchors the left edge (grows right) for RTL,
+// while a Latin name in an RTL line drifts — so we pick the base direction from
+// the first strong character: Hebrew → rtl+start (right edge at x), Latin →
+// ltr+end (right edge at x). Both land the right edge on x with no drift.
+function rightAlign(s: string): string {
+  for (const ch of s) {
+    if (ch >= "a" && ch <= "z") return 'text-anchor="end" direction="ltr"';
+    if (ch >= "A" && ch <= "Z") return 'text-anchor="end" direction="ltr"';
+    if (ch >= "֐" && ch <= "׿") return 'text-anchor="start" direction="rtl"';
+  }
+  return 'text-anchor="start" direction="rtl"';
+}
+
+// Row layout: a fixed "final" tier on top, then 1–2 stacked form lines.
+const TIER1_H = 82; // top zone (matchup + prob chip)
+const FORM_LINE_H = 44;
+const ROW_BOT = 14;
+const rowHeight = (f: LikelyFinal): number => TIER1_H + Math.max(1, f.forms.length) * FORM_LINE_H + ROW_BOT;
+
+// One leading-form line (RTL): [★ if mine] name (hero, right) · win-% pill ·
+// "לזכות בתרחיש" caption — so the pill's number is self-describing.
+function formLine(form: FavoriteForm, baseY: number, RR: number): string {
+  const fs = 25;
+  const star = form.isMine
+    ? `<text x="${RR}" y="${baseY}" font-family="${FONT_BODY}" font-size="${fs}" font-weight="800" fill="${BRAND.gold}" text-anchor="end">★</text>`
+    : "";
+  const nameRight = RR - (form.isMine ? 28 : 0);
+  const name = form.formName.length > 22 ? form.formName.slice(0, 21) + "…" : form.formName;
+  const nameLeft = nameRight - approxWidth(name, fs);
+  const winW = 78;
+  const winH = 32;
+  const winRight = nameLeft - 12;
+  const winX = winRight - winW;
+  const winY = baseY - 24;
+  const capRight = winX - 12;
+  return `
+    ${star}
+    <text x="${nameRight}" y="${baseY}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${form.color}" ${rightAlign(name)}>${esc(name)}</text>
+    <rect x="${winX}" y="${winY}" width="${winW}" height="${winH}" rx="${winH / 2}" fill="${form.color}"/>
+    <text x="${winX + winW / 2}" y="${winY + 22}" font-family="${FONT_BODY}" font-size="19" font-weight="800" fill="${BRAND.white}" text-anchor="middle">${winPct(form.winProb)}</text>
+    <text x="${capRight}" y="${baseY}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="start" direction="rtl">לזכות בתרחיש</text>`;
+}
+
 // One scenario row (RTL). Tier 1 (the final): a left-side "X% מההרצות" chip,
 // then — laid out from the right — the CHAMPION on a gold plate with a 🏆
 // (the universal "this one won" cue), a "vs" pill, and the runner-up muted.
 // A quiet grey rank number sits far right (gold is reserved for the champion).
-// Tier 2 (the leading form): the form name (hero, right) with its win-% pill
-// glued to its left and a short scenario-framed caption.
+// Below: one line per leading form (1–2, by admin choice).
 function renderRow(f: LikelyFinal, y: number): string {
   const L = PAD;
   const R = W - PAD;
   const innerW = R - L;
   const LL = L + CP;
   const RR = R - CP;
+  const h = rowHeight(f);
 
   // Quiet rank number (no medal colors — gold means "champion" here).
   const rcz = 36;
@@ -239,41 +290,30 @@ function renderRow(f: LikelyFinal, y: number): string {
   const pcX = LL;
   const pcY = y + 16;
 
-  // ── Tier 2: the leading form ──
-  const subY = y + 122;
-  const starW = f.favoriteIsMine ? 30 : 0;
-  const nameRight2 = RR - starW;
-  const name = f.favoriteFormName.length > 24 ? f.favoriteFormName.slice(0, 23) + "…" : f.favoriteFormName;
-  const nameLeft2 = nameRight2 - approxWidth(name, 26);
-  const winW = 84;
-  const winH = 34;
-  const winRight = nameLeft2 - 12;
-  const winX = winRight - winW;
-  const winY = subY - 25;
-  const capRight = winX - 12;
+  // Leading-form lines.
+  let formLines = "";
+  f.forms.forEach((form, k) => {
+    formLines += formLine(form, y + TIER1_H + k * FORM_LINE_H + 28, RR);
+  });
 
   return `
   <g>
-    <rect x="${L}" y="${y + 4}" width="${innerW}" height="${ROW_H}" rx="24" fill="${BRAND.border}" opacity="0.4"/>
-    <rect x="${L}" y="${y}" width="${innerW}" height="${ROW_H}" rx="24" fill="${BRAND.bg}" stroke="${BRAND.border}" stroke-width="2"/>
+    <rect x="${L}" y="${y + 4}" width="${innerW}" height="${h}" rx="24" fill="${BRAND.border}" opacity="0.4"/>
+    <rect x="${L}" y="${y}" width="${innerW}" height="${h}" rx="24" fill="${BRAND.bg}" stroke="${BRAND.border}" stroke-width="2"/>
     <circle cx="${rcCx}" cy="${rcCy}" r="${rcz / 2}" fill="${BRAND.bgSoft}"/>
     <text x="${rcCx}" y="${rcCy + 8}" font-family="${FONT_HEAD}" font-size="22" font-weight="800" fill="${BRAND.inkLight}" text-anchor="middle">${f.rank}</text>
     <rect x="${plateX}" y="${y + 22}" width="${plateRight - plateX}" height="44" rx="22" fill="${BRAND.goldSoft}"/>
     <text x="${trophyRight}" y="${my}" font-family="${FONT_BODY}" font-size="26" text-anchor="end">🏆</text>
     ${flagImg(f.champion, champFlagX, fy)}
-    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="800" fill="${BRAND.ink}" text-anchor="start" direction="rtl">${esc(champ)}</text>
+    <text x="${champNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="800" fill="${BRAND.ink}" ${rightAlign(champ)}>${esc(champ)}</text>
     <circle cx="${vsCx}" cy="${y + 44}" r="${vsR}" fill="${BRAND.bgSoft}"/>
     <text x="${vsCx}" y="${y + 49}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="middle">vs</text>
     ${flagImg(f.runnerUp, ruFlagX, fy)}
-    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="700" fill="${BRAND.inkLight}" text-anchor="start" direction="rtl">${esc(ru)}</text>
+    <text x="${ruNameRight}" y="${my}" font-family="${FONT_HEAD}" font-size="${nfs}" font-weight="700" fill="${BRAND.inkLight}" ${rightAlign(ru)}>${esc(ru)}</text>
     <rect x="${pcX}" y="${pcY}" width="${pcW}" height="${pcH}" rx="14" fill="${BRAND.primarySoft}"/>
     <text x="${pcX + pcW / 2}" y="${pcY + 24}" font-family="${FONT_HEAD}" font-size="24" font-weight="800" fill="${BRAND.primaryDark}" text-anchor="middle">${pct(f.prob)}</text>
     <text x="${pcX + pcW / 2}" y="${pcY + 40}" font-family="${FONT_BODY}" font-size="13" font-weight="700" fill="${BRAND.primaryDark}" text-anchor="middle" direction="rtl">מההרצות</text>
-    ${f.favoriteIsMine ? `<text x="${RR}" y="${subY}" font-family="${FONT_BODY}" font-size="24" font-weight="800" fill="${BRAND.gold}" text-anchor="end">★</text>` : ""}
-    <text x="${nameRight2}" y="${subY}" font-family="${FONT_HEAD}" font-size="26" font-weight="800" fill="${f.color}" text-anchor="start" direction="rtl">${esc(name)}</text>
-    <rect x="${winX}" y="${winY}" width="${winW}" height="${winH}" rx="${winH / 2}" fill="${f.color}"/>
-    <text x="${winX + winW / 2}" y="${winY + 23}" font-family="${FONT_BODY}" font-size="20" font-weight="800" fill="${BRAND.white}" text-anchor="middle">${winPct(f.favoriteWinProb)}</text>
-    <text x="${capRight}" y="${subY}" font-family="${FONT_BODY}" font-size="17" font-weight="700" fill="${BRAND.inkLight}" text-anchor="start" direction="rtl">מוביל בתרחיש</text>
+    ${formLines}
   </g>`;
 }
 
@@ -283,12 +323,8 @@ export function buildInfographicSvg(
   opts: { generatedAt?: number } = {},
 ): { svg: string; width: number; height: number } {
   const { finals } = selection;
-  const n = finals.length;
 
   const rowsTop = HEADER_H + META_H + BLOCK_GAP;
-  const rowsBlock = n > 0 ? n * ROW_H + (n - 1) * ROW_GAP : 0;
-  const footerTop = rowsTop + rowsBlock + BLOCK_GAP;
-  const H = footerTop + FOOTER_H;
 
   const generatedAt = opts.generatedAt ?? run.meta.generatedAt;
   const dateStr = new Date(generatedAt).toLocaleString("he-IL", {
@@ -299,13 +335,15 @@ export function buildInfographicSvg(
     minute: "2-digit",
   });
 
-  // Rows.
+  // Rows (each as tall as its form-line count).
   let rows = "";
   let y = rowsTop;
   for (const f of finals) {
     rows += renderRow(f, y);
-    y += ROW_H + ROW_GAP;
+    y += rowHeight(f) + ROW_GAP;
   }
+  const footerTop = (finals.length > 0 ? y - ROW_GAP : rowsTop) + BLOCK_GAP;
+  const H = footerTop + FOOTER_H;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMin meet" font-family="${FONT_BODY}" style="display:block">
   <rect x="0" y="0" width="${W}" height="${H}" fill="${BRAND.bgSoft}"/>

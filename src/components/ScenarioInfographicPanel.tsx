@@ -70,6 +70,7 @@ export default function ScenarioInfographicPanel() {
   const { user } = useCurrentUser();
   const showToast = useToast();
   const [thresholdPct, setThresholdPct] = useState<number>(DEFAULT_THRESHOLD);
+  const [formsPerScenario, setFormsPerScenario] = useState<number>(1);
   const [saving, setSaving] = useState(false);
 
   const run = state.result;
@@ -78,11 +79,12 @@ export default function ScenarioInfographicPanel() {
     if (!run || run.scenarios.length === 0) return null;
     const selection = selectLikelyScenarios(run, {
       threshold: Math.min(0.95, Math.max(0, thresholdPct / 100)),
+      formsPerScenario,
       currentUserId: user?.id || null,
     });
     const { svg, width, height } = buildInfographicSvg(run, selection);
     return { selection, svg, width, height };
-  }, [run, thresholdPct, user?.id]);
+  }, [run, thresholdPct, formsPerScenario, user?.id]);
 
   const handleSave = async () => {
     if (!built) return;
@@ -107,6 +109,24 @@ export default function ScenarioInfographicPanel() {
           </p>
         </div>
         <div className="flex items-end gap-2 shrink-0">
+          <label className="flex flex-col gap-1">
+            <span className="text-2xs text-ink-muted font-extrabold">טפסים בתרחיש</span>
+            <div className="flex rounded-lg overflow-hidden border border-ink/10">
+              {[1, 2].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setFormsPerScenario(n)}
+                  className={`px-3 py-1.5 text-2xs font-extrabold transition-colors ${
+                    formsPerScenario === n ? "bg-blue-600 text-white" : "bg-white text-ink-muted"
+                  }`}
+                  aria-pressed={formsPerScenario === n}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </label>
           <label className="flex flex-col gap-1">
             <span className="text-2xs text-ink-muted font-extrabold">סף סבירות (%)</span>
             <input
