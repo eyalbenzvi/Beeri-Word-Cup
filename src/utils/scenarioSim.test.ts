@@ -141,9 +141,13 @@ describe("runScenarioSimulation", () => {
     expect(big.trimmed).toBe(0);
     expect(big.run.scenarios.length).toBe(res.scenarios.length);
 
+    // Trimming drops scenarios but must preserve the overall aggregate.
+    expect(big.run.overall).toEqual(res.overall);
+
     const tiny = fitScenarioRunToDoc(res, 1000);
     expect(tiny.run.scenarios.length).toBeLessThanOrEqual(1);
     expect(tiny.trimmed).toBeGreaterThan(0);
+    expect(tiny.run.overall).toEqual(res.overall);
     if (tiny.run.scenarios.length === 1) {
       expect(tiny.run.scenarios[0].samples).toBe(res.scenarios[0].samples);
     }

@@ -150,7 +150,7 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
       )}
     </div>
 
-    {showRecompute && run && run.scenarios.length > 0 && (
+    {showRecompute && run && run.formOrder.length > 0 && (
       <div className="card-duo">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
           <div>
