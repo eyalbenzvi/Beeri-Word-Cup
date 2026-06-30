@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { getTeamByCode } from "../data/teams";
 import { useNavigation } from "../hooks/useNavigation";
 import ClickableName from "./ClickableName";
-import type { ScenarioRunResult, Scenario } from "../utils/scenarioSim";
+import type { ScenarioRunResult } from "../utils/scenarioSim";
 
 // ── formatting (clarity-first, per the UX review) ──
 const teamLabel = (code: string) => {
@@ -25,14 +25,22 @@ type Row = { formId: string; winProb: number; avgRank: number; avgPoints: number
 // points or average position.
 type SortKey = "win" | "points" | "rank";
 
-function ScenarioTable({
-  scenario,
+// A set of per-form metric arrays, all aligned to `run.formOrder` — exactly
+// the shape a Scenario carries, and also what the "no-scenario" overall
+// aggregate carries. Driving the table off this (rather than a Scenario)
+// lets the admin overall view reuse the identical sorting/rendering.
+type Metrics = { winProb: number[]; avgRank: number[]; avgPoints: number[] };
+
+function RankingTable({
+  metrics,
   run,
   currentUserId,
+  myLabel = "הטופס שלך בתרחיש הזה",
 }: {
-  scenario: Scenario;
+  metrics: Metrics;
   run: ScenarioRunResult;
   currentUserId?: string | null;
+  myLabel?: string;
 }) {
   const { navigate } = useNavigation();
   const [showAll, setShowAll] = useState(false);
@@ -47,9 +55,9 @@ function ScenarioTable({
   const rows: Row[] = useMemo(() => {
     const r = run.formOrder.map((formId, i) => ({
       formId,
-      winProb: scenario.winProb[i],
-      avgRank: scenario.avgRank[i],
-      avgPoints: scenario.avgPoints[i],
+      winProb: metrics.winProb[i],
+      avgRank: metrics.avgRank[i],
+      avgPoints: metrics.avgPoints[i],
     }));
     // Each sort falls back to win% so ties resolve consistently. Lower avgRank
     // is better (1 = first place), so rank sorts ascending.
@@ -61,11 +69,11 @@ function ScenarioTable({
       r.sort((a, b) => b.winProb - a.winProb || a.avgRank - b.avgRank);
     }
     return r;
-  }, [scenario, run.formOrder, sortBy]);
+  }, [metrics, run.formOrder, sortBy]);
 
   const maxWin = useMemo(
-    () => run.formOrder.reduce((m, _f, i) => Math.max(m, scenario.winProb[i]), 0.0001),
-    [scenario, run.formOrder],
+    () => run.formOrder.reduce((m, _f, i) => Math.max(m, metrics.winProb[i]), 0.0001),
+    [metrics, run.formOrder],
   );
   const myBest = useMemo(() => {
     const idx = rows.findIndex((r) => isMine(r.formId));
@@ -123,7 +131,7 @@ function ScenarioTable({
     <div className="mt-3">
       {myBest && (
         <div className="alert-primary-soft rounded-2xl p-3 mb-3" aria-live="polite">
-          <div className="text-2xs text-ink-muted font-extrabold mb-0.5">הטופס שלך בתרחיש הזה</div>
+          <div className="text-2xs text-ink-muted font-extrabold mb-0.5">{myLabel}</div>
           <div className="text-sm font-extrabold text-ink">
             {label(myBest.formId)} — סיכוי לזכייה{" "}
             <span className="text-primary-dark" style={LTR}>{winPctLabel(myBest.winProb)}</span>
@@ -265,7 +273,11 @@ export default function ScenarioExplorer({
             </div>
           )}
 
-          <ScenarioTable scenario={selected} run={run} currentUserId={currentUserId} />
+          <RankingTable
+            metrics={selected}
+            run={run}
+            currentUserId={currentUserId}
+          />
 
           <p className="text-3xs text-ink-light font-medium text-center">
             הסיכויים מחושבים רק מהתרחישים שבהם {teamLabel(selected.champion)} ניצחה את{" "}
@@ -273,6 +285,35 @@ export default function ScenarioExplorer({
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+// Admin-only "no-scenario" view: the SAME ranking table, but pooled over every
+// simulated tournament instead of conditioned on a chosen final. Shows each
+// form's overall chance to finish 1st, its average rank, and average points,
+// with the identical sorting + form-name display as the per-scenario table.
+export function ScenarioOverallTable({
+  run,
+  currentUserId,
+}: {
+  run: ScenarioRunResult;
+  currentUserId?: string | null;
+}) {
+  const overall = run.overall;
+  if (!overall || overall.avgRank.length === 0) {
+    return (
+      <p className="text-2xs text-ink-muted font-medium text-center py-3">
+        אין נתונים לטבלה הכללית — הריצו חישוב מחדש כדי ליצור אותה.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <RankingTable metrics={overall} run={run} currentUserId={currentUserId} myLabel="הטופס שלך (כל ההרצות)" />
+      <p className="text-3xs text-ink-light font-medium text-center">
+        מצרף את כל {run.meta.simCount.toLocaleString("he-IL")} ההרצות, ללא בחירת גמר. מודל Elo — הערכה, לא הימור.
+      </p>
     </div>
   );
 }
