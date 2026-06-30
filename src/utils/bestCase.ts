@@ -80,11 +80,25 @@ function buildFormPreds(form: any): FormPreds {
 // goes through this function → `calculateFullScore`. Top-scorer bonus is
 // intentionally excluded from the projection (passed as []).
 
+const STAGE_BY_ID: Record<string, string> = Object.fromEntries([
+  ...groupMatches.map((m) => [m.id, "group"]),
+  ...knockoutMatches.map((m) => [m.id, m.stage]),
+]);
+
+function withStage(trialResults: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [mid, r] of Object.entries(trialResults)) {
+    out[mid] = (r as any)?.stage ? r : { ...(r as any), stage: STAGE_BY_ID[mid] || "group" };
+  }
+  return out;
+}
+
 function scoreForms(
   forms: Record<string, any>,
   formPreds: Record<string, FormPreds>,
-  trialResults: Record<string, any>,
+  rawTrialResults: Record<string, any>,
 ): Record<string, any> {
+  const trialResults = withStage(rawTrialResults);
   const actualBracket = calcBracketTeams(trialResults);
   const actualAdvancing = deriveActualAdvancing(actualBracket, trialResults);
   const actualChampion = deriveChampion(trialResults, actualBracket);
@@ -515,6 +529,107 @@ function refineGroups(
   return best;
 }
 
+// ─── Knockout local search ────────────────────────────────────────
+// refineGroups only fires while group matches are still unplayed. The
+// dominant real-world use of this tool, though, is "group stage finished,
+// only the knockout bracket remains" — and there the round-by-round greedy
+// (optimizeKnockout) is the ONLY optimization, with no lookahead: an
+// advancing-team / scoreline choice in an early round can be locally optimal
+// yet globally worse once its downstream matchups are filled in.
+//
+// This pass adds that lookahead. For each remaining KO match it re-tries every
+// candidate result and, crucially, RE-OPTIMISES all strictly-downstream
+// remaining KO matches for that choice (their matchups depend on it), then
+// scores the FULL population. It is a strict hill-climb: a trial replaces the
+// incumbent only when it improves (rank, then target score), so the result is
+// never worse than the greedy/refineGroups output it starts from.
+
+const KO_ROUND_ORDER = ["R32", "R16", "QF", "SF", "3RD", "F"];
+const koRoundIndex = (stage: string) => KO_ROUND_ORDER.indexOf(stage);
+
+// The pass re-optimises every strictly-downstream match for each candidate of
+// each match, so its cost grows ~quadratically with the number of remaining KO
+// matches (≈37s at 16, untenable at the full 32). It is gated to the late,
+// CONSTRAINED rounds (QF onward ≈ 8 matches, a few seconds) where the greedy
+// has the least room and benefits most. With many matches still open the greedy
+// already has enough freedom to seat the target near the top, so the lookahead
+// would add seconds for negligible gain.
+const MAX_KO_REFINE = 8;
+
+function refineKnockout(
+  remKO: any[],
+  workingResults: Record<string, any>,
+  targetId: string,
+  trackedIds: string[],
+  trackedForms: Record<string, any>,
+  formPreds: Record<string, FormPreds>,
+  scoringForms: Record<string, any>,
+  scoringPreds: Record<string, FormPreds>,
+  allIds: string[],
+): Record<string, any> {
+  if (remKO.length === 0 || remKO.length > MAX_KO_REFINE) {
+    return { ...workingResults };
+  }
+
+  let best = { ...workingResults };
+  const bestScores = scoreForms(scoringForms, scoringPreds, best);
+  let bestRank = countAbove(targetId, allIds, bestScores);
+  let bestScore = bestScores[targetId]?.totalPoints ?? 0;
+
+  const ordered = [...remKO].sort(
+    (a, b) => koRoundIndex(a.stage) - koRoundIndex(b.stage),
+  );
+
+  for (let iter = 0; iter < 3; iter++) {
+    let improved = false;
+
+    for (const m of ordered) {
+      // Only matches in strictly later rounds depend on m's outcome; same-round
+      // matches are independent bracket slots, so leave them fixed.
+      const mIdx = koRoundIndex(m.stage);
+      const downstream = remKO.filter((k) => koRoundIndex(k.stage) > mIdx);
+
+      const bracket = calcBracketTeams(best);
+      const actualTeams = bracket[m.id];
+      if (!actualTeams?.home || !actualTeams?.away) continue;
+
+      const candidates = expandKnockoutCandidates(
+        getCandidates(m.id, trackedForms),
+        actualTeams,
+      );
+
+      for (const cand of candidates) {
+        const trial = { ...best, [m.id]: cand };
+        for (const d of downstream) delete trial[d.id];
+        Object.assign(
+          trial,
+          optimizeKnockout(
+            downstream, trial, targetId, trackedIds, trackedForms, formPreds,
+          ),
+        );
+
+        const trialScores = scoreForms(scoringForms, scoringPreds, trial);
+        const trialRank = countAbove(targetId, allIds, trialScores);
+        const trialScore = trialScores[targetId]?.totalPoints ?? 0;
+
+        if (
+          trialRank < bestRank ||
+          (trialRank === bestRank && trialScore > bestScore)
+        ) {
+          bestRank = trialRank;
+          bestScore = trialScore;
+          best = trial;
+          improved = true;
+        }
+      }
+    }
+
+    if (!improved) break;
+  }
+
+  return best;
+}
+
 // ─── Main entry point ─────────────────────────────────────────────
 
 export function computeBestCase(
@@ -582,7 +697,7 @@ export function computeBestCase(
     ),
   );
 
-  // ── Phase 3: iterative refinement (full-population scoring) ──
+  // ── Phase 3: iterative refinement of group shapes (full-population) ──
   onProgress?.("refine", 65);
   const refined = refineGroups(
     remGroup, remKO, workingResults,
@@ -590,9 +705,20 @@ export function computeBestCase(
     submittedForms, allFormPreds, allIds,
   );
 
+  // ── Phase 3b: knockout local search (lookahead over bracket choices) ──
+  // The key optimization once the group stage is over and only the bracket is
+  // left to play — refineGroups is a no-op then. Monotonic, so it can only
+  // match or improve `refined`.
+  onProgress?.("refine", 80);
+  const refinedKO = refineKnockout(
+    remKO, refined,
+    targetFormId, trackedIds, trackedForms, trackedPreds,
+    submittedForms, allFormPreds, allIds,
+  );
+
   // ── Phase 4: final rank against the full population ──
   onProgress?.("rank", 93);
-  const finalScores = scoreForms(submittedForms, allFormPreds, refined);
+  const finalScores = scoreForms(submittedForms, allFormPreds, refinedKO);
   const projectedRank = 1 + countAbove(targetFormId, allIds, finalScores);
   const projectedScore = finalScores[targetFormId]?.totalPoints ?? 0;
 
@@ -601,6 +727,8 @@ export function computeBestCase(
     projectedRank,
     projectedScore,
     totalForms: allIds.length,
-    bestResults: refined,
+    // Attach `stage` so the returned scenario scores identically if it is ever
+    // re-fed through the leaderboard scoring path (which keys points off it).
+    bestResults: withStage(refinedKO),
   };
 }
