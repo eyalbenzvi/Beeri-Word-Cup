@@ -220,28 +220,24 @@ const FORM_LINE_H = 44;
 const ROW_BOT = 14;
 const rowHeight = (f: LikelyFinal): number => TIER1_H + Math.max(1, f.forms.length) * FORM_LINE_H + ROW_BOT;
 
-// One leading-form line (RTL): [★ if mine] name (hero, right) · win-% pill ·
-// "לזכות בתרחיש" caption — so the pill's number is self-describing.
+// Unicode isolates: wrap a (possibly LTR) run so the surrounding RTL line never
+// reorders it. FSI auto-detects the run's own direction; PDI closes it. This is
+// what makes "Hugo" and "47%" sit in the right place with zero width math.
+const FSI = "⁦";
+const PDI = "⁩";
+const iso = (s: string) => `${FSI}${s}${PDI}`;
+
+// One leading-form line, rendered as a SINGLE right-aligned RTL text so the
+// text engine does all spacing — no width estimation, so it can't drift or
+// overlap in any font (the bug with manually-placed Latin names). Reads, from
+// the right: [★ if mine] form-name · win% · "לזכות בתרחיש". The name and its
+// win% share the form color and sit adjacent, so the number is clearly tied to
+// the form and labelled as scenario-conditional.
 function formLine(form: FavoriteForm, baseY: number, RR: number): string {
-  const fs = 25;
-  const star = form.isMine
-    ? `<text x="${RR}" y="${baseY}" font-family="${FONT_BODY}" font-size="${fs}" font-weight="800" fill="${BRAND.gold}" text-anchor="end">★</text>`
-    : "";
-  const nameRight = RR - (form.isMine ? 28 : 0);
-  const name = form.formName.length > 22 ? form.formName.slice(0, 21) + "…" : form.formName;
-  const nameLeft = nameRight - approxWidth(name, fs);
-  const winW = 78;
-  const winH = 32;
-  const winRight = nameLeft - 12;
-  const winX = winRight - winW;
-  const winY = baseY - 24;
-  const capRight = winX - 12;
+  const name = form.formName.length > 26 ? form.formName.slice(0, 25) + "…" : form.formName;
+  const star = form.isMine ? `<tspan fill="${BRAND.gold}">★ </tspan>` : "";
   return `
-    ${star}
-    <text x="${nameRight}" y="${baseY}" font-family="${FONT_HEAD}" font-size="${fs}" font-weight="800" fill="${form.color}" ${rightAlign(name)}>${esc(name)}</text>
-    <rect x="${winX}" y="${winY}" width="${winW}" height="${winH}" rx="${winH / 2}" fill="${form.color}"/>
-    <text x="${winX + winW / 2}" y="${winY + 22}" font-family="${FONT_BODY}" font-size="19" font-weight="800" fill="${BRAND.white}" text-anchor="middle">${winPct(form.winProb)}</text>
-    <text x="${capRight}" y="${baseY}" font-family="${FONT_BODY}" font-size="16" font-weight="700" fill="${BRAND.inkLight}" text-anchor="start" direction="rtl">לזכות בתרחיש</text>`;
+    <text x="${RR}" y="${baseY}" font-family="${FONT_HEAD}" font-size="25" text-anchor="start" direction="rtl">${star}<tspan font-weight="800" fill="${form.color}">${iso(esc(name))}</tspan><tspan font-weight="700" fill="${BRAND.inkLight}">  ·  </tspan><tspan font-weight="800" fill="${form.color}">${iso(winPct(form.winProb))}</tspan><tspan font-weight="700" fill="${BRAND.inkLight}" font-size="18"> לזכות בתרחיש</tspan></text>`;
 }
 
 // One scenario row (RTL). Tier 1 (the final): a left-side "X% מההרצות" chip,
