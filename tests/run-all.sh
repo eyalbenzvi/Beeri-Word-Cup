@@ -196,6 +196,7 @@ run_test "126. Breakdown Sources (ESPN/FD ET+penalty extraction + consensus reco
 run_test "127. Breakdown Scoring Invariance (golden: ET/penalties never change points/bracket)" "scoring/test-breakdown-invariance.mjs" "yes"
 run_test "128. Result Breakdown Display (shared component wired across all result surfaces)" "ui/test-result-breakdown-display.mjs" "no"
 run_test "129. Advancing Points Breakdown (נקודות עליה: per-round team count × rate + totals)" "ui/test-advancing-points-breakdown.mjs" "no"
+run_test "130. Best-Case Optimizer (projected rank/score reconciles with leaderboard; stage-tagged scenario)" "bracket/test-best-case-optimizer.mjs" "yes"
 
 echo ""
 echo "==========================================="
