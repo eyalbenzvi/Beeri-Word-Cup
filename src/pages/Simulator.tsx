@@ -41,6 +41,7 @@ export default function Simulator() {
       />
       <SimulatorPanel
         userMode
+        acceptSeed
         highlightUserId={user?.id || null}
         leaderboardLimit={0}
       />

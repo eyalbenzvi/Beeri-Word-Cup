@@ -39,6 +39,66 @@ export type BestCaseResult = {
 
 export type ProgressCallback = (phase: string, percent: number) => void;
 
+// ─── Best-case → simulator override conversion ────────────────────
+// The optimizer's `bestResults` is a full results map (already-played matches
+// + synthesised results for every remaining match). The shared SimulatorPanel
+// keeps its hypothetical edits as an `override` map that is merged OVER the
+// real results — so to seed it we only need the REMAINING (not-yet-really-
+// played) matches; the played ones are the simulator's fixed base already.
+//
+// We shape each entry exactly like SimulatorPanel.handleSaveResult produces
+// (homeTeam/awayTeam/stage/group/played, plus advancingTeam for KO draws) so a
+// seeded simulator is indistinguishable from one the user filled by hand. Team
+// codes are cosmetic (the panel re-derives display teams from the live
+// bracket), but we populate them for shape-parity. Knockout teams come from the
+// best-case bracket; group teams from the fixed fixtures.
+
+const GROUP_FIXTURE: Record<string, { home: string; away: string; group: string }> =
+  Object.fromEntries(
+    groupMatches.map((m) => [m.id, { home: m.homeTeam, away: m.awayTeam, group: m.group }]),
+  );
+
+export function bestResultsToSimulatorOverrides(
+  bestResults: Record<string, any>,
+  playedResults: Record<string, any> | null | undefined,
+): Record<string, any> {
+  const played = playedResults || {};
+  // Knockout matchups resolve from the full best-case scenario.
+  const koBracket = calcBracketTeams(bestResults);
+  const overrides: Record<string, any> = {};
+
+  for (const [matchId, r] of Object.entries(bestResults)) {
+    // Already-played matches are the simulator's fixed base — never an override.
+    if (isScoreValid(played[matchId])) continue;
+    if (!isScoreValid(r)) continue;
+
+    const stage = STAGE_BY_ID[matchId] || "group";
+    const isKO = stage !== "group";
+    const teams = isKO
+      ? koBracket[matchId] || { home: null, away: null }
+      : GROUP_FIXTURE[matchId] || { home: null, away: null };
+
+    const entry: Record<string, any> = {
+      homeTeam: teams.home ?? null,
+      awayTeam: teams.away ?? null,
+      homeScore: Number((r as any).homeScore),
+      awayScore: Number((r as any).awayScore),
+      stage,
+      group: isKO ? null : GROUP_FIXTURE[matchId]?.group ?? null,
+      played: true,
+    };
+    // Carry the tie-break winner for knockout draws so the simulator doesn't
+    // flag the match as "needs an advancing team".
+    if (isKO && entry.homeScore === entry.awayScore && (r as any).advancingTeam) {
+      entry.advancingTeam = (r as any).advancingTeam;
+      entry.needsAdvancingTeam = false;
+    }
+    overrides[matchId] = entry;
+  }
+
+  return overrides;
+}
+
 // ─── Availability gate ────────────────────────────────────────────
 // The optimizer is only offered once the group stage is fully played:
 // all 32 R32 qualifiers (winners, runners-up, best thirds) are determined

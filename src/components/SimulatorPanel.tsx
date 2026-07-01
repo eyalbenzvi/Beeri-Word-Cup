@@ -1,10 +1,12 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Sparkles, X } from "lucide-react";
 import {
   useMatchResults,
   useAllPredictions,
   useUserDirectory,
   useActualBonuses,
 } from "../hooks/useStore";
+import { takeSimulatorSeed, pickFirstSeededStage } from "../utils/simulatorSeed";
 import { useLeaderboardComputed } from "../hooks/useLeaderboardComputed";
 import { groupMatches, knockoutMatches, STAGES } from "../data/matches";
 import { GROUPS, getTeamByCode } from "../data/teams";
@@ -27,6 +29,7 @@ export default function SimulatorPanel({
   highlightUserId = null,
   showWarningBanner = true,
   userMode = false,
+  acceptSeed = false,
 }) {
   const realResults = useMatchResults();
   const allPredictions = useAllPredictions();
@@ -37,6 +40,32 @@ export default function SimulatorPanel({
   const [scoreCheckMode, setScoreCheckMode] = useState(false);
   const [selectedStage, setSelectedStage] = useState("group");
   const [selectedGroup, setSelectedGroup] = useState("A");
+  // Set when a best-case scenario was handed off from the leaderboard.
+  const [seededFromBestCase, setSeededFromBestCase] = useState(false);
+  // Guards the one-shot seed consumption against React 18 strict-mode's
+  // double-invoked effects (and any incidental re-run).
+  const seedConsumedRef = useRef(false);
+
+  // Consume a best-case scenario handed off via the simulatorSeed channel.
+  // Gated on `acceptSeed` so only the user-facing Simulator page picks it up —
+  // the admin simulator never grabs a stray seed. `takeSimulatorSeed` clears
+  // the holder, so this applies exactly once.
+  useEffect(() => {
+    if (!acceptSeed || seedConsumedRef.current) return;
+    seedConsumedRef.current = true;
+    const seed = takeSimulatorSeed();
+    if (!seed || Object.keys(seed).length === 0) return;
+    setScoreCheckMode(false); // scenario is a full-scoring "what-if", not score-check
+    setOverride(seed);
+    setSeededFromBestCase(true);
+    // Jump the stage selector to the earliest round that actually carries a
+    // seeded result so the loaded matches are visible without hunting.
+    const firstStage = pickFirstSeededStage(seed);
+    if (firstStage) {
+      setSelectedStage(firstStage.stage);
+      if (firstStage.group) setSelectedGroup(firstStage.group);
+    }
+  }, [acceptSeed]);
   const [editingMatch, setEditingMatch] = useState(null);
   const [editScores, setEditScores] = useState({
     homeScore: "",
@@ -81,6 +110,7 @@ export default function SimulatorPanel({
   const switchMode = useCallback((checkMode) => {
     setScoreCheckMode(checkMode);
     setOverride({});
+    setSeededFromBestCase(false);
     setEditingMatch(null);
     setEditScores({ homeScore: "", awayScore: "" });
   }, []);
@@ -94,7 +124,10 @@ export default function SimulatorPanel({
     });
   }, []);
 
-  const clearSim = () => setOverride({});
+  const clearSim = () => {
+    setOverride({});
+    setSeededFromBestCase(false);
+  };
 
   const STAGES_LIST = useMemo(() => ({ all: "הכל", ...STAGES }), []);
 
@@ -195,6 +228,26 @@ export default function SimulatorPanel({
 
   return (
     <div className="space-y-3">
+      {seededFromBestCase && overrideCount > 0 && (
+        <div
+          className="border-2 rounded-2xl p-3 text-sm font-medium flex items-start gap-2"
+          style={{ background: "var(--color-primary-soft)", borderColor: "var(--color-primary)", color: "var(--color-primary-dark)" }}
+        >
+          <Sparkles size={18} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <strong>התרחיש המיטבי נטען.</strong> אלה התוצאות שמביאות אותך למיקום
+            הגבוה ביותר. שנה תוצאות כדי לראות איך זה משפיע עליך ועל שאר המתמודדים.
+          </div>
+          <button
+            type="button"
+            onClick={clearSim}
+            className="flex-shrink-0 bg-transparent border-none text-primary-dark cursor-pointer p-0.5 hover:opacity-70"
+            aria-label="נקה תרחיש"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {showWarningBanner && (
         <div
           className="border-2 rounded-2xl p-3 text-sm font-medium"
