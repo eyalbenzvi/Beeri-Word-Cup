@@ -103,6 +103,11 @@ export default function SimulatorPanel({
 
   const setOverrideResult = useCallback((matchId, result) => {
     setOverride((o) => ({ ...o, [matchId]: result }));
+    // The "best-case scenario loaded" banner describes the scenario AS HANDED
+    // OFF. The moment the user hand-edits any match the map is no longer the
+    // pristine best-case, so drop the banner (otherwise it could reappear
+    // claiming a user-entered result is the optimal one).
+    setSeededFromBestCase(false);
   }, []);
 
   // Clear entered results on mode switch: a knockout override's team metadata
@@ -122,6 +127,9 @@ export default function SimulatorPanel({
       delete next[matchId];
       return next;
     });
+    // Removing a seeded match also diverges from the pristine best-case — see
+    // setOverrideResult.
+    setSeededFromBestCase(false);
   }, []);
 
   const clearSim = () => {

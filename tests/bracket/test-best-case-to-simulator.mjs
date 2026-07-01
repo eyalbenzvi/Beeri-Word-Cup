@@ -212,6 +212,15 @@ console.log("--- 5. Static wiring ---");
   assert(/takeSimulatorSeed/.test(sim), "SimulatorPanel consumes the seed");
   assert(/acceptSeed/.test(sim), "SimulatorPanel gates seeding on acceptSeed");
   assert(/seedConsumedRef/.test(sim), "SimulatorPanel guards one-shot consumption (strict-mode safe)");
+  // The "scenario loaded" banner must drop the moment the map diverges from the
+  // pristine seed (any manual edit or per-match clear), so it can never
+  // reappear labelling a hand-entered result as the optimum.
+  {
+    const clearOneBody = sim.slice(sim.indexOf("const clearOne"), sim.indexOf("const clearSim"));
+    const setResultBody = sim.slice(sim.indexOf("const setOverrideResult"), sim.indexOf("const switchMode"));
+    assert(/setSeededFromBestCase\(false\)/.test(clearOneBody), "clearOne drops the best-case banner flag");
+    assert(/setSeededFromBestCase\(false\)/.test(setResultBody), "manual edit (setOverrideResult) drops the best-case banner flag");
+  }
 
   const page = readMigratedSrc("src/pages/Simulator.tsx");
   assert(/acceptSeed/.test(page), "Simulator page opts into seeding");

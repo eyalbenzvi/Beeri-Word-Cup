@@ -165,6 +165,12 @@ export default function BestCasePanel({ formId, onReset }: Props) {
   // Hand the optimised scenario off to the shared simulator and jump there.
   // Only the still-unplayed matches become simulator overrides — the already-
   // played matches are the simulator's fixed base.
+  //
+  // Rank/score in the simulator match this panel's projection exactly, with one
+  // caveat: the projection here excludes the top-scorer bonus ("ללא מלך שערים"),
+  // while the simulator scores with the real locked bonuses. They only diverge
+  // if a top scorer has already been officially set — which, since the optimizer
+  // is admin-gated to the post-group-stage window, normally hasn't happened yet.
   const openInSimulator = () => {
     const overrides = bestResultsToSimulatorOverrides(bestResults, realResults);
     setSimulatorSeed(overrides);
