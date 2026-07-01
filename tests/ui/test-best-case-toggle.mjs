@@ -104,6 +104,19 @@ console.log("--- 6. Static wiring ---");
   assert(/useSettings/.test(hook), "useBestCase reads settings via useSettings");
   assert(!/isBestCaseAvailable/.test(hook), "useBestCase no longer uses the old auto group-stage gate");
 
+  // Worker-failure resilience: module Web Workers fail to load on some
+  // browsers (iOS Safari / in-app WebViews), erroring on EVERY run. The hook
+  // must (a) fall back to computing on the main thread instead of showing a
+  // permanent error, and (b) report the failure to Sentry so it is diagnosable
+  // (previously the worker's error message was silently discarded).
+  assert(/runOnMainThread/.test(hook), "useBestCase has a main-thread fallback");
+  assert(/import\(["'][^"']*bestCase["']\)/.test(hook), "fallback dynamically imports computeBestCase (kept out of main bundle)");
+  assert(/worker\.onerror/.test(hook), "useBestCase handles worker.onerror (module-load failure)");
+  assert(/captureClientMessage|captureClientError/.test(hook), "useBestCase reports worker failures to Sentry");
+  // The onerror / worker-error paths must route to the fallback, not straight
+  // to a dead error state.
+  assert(/onerror[\s\S]{0,120}runOnMainThread/.test(hook), "worker.onerror routes to the main-thread fallback");
+
   const admin = readMigratedSrc("src/components/AdminSettingsTab.jsx");
   // Lenient on formatting/whitespace: assert the handler hands a TOGGLED
   // bestCaseEnabled to updateSettings, without pinning exact spacing.
