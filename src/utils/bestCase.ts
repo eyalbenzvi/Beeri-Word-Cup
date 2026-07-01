@@ -39,6 +39,92 @@ export type BestCaseResult = {
 
 export type ProgressCallback = (phase: string, percent: number) => void;
 
+// ─── Worker-payload sanitization ──────────────────────────────────
+// The optimizer runs in a Web Worker, so its inputs (`allForms`,
+// `playedResults`) must survive `postMessage`'s structured clone. Those maps
+// come STRAIGHT off the Firestore-backed store (`docSnap.data()`), whose values
+// are outside our control: a legacy doc, a future field, or an unexpected class
+// instance can carry something structured-clone chokes on (functions, proxies,
+// DOM-ish objects) — a `DataCloneError` that throws on EVERY postMessage and is
+// impossible to reproduce with synthetic data. Even values that clone (a
+// Firestore Timestamp) arrive prototype-stripped, so the worker could see a
+// subtly different object than the main thread.
+//
+// The fix: before we ever hand data to the worker (or to the main-thread
+// fallback), project both maps down to a PLAIN, JSON-safe shape containing ONLY
+// the fields the compute graph reads — per match `homeScore` / `awayScore` /
+// `advancingTeam` / `stage`, per form `status` + `matches`. This makes the
+// payload provably cloneable, and guarantees the worker and the fallback score
+// byte-identical inputs. `null`/`undefined`/non-object entries are preserved as
+// harmless empties so the search's `!playedResults[id]` and `isScoreValid`
+// checks behave exactly as before.
+//
+// Every field carried here is verified against the readers: bracket.ts /
+// scoring.ts / deriveChampion read nothing else off a match, and buildFormPreds
+// re-derives `advancing`/`champion` from `matches` (so a form's persisted copies
+// are intentionally dropped — they're recomputed anyway).
+
+// Numeric-ish scores are copied verbatim (number | string | null | undefined) —
+// the compute graph coerces them itself (isScoreValid, Number(...)), and
+// preserving the original type keeps sanitized data behaviourally identical to
+// the raw store data the main thread used to consume directly.
+function sanitizeMatchEntry(m: any): Record<string, any> {
+  if (!m || typeof m !== "object") return {};
+  const out: Record<string, any> = {
+    homeScore: m.homeScore ?? null,
+    awayScore: m.awayScore ?? null,
+  };
+  if (m.advancingTeam != null) out.advancingTeam = m.advancingTeam;
+  if (m.stage != null) out.stage = m.stage;
+  return out;
+}
+
+function sanitizeMatchMap(matches: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (matches && typeof matches === "object") {
+    for (const [id, m] of Object.entries(matches)) {
+      out[id] = sanitizeMatchEntry(m);
+    }
+  }
+  return out;
+}
+
+// Project the store's forms map to the minimal, structured-cloneable shape the
+// optimizer needs. Preserves the SET of form ids (so ranking/relevant-form
+// filtering is unchanged) and each form's `status` + sanitized `matches`.
+export function sanitizeFormsForWorker(
+  allForms: Record<string, any> | null | undefined,
+): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (allForms && typeof allForms === "object") {
+    for (const [formId, form] of Object.entries(allForms)) {
+      const f = (form as any) || {};
+      out[formId] = {
+        status: typeof f.status === "string" ? f.status : undefined,
+        matches: sanitizeMatchMap(f.matches),
+      };
+    }
+  }
+  return out;
+}
+
+// Project the store's played-results map to the minimal, cloneable shape.
+export function sanitizeResultsForWorker(
+  playedResults: Record<string, any> | null | undefined,
+): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (playedResults && typeof playedResults === "object") {
+    for (const [id, r] of Object.entries(playedResults)) {
+      // Preserve falsy/non-object entries AS-IS (null/undefined). computeBestCase
+      // keys "is this match still open?" off `!playedResults[id]`, so a null
+      // placeholder row must stay falsy — replacing it with `{}` would flip the
+      // match from "remaining" to "played" and change the search.
+      out[id] = r && typeof r === "object" ? sanitizeMatchEntry(r) : (r ?? null);
+    }
+  }
+  return out;
+}
+
 // ─── Best-case → simulator override conversion ────────────────────
 // The optimizer's `bestResults` is a full results map (already-played matches
 // + synthesised results for every remaining match). The shared SimulatorPanel

@@ -21,7 +21,11 @@ import { predictScenario } from "/home/user/Beeri-World-Cup/src/utils/scenarioPr
 import { groupMatches, knockoutMatches } from "/home/user/Beeri-World-Cup/src/data/matches.ts";
 import { calcBracketTeams } from "/home/user/Beeri-World-Cup/src/utils/bracket.ts";
 import { GROUPS } from "/home/user/Beeri-World-Cup/src/data/teams.ts";
-import { computeBestCase } from "/home/user/Beeri-World-Cup/src/utils/bestCase.ts";
+import {
+  computeBestCase,
+  sanitizeFormsForWorker,
+  sanitizeResultsForWorker,
+} from "/home/user/Beeri-World-Cup/src/utils/bestCase.ts";
 import {
   computeScoredForms,
   assignDenseRanks,
@@ -175,6 +179,120 @@ console.log("--- 4. Static wiring (stage normalisation stays in place) ---");
   // mis-scored as group + the wrong-matchup gate is enforced).
   assert(/const trialResults = withStage\(/.test(src), "scoreForms normalises stage on trial results before scoring");
   assert(/bestResults: withStage\(/.test(src), "computeBestCase returns stage-tagged bestResults");
+}
+
+// ── 5. Worker-payload sanitization ────────────────────────────────
+// The optimizer's inputs come straight off the Firestore-backed store and are
+// handed to a Web Worker via postMessage (structured clone). A single
+// non-cloneable value (function/DOM/proxy) in a real form throws a
+// DataCloneError on EVERY run — the production every-device failure. The
+// sanitizer projects both maps to a plain, cloneable, JSON-safe shape holding
+// only the scoring-relevant fields, and MUST NOT change the computed result.
+console.log("--- 5. Worker-payload sanitization ---");
+{
+  const forms = genForms(20);
+  // Inject production-messy, non-cloneable + Firestore-ish noise into a form.
+  forms.f0.__handler = () => 1;              // functions break structuredClone
+  forms.f0.submittedAt = new Date();          // class instance (prototype-stripped on clone)
+  forms.f0.advancing = { A: ["X"] };          // persisted derived field (recomputed → droppable)
+  forms.f0.champion = "BRA";
+  forms.f3.status = "approved";               // approved forms are included too
+
+  const actual = fullResults(allCodes[2], allCodes[15]);
+  // Post-group-stage shape (the gate the feature runs under): all group matches
+  // played, only the bracket remains — plus noisy result rows.
+  const played = {};
+  for (const id of Object.keys(actual)) {
+    if (stageOf[id] === "group") {
+      played[id] = { ...actual[id], source: "auto", updatedAt: "x", extra: { nested: 1 } };
+    }
+  }
+  // A couple of played R32 rows + a null placeholder (must stay "open").
+  let n = 0;
+  for (const m of knockoutMatches) {
+    if (m.stage !== "R32" || n++ >= 4) continue;
+    played[m.id] = { ...actual[m.id], source: "admin" };
+  }
+  played["R32-9"] = null;
+
+  const raw = computeBestCase("f0", forms, played);
+  const safeForms = sanitizeFormsForWorker(forms);
+  const safeResults = sanitizeResultsForWorker(played);
+  const san = computeBestCase("f0", safeForms, safeResults);
+
+  // (a) Parity: identical projection from raw vs. sanitized inputs.
+  assert(
+    raw && san &&
+      raw.projectedRank === san.projectedRank &&
+      raw.projectedScore === san.projectedScore &&
+      raw.totalForms === san.totalForms &&
+      Object.keys(raw.bestResults).length === Object.keys(san.bestResults).length,
+    "sanitized inputs produce IDENTICAL best-case results (parity)",
+  );
+
+  // (b) The raw payload is NOT structured-cloneable (proves the hazard is real).
+  let rawCloneable = true;
+  try { structuredClone({ allForms: forms, playedResults: played }); }
+  catch { rawCloneable = false; }
+  assert(!rawCloneable, "raw store payload with a function value fails structuredClone (the production hazard)");
+
+  // (c) The sanitized payload IS structured-cloneable (the fix).
+  let sanCloneable = true;
+  try { structuredClone({ allForms: safeForms, playedResults: safeResults }); }
+  catch (e) { sanCloneable = false; console.error("    sanitized clone threw: " + e.message); }
+  assert(sanCloneable, "sanitized payload survives structuredClone (postMessage-safe)");
+
+  // (d) Sanitizer strips non-scoring fields but preserves status + matches.
+  const sf0 = safeForms.f0;
+  assert(!("__handler" in sf0) && !("submittedAt" in sf0) && !("createdAt" in sf0) &&
+         !("advancing" in sf0) && !("champion" in sf0) && !("userId" in sf0),
+    "sanitized form drops non-scoring fields (functions, timestamps, derived, userId)");
+  assert(sf0.status === "submitted" && safeForms.f3.status === "approved",
+    "sanitized form preserves status (submitted + approved)");
+  const sampleMid = Object.keys(sf0.matches)[0];
+  assert(sampleMid && "homeScore" in sf0.matches[sampleMid] && "awayScore" in sf0.matches[sampleMid],
+    "sanitized form matches preserve homeScore/awayScore");
+
+  // (e) The set of form ids is preserved exactly (ranking population unchanged).
+  assert(Object.keys(safeForms).sort().join(",") === Object.keys(forms).sort().join(","),
+    "sanitizer preserves the full set of form ids");
+
+  // (f) Result rows: scoring fields kept, noise stripped, null placeholder kept falsy.
+  const someGroupId = groupMatches[0].id;
+  assert("homeScore" in safeResults[someGroupId] && "awayScore" in safeResults[someGroupId] &&
+         !("extra" in safeResults[someGroupId]) && !("source" in safeResults[someGroupId]) &&
+         !("updatedAt" in safeResults[someGroupId]),
+    "sanitized results keep scores, drop noise (source/updatedAt/nested)");
+  assert(!safeResults["R32-9"],
+    "sanitizer preserves a null result placeholder as falsy (match stays open)");
+}
+
+// ── 6. Static wiring: hook sanitizes + guards postMessage + panel boundary ──
+console.log("--- 6. Static wiring (sanitization + graceful degradation) ---");
+{
+  const src = readMigratedSrc("src/utils/bestCase.ts");
+  assert(/export function sanitizeFormsForWorker/.test(src), "bestCase exports sanitizeFormsForWorker");
+  assert(/export function sanitizeResultsForWorker/.test(src), "bestCase exports sanitizeResultsForWorker");
+
+  const hook = readMigratedSrc("src/hooks/useBestCase.ts");
+  assert(/sanitizeFormsForWorker\(allForms\)/.test(hook), "hook sanitizes forms before use");
+  assert(/sanitizeResultsForWorker\(matchResults\)/.test(hook), "hook sanitizes results before use");
+  // postMessage must send the sanitized payload, wrapped in try/catch → fallback.
+  assert(/allForms:\s*safeForms/.test(hook) && /playedResults:\s*safeResults/.test(hook),
+    "hook posts the SANITIZED payload to the worker");
+  assert(/try\s*\{[\s\S]*worker\.postMessage[\s\S]*\}\s*catch/.test(hook),
+    "hook wraps postMessage in try/catch");
+  assert(/runOnMainThread\("postmessage-failed"\)/.test(hook),
+    "hook routes a postMessage failure to the main-thread fallback");
+  // The main-thread fallback must use the SAME sanitized data.
+  assert(/computeBestCase\(formId,\s*safeForms,\s*safeResults/.test(hook),
+    "main-thread fallback uses the sanitized data (identical to the worker)");
+
+  const panel = readMigratedSrc("src/components/BestCasePanel.tsx");
+  assert(/getDerivedStateFromError/.test(panel),
+    "BestCasePanel is wrapped in an error boundary (render throws hide the feature)");
+  assert(/<BestCasePanelInner/.test(panel) && /BestCasePanelBoundary/.test(panel),
+    "default export wraps the inner panel in the feature-local boundary");
 }
 
 console.log(`\n=== BEST-CASE OPTIMIZER RESULTS: ${passed} passed, ${failed} failed ===`);
