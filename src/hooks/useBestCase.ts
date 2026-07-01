@@ -105,10 +105,15 @@ export function useBestCase(formId: string | null): {
 
     // Project the store data down to a plain, structured-cloneable, JSON-safe
     // shape BEFORE it touches either the worker (postMessage) or the fallback.
-    // The raw maps come straight off Firestore (`docSnap.data()`), so an
-    // unexpected value could throw a DataCloneError on postMessage on every run;
-    // sanitizing removes that hazard and guarantees the worker and the
-    // main-thread fallback score byte-identical inputs. See bestCase.ts.
+    // Two reasons: (1) it guarantees the worker and the main-thread fallback
+    // score BYTE-IDENTICAL inputs; (2) defense-in-depth — the raw maps come
+    // straight off Firestore (`docSnap.data()`), and while the current data
+    // model is all JSON-safe (timestamps are stored as ISO strings), a future
+    // or legacy field carrying a non-cloneable value would otherwise throw a
+    // DataCloneError on postMessage. This is NOT a confirmed diagnosis of the
+    // observed every-run failure — the likelier cause is the worker chunk
+    // failing to load in production; watch the `bestcase-worker-fallback`
+    // Sentry signal (with its `kind`) to confirm which. See bestCase.ts.
     const safeForms = sanitizeFormsForWorker(allForms);
     const safeResults = sanitizeResultsForWorker(matchResults);
 
@@ -156,22 +161,39 @@ export function useBestCase(formId: string | null): {
     // terminal message, and the fallback must not race the worker).
     let settled = false;
 
-    // Main-thread fallback. Module Web Workers fail to load in some browsers
-    // (notably iOS Safari / in-app WebViews), where the worker errors on every
-    // run and the feature is permanently stuck on "error". The optimizer is
-    // admin-gated to the post-group-stage window, where the search is small
-    // enough (greedy knockout, refinement capped at ≤8 open matches) to run
-    // inline without freezing the UI. `bestCase` is dynamically imported so it
-    // stays out of the main bundle until this fallback actually fires.
-    const runOnMainThread = (reason: string) => {
+    // Main-thread fallback for when the worker path fails. `kind` classifies WHY
+    // so production telemetry can tell apart the cases (crucial — the reviewer
+    // flagged that an every-run failure most likely means the worker CHUNK never
+    // loads, not that anything is wrong with the inputs):
+    //   • "load-failure"       — worker.onerror: the module chunk failed to
+    //                            load/parse (stale deploy, MIME, in-app WebView).
+    //                            This is the prime suspect for the reported bug.
+    //   • "runtime-error"      — the worker ran but computeBestCase threw.
+    //   • "construct-failure"  — `new Worker()` threw synchronously.
+    //   • "postmessage-failure"— structured-clone/postMessage threw.
+    //
+    // The fallback runs computeBestCase inline (bestCase is dynamically imported
+    // to stay out of the main bundle). IMPORTANT: it does so ONLY when the group
+    // stage is complete (isBestCaseAvailable). Before that the search includes a
+    // 3^k-per-group enumeration that would block the tab for seconds — so if the
+    // worker is unavailable in that window we surface a clean error instead of
+    // freezing the UI. The worker remains the only path that can run the heavy
+    // pre-group-stage search.
+    const runOnMainThread = (kind: string, reason: string) => {
       if (settled) return;
       settled = true;
       workerRef.current?.terminate();
       workerRef.current = null;
-      captureClientMessage("bestcase-worker-fallback", { reason }, "warning");
+      captureClientMessage("bestcase-worker-fallback", { kind, reason }, "warning");
       import("../utils/bestCase")
-        .then(({ computeBestCase }) => {
+        .then(({ computeBestCase, isBestCaseAvailable }) => {
           if (!mountedRef.current) return;
+          if (!isBestCaseAvailable(safeResults)) {
+            // Heavy search + no worker → refuse to block the main thread.
+            captureClientMessage("bestcase-fallback-skipped-heavy", { kind, reason }, "warning");
+            showError();
+            return;
+          }
           const result = computeBestCase(formId, safeForms, safeResults, onProgress);
           if (!mountedRef.current) return;
           if (!result) {
@@ -184,7 +206,7 @@ export function useBestCase(formId: string | null): {
         .catch((err) => {
           captureClientError(
             err instanceof Error ? err : new Error(String(err)),
-            { feature: "bestCase", stage: "mainThreadFallback", reason },
+            { feature: "bestCase", stage: "mainThreadFallback", kind, reason },
           );
           showError();
         });
@@ -198,8 +220,7 @@ export function useBestCase(formId: string | null): {
       );
     } catch (err) {
       // Some engines throw synchronously on module-worker construction.
-      captureClientMessage("bestcase-worker-unavailable", { reason: String(err) }, "warning");
-      runOnMainThread("worker-construct-failed");
+      runOnMainThread("construct-failure", String(err));
       return;
     }
     workerRef.current = worker;
@@ -224,24 +245,25 @@ export function useBestCase(formId: string | null): {
         }
         succeed(e.data.result);
       } else if (type === "error") {
-        // The worker's own try/catch caught a runtime error. Retry on the main
-        // thread so a transient/worker-only failure still yields a result; a
-        // genuine logic bug will rethrow there and be captured with a real stack.
-        runOnMainThread(`worker-error: ${e.data.message || "unknown"}`);
+        // The worker ran but computeBestCase threw. Retry on the main thread so
+        // a transient/worker-only failure still yields a result; a genuine logic
+        // bug will rethrow there and be captured with a real stack.
+        runOnMainThread("runtime-error", e.data.message || "unknown");
       }
     };
 
-    // Fires when the worker module itself fails to load/parse (the iOS case).
+    // Fires when the worker module itself fails to load/parse — the PRIME
+    // SUSPECT for the reported every-device/every-run failure.
     worker.onerror = (e) => {
-      runOnMainThread(`worker-onerror: ${(e as ErrorEvent)?.message || "unknown"}`);
+      runOnMainThread("load-failure", (e as ErrorEvent)?.message || "unknown");
     };
 
     // postMessage can throw synchronously (a structured-clone failure the
     // sanitizer somehow didn't cover, or an engine quirk). An uncaught throw
     // here would abandon the run mid-"prep" with the spinner stuck forever, so
-    // route any failure straight into the main-thread fallback (same as a
-    // worker onerror). Sanitized data means this realistically never fires, but
-    // the feature must degrade gracefully rather than trap the user.
+    // route any failure straight into the main-thread fallback. Sanitized data
+    // means this realistically never fires, but the feature must degrade
+    // gracefully rather than trap the user.
     try {
       worker.postMessage({
         targetFormId: formId,
@@ -249,12 +271,7 @@ export function useBestCase(formId: string | null): {
         playedResults: safeResults,
       });
     } catch (err) {
-      captureClientMessage(
-        "bestcase-postmessage-failed",
-        { reason: String(err) },
-        "warning",
-      );
-      runOnMainThread("postmessage-failed");
+      runOnMainThread("postmessage-failure", String(err));
     }
   }, [formId, available, allForms, matchResults, safeSetState]);
 

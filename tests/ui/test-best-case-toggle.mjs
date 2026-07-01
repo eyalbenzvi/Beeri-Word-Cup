@@ -102,13 +102,17 @@ console.log("--- 6. Static wiring ---");
   const hook = readMigratedSrc("src/hooks/useBestCase.ts");
   assert(/bestCaseEnabled\s*===\s*true/.test(hook), "useBestCase gates on settings.bestCaseEnabled === true");
   assert(/useSettings/.test(hook), "useBestCase reads settings via useSettings");
-  assert(!/isBestCaseAvailable/.test(hook), "useBestCase no longer uses the old auto group-stage gate");
+  // The availability GATE is the admin flag alone (not the old auto group-stage
+  // check). isBestCaseAvailable is still referenced in the hook — but only to
+  // guard the main-thread FALLBACK below — so assert the gate line specifically
+  // rather than banning the symbol outright.
+  assert(/const available = settings\?\.bestCaseEnabled === true/.test(hook), "availability gate is the admin flag alone");
+  assert(!/available\s*=\s*[^;]*isBestCaseAvailable/.test(hook), "availability gate does not depend on isBestCaseAvailable");
 
-  // Worker-failure resilience: module Web Workers fail to load on some
-  // browsers (iOS Safari / in-app WebViews), erroring on EVERY run. The hook
-  // must (a) fall back to computing on the main thread instead of showing a
-  // permanent error, and (b) report the failure to Sentry so it is diagnosable
-  // (previously the worker's error message was silently discarded).
+  // Worker-failure resilience: an every-run failure most likely means the worker
+  // CHUNK never loaded (not a bad input). The hook must (a) fall back to
+  // computing on the main thread instead of showing a permanent error, and
+  // (b) report the failure to Sentry, classified by kind, so it is diagnosable.
   assert(/runOnMainThread/.test(hook), "useBestCase has a main-thread fallback");
   assert(/import\(["'][^"']*bestCase["']\)/.test(hook), "fallback dynamically imports computeBestCase (kept out of main bundle)");
   assert(/worker\.onerror/.test(hook), "useBestCase handles worker.onerror (module-load failure)");
@@ -116,6 +120,13 @@ console.log("--- 6. Static wiring ---");
   // The onerror / worker-error paths must route to the fallback, not straight
   // to a dead error state.
   assert(/onerror[\s\S]{0,120}runOnMainThread/.test(hook), "worker.onerror routes to the main-thread fallback");
+  // Fallback safety: it must refuse a HEAVY (pre-group-stage) search so a
+  // worker-less client can't freeze the tab on the 3^k-per-group enumeration.
+  assert(/isBestCaseAvailable\(safeResults\)/.test(hook), "main-thread fallback gates on isBestCaseAvailable (no UI freeze)");
+  assert(/bestcase-fallback-skipped-heavy/.test(hook), "fallback reports when it skips a heavy search");
+  // Failure kinds are classified for prod telemetry (load vs runtime vs …).
+  assert(/["']load-failure["']/.test(hook) && /["']runtime-error["']/.test(hook), "fallback classifies worker load-failure vs runtime-error for Sentry");
+  assert(/sanitizeFormsForWorker/.test(hook) && /sanitizeResultsForWorker/.test(hook), "useBestCase sanitizes the worker payload");
 
   const admin = readMigratedSrc("src/components/AdminSettingsTab.jsx");
   // Lenient on formatting/whitespace: assert the handler hands a TOGGLED

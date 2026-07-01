@@ -42,22 +42,28 @@ export type ProgressCallback = (phase: string, percent: number) => void;
 // ─── Worker-payload sanitization ──────────────────────────────────
 // The optimizer runs in a Web Worker, so its inputs (`allForms`,
 // `playedResults`) must survive `postMessage`'s structured clone. Those maps
-// come STRAIGHT off the Firestore-backed store (`docSnap.data()`), whose values
-// are outside our control: a legacy doc, a future field, or an unexpected class
-// instance can carry something structured-clone chokes on (functions, proxies,
-// DOM-ish objects) — a `DataCloneError` that throws on EVERY postMessage and is
-// impossible to reproduce with synthetic data. Even values that clone (a
-// Firestore Timestamp) arrive prototype-stripped, so the worker could see a
-// subtly different object than the main thread.
+// come STRAIGHT off the Firestore-backed store (`docSnap.data()`).
 //
-// The fix: before we ever hand data to the worker (or to the main-thread
-// fallback), project both maps down to a PLAIN, JSON-safe shape containing ONLY
-// the fields the compute graph reads — per match `homeScore` / `awayScore` /
-// `advancingTeam` / `stage`, per form `status` + `matches`. This makes the
-// payload provably cloneable, and guarantees the worker and the fallback score
-// byte-identical inputs. `null`/`undefined`/non-object entries are preserved as
-// harmless empties so the search's `!playedResults[id]` and `isScoreValid`
-// checks behave exactly as before.
+// NOTE on intent — this is DEFENSE-IN-DEPTH + input parity, NOT a confirmed
+// diagnosis. The current data model is entirely JSON-safe (timestamps are
+// stored as ISO strings; no Firestore Timestamp/GeoPoint/DocumentReference is
+// persisted on form/result docs), so a `DataCloneError` on this payload is not
+// something we have observed. What sanitization DOES buy us:
+//   1. Parity — the worker and the main-thread fallback score byte-identical
+//      inputs (no prototype-stripping / field-ordering differences between the
+//      two paths).
+//   2. Future-proofing — if a legacy or future field ever carries a
+//      non-cloneable value (a function/proxy), it is dropped here instead of
+//      throwing on postMessage.
+// The far likelier cause of the reported every-run failure is the worker chunk
+// itself failing to load in production; that is handled by the fallback +
+// `bestcase-worker-fallback` Sentry signal in useBestCase, not here.
+//
+// The projection keeps ONLY the fields the compute graph reads — per match
+// `homeScore` / `awayScore` / `advancingTeam` / `stage`, per form `status` +
+// `matches`. `null`/`undefined`/non-object entries are preserved as harmless
+// empties so the search's `!playedResults[id]` and `isScoreValid` checks behave
+// exactly as before.
 //
 // Every field carried here is verified against the readers: bracket.ts /
 // scoring.ts / deriveChampion read nothing else off a match, and buildFormPreds
