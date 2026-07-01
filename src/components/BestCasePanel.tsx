@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState } from "react";
 import { Sparkles, X, Gamepad2 } from "lucide-react";
 import { useBestCase } from "../hooks/useBestCase";
 import { useMatchResults } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { bestResultsToSimulatorOverrides } from "../utils/bestCase";
 import { setSimulatorSeed } from "../utils/simulatorSeed";
+import { captureClientError } from "../sentry";
 import FormMatchesView from "./FormMatchesView";
 
 type Props = {
@@ -84,7 +85,7 @@ function ScenarioOverlay({
   );
 }
 
-export default function BestCasePanel({ formId, onReset }: Props) {
+function BestCasePanelInner({ formId, onReset }: Props) {
   const { state, compute, reset, available } = useBestCase(formId);
   const realResults = useMatchResults();
   const { navigate } = useNavigation();
@@ -236,5 +237,68 @@ export default function BestCasePanel({ formId, onReset }: Props) {
         />
       )}
     </div>
+  );
+}
+
+// Feature-local error boundary. The best-case optimizer is an OPTIONAL extra on
+// the Leaderboard: a render-time throw inside it (or its scenario overlay) must
+// NEVER take down the surrounding leaderboard page. React's ErrorBoundary only
+// catches render/lifecycle errors — the async worker/postMessage failures are
+// already handled inside useBestCase (which degrades to a clean "try again"
+// state, never an infinite spinner) — so this boundary is the last line of
+// defense for the synchronous render path. On error it hides the feature
+// cleanly (a single unobtrusive line, no page-breaking fallback) and reports
+// to Sentry. `resetKey={formId}` clears the error when the user navigates to a
+// different form, so a transient fault doesn't disable the panel forever.
+class BestCasePanelBoundary extends Component<
+  { formId: string; children?: any },
+  { hasError: boolean }
+> {
+  constructor(props: { formId: string; children?: any }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidUpdate(prevProps: { formId: string }) {
+    if (this.state.hasError && prevProps.formId !== this.props.formId) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  componentDidCatch(error: Error, info: { componentStack?: string }) {
+    try {
+      captureClientError(error, {
+        feature: "bestCase",
+        stage: "render",
+        componentStack: info?.componentStack || null,
+      });
+    } catch {
+      // דיווח לעולם לא ישבור את הרינדור
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mt-3 pt-3 border-t border-border">
+          <p className="text-xs text-ink-muted font-medium text-center">
+            חישוב התרחיש המיטבי אינו זמין כרגע.
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function BestCasePanel({ formId, onReset }: Props) {
+  return (
+    <BestCasePanelBoundary formId={formId}>
+      <BestCasePanelInner formId={formId} onReset={onReset} />
+    </BestCasePanelBoundary>
   );
 }

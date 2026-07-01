@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { BestCaseResult } from "../utils/bestCase";
+import { sanitizeFormsForWorker, sanitizeResultsForWorker } from "../utils/bestCase";
 import { useAllPredictions, useMatchResults, useSettings } from "./useStore";
 import { captureClientError, captureClientMessage } from "../sentry";
 
@@ -102,6 +103,15 @@ export function useBestCase(formId: string | null): {
     // Terminate any prior worker
     workerRef.current?.terminate();
 
+    // Project the store data down to a plain, structured-cloneable, JSON-safe
+    // shape BEFORE it touches either the worker (postMessage) or the fallback.
+    // The raw maps come straight off Firestore (`docSnap.data()`), so an
+    // unexpected value could throw a DataCloneError on postMessage on every run;
+    // sanitizing removes that hazard and guarantees the worker and the
+    // main-thread fallback score byte-identical inputs. See bestCase.ts.
+    const safeForms = sanitizeFormsForWorker(allForms);
+    const safeResults = sanitizeResultsForWorker(matchResults);
+
     safeSetState({
       loading: true,
       phase: "prep",
@@ -111,11 +121,14 @@ export function useBestCase(formId: string | null): {
       error: false,
     });
 
-    const onProgress = (phase: Phase, percent: number) =>
+    // Typed to match `ProgressCallback` (phase: string) so it can be passed
+    // straight to `computeBestCase` in the main-thread fallback; the worker's
+    // phases are a subset of `Phase`, narrowed here for the label lookup.
+    const onProgress = (phase: string, percent: number) =>
       safeSetState((s) => ({
         ...s,
-        phase,
-        phaseLabel: PHASE_LABELS[phase] ?? s.phaseLabel,
+        phase: phase as Phase,
+        phaseLabel: PHASE_LABELS[phase as Phase] ?? s.phaseLabel,
         percent,
       }));
 
@@ -159,7 +172,7 @@ export function useBestCase(formId: string | null): {
       import("../utils/bestCase")
         .then(({ computeBestCase }) => {
           if (!mountedRef.current) return;
-          const result = computeBestCase(formId, allForms, matchResults, onProgress);
+          const result = computeBestCase(formId, safeForms, safeResults, onProgress);
           if (!mountedRef.current) return;
           if (!result) {
             captureClientMessage("bestcase-null-result", { source: "mainthread" }, "warning");
@@ -223,11 +236,26 @@ export function useBestCase(formId: string | null): {
       runOnMainThread(`worker-onerror: ${(e as ErrorEvent)?.message || "unknown"}`);
     };
 
-    worker.postMessage({
-      targetFormId: formId,
-      allForms,
-      playedResults: matchResults,
-    });
+    // postMessage can throw synchronously (a structured-clone failure the
+    // sanitizer somehow didn't cover, or an engine quirk). An uncaught throw
+    // here would abandon the run mid-"prep" with the spinner stuck forever, so
+    // route any failure straight into the main-thread fallback (same as a
+    // worker onerror). Sanitized data means this realistically never fires, but
+    // the feature must degrade gracefully rather than trap the user.
+    try {
+      worker.postMessage({
+        targetFormId: formId,
+        allForms: safeForms,
+        playedResults: safeResults,
+      });
+    } catch (err) {
+      captureClientMessage(
+        "bestcase-postmessage-failed",
+        { reason: String(err) },
+        "warning",
+      );
+      runOnMainThread("postmessage-failed");
+    }
   }, [formId, available, allForms, matchResults, safeSetState]);
 
   return { state, compute, reset, available };
