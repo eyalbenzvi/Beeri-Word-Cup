@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles, X, Gamepad2 } from "lucide-react";
 import { useBestCase } from "../hooks/useBestCase";
+import { useMatchResults } from "../hooks/useStore";
+import { useNavigation } from "../hooks/useNavigation";
+import { bestResultsToSimulatorOverrides } from "../utils/bestCase";
+import { setSimulatorSeed } from "../utils/simulatorSeed";
 import FormMatchesView from "./FormMatchesView";
 
 type Props = {
@@ -12,9 +16,11 @@ type Props = {
 function ScenarioOverlay({
   results,
   onClose,
+  onOpenInSimulator,
 }: {
   results: Record<string, any>;
   onClose: () => void;
+  onOpenInSimulator: () => void;
 }) {
   // Lock body scroll while the overlay is open so swipes inside the panel
   // don't bleed through to the leaderboard underneath.
@@ -52,11 +58,26 @@ function ScenarioOverlay({
             <X size={22} aria-hidden="true" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        <div className="flex-1 overflow-y-auto p-4 pb-4">
           <p className="text-xs text-ink-muted font-medium mb-3">
             תוצאות המשחקים בתרחיש שמביא את הטופס לדירוג הגבוה ביותר.
           </p>
           <FormMatchesView predictions={results} />
+        </div>
+        {/* Sticky hand-off footer: carry this exact scenario into the simulator
+            so the user can tweak results and watch the whole leaderboard react. */}
+        <div className="flex-shrink-0 border-t-2 border-border bg-bg p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] space-y-2">
+          <button
+            onClick={onOpenInSimulator}
+            className="btn-duo btn-duo-blue btn-duo-cta flex items-center justify-center gap-2 text-sm font-extrabold"
+          >
+            <Gamepad2 size={17} aria-hidden="true" />
+            פתח בסימולטור
+          </button>
+          <p className="text-3xs text-ink-light font-medium text-center">
+            כל התוצאות ייטענו לסימולטור — שם אפשר לשנות תוצאות ולראות איך זה משפיע
+            עליך ועל שאר המתמודדים.
+          </p>
         </div>
       </div>
     </>
@@ -65,6 +86,8 @@ function ScenarioOverlay({
 
 export default function BestCasePanel({ formId, onReset }: Props) {
   const { state, compute, reset, available } = useBestCase(formId);
+  const realResults = useMatchResults();
+  const { navigate } = useNavigation();
   const [scenarioOpen, setScenarioOpen] = useState(false);
 
   // Reset whenever formId changes (user navigates to a different form).
@@ -139,6 +162,22 @@ export default function BestCasePanel({ formId, onReset }: Props) {
 
   const { projectedRank, projectedScore, totalForms, bestResults } = result;
 
+  // Hand the optimised scenario off to the shared simulator and jump there.
+  // Only the still-unplayed matches become simulator overrides — the already-
+  // played matches are the simulator's fixed base.
+  //
+  // Rank/score in the simulator match this panel's projection exactly, with one
+  // caveat: the projection here excludes the top-scorer bonus ("ללא מלך שערים"),
+  // while the simulator scores with the real locked bonuses. They only diverge
+  // if a top scorer has already been officially set — which, since the optimizer
+  // is admin-gated to the post-group-stage window, normally hasn't happened yet.
+  const openInSimulator = () => {
+    const overrides = bestResultsToSimulatorOverrides(bestResults, realResults);
+    setSimulatorSeed(overrides);
+    setScenarioOpen(false);
+    navigate("simulator");
+  };
+
   const rankEmoji =
     projectedRank === 1 ? "🥇" : projectedRank === 2 ? "🥈" : projectedRank === 3 ? "🥉" : null;
 
@@ -193,6 +232,7 @@ export default function BestCasePanel({ formId, onReset }: Props) {
         <ScenarioOverlay
           results={bestResults}
           onClose={() => setScenarioOpen(false)}
+          onOpenInSimulator={openInSimulator}
         />
       )}
     </div>
