@@ -183,11 +183,13 @@ console.log("--- 4. Static wiring (stage normalisation stays in place) ---");
 
 // ── 5. Worker-payload sanitization ────────────────────────────────
 // The optimizer's inputs come straight off the Firestore-backed store and are
-// handed to a Web Worker via postMessage (structured clone). A single
-// non-cloneable value (function/DOM/proxy) in a real form throws a
-// DataCloneError on EVERY run — the production every-device failure. The
-// sanitizer projects both maps to a plain, cloneable, JSON-safe shape holding
-// only the scoring-relevant fields, and MUST NOT change the computed result.
+// handed to a Web Worker via postMessage (structured clone). Sanitization is
+// DEFENSE-IN-DEPTH + input parity (NOT a confirmed diagnosis of the production
+// failure — the current data model is all JSON-safe): it projects both maps to
+// a plain, cloneable, JSON-safe shape holding only the scoring-relevant fields,
+// so (1) the worker and the main-thread fallback score identical inputs, and
+// (2) a hypothetical future/legacy non-cloneable field can't throw on
+// postMessage. It MUST NOT change the computed result.
 console.log("--- 5. Worker-payload sanitization ---");
 {
   const forms = genForms(20);
@@ -220,21 +222,43 @@ console.log("--- 5. Worker-payload sanitization ---");
   const safeResults = sanitizeResultsForWorker(played);
   const san = computeBestCase("f0", safeForms, safeResults);
 
-  // (a) Parity: identical projection from raw vs. sanitized inputs.
+  // (a) Parity: identical projection from raw vs. sanitized inputs — checked at
+  // the aggregate level AND per-match (a sanitization bug that swapped a score
+  // for another VALID score would keep rank/score/key-count but change a
+  // scoreline; compare every bestResults entry to catch that).
+  let bestResultsMatch = raw && san &&
+    Object.keys(raw.bestResults).length === Object.keys(san.bestResults).length;
+  if (bestResultsMatch) {
+    for (const id of Object.keys(raw.bestResults)) {
+      const a = raw.bestResults[id], b = san.bestResults[id];
+      if (!b ||
+          a.homeScore !== b.homeScore ||
+          a.awayScore !== b.awayScore ||
+          (a.advancingTeam ?? null) !== (b.advancingTeam ?? null) ||
+          (a.stage ?? null) !== (b.stage ?? null)) {
+        bestResultsMatch = false;
+        if (failures.length < 6) console.error(`    bestResults diverged at ${id}`);
+        break;
+      }
+    }
+  }
   assert(
     raw && san &&
       raw.projectedRank === san.projectedRank &&
       raw.projectedScore === san.projectedScore &&
       raw.totalForms === san.totalForms &&
-      Object.keys(raw.bestResults).length === Object.keys(san.bestResults).length,
-    "sanitized inputs produce IDENTICAL best-case results (parity)",
+      bestResultsMatch,
+    "sanitized inputs produce IDENTICAL best-case results (rank/score + per-match scenario)",
   );
 
-  // (b) The raw payload is NOT structured-cloneable (proves the hazard is real).
+  // (b) A non-cloneable value makes the RAW payload fail structured clone, while
+  // the sanitized copy survives — i.e. sanitization neutralizes the hazard.
+  // (This demonstrates the defense-in-depth property; it is not a claim that
+  // production data actually carried such a value.)
   let rawCloneable = true;
   try { structuredClone({ allForms: forms, playedResults: played }); }
   catch { rawCloneable = false; }
-  assert(!rawCloneable, "raw store payload with a function value fails structuredClone (the production hazard)");
+  assert(!rawCloneable, "a non-cloneable field makes the raw payload fail structuredClone");
 
   // (c) The sanitized payload IS structured-cloneable (the fix).
   let sanCloneable = true;
@@ -282,11 +306,14 @@ console.log("--- 6. Static wiring (sanitization + graceful degradation) ---");
     "hook posts the SANITIZED payload to the worker");
   assert(/try\s*\{[\s\S]*worker\.postMessage[\s\S]*\}\s*catch/.test(hook),
     "hook wraps postMessage in try/catch");
-  assert(/runOnMainThread\("postmessage-failed"\)/.test(hook),
+  assert(/runOnMainThread\("postmessage-failure"/.test(hook),
     "hook routes a postMessage failure to the main-thread fallback");
   // The main-thread fallback must use the SAME sanitized data.
   assert(/computeBestCase\(formId,\s*safeForms,\s*safeResults/.test(hook),
     "main-thread fallback uses the sanitized data (identical to the worker)");
+  // Fallback must refuse a heavy pre-group-stage search (no main-thread freeze).
+  assert(/isBestCaseAvailable\(safeResults\)/.test(hook),
+    "main-thread fallback gates on isBestCaseAvailable to avoid a UI freeze");
 
   const panel = readMigratedSrc("src/components/BestCasePanel.tsx");
   assert(/getDerivedStateFromError/.test(panel),

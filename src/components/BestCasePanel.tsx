@@ -173,6 +173,11 @@ function BestCasePanelInner({ formId, onReset }: Props) {
   // if a top scorer has already been officially set — which, since the optimizer
   // is admin-gated to the post-group-stage window, normally hasn't happened yet.
   const openInSimulator = () => {
+    // `realResults` (raw store) determines which matches are "played" and thus
+    // excluded from the overrides. The optimizer consumed the SANITIZED results
+    // to produce `bestResults`, but sanitization preserves each score's validity
+    // (null stays null), so the played/remaining split here is identical to the
+    // one the projection assumed — they derive from the same store snapshot.
     const overrides = bestResultsToSimulatorOverrides(bestResults, realResults);
     setSimulatorSeed(overrides);
     setScenarioOpen(false);
