@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { BestCaseResult } from "../utils/bestCase";
 import { useAllPredictions, useMatchResults, useSettings } from "./useStore";
+import { captureClientError, captureClientMessage } from "../sentry";
 
 type Phase =
   | "idle"
@@ -110,13 +111,25 @@ export function useBestCase(formId: string | null): {
       error: false,
     });
 
-    const worker = new Worker(
-      new URL("../workers/bestCaseWorker.ts", import.meta.url),
-      { type: "module" },
-    );
-    workerRef.current = worker;
+    const onProgress = (phase: Phase, percent: number) =>
+      safeSetState((s) => ({
+        ...s,
+        phase,
+        phaseLabel: PHASE_LABELS[phase] ?? s.phaseLabel,
+        percent,
+      }));
 
-    const fail = () => {
+    const succeed = (result: BestCaseResult) =>
+      safeSetState({
+        loading: false,
+        phase: "done",
+        phaseLabel: PHASE_LABELS.done,
+        percent: 100,
+        result,
+        error: false,
+      });
+
+    const showError = () =>
       safeSetState({
         loading: false,
         phase: "error",
@@ -125,44 +138,90 @@ export function useBestCase(formId: string | null): {
         result: null,
         error: true,
       });
-      worker.terminate();
+
+    // Guards against double-settling (a worker can fire both `onerror` and a
+    // terminal message, and the fallback must not race the worker).
+    let settled = false;
+
+    // Main-thread fallback. Module Web Workers fail to load in some browsers
+    // (notably iOS Safari / in-app WebViews), where the worker errors on every
+    // run and the feature is permanently stuck on "error". The optimizer is
+    // admin-gated to the post-group-stage window, where the search is small
+    // enough (greedy knockout, refinement capped at ≤8 open matches) to run
+    // inline without freezing the UI. `bestCase` is dynamically imported so it
+    // stays out of the main bundle until this fallback actually fires.
+    const runOnMainThread = (reason: string) => {
+      if (settled) return;
+      settled = true;
+      workerRef.current?.terminate();
       workerRef.current = null;
+      captureClientMessage("bestcase-worker-fallback", { reason }, "warning");
+      import("../utils/bestCase")
+        .then(({ computeBestCase }) => {
+          if (!mountedRef.current) return;
+          const result = computeBestCase(formId, allForms, matchResults, onProgress);
+          if (!mountedRef.current) return;
+          if (!result) {
+            captureClientMessage("bestcase-null-result", { source: "mainthread" }, "warning");
+            showError();
+            return;
+          }
+          succeed(result);
+        })
+        .catch((err) => {
+          captureClientError(
+            err instanceof Error ? err : new Error(String(err)),
+            { feature: "bestCase", stage: "mainThreadFallback", reason },
+          );
+          showError();
+        });
     };
+
+    let worker: Worker;
+    try {
+      worker = new Worker(
+        new URL("../workers/bestCaseWorker.ts", import.meta.url),
+        { type: "module" },
+      );
+    } catch (err) {
+      // Some engines throw synchronously on module-worker construction.
+      captureClientMessage("bestcase-worker-unavailable", { reason: String(err) }, "warning");
+      runOnMainThread("worker-construct-failed");
+      return;
+    }
+    workerRef.current = worker;
 
     worker.onmessage = (e: MessageEvent) => {
       const { type } = e.data;
       if (type === "progress") {
-        const phase = e.data.phase as Phase;
-        safeSetState((s) => ({
-          ...s,
-          phase,
-          phaseLabel: PHASE_LABELS[phase] ?? s.phaseLabel,
-          percent: e.data.percent,
-        }));
+        onProgress(e.data.phase as Phase, e.data.percent);
       } else if (type === "result") {
-        // A null result means the target form was not found among
-        // submitted forms — surface it as an error so the panel doesn't
-        // collapse to a silent blank state after the loading spinner.
-        if (!e.data.result) {
-          fail();
-          return;
-        }
-        safeSetState({
-          loading: false,
-          phase: "done",
-          phaseLabel: PHASE_LABELS.done,
-          percent: 100,
-          result: e.data.result,
-          error: false,
-        });
+        if (settled) return;
+        settled = true;
         worker.terminate();
         workerRef.current = null;
+        // A null result means the target form was not found among submitted
+        // forms — a genuine "nothing to show", not a worker failure, so surface
+        // it as an error rather than re-running on the main thread (which would
+        // only reproduce the same null).
+        if (!e.data.result) {
+          captureClientMessage("bestcase-null-result", { source: "worker" }, "warning");
+          showError();
+          return;
+        }
+        succeed(e.data.result);
       } else if (type === "error") {
-        fail();
+        // The worker's own try/catch caught a runtime error. Retry on the main
+        // thread so a transient/worker-only failure still yields a result; a
+        // genuine logic bug will rethrow there and be captured with a real stack.
+        runOnMainThread(`worker-error: ${e.data.message || "unknown"}`);
       }
     };
 
-    worker.onerror = fail;
+    // Fires when the worker module itself fails to load/parse (the iOS case).
+    worker.onerror = (e) => {
+      runOnMainThread(`worker-onerror: ${(e as ErrorEvent)?.message || "unknown"}`);
+    };
 
     worker.postMessage({
       targetFormId: formId,
