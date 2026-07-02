@@ -4,9 +4,9 @@
 // carries a why-clause — never emitted bare.
 
 import { useMemo } from "react";
-import { getTeamByCode } from "../../data/teams";
 import { getMatchById } from "../../data/matches";
 import { formatIsraelDateLabel } from "../../utils/matchTime";
+import { getTeamDisplayName, getTeamFlagName } from "../../utils/teamDisplay";
 import {
   classifyRootFor,
   type RootForAdvice,
@@ -17,24 +17,13 @@ import type {
 } from "../../utils/personalAnalysis";
 import type { WatchMatch } from "../../utils/analysisWindow";
 
-const NEXT_ROUND: Record<string, string> = {
-  R32: "R16",
-  R16: "QF",
-  QF: "SF",
-  SF: "F",
-};
-
 const TARGET_PHRASE: Record<TargetKey, string> = {
   win: "לזכייה",
+  podium: "לפודיום",
   p100: "למקום 100",
   p200: "למקום 200",
   last: "למקום האחרון",
 };
-
-function teamLabel(code: string): string {
-  const t = getTeamByCode(code);
-  return t ? `${t.flag} ${t.name}` : code;
-}
 
 function adviceSentence(
   advice: RootForAdvice,
@@ -48,8 +37,8 @@ function adviceSentence(
   }
   const team = advice.side === "home" ? wm.home : wm.away;
   const other = advice.side === "home" ? wm.away : wm.home;
-  const teamName = getTeamByCode(team)?.name || team;
-  const otherName = getTeamByCode(other)?.name || other;
+  const teamName = getTeamDisplayName(team, team);
+  const otherName = getTeamDisplayName(other, other);
 
   // Against-your-heart: the form predicted the OTHER side to advance from
   // this slot, but the target is better served by it losing.
@@ -129,8 +118,8 @@ export default function RootForSection({
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-sm font-extrabold text-ink">
-                    {teamLabel(wm.home)} <span className="text-ink-muted">נגד</span>{" "}
-                    {teamLabel(wm.away)}
+                    {getTeamFlagName(wm.home)} <span className="text-ink-muted">נגד</span>{" "}
+                    {getTeamFlagName(wm.away)}
                   </span>
                   <span className="text-2xs text-ink-muted font-bold shrink-0">
                     <bdi>{dateLabel}</bdi>
@@ -159,5 +148,3 @@ export default function RootForSection({
     </div>
   );
 }
-
-export { NEXT_ROUND };

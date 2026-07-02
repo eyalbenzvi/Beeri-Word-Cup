@@ -14,11 +14,11 @@
 //   - worker failure: deterministic + outlook stay, probabilistic sections
 //     show a retry — no eternal spinner (CLAUDE.md failure-path rule).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import VerdictSection from "../components/competitionStatus/VerdictSection";
-import RootForSection, { NEXT_ROUND } from "../components/competitionStatus/RootForSection";
+import RootForSection from "../components/competitionStatus/RootForSection";
 import OutlookSection from "../components/competitionStatus/OutlookSection";
 import EmptyState from "../components/EmptyState";
 import {
@@ -31,8 +31,8 @@ import { useCompetitionAnalysisAccess } from "../hooks/useCompetitionAnalysisAcc
 import { usePersonalAnalysis } from "../hooks/usePersonalAnalysis";
 import { useScenarioData } from "../hooks/useScenarioRun";
 import { computePoolCertainty } from "../utils/poolCertainty";
-import { selectWatchMatches } from "../utils/analysisWindow";
-import { pickPrimaryTarget, targetProbs } from "../utils/analysisVerdict";
+import { selectWatchMatches, NEXT_ROUND } from "../utils/analysisWindow";
+import { pickPrimaryTarget, targetProbs, type PrimaryTarget } from "../utils/analysisVerdict";
 import { getCachedBracket } from "../utils/bracketCache";
 import { deriveAdvancingTeams, deriveActualAdvancing } from "../utils/bracket";
 import { ALL_MATCHES, knockoutMatches } from "../data/matches";
@@ -69,10 +69,18 @@ export default function CompetitionStatus() {
     myForms[0]?.formId ||
     null;
 
+  // Minute ticker so the time-based window keeps sliding while the page is
+  // open (a match kicking off must surface without waiting for a result).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
   // Watch matches: next 48h (or next matchday), matchup already known.
   const watchMatches = useMemo(
-    () => selectWatchMatches(ALL_MATCHES, results, getCachedBracket(results, true), Date.now()),
-    [results],
+    () => selectWatchMatches(ALL_MATCHES, results, getCachedBracket(results, true), now),
+    [results, now],
   );
   const workerWatch = useMemo(
     () => watchMatches.map((w) => ({ id: w.id, isKnockout: w.stage !== "group" })),
@@ -118,16 +126,19 @@ export default function CompetitionStatus() {
     return analysis.agg.targetForms.findIndex((t) => t.formId === selectedFormId);
   }, [analysis.agg, selectedFormId]);
 
-  const primaryTargetKey = useMemo(() => {
-    if (!analysis.agg || targetFormIndex < 0 || !selectedFormId) return "none" as const;
+  // The PrimaryTarget is computed ONCE here and passed to BOTH the verdict
+  // and the root-for section — a single evaluation, so the headline and the
+  // advice can never describe different money targets.
+  const primaryTarget = useMemo<PrimaryTarget | null>(() => {
+    if (!analysis.agg || targetFormIndex < 0 || !selectedFormId) return null;
     const my = cert.byFormId[selectedFormId];
-    if (!my || analysis.agg.simCount === 0) return "none" as const;
+    if (!my || analysis.agg.simCount === 0) return null;
     return pickPrimaryTarget({
       currentRank: my.rank,
       nForms: cert.nForms,
       probs: targetProbs(analysis.agg, targetFormIndex),
       aliveForFirst: my.aliveForFirst,
-    }).key;
+    });
   }, [analysis.agg, targetFormIndex, selectedFormId, cert]);
 
   // Teams the selected form predicted to advance out of the watch matches'
@@ -150,9 +161,19 @@ export default function CompetitionStatus() {
   // Live-match staleness note (same detection idea as LiveNowCard: kicked
   // off, no recorded result).
   const liveNow = useMemo(
-    () => watchMatches.some((w) => w.kickoffUTC <= Date.now()),
-    [watchMatches],
+    () => watchMatches.some((w) => w.kickoffUTC <= now),
+    [watchMatches, now],
   );
+
+  // Settings-confirmation watchdog: if the server snapshot never lands
+  // (offline deep link), the loader below must not be eternal (CLAUDE.md
+  // failure-path rule) — after the timeout we offer a way out.
+  const [confirmStuck, setConfirmStuck] = useState(false);
+  useEffect(() => {
+    if (confirmed) return undefined;
+    const t = setTimeout(() => setConfirmStuck(true), 10000);
+    return () => clearTimeout(t);
+  }, [confirmed]);
 
   // ── Gates ──
   // Settings not server-confirmed yet: we don't KNOW whether this user is
@@ -163,6 +184,17 @@ export default function CompetitionStatus() {
       <div className="text-center py-16 text-ink-muted font-bold">
         <div className="text-5xl animate-bounce">⚽</div>
         <div className="text-sm mt-3">טוען…</div>
+        {confirmStuck && (
+          <div className="mt-6 space-y-2 max-w-xs mx-auto">
+            <p className="text-xs font-medium">ההגדרות לא נטענות — בדקו את החיבור.</p>
+            <button onClick={() => window.location.reload()} className="btn-duo btn-duo-primary w-full">
+              רענן את הדף
+            </button>
+            <button onClick={() => navigate("home")} className="btn-duo btn-duo-ghost w-full">
+              חזרה לדף הבית
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -246,6 +278,7 @@ export default function CompetitionStatus() {
               cert={cert}
               agg={analysis.agg}
               targetFormIndex={targetFormIndex}
+              target={primaryTarget}
               aliveSet={aliveSet}
               refining={analysis.running && !!analysis.agg}
               failed={analysis.failed}
@@ -257,7 +290,7 @@ export default function CompetitionStatus() {
             watchMatches={watchMatches}
             agg={analysis.agg}
             targetFormIndex={targetFormIndex}
-            targetKey={primaryTargetKey}
+            targetKey={primaryTarget?.key ?? "none"}
             predictedAdvancers={predictedAdvancers}
           />
         </>

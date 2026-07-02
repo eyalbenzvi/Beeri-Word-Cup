@@ -15,7 +15,7 @@
 // re-open instantly in the same session; a new match result produces new
 // store references and naturally invalidates it.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonalAnalysisAggregate } from "../utils/personalAnalysis";
 import { TARGET_SIMS, DEFAULT_ANALYSIS_SEED } from "../utils/personalAnalysis";
 import { captureClientError } from "../sentry";
@@ -29,14 +29,42 @@ export type PersonalAnalysisState = {
 };
 
 type CacheEntry = {
-  allPredictions: any;
-  results: any;
-  targetKey: string;
+  key: string;
   agg: PersonalAnalysisAggregate;
 };
 let lastCompleted: CacheEntry | null = null;
 
 const WATCHDOG_MS = 45000;
+
+// Cheap CONTENT signature of the sim inputs. The store's onSnapshot handlers
+// reassign cache slices on every (re)delivery — a fresh reference even when
+// nothing changed (e.g. the server confirmation right after a cached read) —
+// so keying the run on reference identity would tear down and restart a
+// 20k-sim run for a no-op redelivery. Content keys make the run restart only
+// when a result/bonus actually changes. Predictions are locked mid-tournament
+// (immutable content), so their signature is just the form-id set.
+function inputsKey(
+  allPredictions: Record<string, any>,
+  results: Record<string, any>,
+  actualBonuses: any,
+  targetKey: string,
+): string {
+  const formsKey = Object.keys(allPredictions || {}).sort().join(",");
+  const resultsKey = Object.keys(results || {})
+    .sort()
+    .map((id) => {
+      const r = results[id] || {};
+      return `${id}:${r.homeScore ?? ""}-${r.awayScore ?? ""}-${r.advancingTeam ?? ""}`;
+    })
+    .join("|");
+  let bonusesKey = "";
+  try {
+    bonusesKey = JSON.stringify(actualBonuses ?? null);
+  } catch {
+    bonusesKey = "?";
+  }
+  return `${targetKey}#${formsKey}#${resultsKey}#${bonusesKey}`;
+}
 
 export function usePersonalAnalysis(opts: {
   allPredictions: Record<string, any>;
@@ -49,13 +77,14 @@ export function usePersonalAnalysis(opts: {
   const { allPredictions, results, actualBonuses, targetFormIds, watchMatches, enabled } = opts;
   const targetKey = targetFormIds.join(",");
 
-  const cached =
-    lastCompleted &&
-    lastCompleted.allPredictions === allPredictions &&
-    lastCompleted.results === results &&
-    lastCompleted.targetKey === targetKey
-      ? lastCompleted.agg
-      : null;
+  // Recomputed only when a store reference rotates (cheap), yielding a
+  // stable string that changes only on real content changes.
+  const cacheKey = useMemo(
+    () => inputsKey(allPredictions, results, actualBonuses, targetKey),
+    [allPredictions, results, actualBonuses, targetKey],
+  );
+
+  const cached = lastCompleted && lastCompleted.key === cacheKey ? lastCompleted.agg : null;
 
   const [state, setState] = useState<PersonalAnalysisState>(() => ({
     running: false,
@@ -124,7 +153,7 @@ export function usePersonalAnalysis(opts: {
           if (active) setState({ running: true, failed: false, agg: e.data.agg, done: false });
         } else if (type === "done") {
           const agg = e.data.agg as PersonalAnalysisAggregate;
-          lastCompleted = { allPredictions, results, targetKey, agg };
+          lastCompleted = { key: cacheKey, agg };
           if (active) setState({ running: false, failed: false, agg, done: true });
           cleanup();
         } else if (type === "error") {
@@ -150,8 +179,11 @@ export function usePersonalAnalysis(opts: {
       active = false;
       cleanup();
     };
+    // Keyed on the CONTENT signature (cacheKey), not the raw store
+    // references — see inputsKey. The raw slices are read from the closure
+    // when the run actually starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, allPredictions, results, actualBonuses, targetKey, nonce]);
+  }, [enabled, cacheKey, nonce]);
 
   return { ...state, retry };
 }

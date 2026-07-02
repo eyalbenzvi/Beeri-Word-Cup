@@ -6,7 +6,7 @@
 // usually wrong) — the pool-specific pick counts are the social hook.
 
 import { useMemo } from "react";
-import { getTeamByCode } from "../../data/teams";
+import { getTeamFlagName } from "../../utils/teamDisplay";
 import { getCachedChampion } from "../../utils/bracketCache";
 import { normalizeStatus } from "../../utils/helpers";
 import { chanceLabel, formatChance, pickKeyMatch } from "../../utils/analysisVerdict";
@@ -15,11 +15,6 @@ import type { WatchMatch } from "../../utils/analysisWindow";
 import type { ScenarioRunResult } from "../../utils/scenarioSim";
 
 const MAX_CHAMPION_ROWS = 5;
-
-function teamLabel(code: string): string {
-  const t = getTeamByCode(code);
-  return t ? `${t.flag} ${t.name}` : code;
-}
 
 export default function OutlookSection({
   run,
@@ -87,8 +82,8 @@ export default function OutlookSection({
             משחק המפתח של הימים הקרובים
           </div>
           <div className="text-sm font-extrabold text-ink">
-            {teamLabel(keyMatch.home)} <span className="text-ink-muted">נגד</span>{" "}
-            {teamLabel(keyMatch.away)} — התוצאה שלו מזיזה את טבלת הטוטו יותר מכל
+            {getTeamFlagName(keyMatch.home)} <span className="text-ink-muted">נגד</span>{" "}
+            {getTeamFlagName(keyMatch.away)} — התוצאה שלו מזיזה את טבלת הטוטו יותר מכל
             משחק אחר 🌪️
           </div>
         </div>
@@ -113,7 +108,7 @@ export default function OutlookSection({
                 aria-hidden="true"
               />
               <div className="relative flex items-center justify-between gap-2 px-3 py-2">
-                <span className="text-sm font-extrabold text-ink">{teamLabel(c.code)}</span>
+                <span className="text-sm font-extrabold text-ink">{getTeamFlagName(c.code)}</span>
                 <span className="text-xs font-bold text-ink-muted text-left">
                   {formatChance(chanceLabel(c.prob))}
                   {c.picks > 0 && (

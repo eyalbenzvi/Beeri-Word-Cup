@@ -17,11 +17,30 @@
 
 import { getMatchKickoffUTC, getMatchIsraelDateKey } from "./matchTime";
 import { isScoreValid } from "./helpers";
+import { isUnresolvedKnockoutTie } from "./resultBreakdown";
 
 export const WATCH_WINDOW_MS = 48 * 3600000;
 // A match that kicked off within the last 3h with no result is treated as
 // live/unresolved and stays watchable (covers extra time + shootout).
 export const WATCH_LIVE_GRACE_MS = 3 * 3600000;
+
+// Which round a match's winner advances INTO — tournament structure, shared
+// by the root-for cards and the page's against-heart detection.
+export const NEXT_ROUND: Record<string, string> = {
+  R32: "R16",
+  R16: "QF",
+  QF: "SF",
+  SF: "F",
+};
+
+// A match counts as DECIDED only when it has a final result. A knockout
+// entry tied at 90' with no advancingTeam yet (extra time / shootout in
+// progress) is NOT final — that is the highest-drama rooting moment and it
+// must stay on the watch list. Mirrors upcomingMatches.hasFinalResult.
+function hasFinalResult(result: any, isKnockout: boolean): boolean {
+  if (!isScoreValid(result)) return false;
+  return !isUnresolvedKnockoutTie(result, isKnockout);
+}
 
 export type WatchMatch = {
   id: string;
@@ -42,11 +61,11 @@ export function selectWatchMatches(
 ): WatchMatch[] {
   const candidates: WatchMatch[] = [];
   for (const m of allMatches) {
-    if (isScoreValid(results?.[m.id])) continue; // already played
+    const isKO = !!m.stage && m.stage !== "group";
+    if (hasFinalResult(results?.[m.id], isKO)) continue; // decided
     const kickoff = getMatchKickoffUTC(m);
     if (kickoff == null) continue;
     if (kickoff < now - WATCH_LIVE_GRACE_MS) continue; // stale placeholder
-    const isKO = m.stage && m.stage !== "group";
     const teams = isKO
       ? actualBracket?.[m.id] || {}
       : { home: m.homeTeam, away: m.awayTeam };

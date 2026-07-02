@@ -44,13 +44,15 @@ export const FIRST_PAINT_SIMS = 2000; // one chunk ≈ first meaningful paint
 export const TARGET_SIMS = 20000;
 export const CHUNK_SIMS = 2000;
 export const DEFAULT_ANALYSIS_SEED = 0x9e3779b9; // matches the scenario runs
-// Money targets: rank 1 (win) + the entry-fee-refund ranks. Places 100/200
-// are framed as a ±BAND range ("בסביבות מקום 100") — an exact-rank event is
-// too narrow to estimate stably at these sample sizes.
+// Money targets: rank 1 (win), the podium (top PODIUM_PLACES pay a prize),
+// and the entry-fee-refund ranks. Places 100/200 are framed as a ±BAND range
+// ("בסביבות מקום 100") — an exact-rank event is too narrow to estimate
+// stably at these sample sizes.
+export const PODIUM_PLACES = 3;
 export const REFUND_RANKS = [100, 200] as const;
 export const TARGET_BAND = 2;
 
-export type TargetKey = "win" | "p100" | "p200" | "last";
+export type TargetKey = "win" | "podium" | "p100" | "p200" | "last";
 
 export type WatchOutcome = {
   // Group matches: "home" | "draw" | "away". Knockout: "home" | "away" =
@@ -99,21 +101,26 @@ export type PersonalAnalysisInput = {
   onChunk?: (agg: PersonalAnalysisAggregate, done: number, total: number) => boolean | void;
 };
 
-const TARGET_KEYS: TargetKey[] = ["win", "p100", "p200", "last"];
+const TARGET_KEYS: TargetKey[] = ["win", "podium", "p100", "p200", "last"];
 
 function emptyHits(): Record<TargetKey, number> {
-  return { win: 0, p100: 0, p200: 0, last: 0 };
+  return { win: 0, podium: 0, p100: 0, p200: 0, last: 0 };
 }
 
 // Which targets a form hit in one sim, given its dense rank and the sim's
-// bottom dense rank. Exposed for unit tests.
-export function targetHitFlags(rank: number, lastRank: number): Record<TargetKey, boolean> {
-  return {
-    win: rank === 1,
-    p100: Math.abs(rank - 100) <= TARGET_BAND,
-    p200: Math.abs(rank - 200) <= TARGET_BAND,
-    last: rank === lastRank,
-  };
+// bottom dense rank. `out` may be passed to avoid allocation in the hot loop.
+// Exposed for unit tests.
+export function targetHitFlags(
+  rank: number,
+  lastRank: number,
+  out: Record<TargetKey, boolean> = { win: false, podium: false, p100: false, p200: false, last: false },
+): Record<TargetKey, boolean> {
+  out.win = rank === 1;
+  out.podium = rank <= PODIUM_PLACES;
+  out.p100 = Math.abs(rank - 100) <= TARGET_BAND;
+  out.p200 = Math.abs(rank - 200) <= TARGET_BAND;
+  out.last = rank === lastRank;
+  return out;
 }
 
 export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnalysisAggregate {
@@ -165,12 +172,19 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
   );
 
   // Reused per-sim buffers (scenarioSim pattern — nothing allocated per form).
-  const scratch: FastScore[] = fastForms.map((f) => makeScratchScore(f.formId));
-  const order: FastScore[] = new Array(nForms) as FastScore[];
+  // Each scratch score carries its fastForms index (`_idx`) so the ranking
+  // loop reads a numeric field instead of a string-keyed map lookup.
+  const scratch: (FastScore & { _idx?: number })[] = fastForms.map((f, i) => {
+    const s = makeScratchScore(f.formId) as FastScore & { _idx?: number };
+    s._idx = i;
+    return s;
+  });
+  const order: (FastScore & { _idx?: number })[] = new Array(nForms);
   const denseRank = new Int32Array(nForms); // by sorted position
   const rankByFormIdx = new Int32Array(nForms); // by fastForms index
-  const formIdxById: Record<string, number> = {};
-  fastForms.forEach((f, i) => (formIdxById[f.formId] = i));
+  // Per-sim target-hit flags, one reused record per target form (computed
+  // once per sim, read by both the unconditional and the watch-match loops).
+  const simFlags = targetIdx.map(() => targetHitFlags(0, 0));
 
   if (nForms === 0 || targetIdx.length === 0) {
     return snapshot(0);
@@ -201,7 +215,8 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
         return a.formId.localeCompare(b.formId);
       });
 
-      // Dense ranks (1,1,3 …) — the leaderboard's ranking semantics.
+      // Dense ranks (1,1,3 …) — the leaderboard's ranking semantics
+      // (assignDenseRanks' tie predicate, allocation-free for the hot loop).
       let current = 1;
       for (let i = 0; i < nForms; i++) {
         if (i > 0) {
@@ -214,16 +229,18 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
           }
         }
         denseRank[i] = current;
-        rankByFormIdx[formIdxById[order[i].formId]] = current;
-        rankSum[formIdxById[order[i].formId]] += current;
+        const fi = order[i]._idx as number;
+        rankByFormIdx[fi] = current;
+        rankSum[fi] += current;
       }
       const lastRank = denseRank[nForms - 1];
 
-      // Target-form aggregates.
+      // Target-form aggregates. Flags are computed ONCE per sim per target
+      // (into the reused simFlags records) and reused by the watch loop.
       for (let t = 0; t < targetIdx.length; t++) {
         const r = rankByFormIdx[targetIdx[t].idx];
         hist[t][r - 1]++;
-        const flags = targetHitFlags(r, lastRank);
+        const flags = targetHitFlags(r, lastRank, simFlags[t]);
         if (flags.last) lastCount[t]++;
         for (const k of TARGET_KEYS) if (flags[k]) overallHits[t][k]++;
       }
@@ -254,8 +271,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
         const acc = watchAcc[w][OUTCOME_KEYS.indexOf(key)];
         acc.n++;
         for (let t = 0; t < targetIdx.length; t++) {
-          const r = rankByFormIdx[targetIdx[t].idx];
-          const flags = targetHitFlags(r, lastRank);
+          const flags = simFlags[t]; // computed above for this sim
           for (const k of TARGET_KEYS) if (flags[k]) acc.hits[t][k]++;
         }
         for (let i = 0; i < nForms; i++) acc.condRankSum[i] += rankByFormIdx[i];

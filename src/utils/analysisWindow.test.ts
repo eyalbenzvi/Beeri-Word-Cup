@@ -47,6 +47,17 @@ describe("selectWatchMatches", () => {
     expect(selectWatchMatches(matches, results, bracket, NOW)).toEqual([]);
   });
 
+  it("a knockout tied at 90' with no advancingTeam is NOT decided — stays watchable", () => {
+    const matches = [ko("R32-1", "Jul 2", "13:00")];
+    const bracket = { "R32-1": { home: "FRA", away: "GER" } };
+    // Mid-shootout: scores recorded, advancer not — the highest-drama moment.
+    const tied = { "R32-1": { homeScore: 1, awayScore: 1 } };
+    expect(selectWatchMatches(matches, tied, bracket, NOW).map((w) => w.id)).toEqual(["R32-1"]);
+    // Once the advancer lands, the match is decided and drops off.
+    const decided = { "R32-1": { homeScore: 1, awayScore: 1, advancingTeam: "FRA" } };
+    expect(selectWatchMatches(matches, decided, bracket, NOW)).toEqual([]);
+  });
+
   it("keeps a live match (kicked off, no result) within the grace window", () => {
     const matches = [ko("R32-1", "Jul 2", "13:00")]; // 2h before NOW (Israel 13:00 = 10:00 UTC → 2h ago)
     const bracket = { "R32-1": { home: "FRA", away: "GER" } };

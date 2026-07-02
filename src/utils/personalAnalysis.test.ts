@@ -44,8 +44,10 @@ function groupsPlayedWorld(seed: number) {
 }
 
 describe("targetHitFlags", () => {
-  it("flags win / refund bands / last", () => {
-    expect(targetHitFlags(1, 50)).toMatchObject({ win: true, last: false });
+  it("flags win / podium / refund bands / last", () => {
+    expect(targetHitFlags(1, 50)).toMatchObject({ win: true, podium: true, last: false });
+    expect(targetHitFlags(3, 50).podium).toBe(true);
+    expect(targetHitFlags(4, 50).podium).toBe(false);
     expect(targetHitFlags(100 - TARGET_BAND, 300).p100).toBe(true);
     expect(targetHitFlags(100 + TARGET_BAND + 1, 300).p100).toBe(false);
     expect(targetHitFlags(200, 300).p200).toBe(true);

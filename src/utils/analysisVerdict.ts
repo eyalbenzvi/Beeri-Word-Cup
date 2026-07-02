@@ -15,11 +15,11 @@
  */
 
 import type { PersonalAnalysisAggregate, TargetKey, WatchMatchAgg } from "./personalAnalysis";
-import { TARGET_BAND } from "./personalAnalysis";
+import { TARGET_BAND, PODIUM_PLACES } from "./personalAnalysis";
 
-// How many top places win a (non-refund) prize. Kept as one constant so the
-// real prize structure can be tuned in one place.
-export const PRIZE_TOP_PLACES = 3;
+// How many top places win a (non-refund) prize. Single source of truth is
+// the engine's PODIUM_PLACES (the histogram hit-flag uses the same value).
+export const PRIZE_TOP_PLACES = PODIUM_PLACES;
 
 // Minimum probability for a money target to be "the story" of the verdict.
 export const TARGET_PROB_FLOOR = 0.02;
@@ -90,6 +90,8 @@ export function targetProbs(
   const n = Math.max(agg.simCount, 1);
   return {
     win: tf.hits.win / n,
+    // Aggregates persisted before "podium" existed lack the key — treat as 0.
+    podium: (tf.hits.podium || 0) / n,
     p100: tf.hits.p100 / n,
     p200: tf.hits.p200 / n,
     last: tf.hits.last / n,
@@ -142,6 +144,12 @@ export function pickPrimaryTarget(opts: {
   // Winning outranks everything when it's a real story.
   if (aliveForFirst && (probs.win >= TARGET_PROB_FLOOR || currentRank <= PRIZE_TOP_PLACES)) {
     return { key: "win", prob: probs.win };
+  }
+
+  // The podium pays a prize too — a form in (or near) the top places that
+  // fell out of the win race still has a real money story to defend.
+  if (probs.podium >= TARGET_PROB_FLOOR || currentRank <= PRIZE_TOP_PLACES) {
+    return { key: "podium", prob: probs.podium };
   }
 
   // Otherwise the most probable refund target that clears the floor.

@@ -28,17 +28,17 @@ export type FeatureFlag = {
 
 export const COMPETITION_ANALYSIS_FLAG = "competitionAnalysis";
 
-export function getCompetitionAnalysisFlag(settings: any): FeatureFlag {
-  const flag = settings?.features?.[COMPETITION_ANALYSIS_FLAG];
+export function getFeatureFlag(settings: any, key: string): FeatureFlag {
+  const flag = settings?.features?.[key];
   return flag && typeof flag === "object" ? flag : {};
 }
 
-// Evaluate whether `user` (the store's current-user record: { id, isAdmin? })
-// may see the competition-analysis feature. Admin sees it in every mode
-// except "off" — the admin is always the first rollout ring.
-export function canUseCompetitionAnalysis(settings: any, user: any): boolean {
+// Generic evaluator: may `user` (the store's current-user record:
+// { id, isAdmin? }) see the feature behind `key`? Admin sees it in every
+// mode except "off" — the admin is always the first rollout ring.
+export function canUseFeature(settings: any, user: any, key: string): boolean {
   if (!user?.id) return false;
-  const flag = getCompetitionAnalysisFlag(settings);
+  const flag = getFeatureFlag(settings, key);
   const isAdmin = user.isAdmin === true;
   switch (flag.mode) {
     case "admin":
@@ -51,4 +51,13 @@ export function canUseCompetitionAnalysis(settings: any, user: any): boolean {
       // "off", missing, or an unrecognised value from a future client.
       return false;
   }
+}
+
+// Named wrappers for the flags that exist today.
+export function getCompetitionAnalysisFlag(settings: any): FeatureFlag {
+  return getFeatureFlag(settings, COMPETITION_ANALYSIS_FLAG);
+}
+
+export function canUseCompetitionAnalysis(settings: any, user: any): boolean {
+  return canUseFeature(settings, user, COMPETITION_ANALYSIS_FLAG);
 }

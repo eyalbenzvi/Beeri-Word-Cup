@@ -57,7 +57,22 @@ describe("rankRange", () => {
 // ── Primary target selection ──
 
 describe("pickPrimaryTarget", () => {
-  const base = { win: 0, p100: 0, p200: 0, last: 0 };
+  const base = { win: 0, podium: 0, p100: 0, p200: 0, last: 0 };
+
+  it("a podium form out of the win race defends the podium, not 'no prizes'", () => {
+    const t = pickPrimaryTarget({
+      currentRank: 2,
+      nForms: 210,
+      probs: { ...base, podium: 0.7 },
+      aliveForFirst: false,
+    });
+    expect(t.key).toBe("podium");
+    // Even with a tiny probability, a form currently ON the podium keeps it
+    // as the story (rank ≤ PRIZE_TOP_PLACES).
+    expect(
+      pickPrimaryTarget({ currentRank: 3, nForms: 210, probs: base, aliveForFirst: false }).key,
+    ).toBe("podium");
+  });
 
   it("prefers the win while alive and probable (or on the podium)", () => {
     expect(
@@ -121,7 +136,7 @@ describe("pickPrimaryTarget", () => {
 const mkOutcome = (key: "home" | "draw" | "away", n: number, hitWin: number) => ({
   key,
   n,
-  hits: [{ win: hitWin, p100: 0, p200: 0, last: 0 }],
+  hits: [{ win: hitWin, podium: 0, p100: 0, p200: 0, last: 0 }],
 });
 
 const mkMatch = (matchId: string, homeP: number, awayP: number, n = 5000): WatchMatchAgg => ({

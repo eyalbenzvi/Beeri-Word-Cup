@@ -11,10 +11,8 @@ import { deriveAdvancingTeams } from "../../utils/bracket";
 import {
   chanceLabel,
   formatChance,
-  pickPrimaryTarget,
   rankRange,
   refundBandLabel,
-  targetProbs,
   PRIZE_TOP_PLACES,
   type PrimaryTarget,
 } from "../../utils/analysisVerdict";
@@ -109,6 +107,7 @@ function LivePicksLine({ formData, aliveSet }: { formData: any; aliveSet: Set<st
 
 const TARGET_LABEL: Record<string, string> = {
   win: "זכייה",
+  podium: "פודיום",
   p100: "מקום 100",
   p200: "מקום 200",
   last: "המקום האחרון",
@@ -138,6 +137,11 @@ function verdictSentence(target: PrimaryTarget, rank: number): string {
         return `אתה על הפודיום עכשיו — ${chance} זה נגמר בזכייה שלך 🏆`;
       }
       return `יש לך סיכוי אמיתי לזכייה — ${chance} מסתיים אצלך 🏆`;
+    case "podium":
+      if (rank <= PRIZE_TOP_PLACES) {
+        return `אתה על הפודיום — מקום ששווה פרס 🏆 הסיכוי שתשמור עליו עד הסוף: ${chance}. עכשיו רק לא לעזוב`;
+      }
+      return `הפודיום — ומדליה ששווה פרס — בטווח שלך 🏆 הסיכוי שתסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
     case "p100":
     case "p200": {
       const tr = target.targetRank!;
@@ -156,6 +160,7 @@ export default function VerdictSection({
   cert,
   agg,
   targetFormIndex,
+  target,
   aliveSet,
   refining,
   failed,
@@ -166,6 +171,9 @@ export default function VerdictSection({
   cert: PoolCertainty;
   agg: PersonalAnalysisAggregate | null;
   targetFormIndex: number;
+  // Computed ONCE by the page (single evaluation shared with the root-for
+  // section, so headline and advice always describe the same target).
+  target: PrimaryTarget | null;
   aliveSet: Set<string> | null;
   refining: boolean;
   failed: boolean;
@@ -174,24 +182,26 @@ export default function VerdictSection({
   const my = cert.byFormId[formId];
 
   const analysis = useMemo(() => {
-    if (!my) return null;
+    if (!my || !target) return null;
     if (!agg || targetFormIndex < 0 || agg.simCount === 0) return null;
-    const probs = targetProbs(agg, targetFormIndex);
-    const target = pickPrimaryTarget({
-      currentRank: my.rank,
-      nForms: cert.nForms,
-      probs,
-      aliveForFirst: my.aliveForFirst,
-    });
     const range = rankRange(agg.targetForms[targetFormIndex].hist, agg.simCount);
-    return { probs, target, range };
-  }, [agg, targetFormIndex, my, cert.nForms]);
+    return { target, range };
+  }, [agg, targetFormIndex, my, target]);
+
+  // Deterministic claims are O(nForms) scans — inputs only change when a
+  // result lands, not on every Monte-Carlo refinement tick.
+  const clinched = useMemo(() => {
+    const first = isClinchedTopN(cert, formId, 1);
+    const podium = !first && isClinchedTopN(cert, formId, PRIZE_TOP_PLACES);
+    const top10 = !first && !podium && isClinchedTopN(cert, formId, 10);
+    return { first, podium, top10 };
+  }, [cert, formId]);
 
   if (!my) return null;
 
-  const clinchedFirst = isClinchedTopN(cert, formId, 1);
-  const clinchedPodium = !clinchedFirst && isClinchedTopN(cert, formId, PRIZE_TOP_PLACES);
-  const clinchedTop10 = !clinchedFirst && !clinchedPodium && isClinchedTopN(cert, formId, 10);
+  const clinchedFirst = clinched.first;
+  const clinchedPodium = clinched.podium;
+  const clinchedTop10 = clinched.top10;
 
   const today = new Date().toLocaleDateString("he-IL", {
     weekday: "long",
@@ -205,7 +215,9 @@ export default function VerdictSection({
         <span className="text-xs font-extrabold text-ink truncate">
           ⚽ {my.formName} · מקום <bdi>{my.rank}</bdi> מתוך <bdi>{cert.nForms}</bdi>
         </span>
-        <span className="text-3xs text-ink-light font-bold shrink-0">נכון ל{today}</span>
+        <span className="text-3xs text-ink-light font-bold shrink-0">
+          נכון ל<bdi>{today}</bdi>
+        </span>
       </div>
 
       {/* Verdict line */}
@@ -221,13 +233,16 @@ export default function VerdictSection({
           {analysis.target.key === "none" && (
             <LivePicksLine formData={formData} aliveSet={aliveSet} />
           )}
-          {analysis.target.targetRank != null && (
-            <LadderStrip
-              rank={my.rank}
-              targetRank={analysis.target.targetRank}
-              targetLabel={TARGET_LABEL[analysis.target.key] || ""}
-            />
-          )}
+          {/* Distance ladder only for the fixed refund places — "last" is a
+              moving rank under bottom-ties, so the sentence carries it alone. */}
+          {analysis.target.targetRank != null &&
+            (analysis.target.key === "p100" || analysis.target.key === "p200") && (
+              <LadderStrip
+                rank={my.rank}
+                targetRank={analysis.target.targetRank}
+                targetLabel={TARGET_LABEL[analysis.target.key] || ""}
+              />
+            )}
           {analysis.range && analysis.target.key !== "none" && (
             <p className="text-sm text-ink-muted font-bold mt-1.5">
               ברוב התרחישים תסיים בין מקום <bdi>{analysis.range.lo}</bdi> למקום{" "}
