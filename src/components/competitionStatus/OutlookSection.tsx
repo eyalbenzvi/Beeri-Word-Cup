@@ -10,25 +10,28 @@ import { getTeamFlagName } from "../../utils/teamDisplay";
 import { getCachedChampion } from "../../utils/bracketCache";
 import { normalizeStatus } from "../../utils/helpers";
 import { chanceLabel, formatChance, pickKeyMatch } from "../../utils/analysisVerdict";
+import { useScenarioData } from "../../hooks/useScenarioRun";
 import type { PersonalAnalysisAggregate } from "../../utils/personalAnalysis";
 import type { WatchMatch } from "../../utils/analysisWindow";
-import type { ScenarioRunResult } from "../../utils/scenarioSim";
 
 const MAX_CHAMPION_ROWS = 5;
 
 export default function OutlookSection({
-  run,
-  runLoading,
   allPredictions,
   agg,
   watchMatches,
 }: {
-  run: ScenarioRunResult | null;
-  runLoading: boolean;
   allPredictions: Record<string, any>;
   agg: PersonalAnalysisAggregate | null;
   watchMatches: WatchMatch[];
 }) {
+  // The scenarioRun subscription lives HERE (not in the page) on purpose:
+  // this component only mounts after the page's flag/lock gates pass, so a
+  // pre-lock or unreleased deep link never opens a doomed subscription
+  // (permission-denied → Sentry noise on every visit).
+  const { state } = useScenarioData();
+  const run = state.result;
+  const runLoading = state.loading;
   // How many submitted forms picked each champion (pool-crowd view).
   const pickCounts = useMemo(() => {
     const counts: Record<string, number> = {};

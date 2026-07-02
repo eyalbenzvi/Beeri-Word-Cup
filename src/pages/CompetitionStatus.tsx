@@ -29,7 +29,6 @@ import {
 import { useNavigation } from "../hooks/useNavigation";
 import { useCompetitionAnalysisAccess } from "../hooks/useCompetitionAnalysisAccess";
 import { usePersonalAnalysis } from "../hooks/usePersonalAnalysis";
-import { useScenarioData } from "../hooks/useScenarioRun";
 import { computePoolCertainty } from "../utils/poolCertainty";
 import { selectWatchMatches, NEXT_ROUND } from "../utils/analysisWindow";
 import { pickPrimaryTarget, targetProbs, type PrimaryTarget } from "../utils/analysisVerdict";
@@ -44,7 +43,6 @@ export default function CompetitionStatus() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
   const actualBonuses = useActualBonuses();
-  const scenario = useScenarioData();
 
   // The viewer's submitted forms, leaderboard-ordered.
   const cert = useMemo(
@@ -297,8 +295,6 @@ export default function CompetitionStatus() {
       )}
 
       <OutlookSection
-        run={scenario.state.result}
-        runLoading={scenario.state.loading}
         allPredictions={allPredictions}
         agg={analysis.agg}
         watchMatches={watchMatches}
