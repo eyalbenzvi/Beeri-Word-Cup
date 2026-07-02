@@ -161,5 +161,36 @@ console.log("5. Static wiring (additive, flag-gated touch points)");
   assert(certainty.includes("computeCore"), "certainty scores via the canonical leaderboard core");
 }
 
+// ── 6. Copy contract: alive-badge gating + gender-neutral Hebrew ────
+console.log("6. Copy contract");
+{
+  // The "still in the race" badge must be gated on the win being the
+  // verdict's OWN target — the sound bound is loose by design, so showing it
+  // to every not-yet-eliminated form reads as a false promise (user report).
+  const verdict = read("src/components/competitionStatus/VerdictSection.tsx");
+  assert(
+    /aliveForFirst && analysis\?\.target\.key === "win"/.test(verdict),
+    "alive badge gated on target.key === 'win'",
+  );
+
+  // Gender-neutral copy guard: no masculine-singular address in any
+  // user-facing component of the feature (per the Hebrew review). Tokens
+  // chosen to avoid false positives (e.g. plural תעודדו does not match).
+  const uiFiles = [
+    "src/components/competitionStatus/VerdictSection.tsx",
+    "src/components/competitionStatus/RootForSection.tsx",
+    "src/components/competitionStatus/OutlookSection.tsx",
+    "src/components/competitionStatus/CompetitionAnalysisEntry.tsx",
+    "src/pages/CompetitionStatus.tsx",
+  ];
+  const masculine = ["אתה ", "בוא נ", "תיהנה", "אל תיתן", "תעודד את", "שתסיים", "שתשמור", "שתנחת"];
+  for (const f of uiFiles) {
+    const src = read(f);
+    for (const tok of masculine) {
+      assert(!src.includes(tok), `${f}: no masculine-singular token "${tok}"`);
+    }
+  }
+}
+
 console.log(`\n=== COMPETITION ANALYSIS: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) { console.error("\nFailures:\n" + failures.map((f) => " - " + f).join("\n")); process.exit(1); }

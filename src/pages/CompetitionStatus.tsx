@@ -186,7 +186,7 @@ export default function CompetitionStatus() {
           <div className="mt-6 space-y-2 max-w-xs mx-auto">
             <p className="text-xs font-medium">ההגדרות לא נטענות — בדקו את החיבור.</p>
             <button onClick={() => window.location.reload()} className="btn-duo btn-duo-primary w-full">
-              רענן את הדף
+              רעננו את הדף
             </button>
             <button onClick={() => navigate("home")} className="btn-duo btn-duo-ghost w-full">
               חזרה לדף הבית
@@ -202,7 +202,7 @@ export default function CompetitionStatus() {
       <EmptyState
         icon="🔭"
         title="העמוד הזה עוד לא נפתח עבורך"
-        description="ניתוח התחרות משוחרר בהדרגה. שווה לחכות — זה טוב."
+        description="ניתוח התחרות נפתח בהדרגה. עוד קצת סבלנות — שווה לחכות."
         cta={
           <button onClick={() => navigate("home")} className="btn-duo btn-duo-primary">
             חזרה לדף הבית
@@ -241,8 +241,8 @@ export default function CompetitionStatus() {
 
       {liveNow && (
         <div className="alert-accent-soft rounded-2xl p-3 mb-3 text-sm font-bold text-ink">
-          ⏳ יש משחק על הדשא ממש עכשיו — התמונה כאן מעודכנת לרגע שריקת הפתיחה,
-          ותתרענן כשתיכנס תוצאה.
+          ⏳ יש משחק על הדשא ממש עכשיו — מה שרואים כאן עוד לא כולל אותו, והתמונה
+          תתעדכן כשתיכנס התוצאה.
         </div>
       )}
 
@@ -250,7 +250,7 @@ export default function CompetitionStatus() {
         <EmptyState
           icon="📝"
           title="אין טופס בתחרות"
-          description="העמוד הזה מספר איך הטופס שלך מסתדר — ובלי טופס שהוגש, אין מה לספר."
+          description="העמוד הזה מספר מה מצב הטופס שלך בתחרות — ובלי טופס שהוגש, אין מה לספר."
         />
       ) : (
         <>
