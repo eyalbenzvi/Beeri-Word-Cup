@@ -60,7 +60,7 @@ export default function CompetitionAnalysisEntry({
       <span className="flex-1 min-w-0">
         <span className="block font-extrabold text-ink text-sm">המצב שלי בתחרות</span>
         <span className="block text-xs text-ink-muted font-medium mt-0.5">
-          סיכויים, יעדים ולמי לעודד במשחקים הקרובים
+          סיכויים, יעדים ואת מי לעודד במשחקים הקרובים
         </span>
       </span>
       <span className="badge-duo badge-duo-accent shrink-0">חדש</span>

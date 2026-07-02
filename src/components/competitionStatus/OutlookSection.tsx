@@ -86,8 +86,8 @@ export default function OutlookSection({
           </div>
           <div className="text-sm font-extrabold text-ink">
             {getTeamFlagName(keyMatch.home)} <span className="text-ink-muted">נגד</span>{" "}
-            {getTeamFlagName(keyMatch.away)} — התוצאה שלו יכולה לטלטל את הטבלה יותר
-            מכל משחק אחר 🌪️
+            {getTeamFlagName(keyMatch.away)} — התוצאה שלו תשפיע על הטבלה יותר מכל
+            משחק אחר 🌪️
           </div>
         </div>
       )}

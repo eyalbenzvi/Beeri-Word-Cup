@@ -1,4 +1,4 @@
-// "למי לעודד" — up to 3 upcoming (48h-window) matches, sorted by how much
+// "את מי לעודד" — up to 3 upcoming (48h-window) matches, sorted by how much
 // their outcome moves the user's primary money target. Direction words only,
 // no numbers. Counterintuitive advice ("root against your own pick") always
 // carries a why-clause — never emitted bare.
@@ -86,7 +86,7 @@ export default function RootForSection({
 
   return (
     <div className="mb-4">
-      <h3 className="text-base font-extrabold text-ink mb-0.5">📣 למי לעודד</h3>
+      <h3 className="text-base font-extrabold text-ink mb-0.5">📣 את מי לעודד</h3>
       <p className="text-xs text-ink-muted font-medium mb-2">
         המשחקים הקרובים, מנקודת המבט של הטופס שלך
       </p>

@@ -92,7 +92,7 @@ function LivePicksLine({ formData, aliveSet }: { formData: any; aliveSet: Set<st
     <div className="text-sm font-bold text-ink mt-2 space-y-1">
       {info.championAlive && info.championName && (
         <div>
-          🏆 {info.championName} — האלופה שסימנת — עדיין במשחק. יש למי לעודד.
+          🏆 {info.championName} — האלופה שסימנת — עדיין במשחק. יש את מי לעודד.
         </div>
       )}
       {info.pickedCount > 0 && (
@@ -141,7 +141,7 @@ function verdictSentence(target: PrimaryTarget, rank: number): string {
       if (rank <= PRIZE_TOP_PLACES) {
         return `הטופס שלך על הפודיום — מקום ששווה פרס 🏆 הסיכוי לשמור עליו עד הסוף: ${chance}. עכשיו רק לא לעזוב`;
       }
-      return `הפודיום — ומדליה ששווה פרס — בטווח שלך 🏆 הסיכוי לסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
+      return `הפודיום — מקום ששווה פרס — עדיין במשחק 🏆 הסיכוי לסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
     case "p100":
     case "p200": {
       const tr = target.targetRank!;

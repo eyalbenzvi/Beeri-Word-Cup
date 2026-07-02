@@ -184,10 +184,15 @@ console.log("6. Copy contract");
     "src/pages/CompetitionStatus.tsx",
   ];
   const masculine = ["אתה ", "בוא נ", "תיהנה", "אל תיתן", "תעודד את", "שתסיים", "שתשמור", "שתנחת"];
+  // Phrases the owner explicitly rejected — must never come back.
+  const banned = ["למי לעודד", "בטווח שלך", "לטלטל את הטבלה", "מזיזה את"];
   for (const f of uiFiles) {
     const src = read(f);
     for (const tok of masculine) {
       assert(!src.includes(tok), `${f}: no masculine-singular token "${tok}"`);
+    }
+    for (const tok of banned) {
+      assert(!src.includes(tok), `${f}: no banned phrase "${tok}"`);
     }
   }
 }
