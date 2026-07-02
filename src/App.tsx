@@ -28,6 +28,7 @@ const Simulator = lazyWithRetry(() => import("./pages/Simulator"));
 const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const DailySummary = lazyWithRetry(() => import("./pages/DailySummary"));
+const CompetitionStatus = lazyWithRetry(() => import("./pages/CompetitionStatus"));
 
 const PAGES = {
   home: Home,
@@ -39,6 +40,9 @@ const PAGES = {
   admin: Admin,
   profile: Profile,
   blog: DailySummary,
+  // Flag-gated (settings.features.competitionAnalysis); NOT in GUEST_PAGES —
+  // a logged-out deep link normalizes to home via the existing effect.
+  mystatus: CompetitionStatus,
 };
 
 // After STUCK_THRESHOLD_MS, the spinner surfaces recovery options. Without

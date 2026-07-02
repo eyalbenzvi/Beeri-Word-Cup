@@ -10,6 +10,7 @@ import { TOP_SCORER_PLAYERS } from "../data/players";
 import { isBestCaseAvailable } from "../utils/bestCase";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmModal";
+import CompetitionAnalysisAdminControl from "./competitionStatus/CompetitionAnalysisAdminControl";
 
 export default function AdminSettingsTab({
   settings,
@@ -84,6 +85,8 @@ export default function AdminSettingsTab({
           </button>
         </div>
       </div>
+
+      <CompetitionAnalysisAdminControl settings={settings} users={users} />
 
       <div className="card-duo">
         <h3 className="font-bold text-sm mb-2">סטטיסטיקות</h3>

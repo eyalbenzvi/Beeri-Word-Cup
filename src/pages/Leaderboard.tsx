@@ -35,6 +35,7 @@ import FormComparison from "../components/FormComparison";
 import { computeFormRankHistory } from "../utils/computeFormRankHistory";
 import BackToTopButton from "../components/BackToTopButton";
 import ScrollToBottomButton from "../components/ScrollToBottomButton";
+import CompetitionAnalysisEntry from "../components/competitionStatus/CompetitionAnalysisEntry";
 
 const allMatchesMap = Object.fromEntries(
   [...groupMatches, ...knockoutMatches].map((m) => [m.id, m]),
@@ -570,6 +571,7 @@ export default function Leaderboard({
           {predData.status === "submitted" || predData.status === "approved" ? (
             <BestCasePanel formId={selectedForm} />
           ) : null}
+          <CompetitionAnalysisEntry compact formId={selectedForm} />
         </div>
 
         {/* Prediction tree — the same stages⇄bracket view used in "כל הטפסים".
@@ -694,6 +696,8 @@ export default function Leaderboard({
               </div>
             </div>
           )}
+
+          {!embedded && <CompetitionAnalysisEntry />}
 
           {!embedded && rankedLeaderboard.length > 0 && (
             <div className="card-duo mb-3">

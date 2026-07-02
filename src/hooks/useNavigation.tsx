@@ -6,7 +6,7 @@ const NavigationContext = createContext<any>(null);
 // Pages supported via URL query parameters. Only these are rehydrated from
 // `?page=...` on load, so bogus or legacy values can't drop the user onto
 // an unrendered page.
-const URL_PAGES = new Set(["home", "predict", "leaderboard", "results", "stats", "admin", "profile", "blog", "simulator"]);
+const URL_PAGES = new Set(["home", "predict", "leaderboard", "results", "stats", "admin", "profile", "blog", "simulator", "mystatus"]);
 
 // Query-string params we care about. Anything else is preserved on navigation
 // via URLSearchParams.
