@@ -198,6 +198,7 @@ run_test "128. Result Breakdown Display (shared component wired across all resul
 run_test "129. Advancing Points Breakdown (נקודות עליה: per-round team count × rate + totals)" "ui/test-advancing-points-breakdown.mjs" "no"
 run_test "130. Best-Case Optimizer (projected rank/score reconciles with leaderboard; stage-tagged scenario)" "bracket/test-best-case-optimizer.mjs" "yes"
 run_test "131. Best-Case → Simulator Hand-off (converter shape + parity + one-shot seed)" "bracket/test-best-case-to-simulator.mjs" "yes"
+run_test "132. Competition Analysis (המצב שלי: engine parity + certainty soundness + flag gate + wiring)" "analysis/test-competition-analysis.mjs" "yes"
 
 echo ""
 echo "==========================================="
