@@ -270,12 +270,18 @@ export default function VerdictSection({
         {clinchedFirst && <span className="badge-duo badge-duo-primary">אלוף — מובטח 🔒</span>}
         {clinchedPodium && <span className="badge-duo badge-duo-primary">פודיום מובטח 🔒</span>}
         {clinchedTop10 && <span className="badge-duo badge-duo-secondary">טופ־10 מובטח 🔒</span>}
-        {!clinchedFirst &&
-          (my.aliveForFirst ? (
-            <span className="badge-duo badge-duo-muted">עדיין בחיים במרוץ לזכייה ✅</span>
-          ) : (
-            <span className="badge-duo badge-duo-muted">הזכייה ירדה מהפרק</span>
-          ))}
+        {/* The "still alive for the win" fact is shown ONLY when the win is
+            the verdict's own story — for a form whose realistic target is
+            place 100, "עדיין בחיים במרוץ לזכייה" is technically true (the
+            sound bound is loose by design) but reads as a promise the
+            verdict itself contradicts. Mathematical elimination, by
+            contrast, is always worth stating. */}
+        {!clinchedFirst && my.aliveForFirst && analysis?.target.key === "win" && (
+          <span className="badge-duo badge-duo-muted">הזכייה עוד בהישג יד ✅</span>
+        )}
+        {!clinchedFirst && !my.aliveForFirst && (
+          <span className="badge-duo badge-duo-muted">הזכייה כבר לא אפשרית מתמטית</span>
+        )}
         {refining && !failed && (
           <span className="badge-duo badge-duo-muted">מדייק את החישוב…</span>
         )}
