@@ -19,7 +19,8 @@
 import { readMigratedSrc } from "../helpers/readMigratedSrc.mjs";
 import { predictScenario } from "/home/user/Beeri-World-Cup/src/utils/scenarioPredictor.ts";
 import { groupMatches, knockoutMatches } from "/home/user/Beeri-World-Cup/src/data/matches.ts";
-import { calcBracketTeams } from "/home/user/Beeri-World-Cup/src/utils/bracket.ts";
+import { calcBracketTeams, deriveAdvancingTeams, deriveChampion } from "/home/user/Beeri-World-Cup/src/utils/bracket.ts";
+import { isScoreValid } from "/home/user/Beeri-World-Cup/src/utils/helpers.ts";
 import { GROUPS } from "/home/user/Beeri-World-Cup/src/data/teams.ts";
 import {
   computeBestCase,
@@ -320,6 +321,101 @@ console.log("--- 6. Static wiring (sanitization + graceful degradation) ---");
     "BestCasePanel is wrapped in an error boundary (render throws hide the feature)");
   assert(/<BestCasePanelInner/.test(panel) && /BestCasePanelBoundary/.test(panel),
     "default export wraps the inner panel in the feature-local boundary");
+}
+
+// ── 7. Optimality floor: never worse than the target's own "dream" scenario ──
+// Root bug this section locks in: with 16 KO matches remaining (R16 onward —
+// the state the tournament spends most of the knockout stage in) the old
+// MAX_KO_REFINE=8 gate disabled the lookahead entirely, leaving only the
+// myopic round-by-round greedy. Users could then beat the optimizer by hand
+// with the most obvious scenario of all: "every remaining match goes exactly
+// as MY form predicted" (reported in production as best-case rank 3 vs. a
+// trivially-reachable rank 1). computeBestCase now evaluates that dream
+// completion explicitly, so its projection must NEVER rank worse.
+console.log("--- 7. Projected rank is never worse than the target's dream scenario ---");
+{
+  const KO_ORDER = ["R32", "R16", "QF", "SF", "3RD", "F"];
+  // Independent re-implementation of the dream completion (kept deliberately
+  // separate from the production code so a bug there can't hide here).
+  function dreamScenario(targetForm, played, remKO) {
+    const predBracket = calcBracketTeams(targetForm.matches || {});
+    const adv = deriveAdvancingTeams(predBracket);
+    const champion = deriveChampion(targetForm.matches || {}, predBracket);
+    const remSet = new Set(remKO.map((m) => m.id));
+    const results = { ...played };
+    const depth = (team) => {
+      if (!team) return -1;
+      let d = -1;
+      ["R32", "R16", "QF", "SF", "F"].forEach((r, i) => {
+        if ((adv[r] || []).includes(team)) d = i;
+      });
+      if (champion === team) d = 5;
+      return d;
+    };
+    for (const round of KO_ORDER) {
+      const bracket = calcBracketTeams(results);
+      for (const m of knockoutMatches.filter((x) => x.stage === round && remSet.has(x.id))) {
+        const t = bracket[m.id];
+        if (!t?.home || !t?.away) continue;
+        const pred = targetForm.matches?.[m.id];
+        const pt = predBracket[m.id];
+        if (pt?.home === t.home && pt?.away === t.away && isScoreValid(pred)) {
+          const e = { homeScore: +pred.homeScore, awayScore: +pred.awayScore, stage: m.stage };
+          if (e.homeScore === e.awayScore) e.advancingTeam = pred.advancingTeam || t.home;
+          results[m.id] = e;
+        } else {
+          results[m.id] = depth(t.home) >= depth(t.away)
+            ? { homeScore: 1, awayScore: 0, stage: m.stage }
+            : { homeScore: 0, awayScore: 1, stage: m.stage };
+        }
+      }
+    }
+    return results;
+  }
+
+  let checked = 0, beaten = 0;
+  for (let w = 0; w < 2; w++) {
+    const forms = genForms(14);
+    const actual = fullResults(allCodes[7 + w], allCodes[25 + w]);
+    // R16 onward remaining — 16 KO matches, the reported-bug window.
+    const remKO = knockoutMatches.filter((m) => m.stage !== "R32");
+    const remSet = new Set(remKO.map((m) => m.id));
+    const played = {};
+    for (const id of Object.keys(actual)) if (!remSet.has(id)) played[id] = actual[id];
+
+    for (const target of Object.keys(forms)) {
+      const bc = computeBestCase(target, forms, played);
+      const dream = dreamScenario(forms[target], played, remKO);
+      const dreamRank = leaderboardRankScore(target, forms, dream).rank;
+      checked++;
+      if (bc.projectedRank > dreamRank) {
+        beaten++;
+        if (failures.length < 6)
+          console.error(`    ${target} (world ${w}): optimizer rank ${bc.projectedRank} beaten by dream rank ${dreamRank}`);
+      }
+    }
+  }
+  assert(beaten === 0, `optimizer never ranks worse than the target's dream scenario (${checked - beaten}/${checked})`);
+}
+
+// ── 8. Static wiring: dream floor + deny candidates + refine gate ──
+console.log("--- 8. Static wiring (dream floor, deny candidates, refine gate) ---");
+{
+  const src = readMigratedSrc("src/utils/bestCase.ts");
+  assert(/function dreamCompletion\(/.test(src), "bestCase has a dreamCompletion builder");
+  // Phase 2b: the dream completion must be evaluated against the greedy seed.
+  assert(/Phase 2b: target-dream floor/.test(src), "computeBestCase runs the target-dream floor phase");
+  // Deny candidates exist but are RESERVED for the refinement pass — the
+  // myopic greedy must not see them (observed rank collapse when it did).
+  assert(/function addDenyCandidate\(/.test(src), "bestCase has per-outcome deny candidates");
+  assert(/includeDeny = false/.test(src), "getCandidates excludes deny candidates by default");
+  assert(/getCandidates\(m\.id, trackedForms, \/\* includeDeny \*\/ true\)/.test(src),
+    "refineKnockout opts into deny candidates");
+  // The local search must cover the R16-onward window (16 remaining matches).
+  assert(/const MAX_KO_REFINE = 16/.test(src), "knockout local search covers 16 remaining matches");
+  // And its trials must be complete scenarios (dream rollout, not partial brackets).
+  assert(/dreamCompletion\(\s*targetForm, targetPreds, \[\], downstream, withCand,?\s*\)/.test(src),
+    "refineKnockout evaluates complete dream-rollout scenarios");
 }
 
 console.log(`\n=== BEST-CASE OPTIMIZER RESULTS: ${passed} passed, ${failed} failed ===`);
