@@ -411,8 +411,9 @@ console.log("--- 8. Static wiring (dream floor, deny candidates, refine gate) --
   assert(/includeDeny = false/.test(src), "getCandidates excludes deny candidates by default");
   assert(/getCandidates\(m\.id, trackedForms, \/\* includeDeny \*\/ true\)/.test(src),
     "refineKnockout opts into deny candidates");
-  // The local search must cover the R16-onward window (16 remaining matches).
-  assert(/const MAX_KO_REFINE = 16/.test(src), "knockout local search covers 16 remaining matches");
+  // The local search must cover R16-onward INCLUDING the R32 tail (the real
+  // production bug surfaced at 19 remaining — 13 of 16 R32 results played).
+  assert(/const MAX_KO_REFINE = 20/.test(src), "knockout local search covers 20 remaining matches");
   // And its trials must be complete scenarios (dream rollout, not partial brackets).
   assert(/dreamCompletion\(\s*targetForm, targetPreds, \[\], downstream, withCand,?\s*\)/.test(src),
     "refineKnockout evaluates complete dream-rollout scenarios");

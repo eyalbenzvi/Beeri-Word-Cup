@@ -917,12 +917,16 @@ function refineKnockoutGreedy(
   return best;
 }
 
-// Gate for the rollout local search. 16 covers "R16 onward" — the state the
-// knockout stage spends most of its calendar in, and where the bug was
-// reported. At the full 32 the sweep is still heavy in scoreForms calls (32
-// matches × candidates × iterations), so the pre-R32 window keeps relying on
-// the greedy + dream floor.
-const MAX_KO_REFINE = 16;
+// Gate for the rollout local search. 20 covers "R16 onward" INCLUDING the
+// tail of R32 (validated on the real production backup: at 13/16 R32 results
+// played = 19 remaining, the rollout finds the rank the user could reach by
+// hand in the simulator, while the un-refined greedy+dream stops one rank
+// short). Runtime at 19 remaining × 250 real forms ≈ 20s inside the worker.
+// At the full 32 the sweep is still heavy in scoreForms calls (32 matches ×
+// candidates × iterations), so the early-R32 window keeps relying on the
+// greedy + dream floor — which on the same real backup found rank 1 at every
+// state up to 11 R32 results played.
+const MAX_KO_REFINE = 20;
 
 function refineKnockout(
   remKO: any[],
