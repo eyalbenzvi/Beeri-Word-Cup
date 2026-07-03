@@ -64,10 +64,10 @@ export default function CompetitionAnalysisAdminControl({
 
   return (
     <div className="card-duo">
-      <h3 className="font-bold text-sm mb-1">🎯 המצב שלי בתחרות — שחרור הדרגתי</h3>
+      <h3 className="font-bold text-sm mb-1">🎯 המצב שלי בתחרות — פתיחה הדרגתית</h3>
       <p className="text-xs text-ink-muted mb-3">
-        קובע מי רואה את עמוד ניתוח התחרות. הכל או כלום למשתמש; שינוי נקלט אצל
-        כולם תוך שניות, וכיבוי הוא מיידי.
+        קובע מי רואה את עמוד ניתוח התחרות. הכול או כלום לכל משתמש; שינוי נקלט
+        אצל כולם תוך שניות, וכיבוי הוא מיידי.
       </p>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -94,7 +94,13 @@ export default function CompetitionAnalysisAdminControl({
         <div className="border-t border-border pt-3">
           <div className="flex items-center justify-between gap-2 mb-2">
             <span className="text-xs font-extrabold text-ink">
-              שוחרר ל־<bdi>{allow.length}</bdi> משתמשים
+              {allow.length === 1 ? (
+                "פתוח למשתמש אחד"
+              ) : (
+                <>
+                  פתוח ל־<bdi>{allow.length}</bdi> משתמשים
+                </>
+              )}
             </span>
             <input
               type="search"
@@ -102,7 +108,7 @@ export default function CompetitionAnalysisAdminControl({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חיפוש משתמש…"
               className="input-duo input-duo-sm w-40"
-              aria-label="חיפוש משתמש לשחרור"
+              aria-label="חיפוש משתמש לפתיחת הפיצ'ר"
             />
           </div>
           <div className="max-h-56 overflow-y-auto space-y-1">

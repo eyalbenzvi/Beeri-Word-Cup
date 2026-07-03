@@ -76,7 +76,7 @@ export default function OutlookSection({
     <div className="card-duo mb-4">
       <h3 className="text-base font-extrabold text-ink mb-0.5">🔮 מה צפוי בטורניר</h3>
       <p className="text-xs text-ink-muted font-medium mb-3">
-        אותה תמונה לכולם — מהסימולציה של שארית הטורניר
+        אותה תמונה לכולם — מסימולציה של המשך הטורניר
       </p>
 
       {keyMatch && (
@@ -86,7 +86,7 @@ export default function OutlookSection({
           </div>
           <div className="text-sm font-extrabold text-ink">
             {getTeamFlagName(keyMatch.home)} <span className="text-ink-muted">נגד</span>{" "}
-            {getTeamFlagName(keyMatch.away)} — התוצאה שלו מזיזה את טבלת הטוטו יותר מכל
+            {getTeamFlagName(keyMatch.away)} — התוצאה שלו תשפיע על הטבלה יותר מכל
             משחק אחר 🌪️
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function OutlookSection({
         </p>
       ) : champions.length === 0 ? (
         <p className="text-sm text-ink-muted font-medium py-3 text-center">
-          עוד אין תחזית טורניר — היא מחושבת אוטומטית אחרי התוצאה הבאה.
+          עוד אין תחזית לטורניר — היא תחושב אוטומטית אחרי התוצאה הבאה.
         </p>
       ) : (
         <div className="space-y-1.5">
@@ -116,7 +116,13 @@ export default function OutlookSection({
                   {formatChance(chanceLabel(c.prob))}
                   {c.picks > 0 && (
                     <span className="block text-2xs text-ink-light">
-                      <bdi>{c.picks}</bdi> טפסים הימרו עליה
+                      {c.picks === 1 ? (
+                        "טופס אחד בחר בה"
+                      ) : (
+                        <>
+                          <bdi>{c.picks}</bdi> טפסים בחרו בה
+                        </>
+                      )}
                     </span>
                   )}
                 </span>

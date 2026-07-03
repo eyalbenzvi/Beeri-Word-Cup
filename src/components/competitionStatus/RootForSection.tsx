@@ -1,4 +1,4 @@
-// "למי לעודד" — up to 3 upcoming (48h-window) matches, sorted by how much
+// "את מי לעודד" — up to 3 upcoming (48h-window) matches, sorted by how much
 // their outcome moves the user's primary money target. Direction words only,
 // no numbers. Counterintuitive advice ("root against your own pick") always
 // carries a why-clause — never emitted bare.
@@ -46,12 +46,12 @@ function adviceSentence(
     !!predictedAdvancers && predictedAdvancers.has(other) && !predictedAdvancers.has(team);
 
   if (againstHeart) {
-    return `דווקא הפסד של ${otherName} עוזר לך הפעם — הלב שלך עם ${otherName}, אבל הדרך שלך ${phrase} עוברת דרך ${teamName} 📣`;
+    return `דווקא הפסד של ${otherName} עוזר לך הפעם — הלב שלך עם ${otherName}, אבל המסלול שלך ${phrase} עובר דרך ${teamName} 📣`;
   }
   if (advice.strong) {
-    return `המשחק הזה משנה לך את התמונה: ניצחון של ${teamName} מקדם אותך משמעותית ${phrase}. תעודד את ${teamName} 📣`;
+    return `המשחק הזה משנה לך את התמונה: ניצחון של ${teamName} מקרב אותך משמעותית ${phrase}. שווה לעודד את ${teamName} 📣`;
   }
-  return `ניצחון של ${teamName} מקרב אותך ${phrase}. תעודד את ${teamName} 📣`;
+  return `ניצחון של ${teamName} מקרב אותך ${phrase}. שווה לעודד את ${teamName} 📣`;
 }
 
 export default function RootForSection({
@@ -86,7 +86,7 @@ export default function RootForSection({
 
   return (
     <div className="mb-4">
-      <h3 className="text-base font-extrabold text-ink mb-0.5">📣 למי לעודד</h3>
+      <h3 className="text-base font-extrabold text-ink mb-0.5">📣 את מי לעודד</h3>
       <p className="text-xs text-ink-muted font-medium mb-2">
         המשחקים הקרובים, מנקודת המבט של הטופס שלך
       </p>
@@ -94,7 +94,7 @@ export default function RootForSection({
       {advice.length === 0 ? (
         <div className="card-duo-tight">
           <p className="text-sm font-bold text-ink">
-            המשחקים הקרובים כמעט לא משנים לך — תיהנה מהכדורגל 😌
+            המשחקים הקרובים כמעט לא משנים לך — אפשר פשוט ליהנות מהכדורגל 😌
           </p>
         </div>
       ) : (
@@ -137,7 +137,7 @@ export default function RootForSection({
                 <div className="flex gap-1.5 mt-1.5">
                   {i === 0 && <span className="badge-duo badge-duo-accent">הכי חשוב</span>}
                   {a.lowSample && (
-                    <span className="badge-duo badge-duo-muted">משוער — החישוב עוד מתדייק</span>
+                    <span className="badge-duo badge-duo-muted">משוער — החישוב עוד מתחדד</span>
                   )}
                 </div>
               </div>

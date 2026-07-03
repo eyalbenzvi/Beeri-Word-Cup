@@ -35,7 +35,7 @@ function LadderStrip({
     return (
       <div className="text-center my-3">
         <span className="inline-block bg-primary-soft border-2 border-primary rounded-full px-4 py-1.5 text-sm font-extrabold text-primary-dark">
-          אתה בדיוק על היעד 🎯
+          הטופס שלך בדיוק על היעד 🎯
         </span>
       </div>
     );
@@ -44,10 +44,10 @@ function LadderStrip({
   return (
     <div
       className="flex items-center gap-1 my-3"
-      aria-label={`אתה במקום ${rank}, במרחק ${distance} מקומות מ${targetLabel}`}
+      aria-label={`הטופס שלך במקום ${rank}, במרחק ${distance} מקומות מ${targetLabel}`}
     >
       <span className="bg-primary-soft border-2 border-primary rounded-full px-2.5 py-1 text-xs font-extrabold text-primary-dark shrink-0">
-        אתה · מקום <bdi>{rank}</bdi>
+        הטופס שלך · מקום <bdi>{rank}</bdi>
       </span>
       <span className="flex-1 flex items-center" aria-hidden="true">
         {Array.from({ length: distance - 1 }).map((_, i) => (
@@ -92,7 +92,7 @@ function LivePicksLine({ formData, aliveSet }: { formData: any; aliveSet: Set<st
     <div className="text-sm font-bold text-ink mt-2 space-y-1">
       {info.championAlive && info.championName && (
         <div>
-          🏆 {info.championName} — האלופה שסימנת — עדיין במשחק. יש למי לעודד.
+          🏆 {info.championName} — האלופה שסימנת — עדיין במשחק. יש את מי לעודד.
         </div>
       )}
       {info.pickedCount > 0 && (
@@ -119,38 +119,38 @@ function verdictSentence(target: PrimaryTarget, rank: number): string {
   switch (target.key) {
     case "win":
       if (label.kind === "miracle") {
-        return `הזכייה רחוקה — רק בנס. אבל נסים כבר קרו במונדיאל ⚽`;
+        return `הזכייה רחוקה — רק בנס. אבל ניסים כבר קרו במונדיאל ⚽`;
       }
       if (label.kind === "slim") {
         return `הזכייה עוד אפשרית — סיכוי קלוש, אבל חי ✨`;
       }
       if (label.kind === "almost") {
-        return `הזכייה כמעט בכיס — כמעט בכל תרחיש אתה מסיים ראשון 🏆`;
+        return `הזכייה ממש קרובה — כמעט בכל תרחיש הטופס שלך מסיים ראשון 🏆`;
       }
       if (label.kind === "good") {
-        return `אתה הפייבוריט לזכייה — ברוב התרחישים זה נגמר אצלך 🏆`;
+        return `הטופס שלך הפייבוריט לזכייה — ברוב התרחישים המקום הראשון שלך 🏆`;
       }
       if (label.kind === "coin") {
-        return `הזכייה על הכף — בערך חצי מהתרחישים נגמרים אצלך 🏆`;
+        return `הזכייה פתוחה לגמרי — בערך חצי מהתרחישים נגמרים בזכייה שלך 🏆`;
       }
       if (rank <= PRIZE_TOP_PLACES) {
-        return `אתה על הפודיום עכשיו — ${chance} זה נגמר בזכייה שלך 🏆`;
+        return `הטופס שלך על הפודיום כבר עכשיו — והסיכוי שזה ייגמר בזכייה: ${chance} 🏆`;
       }
-      return `יש לך סיכוי אמיתי לזכייה — ${chance} מסתיים אצלך 🏆`;
+      return `יש לך סיכוי אמיתי לזכייה 🏆 כמה אמיתי? ${chance}`;
     case "podium":
       if (rank <= PRIZE_TOP_PLACES) {
-        return `אתה על הפודיום — מקום ששווה פרס 🏆 הסיכוי שתשמור עליו עד הסוף: ${chance}. עכשיו רק לא לעזוב`;
+        return `הטופס שלך על הפודיום — מקום ששווה פרס 🏆 הסיכוי לשמור עליו עד הסוף: ${chance}. עכשיו רק לא לעזוב`;
       }
-      return `הפודיום — ומדליה ששווה פרס — בטווח שלך 🏆 הסיכוי שתסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
+      return `הפודיום — מקום ששווה פרס — עדיין במשחק 🏆 הסיכוי לסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
     case "p100":
     case "p200": {
       const tr = target.targetRank!;
-      return `היעד שלך: מקום ${tr} — שמחזיר את ההשקעה 💰 הסיכוי שתנחת בסביבתו (${refundBandLabel(tr)}): ${chance}`;
+      return `היעד שלך: מקום ${tr} — שמחזיר את ההשקעה 💰 הסיכוי לנחות באזור (${refundBandLabel(tr)}): ${chance}`;
     }
     case "last":
-      return `המקום האחרון מחזיר את ההשקעה 😄 הסיכוי שתסיים שם: ${chance}. אל תיתן לאף אחד לקחת לך אותו`;
+      return `המקום האחרון מחזיר את ההשקעה 😄 הסיכוי לסיים שם: ${chance}. שלא ייקחו לך אותו`;
     default:
-      return "בוא נהיה כנים: הפרסים כנראה לא בתמונה הפעם. אבל הטופס שלך עדיין חי על המגרש:";
+      return "האמת? הפרסים כנראה לא בתמונה הפעם. אבל הטופס שלך עדיין חי על המגרש:";
   }
 }
 
@@ -245,7 +245,7 @@ export default function VerdictSection({
             )}
           {analysis.range && analysis.target.key !== "none" && (
             <p className="text-sm text-ink-muted font-bold mt-1.5">
-              ברוב התרחישים תסיים בין מקום <bdi>{analysis.range.lo}</bdi> למקום{" "}
+              ברוב התרחישים הטופס שלך מסיים בין מקום <bdi>{analysis.range.lo}</bdi> למקום{" "}
               <bdi>{analysis.range.hi}</bdi>.
             </p>
           )}
@@ -253,7 +253,7 @@ export default function VerdictSection({
       ) : failed ? (
         <div>
           <p className="text-sm font-bold text-ink">
-            הניתוח ההסתברותי לא זמין כרגע — אבל העובדות המתמטיות שלמטה בתוקף.
+            הניתוח ההסתברותי לא זמין כרגע — אבל העובדות המתמטיות שלמטה עדיין תקפות.
           </p>
           <button onClick={retry} className="btn-duo btn-duo-ghost btn-duo-sm mt-2">
             נסו שוב
@@ -261,23 +261,29 @@ export default function VerdictSection({
         </div>
       ) : (
         <p className="text-sm font-bold text-ink-muted animate-pulse">
-          מריצים את שארית המונדיאל אלפי פעמים… ⚽
+          מריצים את המשך המונדיאל אלפי פעמים… ⚽
         </p>
       )}
 
       {/* Deterministic badges — math only, never probabilistic */}
       <div className="flex flex-wrap gap-1.5 mt-3">
-        {clinchedFirst && <span className="badge-duo badge-duo-primary">אלוף — מובטח 🔒</span>}
+        {clinchedFirst && <span className="badge-duo badge-duo-primary">מקום ראשון — מובטח 🔒</span>}
         {clinchedPodium && <span className="badge-duo badge-duo-primary">פודיום מובטח 🔒</span>}
         {clinchedTop10 && <span className="badge-duo badge-duo-secondary">טופ־10 מובטח 🔒</span>}
-        {!clinchedFirst &&
-          (my.aliveForFirst ? (
-            <span className="badge-duo badge-duo-muted">עדיין בחיים במרוץ לזכייה ✅</span>
-          ) : (
-            <span className="badge-duo badge-duo-muted">הזכייה ירדה מהפרק</span>
-          ))}
+        {/* The "still alive for the win" fact is shown ONLY when the win is
+            the verdict's own story — for a form whose realistic target is
+            place 100, "עדיין בחיים במרוץ לזכייה" is technically true (the
+            sound bound is loose by design) but reads as a promise the
+            verdict itself contradicts. Mathematical elimination, by
+            contrast, is always worth stating. */}
+        {!clinchedFirst && my.aliveForFirst && analysis?.target.key === "win" && (
+          <span className="badge-duo badge-duo-muted">עדיין במרוץ לזכייה ✅</span>
+        )}
+        {!clinchedFirst && !my.aliveForFirst && (
+          <span className="badge-duo badge-duo-muted">הזכייה כבר לא אפשרית מתמטית</span>
+        )}
         {refining && !failed && (
-          <span className="badge-duo badge-duo-muted">מדייק את החישוב…</span>
+          <span className="badge-duo badge-duo-muted">מדייקים את החישוב…</span>
         )}
       </div>
 
