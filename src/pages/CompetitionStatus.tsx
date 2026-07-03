@@ -19,19 +19,26 @@ import { ArrowRight } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import VerdictSection from "../components/competitionStatus/VerdictSection";
 import RootForSection from "../components/competitionStatus/RootForSection";
+import HeadToHeadSection from "../components/competitionStatus/HeadToHeadSection";
 import OutlookSection from "../components/competitionStatus/OutlookSection";
 import EmptyState from "../components/EmptyState";
 import {
   useAllPredictions,
   useMatchResults,
   useActualBonuses,
+  useStoreReady,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCompetitionAnalysisAccess } from "../hooks/useCompetitionAnalysisAccess";
 import { usePersonalAnalysis } from "../hooks/usePersonalAnalysis";
 import { computePoolCertainty } from "../utils/poolCertainty";
 import { selectWatchMatches, NEXT_ROUND } from "../utils/analysisWindow";
-import { pickPrimaryTarget, targetProbs, type PrimaryTarget } from "../utils/analysisVerdict";
+import {
+  pickPrimaryTarget,
+  targetProbs,
+  formOptionLabel,
+  type PrimaryTarget,
+} from "../utils/analysisVerdict";
 import { getCachedBracket } from "../utils/bracketCache";
 import { deriveAdvancingTeams, deriveActualAdvancing } from "../utils/bracket";
 import { ALL_MATCHES, knockoutMatches } from "../data/matches";
@@ -43,29 +50,52 @@ export default function CompetitionStatus() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
   const actualBonuses = useActualBonuses();
+  // "Store defaults" ≠ "loaded data" (CLAUDE.md race rule): the no-form
+  // empty state below must never fire off an empty not-yet-loaded cache.
+  const storeReady = useStoreReady();
 
-  // The viewer's submitted forms, leaderboard-ordered.
+  // Every submitted form in the pool (leaderboard-ordered) — ANY of them can
+  // be analysed (post-lock all predictions are readable); the viewer's own
+  // forms are just the subset that gets first-person copy + head-to-head.
   const cert = useMemo(
     () => computePoolCertainty(results, allPredictions, actualBonuses),
     [results, allPredictions, actualBonuses],
   );
-  const myForms = useMemo(
+  const submittedForms = useMemo(
     () =>
       cert.forms.filter(
-        (f) =>
-          user &&
-          f.userId === user.id &&
-          normalizeStatus(allPredictions?.[f.formId]?.status) === "submitted",
+        (f) => normalizeStatus(allPredictions?.[f.formId]?.status) === "submitted",
       ),
-    [cert, user, allPredictions],
+    [cert, allPredictions],
+  );
+  const myForms = useMemo(
+    () => submittedForms.filter((f) => user && f.userId === user.id),
+    [submittedForms, user],
+  );
+  const otherForms = useMemo(
+    () => submittedForms.filter((f) => !user || f.userId !== user.id),
+    [submittedForms, user],
   );
 
   const [pickedForm, setPickedForm] = useState<string | null>(null);
   const urlForm = typeof params?.form === "string" ? params.form : null;
   const selectedFormId =
-    [pickedForm, urlForm].find((fid) => fid && myForms.some((f) => f.formId === fid)) ||
+    [pickedForm, urlForm].find((fid) => fid && submittedForms.some((f) => f.formId === fid)) ||
     myForms[0]?.formId ||
     null;
+  // Single ownership source: membership in myForms (already user-filtered).
+  const owned = !!selectedFormId && myForms.some((f) => f.formId === selectedFormId);
+
+  // Head-to-head rival — only meaningful while viewing one of MY forms, and
+  // never the viewed form itself.
+  const [rivalPick, setRivalPick] = useState<string | null>(null);
+  const rivalFormId =
+    owned &&
+    rivalPick &&
+    rivalPick !== selectedFormId &&
+    submittedForms.some((f) => f.formId === rivalPick)
+      ? rivalPick
+      : null;
 
   // Minute ticker so the time-based window keeps sliding while the page is
   // open (a match kicking off must surface without waiting for a result).
@@ -84,13 +114,20 @@ export default function CompetitionStatus() {
     () => watchMatches.map((w) => ({ id: w.id, isKnockout: w.stage !== "group" })),
     [watchMatches],
   );
-  const targetFormIds = useMemo(() => myForms.map((f) => f.formId), [myForms]);
+  // Targets = my forms + (when browsing) the selected foreign form. Adding a
+  // form changes the run's cache key — an accepted rerun (~2s first paint).
+  const targetFormIds = useMemo(() => {
+    const ids = myForms.map((f) => f.formId);
+    if (selectedFormId && !ids.includes(selectedFormId)) ids.push(selectedFormId);
+    return ids;
+  }, [myForms, selectedFormId]);
 
   const analysis = usePersonalAnalysis({
     allPredictions,
     results,
     actualBonuses,
     targetFormIds,
+    rivalFormId,
     watchMatches: workerWatch,
     enabled: visible && locked && targetFormIds.length > 0,
   });
@@ -163,28 +200,30 @@ export default function CompetitionStatus() {
     [watchMatches, now],
   );
 
-  // Settings-confirmation watchdog: if the server snapshot never lands
-  // (offline deep link), the loader below must not be eternal (CLAUDE.md
-  // failure-path rule) — after the timeout we offer a way out.
+  // Loading watchdog: if the settings snapshot or the store cache never
+  // lands (offline deep link), the loader below must not be eternal
+  // (CLAUDE.md failure-path rule) — after the timeout we offer a way out.
+  const loading = !confirmed || !storeReady;
   const [confirmStuck, setConfirmStuck] = useState(false);
   useEffect(() => {
-    if (confirmed) return undefined;
+    if (!loading) return undefined;
     const t = setTimeout(() => setConfirmStuck(true), 10000);
     return () => clearTimeout(t);
-  }, [confirmed]);
+  }, [loading]);
 
   // ── Gates ──
-  // Settings not server-confirmed yet: we don't KNOW whether this user is
-  // released, so show a neutral loader — never the "not opened for you"
-  // message off a stale/default cache.
-  if (!confirmed) {
+  // Settings not server-confirmed / store cache not loaded yet: we don't
+  // KNOW whether this user is released or whether they have forms, so show
+  // a neutral loader — never a verdict ("not opened for you" / "no form")
+  // off a stale/default cache.
+  if (loading) {
     return (
       <div className="text-center py-16 text-ink-muted font-bold">
         <div className="text-5xl animate-bounce">⚽</div>
         <div className="text-sm mt-3">טוען…</div>
         {confirmStuck && (
           <div className="mt-6 space-y-2 max-w-xs mx-auto">
-            <p className="text-xs font-medium">ההגדרות לא נטענות — בדקו את החיבור.</p>
+            <p className="text-xs font-medium">הנתונים לא נטענים — בדקו את החיבור.</p>
             <button onClick={() => window.location.reload()} className="btn-duo btn-duo-primary w-full">
               רעננו את הדף
             </button>
@@ -246,43 +285,65 @@ export default function CompetitionStatus() {
         </div>
       )}
 
-      {myForms.length === 0 ? (
+      {(myForms.length > 1 || (!owned && selectedFormId && myForms.length > 0)) && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {myForms.map((f) => (
+            <button
+              key={f.formId}
+              onClick={() => setPickedForm(f.formId)}
+              className={`chip-duo ${selectedFormId === f.formId ? "active" : ""}`}
+              aria-pressed={selectedFormId === f.formId}
+            >
+              ⚽ {f.formName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Any-form browser (feature: analysis for a form that isn't mine) */}
+      {otherForms.length > 0 && (
+        <label className="flex flex-col gap-1 mb-3">
+          <span className="text-2xs text-ink-muted font-extrabold">
+            🔎 סקרנות בריאה — ניתוח של כל טופס בתחרות
+          </span>
+          <select
+            value={owned ? "" : selectedFormId || ""}
+            onChange={(e) =>
+              setPickedForm(e.target.value || myForms[0]?.formId || null)
+            }
+            className="input-duo input-duo-sm"
+          >
+            <option value="">{myForms.length > 0 ? "הטופס שלי" : "בחרו טופס…"}</option>
+            {otherForms.map((f) => (
+              <option key={f.formId} value={f.formId}>
+                {formOptionLabel(f)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {!selectedFormId ? (
         <EmptyState
           icon="📝"
           title="אין טופס בתחרות"
-          description="העמוד הזה מספר מה מצב הטופס שלך בתחרות — ובלי טופס שהוגש, אין מה לספר."
+          description="העמוד הזה מספר מה מצב הטופס שלך בתחרות — ובלי טופס שהוגש, אין מה לספר. אפשר עדיין לבחור למעלה טופס אחר ולהציץ בניתוח שלו."
         />
       ) : (
         <>
-          {myForms.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {myForms.map((f) => (
-                <button
-                  key={f.formId}
-                  onClick={() => setPickedForm(f.formId)}
-                  className={`chip-duo ${selectedFormId === f.formId ? "active" : ""}`}
-                  aria-pressed={selectedFormId === f.formId}
-                >
-                  ⚽ {f.formName}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {selectedFormId && (
-            <VerdictSection
-              formId={selectedFormId}
-              formData={allPredictions?.[selectedFormId]}
-              cert={cert}
-              agg={analysis.agg}
-              targetFormIndex={targetFormIndex}
-              target={primaryTarget}
-              aliveSet={aliveSet}
-              refining={analysis.running && !!analysis.agg}
-              failed={analysis.failed}
-              retry={analysis.retry}
-            />
-          )}
+          <VerdictSection
+            formId={selectedFormId}
+            formData={allPredictions?.[selectedFormId]}
+            cert={cert}
+            agg={analysis.agg}
+            targetFormIndex={targetFormIndex}
+            target={primaryTarget}
+            aliveSet={aliveSet}
+            owned={owned}
+            refining={analysis.running && !!analysis.agg}
+            failed={analysis.failed}
+            retry={analysis.retry}
+          />
 
           <RootForSection
             watchMatches={watchMatches}
@@ -290,7 +351,25 @@ export default function CompetitionStatus() {
             targetFormIndex={targetFormIndex}
             targetKey={primaryTarget?.key ?? "none"}
             predictedAdvancers={predictedAdvancers}
+            owned={owned}
           />
+
+          {/* Head-to-head: only while viewing one of MY forms */}
+          {owned && (
+            <HeadToHeadSection
+              myFormId={selectedFormId}
+              cert={cert}
+              candidates={submittedForms}
+              rivalFormId={rivalFormId}
+              onPickRival={setRivalPick}
+              agg={analysis.agg}
+              targetFormIndex={targetFormIndex}
+              watchMatches={watchMatches}
+              predictedAdvancers={predictedAdvancers}
+              running={analysis.running}
+              retry={analysis.retry}
+            />
+          )}
         </>
       )}
 

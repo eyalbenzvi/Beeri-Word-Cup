@@ -10,6 +10,7 @@ import { getTeamDisplayName, getTeamFlagName } from "../../utils/teamDisplay";
 import {
   classifyRootFor,
   type RootForAdvice,
+  type RootForKey,
 } from "../../utils/analysisVerdict";
 import type {
   PersonalAnalysisAggregate,
@@ -28,12 +29,14 @@ const TARGET_PHRASE: Record<TargetKey, string> = {
 function adviceSentence(
   advice: RootForAdvice,
   wm: WatchMatch,
-  targetKey: TargetKey,
+  phrase: string,
+  owned: boolean,
   predictedAdvancers: Set<string> | null,
 ): string {
-  const phrase = TARGET_PHRASE[targetKey];
   if (advice.side === "draw") {
-    return `תיקו זו התוצאה הכי טובה בשבילך פה 🤝`;
+    return owned
+      ? `תיקו זו התוצאה הכי טובה בשבילך פה 🤝`
+      : `תיקו זו התוצאה הכי טובה עבור הטופס הזה 🤝`;
   }
   const team = advice.side === "home" ? wm.home : wm.away;
   const other = advice.side === "home" ? wm.away : wm.home;
@@ -44,6 +47,16 @@ function adviceSentence(
   // this slot, but the target is better served by it losing.
   const againstHeart =
     !!predictedAdvancers && predictedAdvancers.has(other) && !predictedAdvancers.has(team);
+
+  if (!owned) {
+    if (againstHeart) {
+      return `דווקא הפסד של ${otherName} עוזר לטופס הזה — ${otherName} מסומנת בו, אבל המסלול שלו ${phrase} עובר דרך ${teamName} 📣`;
+    }
+    if (advice.strong) {
+      return `המשחק הזה משנה את התמונה עבור הטופס הזה: ניצחון של ${teamName} מקרב אותו משמעותית ${phrase} 📣`;
+    }
+    return `ניצחון של ${teamName} מקרב את הטופס הזה ${phrase} 📣`;
+  }
 
   if (againstHeart) {
     return `דווקא הפסד של ${otherName} עוזר לך הפעם — הלב שלך עם ${otherName}, אבל המסלול שלך ${phrase} עובר דרך ${teamName} 📣`;
@@ -60,14 +73,27 @@ export default function RootForSection({
   targetFormIndex,
   targetKey,
   predictedAdvancers,
+  owned,
+  phraseOverride,
+  title,
+  subtitle,
+  emptyText,
 }: {
   watchMatches: WatchMatch[];
   agg: PersonalAnalysisAggregate | null;
   targetFormIndex: number;
-  targetKey: TargetKey | "none";
+  targetKey: RootForKey | "none";
   // Teams the selected form predicted to advance to the NEXT round of each
   // watch match's stage (for against-heart detection); null = unknown.
   predictedAdvancers: Set<string> | null;
+  // false → third-person copy (viewing someone else's form).
+  owned: boolean;
+  // Required when targetKey === "beat" (e.g. `לעקיפת ״שם הטופס״`) — the
+  // money-target phrases come from TARGET_PHRASE.
+  phraseOverride?: string;
+  title?: string;
+  subtitle?: string;
+  emptyText?: string;
 }) {
   const byId = useMemo(() => {
     const m: Record<string, WatchMatch> = {};
@@ -84,17 +110,26 @@ export default function RootForSection({
     return null;
   }
 
+  const phrase =
+    phraseOverride ?? (targetKey !== "beat" ? TARGET_PHRASE[targetKey] : "");
+
   return (
     <div className="mb-4">
-      <h3 className="text-base font-extrabold text-ink mb-0.5">📣 את מי לעודד</h3>
+      <h3 className="text-base font-extrabold text-ink mb-0.5">{title || "📣 את מי לעודד"}</h3>
       <p className="text-xs text-ink-muted font-medium mb-2">
-        המשחקים הקרובים, מנקודת המבט של הטופס שלך
+        {subtitle ||
+          (owned
+            ? "המשחקים הקרובים, מנקודת המבט של הטופס שלך"
+            : "המשחקים הקרובים, מנקודת המבט של הטופס הזה")}
       </p>
 
       {advice.length === 0 ? (
         <div className="card-duo-tight">
           <p className="text-sm font-bold text-ink">
-            המשחקים הקרובים כמעט לא משנים לך — אפשר פשוט ליהנות מהכדורגל 😌
+            {emptyText ||
+              (owned
+                ? "המשחקים הקרובים כמעט לא משנים לך — אפשר פשוט ליהנות מהכדורגל 😌"
+                : "המשחקים הקרובים כמעט לא משנים לטופס הזה — כדורגל נטו 😌")}
           </p>
         </div>
       ) : (
@@ -132,7 +167,7 @@ export default function RootForSection({
                   </span>
                 </div>
                 <p className="text-sm font-bold text-ink">
-                  {adviceSentence(a, wm, targetKey, predictedAdvancers)}
+                  {adviceSentence(a, wm, phrase, owned, predictedAdvancers)}
                 </p>
                 <div className="flex gap-1.5 mt-1.5">
                   {i === 0 && <span className="badge-duo badge-duo-accent">הכי חשוב</span>}

@@ -28,11 +28,28 @@ export type PersonalAnalysisState = {
   done: boolean;
 };
 
-type CacheEntry = {
-  key: string;
-  agg: PersonalAnalysisAggregate;
-};
-let lastCompleted: CacheEntry | null = null;
+// Small LRU of completed runs. One slot is not enough anymore: the key now
+// carries the selected foreign form and the head-to-head rival, so toggling
+// a rival (or hopping my-form ↔ another form) alternates between keys — a
+// single slot would evict on every hop and rerun 20k sims for a result
+// computed seconds earlier.
+const CACHE_MAX = 8;
+const completedRuns = new Map<string, PersonalAnalysisAggregate>();
+function cacheGet(key: string): PersonalAnalysisAggregate | null {
+  const hit = completedRuns.get(key);
+  if (hit) {
+    completedRuns.delete(key);
+    completedRuns.set(key, hit); // refresh recency
+  }
+  return hit || null;
+}
+function cachePut(key: string, agg: PersonalAnalysisAggregate): void {
+  completedRuns.delete(key);
+  completedRuns.set(key, agg);
+  while (completedRuns.size > CACHE_MAX) {
+    completedRuns.delete(completedRuns.keys().next().value as string);
+  }
+}
 
 const WATCHDOG_MS = 45000;
 
@@ -71,11 +88,15 @@ export function usePersonalAnalysis(opts: {
   results: Record<string, any>;
   actualBonuses: any;
   targetFormIds: string[];
+  // Head-to-head rival (adds `beat` counters to the aggregate). Part of the
+  // cache key — switching rivals restarts the run.
+  rivalFormId?: string | null;
   watchMatches: { id: string; isKnockout: boolean }[];
   enabled: boolean;
 }): PersonalAnalysisState & { retry: () => void } {
   const { allPredictions, results, actualBonuses, targetFormIds, watchMatches, enabled } = opts;
-  const targetKey = targetFormIds.join(",");
+  const rivalFormId = opts.rivalFormId || null;
+  const targetKey = `${targetFormIds.join(",")}~${rivalFormId || ""}`;
 
   // Recomputed only when a store reference rotates (cheap), yielding a
   // stable string that changes only on real content changes.
@@ -84,7 +105,7 @@ export function usePersonalAnalysis(opts: {
     [allPredictions, results, actualBonuses, targetKey],
   );
 
-  const cached = lastCompleted && lastCompleted.key === cacheKey ? lastCompleted.agg : null;
+  const cached = cacheGet(cacheKey);
 
   const [state, setState] = useState<PersonalAnalysisState>(() => ({
     running: false,
@@ -106,10 +127,20 @@ export function usePersonalAnalysis(opts: {
       setState((s) => (s.running ? { ...s, running: false } : s));
       return undefined;
     }
-    if (cached && nonce === 0) return undefined; // session cache hit
+    if (cached && nonce === 0) {
+      // Session cache hit — also on a key SWITCH while mounted (LRU), so the
+      // state must be synced to the hit, not left on the previous key's agg.
+      setState({ running: false, failed: false, agg: cached, done: true });
+      return undefined;
+    }
 
     let active = true;
-    setState({ running: true, failed: false, agg: null, done: false });
+    // Keep the previous aggregate on screen while the new run spins up: a
+    // rival toggle or form hop must not blank the verdict/root-for sections
+    // (consumers re-derive their target index / rival echo from the agg, so
+    // a kept snapshot can render stale-but-valid content, never wrong-key
+    // content). A brand-new mount has no previous agg anyway.
+    setState((s) => ({ running: true, failed: false, agg: s.agg, done: false }));
 
     const fail = (err?: unknown) => {
       if (err) {
@@ -153,7 +184,7 @@ export function usePersonalAnalysis(opts: {
           if (active) setState({ running: true, failed: false, agg: e.data.agg, done: false });
         } else if (type === "done") {
           const agg = e.data.agg as PersonalAnalysisAggregate;
-          lastCompleted = { key: cacheKey, agg };
+          cachePut(cacheKey, agg);
           if (active) setState({ running: false, failed: false, agg, done: true });
           cleanup();
         } else if (type === "error") {
@@ -167,6 +198,7 @@ export function usePersonalAnalysis(opts: {
         results,
         actualBonuses,
         targetFormIds,
+        rivalFormId,
         watchMatches,
         simCount: TARGET_SIMS,
         seed: DEFAULT_ANALYSIS_SEED,

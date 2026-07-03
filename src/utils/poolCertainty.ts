@@ -133,6 +133,24 @@ export function computePoolCertainty(
   return { nForms: forms.length, forms, byFormId };
 }
 
+// ── Pairwise head-to-head claims (same soundness contract as above) ──
+// Both use only the sound OVER-estimate `maxRemaining`, so they can only
+// under-fire. Strict inequalities on purpose: a points tie is NOT decided —
+// future tiebreakers could order the pair either way.
+
+// Is `a` provably guaranteed to finish above `b` whatever happens on the
+// pitch? True only when b's ceiling can't even reach a's current points.
+export function isClinchedAbove(a: CertaintyForm, b: CertaintyForm): boolean {
+  return a.totalPoints > b.totalPoints + b.maxRemaining;
+}
+
+// Is finishing above `b` provably out of reach for `a`? True only when a's
+// ceiling is strictly below b's current points (at equality a could still
+// finish above on tiebreakers, so no claim).
+export function isEliminatedVs(a: CertaintyForm, b: CertaintyForm): boolean {
+  return a.totalPoints + a.maxRemaining < b.totalPoints;
+}
+
 // Is `formId` PROVABLY guaranteed to finish at dense rank ≤ N no matter how
 // the remaining matches go? Ties count as "could pass me" (see contract).
 export function isClinchedTopN(

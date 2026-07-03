@@ -54,6 +54,12 @@ export const TARGET_BAND = 2;
 
 export type TargetKey = "win" | "podium" | "p100" | "p200" | "last";
 
+// Per-target hit counters. The money targets are always present; `beat`
+// counts sims where the target form finished STRICTLY above the run's rival
+// form (head-to-head mode) — 0 when no rival was requested. A full tie
+// (same dense rank) is NOT a beat: passing someone means outranking them.
+export type TargetHits = Record<TargetKey, number> & { beat: number };
+
 export type WatchOutcome = {
   // Group matches: "home" | "draw" | "away". Knockout: "home" | "away" =
   // WHICH TEAM ADVANCES (a KO draw resolves via advancingTeam), so a
@@ -63,7 +69,7 @@ export type WatchOutcome = {
   n: number;
   // Aligned to targetForms: per viewer form, #sims (within this outcome
   // slice) where the form hit each money target.
-  hits: Record<TargetKey, number>[];
+  hits: TargetHits[];
 };
 
 export type WatchMatchAgg = {
@@ -77,7 +83,7 @@ export type TargetFormAgg = {
   formId: string;
   hist: number[]; // dense-rank histogram, index = rank-1, length nForms
   lastCount: number; // sims where the form finished (tied-)last
-  hits: Record<TargetKey, number>; // unconditional target hits
+  hits: TargetHits; // unconditional target hits
 };
 
 export type PersonalAnalysisAggregate = {
@@ -85,6 +91,9 @@ export type PersonalAnalysisAggregate = {
   nForms: number;
   targetForms: TargetFormAgg[];
   watch: WatchMatchAgg[];
+  // Echo of the rival the `beat` counters were computed against (null when
+  // none / rival form not found) — lets the UI reject a stale aggregate.
+  rivalFormId: string | null;
 };
 
 export type PersonalAnalysisInput = {
@@ -92,6 +101,9 @@ export type PersonalAnalysisInput = {
   results: Record<string, any>;
   actualBonuses: any;
   targetFormIds: string[];
+  // Head-to-head rival: when set, every target form also accumulates `beat`
+  // counters (overall + per watch-match outcome) vs this form's dense rank.
+  rivalFormId?: string | null;
   // Watch matches with their stage — outcome extraction differs for KO.
   watchMatches: { id: string; isKnockout: boolean }[];
   simCount: number;
@@ -103,8 +115,8 @@ export type PersonalAnalysisInput = {
 
 const TARGET_KEYS: TargetKey[] = ["win", "podium", "p100", "p200", "last"];
 
-function emptyHits(): Record<TargetKey, number> {
-  return { win: 0, podium: 0, p100: 0, p200: 0, last: 0 };
+function emptyHits(): TargetHits {
+  return { win: 0, podium: 0, p100: 0, p200: 0, last: 0, beat: 0 };
 }
 
 // Which targets a form hit in one sim, given its dense rank and the sim's
@@ -129,6 +141,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
     results,
     actualBonuses,
     targetFormIds,
+    rivalFormId = null,
     watchMatches,
     simCount,
     seed = DEFAULT_ANALYSIS_SEED,
@@ -149,6 +162,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
     const idx = fastForms.findIndex((f) => f.formId === id);
     if (idx >= 0) targetIdx.push({ formId: id, idx });
   }
+  const rivalIdx = rivalFormId ? fastForms.findIndex((f) => f.formId === rivalFormId) : -1;
 
   // ── Accumulators ──
   const hist = targetIdx.map(() => new Uint32Array(Math.max(nForms, 1)));
@@ -159,7 +173,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
   // Per watch match × outcome: n, per-target-form hits, per-form rank sums.
   type OutcomeAcc = {
     n: number;
-    hits: Record<TargetKey, number>[];
+    hits: TargetHits[];
     condRankSum: Float64Array;
   };
   const OUTCOME_KEYS: WatchOutcome["key"][] = ["home", "draw", "away"];
@@ -185,6 +199,8 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
   // Per-sim target-hit flags, one reused record per target form (computed
   // once per sim, read by both the unconditional and the watch-match loops).
   const simFlags = targetIdx.map(() => targetHitFlags(0, 0));
+  // Per-sim "finished strictly above the rival" flags, same reuse pattern.
+  const simBeat = new Array<boolean>(targetIdx.length).fill(false);
 
   if (nForms === 0 || targetIdx.length === 0) {
     return snapshot(0);
@@ -237,12 +253,15 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
 
       // Target-form aggregates. Flags are computed ONCE per sim per target
       // (into the reused simFlags records) and reused by the watch loop.
+      const rivalRank = rivalIdx >= 0 ? rankByFormIdx[rivalIdx] : 0;
       for (let t = 0; t < targetIdx.length; t++) {
         const r = rankByFormIdx[targetIdx[t].idx];
         hist[t][r - 1]++;
         const flags = targetHitFlags(r, lastRank, simFlags[t]);
         if (flags.last) lastCount[t]++;
         for (const k of TARGET_KEYS) if (flags[k]) overallHits[t][k]++;
+        simBeat[t] = rivalIdx >= 0 && r < rivalRank;
+        if (simBeat[t]) overallHits[t].beat++;
       }
 
       // Conditional aggregates per watch match.
@@ -273,6 +292,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
         for (let t = 0; t < targetIdx.length; t++) {
           const flags = simFlags[t]; // computed above for this sim
           for (const k of TARGET_KEYS) if (flags[k]) acc.hits[t][k]++;
+          if (simBeat[t]) acc.hits[t].beat++;
         }
         for (let i = 0; i < nForms; i++) acc.condRankSum[i] += rankByFormIdx[i];
       }
@@ -291,6 +311,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
     return {
       simCount: sims,
       nForms,
+      rivalFormId: rivalIdx >= 0 ? rivalFormId : null,
       targetForms: targetIdx.map((t, i) => ({
         formId: t.formId,
         hist: Array.from(hist[i]),

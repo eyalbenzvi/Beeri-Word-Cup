@@ -177,6 +177,10 @@ export function pickPrimaryTarget(opts: {
 
 // ── Root-for classification ──
 
+// The classifier serves the money targets AND the head-to-head "finish above
+// the rival" channel — all live in the same per-outcome hit records.
+export type RootForKey = TargetKey | "beat";
+
 export type RootForAdvice = {
   matchId: string;
   // The outcome that best serves the user's target.
@@ -192,7 +196,7 @@ export type RootForAdvice = {
 export function classifyRootFor(
   watch: WatchMatchAgg[],
   targetFormIndex: number,
-  targetKey: TargetKey,
+  targetKey: RootForKey,
   simCount: number,
   maxCards = 3,
 ): RootForAdvice[] {
@@ -210,7 +214,8 @@ export function classifyRootFor(
     let bestSide: RootForAdvice["side"] = slices[0].key;
     let lowSample = false;
     for (const o of slices) {
-      const p = o.hits[targetFormIndex][targetKey] / o.n;
+      // `|| 0` guards aggregates persisted before `beat` existed.
+      const p = (o.hits[targetFormIndex][targetKey] || 0) / o.n;
       if (p > bestP) {
         bestP = p;
         bestSide = o.key;
@@ -253,4 +258,14 @@ export function pickKeyMatch(watch: WatchMatchAgg[]): { matchId: string; shake: 
 // ── Refund-band label ("בסביבות מקום 100 (98–102)") helper ──
 export function refundBandLabel(targetRank: number): string {
   return `${targetRank - TARGET_BAND}–${targetRank + TARGET_BAND}`;
+}
+
+// ── Form-picker option label (shared by the page's any-form browser and the
+// head-to-head rival picker, so the two dropdowns can't drift) ──
+export function formOptionLabel(f: {
+  rank: number;
+  formName: string;
+  totalPoints: number;
+}): string {
+  return `#${f.rank} · ${f.formName} · ${f.totalPoints} נק׳`;
 }
