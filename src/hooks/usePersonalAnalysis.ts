@@ -71,11 +71,15 @@ export function usePersonalAnalysis(opts: {
   results: Record<string, any>;
   actualBonuses: any;
   targetFormIds: string[];
+  // Head-to-head rival (adds `beat` counters to the aggregate). Part of the
+  // cache key — switching rivals restarts the run.
+  rivalFormId?: string | null;
   watchMatches: { id: string; isKnockout: boolean }[];
   enabled: boolean;
 }): PersonalAnalysisState & { retry: () => void } {
   const { allPredictions, results, actualBonuses, targetFormIds, watchMatches, enabled } = opts;
-  const targetKey = targetFormIds.join(",");
+  const rivalFormId = opts.rivalFormId || null;
+  const targetKey = `${targetFormIds.join(",")}~${rivalFormId || ""}`;
 
   // Recomputed only when a store reference rotates (cheap), yielding a
   // stable string that changes only on real content changes.
@@ -167,6 +171,7 @@ export function usePersonalAnalysis(opts: {
         results,
         actualBonuses,
         targetFormIds,
+        rivalFormId,
         watchMatches,
         simCount: TARGET_SIMS,
         seed: DEFAULT_ANALYSIS_SEED,

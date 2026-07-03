@@ -25,17 +25,19 @@ function LadderStrip({
   rank,
   targetRank,
   targetLabel,
+  subject,
 }: {
   rank: number;
   targetRank: number;
   targetLabel: string;
+  subject: string; // "הטופס שלך" / "הטופס הזה"
 }) {
   const distance = Math.abs(targetRank - rank);
   if (distance === 0) {
     return (
       <div className="text-center my-3">
         <span className="inline-block bg-primary-soft border-2 border-primary rounded-full px-4 py-1.5 text-sm font-extrabold text-primary-dark">
-          הטופס שלך בדיוק על היעד 🎯
+          {subject} בדיוק על היעד 🎯
         </span>
       </div>
     );
@@ -44,10 +46,10 @@ function LadderStrip({
   return (
     <div
       className="flex items-center gap-1 my-3"
-      aria-label={`הטופס שלך במקום ${rank}, במרחק ${distance} מקומות מ${targetLabel}`}
+      aria-label={`${subject} במקום ${rank}, במרחק ${distance} מקומות מ${targetLabel}`}
     >
       <span className="bg-primary-soft border-2 border-primary rounded-full px-2.5 py-1 text-xs font-extrabold text-primary-dark shrink-0">
-        הטופס שלך · מקום <bdi>{rank}</bdi>
+        {subject} · מקום <bdi>{rank}</bdi>
       </span>
       <span className="flex-1 flex items-center" aria-hidden="true">
         {Array.from({ length: distance - 1 }).map((_, i) => (
@@ -70,7 +72,15 @@ function LadderStrip({
 
 // "Still alive on the pitch" line for users with no realistic money target:
 // how much of the form's own story is still playing.
-function LivePicksLine({ formData, aliveSet }: { formData: any; aliveSet: Set<string> | null }) {
+function LivePicksLine({
+  formData,
+  aliveSet,
+  owned,
+}: {
+  formData: any;
+  aliveSet: Set<string> | null;
+  owned: boolean;
+}) {
   const info = useMemo(() => {
     if (!formData?.matches || !aliveSet) return null;
     const bracket = getCachedBracket(formData.matches);
@@ -92,13 +102,14 @@ function LivePicksLine({ formData, aliveSet }: { formData: any; aliveSet: Set<st
     <div className="text-sm font-bold text-ink mt-2 space-y-1">
       {info.championAlive && info.championName && (
         <div>
-          🏆 {info.championName} — האלופה שסימנת — עדיין במשחק. יש את מי לעודד.
+          🏆 {info.championName} — {owned ? "האלופה שסימנת" : "האלופה שסומנה בטופס"} — עדיין
+          במשחק. יש את מי לעודד.
         </div>
       )}
       {info.pickedCount > 0 && (
         <div>
           ⚽ <bdi>{info.aliveCount}</bdi> מתוך <bdi>{info.pickedCount}</bdi> הקבוצות
-          שסימנת לשלבים הגבוהים עדיין בטורניר.
+          {owned ? " שסימנת" : " שסומנו בטופס"} לשלבים הגבוהים עדיין בטורניר.
         </div>
       )}
     </div>
@@ -154,6 +165,28 @@ function verdictSentence(target: PrimaryTarget, rank: number): string {
   }
 }
 
+// Third-person verdict for a form that is NOT the viewer's ("ניתוח של טופס
+// אחר"). Deliberately compact — the second-person sub-branches (pep talk per
+// chance bucket) don't translate to someone else's form.
+function verdictSentenceThirdPerson(target: PrimaryTarget): string {
+  const chance = formatChance(chanceLabel(target.prob));
+  switch (target.key) {
+    case "win":
+      return `הטופס הזה עדיין במרוץ לזכייה 🏆 הסיכוי שזה ייגמר בזכייה שלו: ${chance}`;
+    case "podium":
+      return `הפודיום — מקום ששווה פרס — בתמונה עבור הטופס הזה 🏆 הסיכוי לסיים בטופ־${PRIZE_TOP_PLACES}: ${chance}`;
+    case "p100":
+    case "p200": {
+      const tr = target.targetRank!;
+      return `היעד של הטופס הזה: מקום ${tr} — שמחזיר את ההשקעה 💰 הסיכוי לנחות באזור (${refundBandLabel(tr)}): ${chance}`;
+    }
+    case "last":
+      return `המקום האחרון מחזיר את ההשקעה 😄 הסיכוי של הטופס הזה לסיים שם: ${chance}`;
+    default:
+      return "הפרסים כנראה כבר לא בתמונה עבור הטופס הזה. אבל הוא עדיין חי על המגרש:";
+  }
+}
+
 export default function VerdictSection({
   formId,
   formData,
@@ -162,6 +195,7 @@ export default function VerdictSection({
   targetFormIndex,
   target,
   aliveSet,
+  owned,
   refining,
   failed,
   retry,
@@ -175,11 +209,14 @@ export default function VerdictSection({
   // section, so headline and advice always describe the same target).
   target: PrimaryTarget | null;
   aliveSet: Set<string> | null;
+  // false → the form belongs to someone else; all copy goes third-person.
+  owned: boolean;
   refining: boolean;
   failed: boolean;
   retry: () => void;
 }) {
   const my = cert.byFormId[formId];
+  const subject = owned ? "הטופס שלך" : "הטופס הזה";
 
   const analysis = useMemo(() => {
     if (!my || !target) return null;
@@ -223,15 +260,19 @@ export default function VerdictSection({
       {/* Verdict line */}
       {clinchedFirst ? (
         <p className="text-lg font-extrabold text-ink font-heading text-balance">
-          זה סגור: המקום הראשון שלך, לא משנה מה יקרה על הדשא 🏆🔒
+          {owned
+            ? "זה סגור: המקום הראשון שלך, לא משנה מה יקרה על הדשא 🏆🔒"
+            : "זה סגור: המקום הראשון של הטופס הזה, לא משנה מה יקרה על הדשא 🏆🔒"}
         </p>
       ) : analysis ? (
         <>
           <p className="text-lg font-extrabold text-ink font-heading text-balance">
-            {verdictSentence(analysis.target, my.rank)}
+            {owned
+              ? verdictSentence(analysis.target, my.rank)
+              : verdictSentenceThirdPerson(analysis.target)}
           </p>
           {analysis.target.key === "none" && (
-            <LivePicksLine formData={formData} aliveSet={aliveSet} />
+            <LivePicksLine formData={formData} aliveSet={aliveSet} owned={owned} />
           )}
           {/* Distance ladder only for the fixed refund places — "last" is a
               moving rank under bottom-ties, so the sentence carries it alone. */}
@@ -241,11 +282,12 @@ export default function VerdictSection({
                 rank={my.rank}
                 targetRank={analysis.target.targetRank}
                 targetLabel={TARGET_LABEL[analysis.target.key] || ""}
+                subject={subject}
               />
             )}
           {analysis.range && analysis.target.key !== "none" && (
             <p className="text-sm text-ink-muted font-bold mt-1.5">
-              ברוב התרחישים הטופס שלך מסיים בין מקום <bdi>{analysis.range.lo}</bdi> למקום{" "}
+              ברוב התרחישים {subject} מסיים בין מקום <bdi>{analysis.range.lo}</bdi> למקום{" "}
               <bdi>{analysis.range.hi}</bdi>.
             </p>
           )}

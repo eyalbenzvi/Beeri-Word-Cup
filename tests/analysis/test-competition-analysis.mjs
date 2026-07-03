@@ -93,6 +93,35 @@ console.log("2. Root-for conditional slices");
   }
 }
 
+// ── 2b. Head-to-head (rival) counters ──────────────────────────────
+console.log("2b. Head-to-head beat counters");
+{
+  const forms = genForms(6, 5);
+  const watch = knockoutMatches.filter((m) => m.stage === "R32").slice(0, 2)
+    .map((m) => ({ id: m.id, isKnockout: true }));
+  const SIMS = 300;
+  const base = { allPredictions: forms, results: groupsPlayed, actualBonuses: {}, watchMatches: watch, simCount: SIMS, seed: 11 };
+  const agg = runPersonalAnalysis({ ...base, targetFormIds: ["f0", "f2"], rivalFormId: "f2" });
+  assert(agg.rivalFormId === "f2", "aggregate echoes the rival form id");
+  const f0 = agg.targetForms.find((t) => t.formId === "f0");
+  const self = agg.targetForms.find((t) => t.formId === "f2");
+  assert(self.hits.beat === 0, "a form never beats itself");
+  assert(f0.hits.beat >= 0 && f0.hits.beat <= SIMS, "beat bounded by the run");
+  const idx = agg.targetForms.indexOf(f0);
+  for (const wm of agg.watch) {
+    const sliced = wm.outcomes.reduce((a, o) => a + (o.hits[idx].beat || 0), 0);
+    assert(sliced === f0.hits.beat, `${wm.matchId}: outcome beat slices partition the overall count`);
+  }
+  // Anti-symmetry (up to exact rank ties): P(A>B) + P(B>A) ≤ 1 on shared sims.
+  const mirror = runPersonalAnalysis({ ...base, targetFormIds: ["f0", "f2"], rivalFormId: "f0" });
+  const f2BeatsF0 = mirror.targetForms.find((t) => t.formId === "f2").hits.beat;
+  assert(f0.hits.beat + f2BeatsF0 <= SIMS, "beat counters are anti-symmetric up to ties");
+  // No rival → beat stays 0 and the echo is null.
+  const plain = runPersonalAnalysis({ ...base, targetFormIds: ["f0"] });
+  assert(plain.rivalFormId === null, "no rival → null echo");
+  assert(plain.targetForms[0].hits.beat === 0, "no rival → beat is 0");
+}
+
 // ── 3. Certainty layer sanity on a decided world ───────────────────
 console.log("3. Deterministic certainty");
 {
@@ -159,6 +188,22 @@ console.log("5. Static wiring (additive, flag-gated touch points)");
   const certainty = read("src/utils/poolCertainty.ts");
   assert(certainty.includes("BONUSES.topScorer"), "certainty bound includes the top-scorer term");
   assert(certainty.includes("computeCore"), "certainty scores via the canonical leaderboard core");
+
+  // Any-form analysis + head-to-head wiring.
+  const page = read("src/pages/CompetitionStatus.tsx");
+  assert(page.includes("submittedForms"), "page selects over the whole submitted pool (any-form analysis)");
+  assert(page.includes("HeadToHeadSection"), "page mounts the head-to-head section");
+  assert(page.includes("owned={owned}"), "page passes ownership to the copy-aware sections");
+  assert(hook.includes("rivalFormId"), "hook threads the rival into the run");
+  assert(/targetKey = `\$\{targetFormIds\.join\(","\)\}~\$\{rivalFormId/.test(hook),
+    "rival is part of the run cache key (switching rivals restarts the run)");
+  assert(worker.includes("rivalFormId"), "worker forwards the rival to the engine");
+  const h2h = read("src/components/competitionStatus/HeadToHeadSection.tsx");
+  assert(h2h.includes("agg.rivalFormId !== rival.formId") || h2h.includes("agg.rivalFormId === rival.formId"),
+    "head-to-head rejects a stale aggregate (rival echo check)");
+  assert(h2h.includes("maxRemaining"), "head-to-head deterministic claims use the sound certainty bounds");
+  const verdictSrc = read("src/components/competitionStatus/VerdictSection.tsx");
+  assert(verdictSrc.includes("verdictSentenceThirdPerson"), "verdict has a third-person branch for foreign forms");
 }
 
 // ── 6. Copy contract: alive-badge gating + gender-neutral Hebrew ────
@@ -181,6 +226,7 @@ console.log("6. Copy contract");
     "src/components/competitionStatus/RootForSection.tsx",
     "src/components/competitionStatus/OutlookSection.tsx",
     "src/components/competitionStatus/CompetitionAnalysisEntry.tsx",
+    "src/components/competitionStatus/HeadToHeadSection.tsx",
     "src/pages/CompetitionStatus.tsx",
   ];
   const masculine = ["אתה ", "בוא נ", "תיהנה", "אל תיתן", "תעודד את", "שתסיים", "שתשמור", "שתנחת"];

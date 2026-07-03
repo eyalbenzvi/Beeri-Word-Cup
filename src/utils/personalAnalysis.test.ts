@@ -136,6 +136,69 @@ describe("runPersonalAnalysis", () => {
     expect(partial.simCount).toBe(2000);
   });
 
+  // Head-to-head: `beat` counts sims where the target finished STRICTLY
+  // above the rival, overall and inside every outcome slice.
+  describe("rival (beat) counters", () => {
+    const rivalAgg = runPersonalAnalysis({
+      allPredictions: forms,
+      results,
+      actualBonuses: bonuses,
+      targetFormIds: ["f0", "f3"],
+      rivalFormId: "f3",
+      watchMatches: watch,
+      simCount: SIMS,
+      seed: SEED,
+    });
+
+    it("echoes the rival and zeroes beat without one", () => {
+      expect(rivalAgg.rivalFormId).toBe("f3");
+      expect(agg.rivalFormId).toBeNull();
+      for (const tf of agg.targetForms) expect(tf.hits.beat).toBe(0);
+    });
+
+    it("a form never beats itself; beat is bounded by the run", () => {
+      const self = rivalAgg.targetForms.find((t) => t.formId === "f3")!;
+      expect(self.hits.beat).toBe(0);
+      const f0 = rivalAgg.targetForms.find((t) => t.formId === "f0")!;
+      expect(f0.hits.beat).toBeGreaterThanOrEqual(0);
+      expect(f0.hits.beat).toBeLessThanOrEqual(SIMS);
+    });
+
+    it("beat is anti-symmetric up to exact ties", () => {
+      const mirror = runPersonalAnalysis({
+        allPredictions: forms,
+        results,
+        actualBonuses: bonuses,
+        targetFormIds: ["f0", "f3"],
+        rivalFormId: "f0",
+        watchMatches: watch,
+        simCount: SIMS,
+        seed: SEED,
+      });
+      const f0BeatsF3 = rivalAgg.targetForms.find((t) => t.formId === "f0")!.hits.beat;
+      const f3BeatsF0 = mirror.targetForms.find((t) => t.formId === "f3")!.hits.beat;
+      expect(f0BeatsF3 + f3BeatsF0).toBeLessThanOrEqual(SIMS);
+      expect(f0BeatsF3 + f3BeatsF0).toBeGreaterThan(0);
+    });
+
+    it("per-outcome beat slices partition the overall beat count", () => {
+      const idx = rivalAgg.targetForms.findIndex((t) => t.formId === "f0");
+      const overall = rivalAgg.targetForms[idx].hits.beat;
+      for (const wm of rivalAgg.watch) {
+        const sliced = wm.outcomes.reduce((a, o) => a + (o.hits[idx].beat || 0), 0);
+        expect(sliced).toBe(overall); // known matchup → every sim lands in a slice
+      }
+    });
+
+    it("does not perturb the money-target aggregates", () => {
+      // Same seed, same sims — adding a rival must not change anything else.
+      const f0 = rivalAgg.targetForms.find((t) => t.formId === "f0")!;
+      const f0Base = agg.targetForms.find((t) => t.formId === "f0")!;
+      expect(f0.hist).toEqual(f0Base.hist);
+      expect({ ...f0.hits, beat: 0 }).toEqual({ ...f0Base.hits, beat: 0 });
+    });
+  });
+
   // PARITY LOCK with the canonical scenario engine: same inputs, same seed →
   // the same tournaments are sampled and ranked through the same scorer, so
   // P(rank=1) from our dense-rank histogram must equal the engine's

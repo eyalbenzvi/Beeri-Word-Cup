@@ -136,7 +136,7 @@ describe("pickPrimaryTarget", () => {
 const mkOutcome = (key: "home" | "draw" | "away", n: number, hitWin: number) => ({
   key,
   n,
-  hits: [{ win: hitWin, podium: 0, p100: 0, p200: 0, last: 0 }],
+  hits: [{ win: hitWin, podium: 0, p100: 0, p200: 0, last: 0, beat: 0 }],
 });
 
 const mkMatch = (matchId: string, homeP: number, awayP: number, n = 5000): WatchMatchAgg => ({
@@ -191,6 +191,22 @@ describe("classifyRootFor", () => {
       { matchId: "m1", isKnockout: true, outcomes: [mkOutcome("home", 100, 50)], shake: 0 },
     ];
     expect(classifyRootFor(watch, 0, targetKey, 10000)).toEqual([]);
+  });
+
+  it('serves the head-to-head "beat" channel through the same gates', () => {
+    const n = 5000;
+    const mk = (key: "home" | "away", beat: number) => ({
+      key,
+      n,
+      hits: [{ win: 0, podium: 0, p100: 0, p200: 0, last: 0, beat }],
+    });
+    const watch: WatchMatchAgg[] = [
+      { matchId: "m1", isKnockout: true, outcomes: [mk("home", 2000), mk("away", 500)], shake: 0 },
+    ];
+    const advice = classifyRootFor(watch, 0, "beat", 10000);
+    expect(advice).toHaveLength(1);
+    expect(advice[0].side).toBe("home");
+    expect(advice[0].strong).toBe(true);
   });
 });
 
