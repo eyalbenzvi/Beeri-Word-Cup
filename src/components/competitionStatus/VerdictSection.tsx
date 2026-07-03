@@ -183,7 +183,9 @@ function verdictSentenceThirdPerson(target: PrimaryTarget): string {
     case "last":
       return `המקום האחרון מחזיר את ההשקעה 😄 הסיכוי של הטופס הזה לסיים שם: ${chance}`;
     default:
-      return "הפרסים כנראה כבר לא בתמונה עבור הטופס הזה. אבל הוא עדיין חי על המגרש:";
+      // No trailing colon: the live-picks line below may legitimately render
+      // nothing (aliveSet unknown before the groups finish).
+      return "הפרסים כנראה כבר לא בתמונה עבור הטופס הזה. אבל הוא עדיין חי על המגרש ⚽";
   }
 }
 
@@ -260,9 +262,7 @@ export default function VerdictSection({
       {/* Verdict line */}
       {clinchedFirst ? (
         <p className="text-lg font-extrabold text-ink font-heading text-balance">
-          {owned
-            ? "זה סגור: המקום הראשון שלך, לא משנה מה יקרה על הדשא 🏆🔒"
-            : "זה סגור: המקום הראשון של הטופס הזה, לא משנה מה יקרה על הדשא 🏆🔒"}
+          {`זה סגור: המקום הראשון ${owned ? "שלך" : "של הטופס הזה"}, לא משנה מה יקרה על הדשא 🏆🔒`}
         </p>
       ) : analysis ? (
         <>

@@ -14,8 +14,13 @@
 
 import { useMemo } from "react";
 import RootForSection from "./RootForSection";
-import { chanceLabel, formatChance } from "../../utils/analysisVerdict";
-import type { CertaintyForm, PoolCertainty } from "../../utils/poolCertainty";
+import { chanceLabel, formatChance, formOptionLabel } from "../../utils/analysisVerdict";
+import {
+  isClinchedAbove,
+  isEliminatedVs,
+  type CertaintyForm,
+  type PoolCertainty,
+} from "../../utils/poolCertainty";
 import type { PersonalAnalysisAggregate } from "../../utils/personalAnalysis";
 import type { WatchMatch } from "../../utils/analysisWindow";
 
@@ -30,7 +35,6 @@ export default function HeadToHeadSection({
   watchMatches,
   predictedAdvancers,
   running,
-  failed,
   retry,
 }: {
   myFormId: string;
@@ -45,7 +49,6 @@ export default function HeadToHeadSection({
   watchMatches: WatchMatch[];
   predictedAdvancers: Set<string> | null;
   running: boolean;
-  failed: boolean;
   retry: () => void;
 }) {
   const my = cert.byFormId[myFormId];
@@ -56,14 +59,14 @@ export default function HeadToHeadSection({
     [candidates, myFormId],
   );
 
-  // Sound deterministic claims (see poolCertainty's contract): the bounds
-  // OVER-estimate remaining points, so both claims can only under-fire.
+  // Sound deterministic claims — single source of truth in poolCertainty
+  // (the bounds OVER-estimate remaining points, so both can only under-fire).
   const facts = useMemo(() => {
     if (!my || !rival) return null;
     return {
       gap: rival.totalPoints - my.totalPoints,
-      clinchedAbove: my.totalPoints > rival.totalPoints + rival.maxRemaining,
-      impossible: my.totalPoints + my.maxRemaining < rival.totalPoints,
+      clinchedAbove: isClinchedAbove(my, rival),
+      impossible: isEliminatedVs(my, rival),
     };
   }, [my, rival]);
 
@@ -97,7 +100,7 @@ export default function HeadToHeadSection({
           <option value="">בחרו טופס יריב…</option>
           {options.map((f) => (
             <option key={f.formId} value={f.formId}>
-              #{f.rank} · {f.formName} · {f.totalPoints} נק׳
+              {formOptionLabel(f)}
             </option>
           ))}
         </select>
@@ -140,13 +143,16 @@ export default function HeadToHeadSection({
                 )}{" "}
                 {pBeat != null ? (
                   <>הסיכוי לסיים מעל {rival.formName}: {formatChance(chanceLabel(pBeat))}.</>
-                ) : failed ? null : (
+                ) : running ? (
                   <span className="text-ink-muted animate-pulse">
                     מריצים את המרוץ הזה אלפי פעמים… ⚽
                   </span>
-                )}
+                ) : null}
               </p>
-              {failed && pBeat == null && (
+              {/* Terminal fallback (failure-path rule): run over — failed OR
+                  completed without a usable beat channel — never an eternal
+                  pulse; always offer a way to re-kick. */}
+              {pBeat == null && !running && (
                 <div className="mt-1.5">
                   <p className="text-xs font-bold text-ink-muted">
                     הניתוח ההסתברותי לא זמין כרגע — העובדות שלמעלה עדיין תקפות.

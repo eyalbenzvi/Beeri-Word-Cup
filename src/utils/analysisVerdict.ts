@@ -259,3 +259,13 @@ export function pickKeyMatch(watch: WatchMatchAgg[]): { matchId: string; shake: 
 export function refundBandLabel(targetRank: number): string {
   return `${targetRank - TARGET_BAND}–${targetRank + TARGET_BAND}`;
 }
+
+// ── Form-picker option label (shared by the page's any-form browser and the
+// head-to-head rival picker, so the two dropdowns can't drift) ──
+export function formOptionLabel(f: {
+  rank: number;
+  formName: string;
+  totalPoints: number;
+}): string {
+  return `#${f.rank} · ${f.formName} · ${f.totalPoints} נק׳`;
+}

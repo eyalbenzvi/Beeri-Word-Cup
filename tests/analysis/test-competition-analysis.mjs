@@ -20,7 +20,7 @@ import { GROUPS } from "/home/user/Beeri-World-Cup/src/data/teams.ts";
 import { mulberry32, simulateTournament, runScenarioSimulation } from "/home/user/Beeri-World-Cup/src/utils/scenarioSim.ts";
 import { computeCurrentElo } from "/home/user/Beeri-World-Cup/src/utils/eloModel.ts";
 import { runPersonalAnalysis } from "/home/user/Beeri-World-Cup/src/utils/personalAnalysis.ts";
-import { computePoolCertainty, isClinchedTopN } from "/home/user/Beeri-World-Cup/src/utils/poolCertainty.ts";
+import { computePoolCertainty, isClinchedTopN, isClinchedAbove, isEliminatedVs } from "/home/user/Beeri-World-Cup/src/utils/poolCertainty.ts";
 import { canUseCompetitionAnalysis } from "/home/user/Beeri-World-Cup/src/utils/featureFlags.ts";
 
 let passed = 0, failed = 0;
@@ -138,6 +138,18 @@ console.log("3. Deterministic certainty");
       assert(!f.aliveForFirst, `${f.formId} with fewer points is not alive on a decided world`);
     }
   }
+  // Pairwise head-to-head claims: sound on a decided world, strict at ties
+  // (equal points → NO claim either way; tiebreakers could order the pair).
+  for (const f of cert.forms.slice(1)) {
+    if (f.totalPoints < leader.totalPoints) {
+      assert(isClinchedAbove(leader, f), `decided world: leader clinched above ${f.formId}`);
+      assert(isEliminatedVs(f, leader), `decided world: ${f.formId} cannot finish above the leader`);
+    } else {
+      assert(!isClinchedAbove(leader, f) && !isEliminatedVs(f, leader),
+        `points tie: no pairwise claim for ${f.formId}`);
+    }
+    assert(!isClinchedAbove(f, f) && !isEliminatedVs(f, f), `${f.formId}: self-pair yields no claim`);
+  }
 }
 
 // ── 4. Flag gate is fail-closed (functional spot-check) ────────────
@@ -201,9 +213,22 @@ console.log("5. Static wiring (additive, flag-gated touch points)");
   const h2h = read("src/components/competitionStatus/HeadToHeadSection.tsx");
   assert(h2h.includes("agg.rivalFormId !== rival.formId") || h2h.includes("agg.rivalFormId === rival.formId"),
     "head-to-head rejects a stale aggregate (rival echo check)");
-  assert(h2h.includes("maxRemaining"), "head-to-head deterministic claims use the sound certainty bounds");
+  assert(h2h.includes("isClinchedAbove") && h2h.includes("isEliminatedVs"),
+    "head-to-head deterministic claims go through poolCertainty's pairwise helpers");
+  assert(h2h.includes("pBeat == null && !running"),
+    "head-to-head has a terminal fallback — a finished run without a beat channel never leaves an eternal pulse");
   const verdictSrc = read("src/components/competitionStatus/VerdictSection.tsx");
   assert(verdictSrc.includes("verdictSentenceThirdPerson"), "verdict has a third-person branch for foreign forms");
+
+  // Run-economics regressions (review findings): the hook keeps the previous
+  // aggregate while a new run spins up (no page-wide blank on rival/form
+  // switches) and caches more than one completed run (no rerun thrash when
+  // hopping between keys).
+  assert(hook.includes("agg: s.agg"), "hook keeps the previous aggregate during a rerun");
+  assert(hook.includes("completedRuns") && hook.includes("CACHE_MAX"),
+    "hook caches multiple completed runs (LRU), not a single slot");
+  assert(page.includes("useStoreReady"),
+    "page gates the no-form empty state on store readiness (race-condition rule)");
 }
 
 // ── 6. Copy contract: alive-badge gating + gender-neutral Hebrew ────

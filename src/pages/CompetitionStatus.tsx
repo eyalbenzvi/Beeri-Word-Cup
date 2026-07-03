@@ -26,13 +26,19 @@ import {
   useAllPredictions,
   useMatchResults,
   useActualBonuses,
+  useStoreReady,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
 import { useCompetitionAnalysisAccess } from "../hooks/useCompetitionAnalysisAccess";
 import { usePersonalAnalysis } from "../hooks/usePersonalAnalysis";
 import { computePoolCertainty } from "../utils/poolCertainty";
 import { selectWatchMatches, NEXT_ROUND } from "../utils/analysisWindow";
-import { pickPrimaryTarget, targetProbs, type PrimaryTarget } from "../utils/analysisVerdict";
+import {
+  pickPrimaryTarget,
+  targetProbs,
+  formOptionLabel,
+  type PrimaryTarget,
+} from "../utils/analysisVerdict";
 import { getCachedBracket } from "../utils/bracketCache";
 import { deriveAdvancingTeams, deriveActualAdvancing } from "../utils/bracket";
 import { ALL_MATCHES, knockoutMatches } from "../data/matches";
@@ -44,6 +50,9 @@ export default function CompetitionStatus() {
   const allPredictions = useAllPredictions();
   const results = useMatchResults();
   const actualBonuses = useActualBonuses();
+  // "Store defaults" ≠ "loaded data" (CLAUDE.md race rule): the no-form
+  // empty state below must never fire off an empty not-yet-loaded cache.
+  const storeReady = useStoreReady();
 
   // Every submitted form in the pool (leaderboard-ordered) — ANY of them can
   // be analysed (post-lock all predictions are readable); the viewer's own
@@ -74,9 +83,8 @@ export default function CompetitionStatus() {
     [pickedForm, urlForm].find((fid) => fid && submittedForms.some((f) => f.formId === fid)) ||
     myForms[0]?.formId ||
     null;
-  const owned = !!(
-    user && selectedFormId && cert.byFormId[selectedFormId]?.userId === user.id
-  );
+  // Single ownership source: membership in myForms (already user-filtered).
+  const owned = !!selectedFormId && myForms.some((f) => f.formId === selectedFormId);
 
   // Head-to-head rival — only meaningful while viewing one of MY forms, and
   // never the viewed form itself.
@@ -192,28 +200,30 @@ export default function CompetitionStatus() {
     [watchMatches, now],
   );
 
-  // Settings-confirmation watchdog: if the server snapshot never lands
-  // (offline deep link), the loader below must not be eternal (CLAUDE.md
-  // failure-path rule) — after the timeout we offer a way out.
+  // Loading watchdog: if the settings snapshot or the store cache never
+  // lands (offline deep link), the loader below must not be eternal
+  // (CLAUDE.md failure-path rule) — after the timeout we offer a way out.
+  const loading = !confirmed || !storeReady;
   const [confirmStuck, setConfirmStuck] = useState(false);
   useEffect(() => {
-    if (confirmed) return undefined;
+    if (!loading) return undefined;
     const t = setTimeout(() => setConfirmStuck(true), 10000);
     return () => clearTimeout(t);
-  }, [confirmed]);
+  }, [loading]);
 
   // ── Gates ──
-  // Settings not server-confirmed yet: we don't KNOW whether this user is
-  // released, so show a neutral loader — never the "not opened for you"
-  // message off a stale/default cache.
-  if (!confirmed) {
+  // Settings not server-confirmed / store cache not loaded yet: we don't
+  // KNOW whether this user is released or whether they have forms, so show
+  // a neutral loader — never a verdict ("not opened for you" / "no form")
+  // off a stale/default cache.
+  if (loading) {
     return (
       <div className="text-center py-16 text-ink-muted font-bold">
         <div className="text-5xl animate-bounce">⚽</div>
         <div className="text-sm mt-3">טוען…</div>
         {confirmStuck && (
           <div className="mt-6 space-y-2 max-w-xs mx-auto">
-            <p className="text-xs font-medium">ההגדרות לא נטענות — בדקו את החיבור.</p>
+            <p className="text-xs font-medium">הנתונים לא נטענים — בדקו את החיבור.</p>
             <button onClick={() => window.location.reload()} className="btn-duo btn-duo-primary w-full">
               רעננו את הדף
             </button>
@@ -306,7 +316,7 @@ export default function CompetitionStatus() {
             <option value="">{myForms.length > 0 ? "הטופס שלי" : "בחרו טופס…"}</option>
             {otherForms.map((f) => (
               <option key={f.formId} value={f.formId}>
-                #{f.rank} · {f.formName} · {f.totalPoints} נק׳
+                {formOptionLabel(f)}
               </option>
             ))}
           </select>
@@ -357,7 +367,6 @@ export default function CompetitionStatus() {
               watchMatches={watchMatches}
               predictedAdvancers={predictedAdvancers}
               running={analysis.running}
-              failed={analysis.failed}
               retry={analysis.retry}
             />
           )}
