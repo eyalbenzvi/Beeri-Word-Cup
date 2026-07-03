@@ -373,9 +373,48 @@ const OUTCOME_DEFAULTS: [number, number][] = [
   [0, 1], // away win
 ];
 
+// Per-outcome DENY candidate: the lowest scoreline with the given outcome
+// that NO tracked form predicted. Every candidate collected from the forms
+// is somebody's exact prediction (and the 1-0/0-0/0-1 fallbacks are the most
+// commonly predicted scorelines), so whichever the optimizer picks, it gifts
+// the exact-score bonus to every rival who predicted it. When the target
+// can't score on a match anyway (no prediction, or a different knockout
+// matchup), the best result is often an outcome NOBODY predicted — this
+// gives the search that option while still steering outcome/advancement.
+function addDenyCandidate(
+  seen: Set<string>,
+  list: Array<{ homeScore: number; awayScore: number }>,
+  outcome: "home" | "draw" | "away",
+): void {
+  if (outcome === "draw") {
+    for (let d = 0; d <= 12; d++) {
+      const k = `${d}:${d}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        list.push({ homeScore: d, awayScore: d });
+        return;
+      }
+    }
+    return;
+  }
+  // Probe realistic scorelines first (1-0, 2-0, 2-1, 3-0, …).
+  for (let hi = 1; hi <= 12; hi++) {
+    for (let lo = 0; lo < hi; lo++) {
+      const [h, a] = outcome === "home" ? [hi, lo] : [lo, hi];
+      const k = `${h}:${a}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        list.push({ homeScore: h, awayScore: a });
+        return;
+      }
+    }
+  }
+}
+
 function getCandidates(
   matchId: string,
   forms: Record<string, any>,
+  includeDeny = false,
 ): Array<{ homeScore: number; awayScore: number }> {
   const seen = new Set<string>();
   const list: Array<{ homeScore: number; awayScore: number }> = [];
@@ -395,6 +434,19 @@ function getCandidates(
       seen.add(k);
       list.push({ homeScore: dh, awayScore: da });
     }
+  }
+  // Deny candidates are reserved for the refinement pass (refineKnockout):
+  // there every trial is a COMPLETE scenario scored against the full
+  // population, so a denial is accepted only when it genuinely improves the
+  // target's rank. The round-by-round greedy, by contrast, evaluates each
+  // match with all later rounds still empty — there a denial that suppresses
+  // a rival looks locally great while silently wrecking the target's own
+  // downstream advancing/champion chain (observed: a 2→51 rank collapse in a
+  // synthetic 60-form world when denials were offered to the greedy).
+  if (includeDeny) {
+    addDenyCandidate(seen, list, "home");
+    addDenyCandidate(seen, list, "draw");
+    addDenyCandidate(seen, list, "away");
   }
   return list;
 }
@@ -559,6 +611,82 @@ function getTopKShapes(
     .map((s) => s.combo);
 }
 
+// ─── Target-dream completion ──────────────────────────────────────
+// The one scenario every user checks by hand: "every remaining match goes
+// exactly the way MY form predicted". The greedy search optimises rank
+// against rivals but explores a limited candidate space and can wander off
+// the target's own bracket — the reported production bug was a form whose
+// optimizer scenario ranked 3rd while trivial manual edits (pushing the
+// form's own picks truer) reached 1st. This builds that scenario explicitly
+// so computeBestCase can never report worse than it.
+//
+// Remaining group matches take the target's exact predicted score (fallback
+// 1-0). Remaining KO matches resolve round by round against the live
+// bracket: when the materialised matchup equals the target's predicted
+// matchup, the target's exact score (and tie-break winner) is used — the
+// only case where the score itself earns points; otherwise the team the
+// target predicted to go deeper advances with a representative 1-0/0-1.
+
+function dreamCompletion(
+  targetForm: any,
+  targetPreds: FormPreds,
+  remGroup: any[],
+  remKO: any[],
+  playedResults: Record<string, any>,
+): Record<string, any> {
+  const results: Record<string, any> = { ...playedResults };
+  const matches = targetForm?.matches || {};
+
+  for (const gm of remGroup) {
+    const pred = matches[gm.id];
+    results[gm.id] = isScoreValid(pred)
+      ? { homeScore: +pred.homeScore, awayScore: +pred.awayScore }
+      : { homeScore: 1, awayScore: 0 };
+  }
+
+  // How deep the target predicted a team to go (index into the advancing
+  // rounds, champion ranks deepest). Drives the "who should advance" choice
+  // for matchups the target didn't foresee.
+  const ROUNDS = ["R32", "R16", "QF", "SF", "F"] as const;
+  const depth = (team: string | null | undefined): number => {
+    if (!team) return -1;
+    let d = -1;
+    for (let i = 0; i < ROUNDS.length; i++) {
+      if ((targetPreds.advancing[ROUNDS[i]] || []).includes(team)) d = i;
+    }
+    if (targetPreds.champion === team) d = ROUNDS.length;
+    return d;
+  };
+
+  for (const round of KO_ROUND_ORDER) {
+    const roundRem = remKO.filter((m) => m.stage === round);
+    if (!roundRem.length) continue;
+    const bracket = calcBracketTeams(results);
+    for (const m of roundRem) {
+      const t = bracket[m.id];
+      if (!t?.home || !t?.away) continue;
+      const pred = matches[m.id];
+      const pt = targetPreds.bracket[m.id];
+      const sameMatchup = pt?.home === t.home && pt?.away === t.away;
+      if (sameMatchup && isScoreValid(pred)) {
+        const e: Record<string, any> = {
+          homeScore: +pred.homeScore,
+          awayScore: +pred.awayScore,
+        };
+        if (e.homeScore === e.awayScore)
+          e.advancingTeam = pred.advancingTeam || t.home;
+        results[m.id] = e;
+      } else {
+        const homeWins = depth(t.home) >= depth(t.away);
+        results[m.id] = homeWins
+          ? { homeScore: 1, awayScore: 0 }
+          : { homeScore: 0, awayScore: 1 };
+      }
+    }
+  }
+  return results;
+}
+
 // ─── Knockout optimizer (greedy round-by-round) ───────────────────
 // For each remaining KO match, try every candidate result, score the
 // target + relevant forms via calculateFullScore against the cumulative
@@ -685,30 +813,37 @@ function refineGroups(
 // refineGroups only fires while group matches are still unplayed. The
 // dominant real-world use of this tool, though, is "group stage finished,
 // only the knockout bracket remains" — and there the round-by-round greedy
-// (optimizeKnockout) is the ONLY optimization, with no lookahead: an
+// (optimizeKnockout) is the ONLY other optimization, with no lookahead: an
 // advancing-team / scoreline choice in an early round can be locally optimal
-// yet globally worse once its downstream matchups are filled in.
+// yet globally worse once its downstream matchups are filled in. The reported
+// production bug (optimizer said 3rd; trivially editing the scenario reached
+// 1st) came from exactly this gap.
 //
-// This pass adds that lookahead. For each remaining KO match it re-tries every
-// candidate result and, crucially, RE-OPTIMISES all strictly-downstream
-// remaining KO matches for that choice (their matchups depend on it), then
-// scores the FULL population. It is a strict hill-climb: a trial replaces the
-// incumbent only when it improves (rank, then target score), so the result is
-// never worse than the greedy/refineGroups output it starts from.
+// This pass is a coordinate descent over COMPLETE scenarios. For each
+// remaining KO match it re-tries every candidate result (including the
+// deny-candidates the greedy is not allowed to use); the strictly-downstream
+// matches — whose matchups depend on the choice — are re-completed with the
+// target-dream rollout (dreamCompletion), and the resulting FULL scenario is
+// scored against the FULL population. A trial replaces the incumbent only
+// when it improves (rank, then target score), so the pass is a strict
+// hill-climb: never worse than the seed it starts from, and every downstream
+// match it rewrites is itself re-tried later in the same sweep. Compared to
+// the previous design (re-running the greedy optimizer for the whole
+// downstream subtree per candidate — quadratic in remaining matches, tens of
+// seconds at 16), the rollout evaluation costs ONE population scoring per
+// candidate, which is what makes running it at 16 remaining matches viable.
 
 const KO_ROUND_ORDER = ["R32", "R16", "QF", "SF", "3RD", "F"];
 const koRoundIndex = (stage: string) => KO_ROUND_ORDER.indexOf(stage);
 
-// The pass re-optimises every strictly-downstream match for each candidate of
-// each match, so its cost grows ~quadratically with the number of remaining KO
-// matches (≈37s at 16, untenable at the full 32). It is gated to the late,
-// CONSTRAINED rounds (QF onward ≈ 8 matches, a few seconds) where the greedy
-// has the least room and benefits most. With many matches still open the greedy
-// already has enough freedom to seat the target near the top, so the lookahead
-// would add seconds for negligible gain.
-const MAX_KO_REFINE = 8;
+// Gate for the greedy-downstream local search (refineKnockoutGreedy). That
+// pass re-optimises every strictly-downstream match for each candidate of
+// each match, so its cost grows ~quadratically with the number of remaining
+// KO matches (≈37s at 16, untenable at the full 32) — it stays gated to the
+// late, CONSTRAINED rounds (QF onward ≈ 8 matches, a few seconds).
+const MAX_KO_REFINE_GREEDY = 8;
 
-function refineKnockout(
+function refineKnockoutGreedy(
   remKO: any[],
   workingResults: Record<string, any>,
   targetId: string,
@@ -719,7 +854,7 @@ function refineKnockout(
   scoringPreds: Record<string, FormPreds>,
   allIds: string[],
 ): Record<string, any> {
-  if (remKO.length === 0 || remKO.length > MAX_KO_REFINE) {
+  if (remKO.length === 0 || remKO.length > MAX_KO_REFINE_GREEDY) {
     return { ...workingResults };
   }
 
@@ -758,6 +893,89 @@ function refineKnockout(
           optimizeKnockout(
             downstream, trial, targetId, trackedIds, trackedForms, formPreds,
           ),
+        );
+
+        const trialScores = scoreForms(scoringForms, scoringPreds, trial);
+        const trialRank = countAbove(targetId, allIds, trialScores);
+        const trialScore = trialScores[targetId]?.totalPoints ?? 0;
+
+        if (
+          trialRank < bestRank ||
+          (trialRank === bestRank && trialScore > bestScore)
+        ) {
+          bestRank = trialRank;
+          bestScore = trialScore;
+          best = trial;
+          improved = true;
+        }
+      }
+    }
+
+    if (!improved) break;
+  }
+
+  return best;
+}
+
+// Gate for the rollout local search. 16 covers "R16 onward" — the state the
+// knockout stage spends most of its calendar in, and where the bug was
+// reported. At the full 32 the sweep is still heavy in scoreForms calls (32
+// matches × candidates × iterations), so the pre-R32 window keeps relying on
+// the greedy + dream floor.
+const MAX_KO_REFINE = 16;
+
+function refineKnockout(
+  remKO: any[],
+  workingResults: Record<string, any>,
+  targetId: string,
+  trackedIds: string[],
+  trackedForms: Record<string, any>,
+  formPreds: Record<string, FormPreds>,
+  scoringForms: Record<string, any>,
+  scoringPreds: Record<string, FormPreds>,
+  allIds: string[],
+): Record<string, any> {
+  if (remKO.length === 0 || remKO.length > MAX_KO_REFINE) {
+    return { ...workingResults };
+  }
+
+  const targetForm = trackedForms[targetId];
+  const targetPreds = formPreds[targetId];
+
+  let best = { ...workingResults };
+  const bestScores = scoreForms(scoringForms, scoringPreds, best);
+  let bestRank = countAbove(targetId, allIds, bestScores);
+  let bestScore = bestScores[targetId]?.totalPoints ?? 0;
+
+  const ordered = [...remKO].sort(
+    (a, b) => koRoundIndex(a.stage) - koRoundIndex(b.stage),
+  );
+
+  for (let iter = 0; iter < 4; iter++) {
+    let improved = false;
+
+    for (const m of ordered) {
+      // Only matches in strictly later rounds depend on m's outcome; same-round
+      // matches are independent bracket slots, so leave them fixed.
+      const mIdx = koRoundIndex(m.stage);
+      const downstream = remKO.filter((k) => koRoundIndex(k.stage) > mIdx);
+
+      const bracket = calcBracketTeams(best);
+      const actualTeams = bracket[m.id];
+      if (!actualTeams?.home || !actualTeams?.away) continue;
+
+      const candidates = expandKnockoutCandidates(
+        getCandidates(m.id, trackedForms, /* includeDeny */ true),
+        actualTeams,
+      );
+
+      for (const cand of candidates) {
+        const withCand = { ...best, [m.id]: cand };
+        for (const d of downstream) delete withCand[d.id];
+        // Re-complete the downstream bracket for this choice with the
+        // target-dream rollout — a full, legal scenario in one cheap pass.
+        const trial = dreamCompletion(
+          targetForm, targetPreds, [], downstream, withCand,
         );
 
         const trialScores = scoreForms(scoringForms, scoringPreds, trial);
@@ -849,6 +1067,36 @@ export function computeBestCase(
     ),
   );
 
+  // ── Phase 2b: target-dream floor (full-population) ──
+  // Never seed refinement with something worse than "the target's own
+  // predictions simply come true". The greedy above can settle on a scenario
+  // off the target's bracket; the dream scenario is the user's own mental
+  // benchmark, so being beaten by it reads as a bug (and was reported as
+  // one). Both candidates are scored against the FULL population — the same
+  // objective the final rank uses.
+  {
+    const dream = dreamCompletion(
+      trackedForms[targetFormId],
+      trackedPreds[targetFormId],
+      remGroup,
+      remKO,
+      playedResults,
+    );
+    const greedyScores = scoreForms(submittedForms, allFormPreds, workingResults);
+    const greedyAbove = countAbove(targetFormId, allIds, greedyScores);
+    const greedyPts = greedyScores[targetFormId]?.totalPoints ?? 0;
+    const dreamScores = scoreForms(submittedForms, allFormPreds, dream);
+    const dreamAbove = countAbove(targetFormId, allIds, dreamScores);
+    const dreamPts = dreamScores[targetFormId]?.totalPoints ?? 0;
+    if (
+      dreamAbove < greedyAbove ||
+      (dreamAbove === greedyAbove && dreamPts > greedyPts)
+    ) {
+      for (const k of Object.keys(workingResults)) delete workingResults[k];
+      Object.assign(workingResults, dream);
+    }
+  }
+
   // ── Phase 3: iterative refinement of group shapes (full-population) ──
   onProgress?.("refine", 65);
   const refined = refineGroups(
@@ -859,11 +1107,24 @@ export function computeBestCase(
 
   // ── Phase 3b: knockout local search (lookahead over bracket choices) ──
   // The key optimization once the group stage is over and only the bracket is
-  // left to play — refineGroups is a no-op then. Monotonic, so it can only
-  // match or improve `refined`.
+  // left to play — refineGroups is a no-op then. Two chained strict
+  // hill-climbs on the same objective, so the result can only match or
+  // improve `refined`:
+  //   1. refineKnockoutGreedy — the exhaustive downstream-re-greedy pass,
+  //      affordable only at ≤8 remaining (QF onward).
+  //   2. refineKnockout — the dream-rollout coordinate descent, cheap enough
+  //      for the R16-onward window (≤16 remaining) where the reported
+  //      "optimizer said 3rd, manual edits reached 1st" bug lived. It also
+  //      runs after (1) so the late-stage window gets both explorers.
   onProgress?.("refine", 80);
-  const refinedKO = refineKnockout(
+  const refinedGreedy = refineKnockoutGreedy(
     remKO, refined,
+    targetFormId, trackedIds, trackedForms, trackedPreds,
+    submittedForms, allFormPreds, allIds,
+  );
+  onProgress?.("refine", 88);
+  const refinedKO = refineKnockout(
+    remKO, refinedGreedy,
     targetFormId, trackedIds, trackedForms, trackedPreds,
     submittedForms, allFormPreds, allIds,
   );
