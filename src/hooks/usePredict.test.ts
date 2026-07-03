@@ -1,20 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { usePredictPosition, usePredictDuplicateNameView } from "./usePredict";
+import { NavigationProvider } from "./useNavigation";
+
+// usePredictPosition is URL-driven through the navigation context — it must
+// render under a NavigationProvider, exactly like in the app.
+const wrapper = ({ children }: { children: ReactNode }) =>
+  createElement(NavigationProvider, null, children);
 
 describe("usePredictPosition", () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    sessionStorage.clear();
+    // The hook writes ?stage=…&group=… via history — reset between tests so
+    // one test's URL residue can't win over the next test's bootstrap.
+    window.history.replaceState({}, "", "/");
+  });
   afterEach(() => sessionStorage.clear());
 
   it("returns sane defaults when no saved state exists", () => {
-    const { result } = renderHook(() => usePredictPosition("formA"));
+    const { result } = renderHook(() => usePredictPosition("formA"), { wrapper });
     const [stage, , group] = result.current;
     expect(stage).toBe("group");
     expect(group).toBe("A");
   });
 
   it("persists changes to sessionStorage keyed by activeFormId", () => {
-    const { result } = renderHook(() => usePredictPosition("formA"));
+    const { result } = renderHook(() => usePredictPosition("formA"), { wrapper });
     const [, setStage, , setGroup] = result.current;
     act(() => {
       setStage("R32");
@@ -30,11 +42,9 @@ describe("usePredictPosition", () => {
       "predict-pos-formX",
       JSON.stringify({ stage: "QF", group: "C" }),
     );
-    const { result } = renderHook(() => usePredictPosition("formX"));
-    // The restore happens in a useEffect, so the first render still
-    // shows the defaults. RTL renderHook doesn't auto-await effects in
-    // the same render — so the defaults apply only on the first sync
-    // pass. After mount the state should reflect saved values.
+    const { result } = renderHook(() => usePredictPosition("formX"), { wrapper });
+    // The bootstrap effect patches the URL params (replace), which re-renders
+    // the provider — after mount the state reflects the saved values.
     const [stage, , group] = result.current;
     expect(stage).toBe("QF");
     expect(group).toBe("C");
@@ -42,14 +52,14 @@ describe("usePredictPosition", () => {
 
   it("ignores malformed saved JSON without throwing", () => {
     sessionStorage.setItem("predict-pos-formY", "not-json{");
-    const { result } = renderHook(() => usePredictPosition("formY"));
+    const { result } = renderHook(() => usePredictPosition("formY"), { wrapper });
     // Defaults survive the malformed restore.
     expect(result.current[0]).toBe("group");
     expect(result.current[2]).toBe("A");
   });
 
   it("does nothing when activeFormId is null", () => {
-    const { result } = renderHook(() => usePredictPosition(null));
+    const { result } = renderHook(() => usePredictPosition(null), { wrapper });
     const [, setStage] = result.current;
     act(() => setStage("R16"));
     // No persisted entry created.
