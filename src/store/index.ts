@@ -49,7 +49,8 @@ registerAutoFillTrigger(maybeTriggerAutoFill);
 
 // Public API re-exports.
 export { commitInBatches } from "./firestoreClient";
-export { logAdminAction, getAuditLog } from "./audit";
+export { logAdminAction, getAuditLog, recordBlogView, fetchBlogViews } from "./audit";
+export type { BlogViewRow } from "./audit";
 export {
   isStoreReady,
   getMissingReadyKeys,

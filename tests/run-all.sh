@@ -199,6 +199,7 @@ run_test "129. Advancing Points Breakdown (נקודות עליה: per-round team
 run_test "130. Best-Case Optimizer (projected rank/score reconciles with leaderboard; stage-tagged scenario)" "bracket/test-best-case-optimizer.mjs" "yes"
 run_test "131. Best-Case → Simulator Hand-off (converter shape + parity + one-shot seed)" "bracket/test-best-case-to-simulator.mjs" "yes"
 run_test "132. Competition Analysis (המצב שלי: engine parity + certainty soundness + flag gate + wiring)" "analysis/test-competition-analysis.mjs" "yes"
+run_test "133. Blog View Tracking (passive auditLog reads: recordBlogView/fetchBlogViews + admin panel)" "summary/test-blog-view-tracking.mjs" "no"
 
 echo ""
 echo "==========================================="

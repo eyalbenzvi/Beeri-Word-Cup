@@ -303,7 +303,15 @@ service cloud.firestore {
         && request.resource.data.action is string
         && request.resource.data.action.size() <= 64
         && request.resource.data.timestamp is string
-        && request.resource.data.timestamp.size() <= 30;
+        && request.resource.data.timestamp.size() <= 30
+        // blog-view entries (and summary CRUD entries) carry a `summaryId`.
+        // The rule has no field whitelist, so absent an explicit cap a hostile
+        // client could write a ~1MB summaryId and bloat the collection the
+        // admin views-panel now scans. Conditional on presence so every other
+        // audit action (no summaryId) is unaffected.
+        && (!('summaryId' in request.resource.data)
+            || (request.resource.data.summaryId is string
+                && request.resource.data.summaryId.size() <= 128));
     }
 
     // Server-side counters written by Netlify Functions via Admin SDK.
