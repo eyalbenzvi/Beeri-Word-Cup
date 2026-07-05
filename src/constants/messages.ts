@@ -225,5 +225,20 @@ export const BLOG = {
     shareAria: "שתף",
     whatsappAria: "שתף בוואטסאפ",
   },
+  // Admin-only "who read this post" panel (analytics #1).
+  views: {
+    button: "צפיות",
+    hide: "הסתר צפיות",
+    title: "מי צפה בסיכום",
+    loading: "טוען צפיות...",
+    error: "טעינת הצפיות נכשלה",
+    empty: "עדיין אין צפיות רשומות",
+    summary: (viewers, total) => {
+      const v = viewers === 1 ? "צופה אחד" : `${viewers} צופים`;
+      const t = total === 1 ? "צפייה אחת" : `${total} צפיות`;
+      return `${v} · ${t}`;
+    },
+    viewCount: (n) => (n === 1 ? "צפייה אחת" : `${n} צפיות`),
+  },
 };
 

@@ -12,6 +12,7 @@ import {
   useCurrentUser,
 } from "../hooks/useStore";
 import { useNavigation } from "../hooks/useNavigation";
+import { recordBlogView } from "../store";
 import { BLOG } from "../constants/messages";
 
 function LatestCountdown({ sortedSummaries, currentNumber }) {
@@ -85,6 +86,32 @@ export default function DailySummary() {
     // navigate intentionally omitted — it's stable from the provider
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, params?.n]);
+
+  // Passive read-tracking (analytics #1). Record a "this user read the blog"
+  // signal for admins, transparently:
+  //   - only for a PUBLISHED post (drafts are admin-preview noise), and only
+  //     for a logged-in user (guests have no uid — recordBlogView bails, but
+  //     gating here avoids the wasted call entirely);
+  //   - NOT for admins: they open published posts constantly while editing,
+  //     and they're the audience for this data — self-views would pollute it;
+  //   - deduped per browser session per summary via sessionStorage, so
+  //     prev/next navigation and re-renders don't spam duplicate writes;
+  //   - fire-and-forget in an effect (post-render), so the reader's UX is
+  //     never blocked or delayed.
+  const viewerUid = user?.id;
+  const viewerIsAdmin = !!user?.isAdmin;
+  useEffect(() => {
+    if (!active || active.status !== "published" || !viewerUid || viewerIsAdmin) return;
+    const key = `bwc_bv_${viewerUid}_${active.id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // Private mode / storage disabled: fall through and still record. Worst
+      // case is one extra write per navigation — harmless and admin-deduped.
+    }
+    recordBlogView(active.id, active.number);
+  }, [active, viewerUid, viewerIsAdmin]);
 
   // For a guest hitting /blog directly, the store starts with default
   // values (summaries: {}) until the public listeners resolve a moment
