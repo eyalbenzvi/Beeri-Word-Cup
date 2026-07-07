@@ -146,6 +146,30 @@ describe("resolveTopScorerProbs", () => {
     });
   });
 
+  it("a KO draw without advancingTeam eliminates nobody (malformed entry)", () => {
+    // Take a fully played world, then strip the decision from one R32 draw…
+    const world = simulateTournament(mulberry32(33), {}, computeCurrentElo({}));
+    // …by forcing a draw with no advancingTeam on a played R32 match.
+    const target = Object.keys(world).find((id) => world[id]?.stage === "R32");
+    const results: Record<string, any> = {};
+    for (const id of Object.keys(world)) {
+      if (world[id]?.stage === "group" || id === target) results[id] = world[id];
+    }
+    const bracket = calcBracketTeams(results);
+    const teams = bracket[target!];
+    results[target!] = {
+      ...world[target!],
+      homeScore: 1,
+      awayScore: 1,
+      advancingTeam: undefined,
+    };
+    const alive = computeAliveTeams(results);
+    expect(alive).not.toBeNull();
+    // Neither side of the undecided draw may be marked eliminated.
+    expect(alive!.has(teams.home)).toBe(true);
+    expect(alive!.has(teams.away)).toBe(true);
+  });
+
   it("treats everyone as alive while qualification is not final", () => {
     // No results at all → computeAliveTeams returns null → nothing zeroed.
     expect(computeAliveTeams({})).toBeNull();

@@ -210,7 +210,8 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
                       step={1}
                       value={tsPct[c.name] ?? 0}
                       onChange={(e) => {
-                        const v = Number(e.target.value);
+                        const n = Number(e.target.value);
+                        const v = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
                         setTsPct((s) => ({ ...s, [c.name]: v }));
                         setTsDirty(true);
                       }}
@@ -226,7 +227,8 @@ export default function ScenariosSection({ showRecompute = false }: { showRecomp
           <p className="text-3xs text-ink-light font-medium mt-1.5">
             כשמופעל, כל הרצה מגרילה מי מלך השערים לפי הסיכויים שכאן (יכולים לצאת גם
             כמה יחד — שוויון בטבלת הכובשים), ובחירה פוגעת מזכה ב-8 נק׳. ההגדרה נשמרת
-            בלחיצה על ״חשב מחדש״ ומשפיעה גם על ״המצב שלי בתחרות״. מועמד שנבחרתו
+            בלחיצה על ״חשב מחדש״, משפיעה גם על ״המצב שלי בתחרות״ ונשארת בתוקף גם
+            לריצות האוטומטיות שאחרי כל תוצאה — עד שמכבים אותה כאן. מועמד שנבחרתו
             הודחה מאופס אוטומטית.
           </p>
         </div>

@@ -21,7 +21,9 @@
  * existing gameData/actualBonuses doc:
  *   actualBonuses.topScorerSim = { enabled: boolean, odds?: { "<player>": p } }
  *   - enabled=false/absent → no sampling anywhere (the automatic post-result
- *     server run needs no odds and behaves exactly as before).
+ *     server run needs no odds and behaves exactly as before). The flag is
+ *     STICKY: once enabled it also applies to subsequent automatic runs
+ *     (with elimination zeroing keeping the odds current) until turned off.
  *   - The admin turns it on from the scenarios tab when recomputing, and can
  *     set each candidate's probability there (odds keys are matched with
  *     isSamePlayer, so Hebrew or English names both work; clamped to [0,1]).
@@ -75,6 +77,9 @@ export function computeAliveTeams(results: Record<string, any>): Set<string> | n
     if (!teams?.home || !teams?.away) continue;
     const h = Number(r.homeScore);
     const a = Number(r.awayScore);
+    // A KO draw without advancingTeam (malformed/partial entry) decides
+    // nothing — don't guess a loser; both stay alive until the row is fixed.
+    if (h === a && !r.advancingTeam) continue;
     const loser =
       h > a ? teams.away : a > h ? teams.home : r.advancingTeam === teams.home ? teams.away : teams.home;
     if (loser) alive.delete(loser);
