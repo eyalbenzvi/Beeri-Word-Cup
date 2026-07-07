@@ -1,8 +1,24 @@
 import { useMemo, useState } from "react";
 import { getTeamByCode } from "../data/teams";
+import { getPlayerDisplayName } from "../utils/playerSearch";
 import { useNavigation } from "../hooks/useNavigation";
 import ClickableName from "./ClickableName";
 import type { ScenarioRunResult } from "../utils/scenarioSim";
+
+// Reflect whether THIS run drew the golden-boot king per sim (admin opt-in;
+// meta.topScorerProbs is stamped by the engine), including the odds it used —
+// so users always know what the tables do and don't contain.
+function topScorerNote(meta: ScenarioRunResult["meta"]): string {
+  const probs = meta.topScorerProbs;
+  if (!probs) return "ללא בונוס מלך השערים.";
+  const parts = Object.entries(probs)
+    .filter(([, p]) => p > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, p]) => `${getPlayerDisplayName(name, undefined)} ${Math.round(p * 100)}%`);
+  return parts.length
+    ? `כולל הגרלת מלך השערים (${parts.join(", ")}).`
+    : "כולל הגרלת מלך השערים.";
+}
 
 // ── formatting (clarity-first, per the UX review) ──
 const teamLabel = (code: string) => {
@@ -281,7 +297,8 @@ export default function ScenarioExplorer({
 
           <p className="text-3xs text-ink-light font-medium text-center">
             הסיכויים מחושבים רק מהתרחישים שבהם {teamLabel(selected.champion)} ניצחה את{" "}
-            {teamLabel(selected.runnerUp)} בגמר. מודל Elo — הערכה, לא הימור.
+            {teamLabel(selected.runnerUp)} בגמר. {topScorerNote(run.meta)}{" "}
+            מודל Elo — הערכה, לא הימור.
           </p>
         </>
       )}
@@ -312,7 +329,8 @@ export function ScenarioOverallTable({
     <div className="space-y-3">
       <RankingTable metrics={overall} run={run} currentUserId={currentUserId} myLabel="הטופס שלך (כל ההרצות)" />
       <p className="text-3xs text-ink-light font-medium text-center">
-        מצרף את כל {run.meta.simCount.toLocaleString("he-IL")} ההרצות, ללא בחירת גמר. מודל Elo — הערכה, לא הימור.
+        מצרף את כל {run.meta.simCount.toLocaleString("he-IL")} ההרצות, ללא בחירת גמר.{" "}
+        {topScorerNote(run.meta)} מודל Elo — הערכה, לא הימור.
       </p>
     </div>
   );

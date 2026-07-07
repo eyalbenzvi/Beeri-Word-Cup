@@ -32,6 +32,11 @@ import { buildFormBracketMap } from "./leaderboardCore";
 import { computeCurrentElo } from "./eloModel";
 import { simulateTournament, mulberry32 } from "./scenarioSim";
 import {
+  isTopScorerSamplingActive,
+  resolveTopScorerProbs,
+  sampleTopScorerMask,
+} from "./topScorerRace";
+import {
   precomputeForms,
   scoreFormFast,
   makeScratchScore,
@@ -156,6 +161,12 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
     : [];
   const fastForms = precomputeForms(allPredictions, formBracketMap, results, fixedTopScorers);
   const nForms = fastForms.length;
+  // Golden-boot sampling, exactly like scenarioSim (admin opt-in via
+  // actualBonuses.topScorerSim, and only while the real king is unknown) —
+  // resolved once, drawn per sim.
+  const tsProbs = isTopScorerSamplingActive(actualBonuses)
+    ? resolveTopScorerProbs(actualBonuses, results)
+    : null;
 
   const targetIdx: { formId: string; idx: number }[] = [];
   for (const id of targetFormIds) {
@@ -211,6 +222,9 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
     const chunk = Math.min(CHUNK_SIMS, simCount - done);
     for (let s = 0; s < chunk; s++) {
       const sim = simulateTournament(rng, results, elo);
+      // Drawn right after simulateTournament — the SAME rng order as
+      // scenarioSim, which the same-seed parity test relies on.
+      const kingsMask = tsProbs ? sampleTopScorerMask(rng, tsProbs) : 0;
 
       // Rank the pool exactly like scenarioSim.scoreSim / the leaderboard.
       const simBracket = calcBracketTeams(sim);
@@ -221,7 +235,7 @@ export function runPersonalAnalysis(input: PersonalAnalysisInput): PersonalAnaly
         advSets[round] = new Set(actualAdvancing[round]);
       }
       for (let i = 0; i < nForms; i++) {
-        scoreFormFast(fastForms[i], sim, simBracket, advSets, champion, scratch[i]);
+        scoreFormFast(fastForms[i], sim, simBracket, advSets, champion, scratch[i], kingsMask);
         order[i] = scratch[i];
       }
       order.sort((a, b) => {

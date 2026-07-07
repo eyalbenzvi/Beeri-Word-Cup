@@ -53,7 +53,7 @@ const DEFAULT_SEED = 0x9e3779b9;
 export function useScenarioData(): {
   state: ScenarioDataState;
   recompute: (simCount?: number) => void;
-  computeLocal: (simCount?: number) => void;
+  computeLocal: (simCount?: number, bonusesOverride?: any) => void;
   local: LocalRunState;
 } {
   const [state, setState] = useState<ScenarioDataState>({
@@ -112,8 +112,11 @@ export function useScenarioData(): {
   // lands. Worker construction / structured-clone of the (large) payload can
   // throw synchronously, so the whole start is guarded — without it the UI
   // would be stuck on the progress bar forever (CLAUDE.md failure-path rule).
+  // `bonusesOverride` lets the caller run with an actualBonuses value it JUST
+  // saved (e.g. the top-scorer sim config) without waiting for the store
+  // listener round-trip to refresh this hook's snapshot.
   const computeLocal = useCallback(
-    (simCount?: number) => {
+    (simCount?: number, bonusesOverride?: any) => {
       const count = clampCount(simCount);
       workerRef.current?.terminate();
       setLocal({ running: true, percent: 0, error: false, saveError: false });
@@ -160,7 +163,7 @@ export function useScenarioData(): {
         worker.postMessage({
           allPredictions,
           results,
-          actualBonuses,
+          actualBonuses: bonusesOverride ?? actualBonuses,
           simCount: count,
           seed: DEFAULT_SEED,
         });

@@ -10,8 +10,12 @@
  *
  * Concept: real results so far are FIXED. The remaining matches (any group
  * games still to play + the whole knockout) are sampled thousands of times.
- * Every simulated tournament ranks all forms; we aggregate, per (champion,
- * runner-up) final, each form's average rank, average points, and win %.
+ * When the admin enables it (actualBonuses.topScorerSim) and the real golden
+ * boot is undecided, each sim also draws that tournament's top-scorer king(s)
+ * from the favorite list (topScorerRace.ts), so the 8-point bonus + its
+ * tiebreaker participate in every simulated table. Every simulated tournament ranks all forms; we
+ * aggregate, per (champion, runner-up) final, each form's average rank,
+ * average points, and win %.
  */
 
 import { groupMatches, knockoutMatches } from "../data/matches";
@@ -21,6 +25,12 @@ import { buildFormBracketMap } from "./leaderboardCore";
 import { isScoreValid } from "./helpers";
 import { computeCurrentElo, sampleEloMatch, shootoutHomeAdvances, DEFAULT_ELO } from "./eloModel";
 import { precomputeForms, scoreFormFast, makeScratchScore, FormFast, FastScore } from "./scenarioScore";
+import {
+  TOP_SCORER_CANDIDATES,
+  isTopScorerSamplingActive,
+  resolveTopScorerProbs,
+  sampleTopScorerMask,
+} from "./topScorerRace";
 
 // ─── Seeded RNG ────────────────────────────────────────────────────
 // mulberry32: tiny, fast, deterministic. A stored seed makes any run fully
@@ -124,6 +134,7 @@ function scoreSim(
   fastForms: FormFast[],
   scratch: FastScore[],
   order: FastScore[],
+  kingsMask: number,
 ): SimRanked {
   const simBracket = calcBracketTeams(sim);
   const actualAdvancing = deriveActualAdvancing(simBracket, sim);
@@ -135,7 +146,7 @@ function scoreSim(
   }
 
   for (let i = 0; i < fastForms.length; i++) {
-    scoreFormFast(fastForms[i], sim, simBracket, advSets, champion, scratch[i]);
+    scoreFormFast(fastForms[i], sim, simBracket, advSets, champion, scratch[i], kingsMask);
     order[i] = scratch[i];
   }
 
@@ -199,6 +210,11 @@ export type ScenarioRunResult = {
     generatedAt: number;
     formCount: number;
     minScenarioSamples: number; // below this a final is too rare to table
+    // Present when the run drew the golden-boot king per sim (real top scorer
+    // still unknown): the resolved per-candidate probabilities actually used
+    // (name → p, after admin overrides + elimination zeroing). Absent on runs
+    // persisted before this existed and on post-king fixed-bonus runs.
+    topScorerProbs?: Record<string, number>;
   };
   formOrder: string[]; // index basis for every Scenario's parallel arrays
   forms: Record<string, ScenarioFormInfo>; // display labels only
@@ -254,14 +270,26 @@ export function runScenarioSimulation(opts: {
   const fastForms = precomputeForms(allPredictions, formBracketMap, results, fixedTopScorers);
   const formIds = fastForms.map((f) => f.formId); // submitted/approved only
 
+  // Golden-boot sampling is ADMIN OPT-IN (actualBonuses.topScorerSim.enabled)
+  // and active only while the real king is unknown; the probabilities actually
+  // used are stamped into meta so the UI can tell users what this run holds.
+  const tsProbs = isTopScorerSamplingActive(actualBonuses)
+    ? resolveTopScorerProbs(actualBonuses, results)
+    : null;
+
   const nForms = formIds.length;
-  const meta = {
+  const meta: ScenarioRunResult["meta"] = {
     seed,
     simCount,
     generatedAt: Date.now(),
     formCount: nForms,
     minScenarioSamples,
   };
+  if (tsProbs) {
+    meta.topScorerProbs = Object.fromEntries(
+      TOP_SCORER_CANDIDATES.map((c, i) => [c.name, tsProbs[i]]),
+    );
+  }
   const forms: ScenarioRunResult["forms"] = {};
   for (const ff of fastForms) forms[ff.formId] = { userId: ff.userId, formName: ff.formName };
 
@@ -314,7 +342,10 @@ export function runScenarioSimulation(opts: {
 
   for (let s = 0; s < simCount; s++) {
     const sim = simulateTournament(rng, results, elo);
-    const { ranked, champion, finalists } = scoreSim(sim, fastForms, scratch, order);
+    // Drawn right after simulateTournament — personalAnalysis consumes the
+    // rng in the same order, which the same-seed parity test relies on.
+    const kingsMask = tsProbs ? sampleTopScorerMask(rng, tsProbs) : 0;
+    const { ranked, champion, finalists } = scoreSim(sim, fastForms, scratch, order, kingsMask);
 
     if (champion) champSamples[champion] = (champSamples[champion] || 0) + 1;
 
