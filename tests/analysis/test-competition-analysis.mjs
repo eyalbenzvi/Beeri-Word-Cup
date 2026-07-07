@@ -268,5 +268,97 @@ console.log("6. Copy contract");
   }
 }
 
+// ── 7. Sampled golden-boot bonus flows through the engines ─────────
+// ADMIN OPT-IN via actualBonuses.topScorerSim = { enabled, odds }. Locks:
+//   a. default OFF — an automatic run (no config) never samples, no stamp;
+//   b. two enabled same-seed runs differing ONLY in odds simulate IDENTICAL
+//      tournaments (sampling consumes a fixed number of rng draws), so with
+//      p(Mbappé)=1 vs p(*)=0 a Mbappé-picker's average points rise by
+//      EXACTLY the 8-point bonus and nobody else's move;
+//   c. meta.topScorerProbs stamps the resolved odds (the UI reflection);
+//   d. a decided real king disables sampling even when enabled;
+//   e. personalAnalysis samples in the same rng order (same-seed parity).
+// Empty `results` keeps every candidate alive (no elimination zeroing)
+// regardless of the sampled world.
+console.log("7. Sampled golden-boot bonus (מלך השערים) in the scenario engine");
+{
+  const forms = genForms(6, 12);
+  forms.f0.topScorer = "קיליאן אמבפה"; // canonical Hebrew pick
+  forms.f1.topScorer = "Harry Kane"; // canonical English pick, p stays 0
+  const SIMS = 200, SEED = 21;
+  const zeroOdds = { "Kylian Mbappe": 0, "Lionel Messi": 0, "Erling Haaland": 0, "Harry Kane": 0 };
+  const runWith = (actualBonuses) => runScenarioSimulation({
+    allPredictions: forms, results: {}, simCount: SIMS, seed: SEED, actualBonuses,
+  });
+
+  // a. default off
+  const auto = runWith({});
+  assert(!auto.meta.topScorerProbs, "no admin config → automatic run never samples (no meta stamp)");
+
+  // b+c. enabled, odds-only difference
+  const base = runWith({ topScorerSim: { enabled: true, odds: zeroOdds } });
+  const mbappe = runWith({ topScorerSim: { enabled: true, odds: { ...zeroOdds, "Kylian Mbappe": 1 } } });
+  assert(!!base.meta.topScorerProbs && !!mbappe.meta.topScorerProbs,
+    "enabled runs stamp meta.topScorerProbs");
+  assert(mbappe.meta.topScorerProbs["Kylian Mbappe"] === 1 && mbappe.meta.topScorerProbs["Harry Kane"] === 0,
+    "meta reflects the resolved (admin) probabilities");
+  const i0 = base.formOrder.indexOf("f0");
+  const i1 = base.formOrder.indexOf("f1");
+  assert(i0 >= 0 && i1 >= 0, "both picker forms are in the run");
+  assert(mbappe.overall.avgPoints[i0] === base.overall.avgPoints[i0] + 8,
+    `Mbappé picker gains exactly the 8-point bonus in every sim (${base.overall.avgPoints[i0]} → ${mbappe.overall.avgPoints[i0]})`);
+  assert(mbappe.overall.avgPoints[i1] === base.overall.avgPoints[i1],
+    "a p=0 candidate's picker gains nothing");
+  let othersUnchanged = true;
+  for (let i = 0; i < base.formOrder.length; i++) {
+    if (i !== i0 && mbappe.overall.avgPoints[i] !== base.overall.avgPoints[i]) othersUnchanged = false;
+  }
+  assert(othersUnchanged, "non-picker forms' average points are untouched");
+
+  // d. a decided real king wins over the sim config: no sampling, odds inert
+  // (two fixed-king runs with different odds share the same rng stream and
+  // must be byte-identical).
+  const fixedA = runWith({ topScorers: ["Harry Kane"], topScorerSim: { enabled: true, odds: { ...zeroOdds, "Kylian Mbappe": 1 } } });
+  const fixedB = runWith({ topScorers: ["Harry Kane"] });
+  assert(!fixedA.meta.topScorerProbs && !fixedB.meta.topScorerProbs,
+    "a decided king disables sampling (no meta stamp)");
+  assert(JSON.stringify(fixedA.overall) === JSON.stringify(fixedB.overall),
+    "with a decided king the sim config has zero effect");
+
+  // e. same-seed parity with sampling ON (locks the rng draw order between
+  // the two engines — the sampled-kings analogue of section 1).
+  const enabledBonuses = { topScorerSim: { enabled: true, odds: { ...zeroOdds, "Kylian Mbappe": 0.5, "Harry Kane": 0.3 } } };
+  const mine = runPersonalAnalysis({
+    allPredictions: forms, results: {}, actualBonuses: enabledBonuses,
+    targetFormIds: Object.keys(forms), watchMatches: [], simCount: SIMS, seed: SEED,
+  });
+  const engine = runWith(enabledBonuses);
+  let maxDiff = 0;
+  for (const tf of mine.targetForms) {
+    const i = engine.formOrder.indexOf(tf.formId);
+    const diff = Math.abs(tf.hist[0] / SIMS - engine.overall.winProb[i]);
+    if (diff > maxDiff) maxDiff = diff;
+  }
+  assert(maxDiff <= 0.00005, `sampling-enabled winProb parity within engine rounding (maxDiff=${maxDiff})`);
+
+  // Static wiring: the admin control persists the config, and both scenario
+  // views + the competition-status page reflect inclusion to users.
+  const scen = read("src/components/ScenariosSection.tsx");
+  assert(scen.includes("topScorerSim") && scen.includes("saveActualBonuses"),
+    "ScenariosSection persists the admin golden-boot config");
+  assert(scen.includes("כולל מלך השערים") && scen.includes("ללא מלך השערים"),
+    "run meta line marks included/excluded for all users");
+  const expl = read("src/components/ScenarioExplorer.tsx");
+  assert(expl.includes("topScorerProbs") && expl.includes("ללא בונוס מלך השערים"),
+    "ScenarioExplorer footnotes reflect the run's golden-boot stamp");
+  const comp = read("src/pages/CompetitionStatus.tsx");
+  assert(comp.includes("isTopScorerSamplingActive"),
+    "CompetitionStatus uses the engines' own sampling gate for its note");
+  for (const f of ["src/utils/scenarioSim.ts", "src/utils/personalAnalysis.ts"]) {
+    assert(read(f).includes("isTopScorerSamplingActive"),
+      `${f}: engine gates sampling through the shared helper`);
+  }
+}
+
 console.log(`\n=== COMPETITION ANALYSIS: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) { console.error("\nFailures:\n" + failures.map((f) => " - " + f).join("\n")); process.exit(1); }

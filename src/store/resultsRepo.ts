@@ -65,9 +65,12 @@ export function getActualBonuses() {
   return cache.actualBonuses || DEFAULT_BONUSES;
 }
 
-export function saveActualBonuses(bonuses: any) {
-  if (!requireAdmin()) return;
-  writeGameDoc("actualBonuses", bonuses);
+// Returns the write promise so callers that must SEQUENCE on the server write
+// (e.g. saving the top-scorer sim config before triggering a server scenario
+// recompute that reads this doc) can await it. Fire-and-forget still works.
+export function saveActualBonuses(bonuses: any): Promise<boolean> {
+  if (!requireAdmin()) return Promise.resolve(false);
+  return writeGameDoc("actualBonuses", bonuses);
 }
 
 // ============ SETTINGS ============

@@ -41,6 +41,7 @@ import {
 } from "../utils/analysisVerdict";
 import { getCachedBracket } from "../utils/bracketCache";
 import { deriveAdvancingTeams, deriveActualAdvancing } from "../utils/bracket";
+import { isTopScorerSamplingActive } from "../utils/topScorerRace";
 import { ALL_MATCHES, knockoutMatches } from "../data/matches";
 import { normalizeStatus, isScoreValid } from "../utils/helpers";
 
@@ -380,6 +381,14 @@ export default function CompetitionStatus() {
       />
 
       <p className="text-xs text-ink-muted font-medium text-center mt-4 mb-2">
+        {/* The engines' own sampling gate: the note appears exactly when the
+            personal analysis draws the golden boot. */}
+        {isTopScorerSamplingActive(actualBonuses) && (
+          <>
+            👑 הסימולציה כוללת הגרלה של מלך השערים לפי הסיכויים שהוגדרו.
+            <br />
+          </>
+        )}
         כל מה שכתוב כאן הוא הערכה — לא הבטחה, לא הימור, ולא תחליף לצפייה
         במשחקים. הטבלה האמיתית נקבעת רק על הדשא. ⚽
       </p>

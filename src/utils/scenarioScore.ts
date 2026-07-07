@@ -7,9 +7,16 @@
  *
  * This module produces NUMERICALLY IDENTICAL totals via two ideas:
  *   1. Pre-compute each form's FIXED points (already-played group matches +
- *      top-scorer bonus) ONCE — they never change across sims.
+ *      top-scorer bonus once the real king is known) ONCE — they never change
+ *      across sims.
  *   2. Per sim, score only the VARIABLE matches (the few remaining group games
  *      + the knockout) with plain integer comparisons, no strings/allocations.
+ *
+ * While the real top scorer is UNKNOWN, the bonus is per-sim instead of fixed:
+ * the engines draw that sim's golden-boot king(s) (topScorerRace.ts) and pass
+ * the drawn bitmask to scoreFormFast, which pays BONUSES.topScorer to every
+ * form whose pick is among them — equivalent to calculateFullScore scoring
+ * against actualBonuses.topScorers = the drawn candidates.
  *
  * Equivalence with `calculateFullScore` is locked by scenarioScore.test.ts.
  * If you change scoring.ts, that test will catch any drift here.
@@ -19,6 +26,7 @@ import { POINTS, BONUSES } from "./scoring";
 import { isSamePlayer } from "./playerSearch.js";
 import { isScoreValid } from "./helpers";
 import { groupMatches, knockoutMatches } from "../data/matches";
+import { buildTopScorerMask } from "./topScorerRace";
 
 // Advancing points are paid at the stage that FEEDS a round (see
 // scoring.ts §2): reaching R32 pays group.advancing, R16 pays R32.advancing…
@@ -41,6 +49,11 @@ export type FormFast = {
   formName: string;
   base: { total: number; exact: number; outcome: number };
   topScorerHit: boolean;
+  // Candidate bitmask of the form's top-scorer pick (topScorerRace.ts). Only
+  // set while the real king is UNKNOWN — scoreFormFast pays the bonus when it
+  // intersects the sim's drawn kings. 0 once fixedTopScorers exist (the fixed
+  // bonus is already inside `base`), so double-pay is structurally impossible.
+  tsMask: number;
   varGroup: { id: string; ph: number; pa: number; pOut: number }[];
   knock: { id: string; stage: string; ph: number; pa: number; pOut: number; ptHome: string; ptAway: string }[];
   advancing: { round: string; teams: string[] }[];
@@ -100,13 +113,21 @@ export function precomputeForms(
       }
     }
 
-    // Top-scorer bonus is fixed (cannot be simulated from match scores).
+    // Top-scorer bonus: FIXED once the real king is known (folded into base);
+    // until then, PER-SIM — precompute which candidate the pick refers to and
+    // let scoreFormFast pay it against each sim's drawn kings.
     let topScorerHit = false;
-    if (fixedTopScorers.length > 0 && predData.topScorer) {
-      if (fixedTopScorers.some((s) => isSamePlayer(predData.topScorer, s))) {
+    let tsMask = 0;
+    if (fixedTopScorers.length > 0) {
+      if (
+        predData.topScorer &&
+        fixedTopScorers.some((s) => isSamePlayer(predData.topScorer, s))
+      ) {
         topScorerHit = true;
         baseTotal += BONUSES.topScorer;
       }
+    } else {
+      tsMask = buildTopScorerMask(predData.topScorer);
     }
 
     // Variable group matches (still to be played).
@@ -156,6 +177,7 @@ export function precomputeForms(
       formName: predData.formName || "טופס ללא שם",
       base: { total: baseTotal, exact: baseExact, outcome: baseOutcome },
       topScorerHit,
+      tsMask,
       varGroup,
       knock,
       advancing,
@@ -181,6 +203,8 @@ export function makeScratchScore(formId = ""): FastScore {
 // Score ONE form for one simulated tournament. `advSets` = actualAdvancing
 // arrays pre-converted to Sets; `simBracket` = calcBracketTeams(sim). Pass
 // `out` (a reused FastScore) to avoid per-form allocation in the hot loop.
+// `kingsMask` = the sim's drawn golden-boot kings (topScorerRace.ts) — 0 when
+// the real top scorer is already known (the fixed bonus lives in f.base).
 export function scoreFormFast(
   f: FormFast,
   sim: Record<string, any>,
@@ -188,6 +212,7 @@ export function scoreFormFast(
   advSets: Record<string, Set<string>>,
   champion: string | null,
   out: FastScore = makeScratchScore(),
+  kingsMask = 0,
 ): FastScore {
   let total = f.base.total;
   let exact = f.base.exact;
@@ -256,11 +281,19 @@ export function scoreFormFast(
     correctChampion = true;
   }
 
+  // Sim-drawn top-scorer bonus (mutually exclusive with f.topScorerHit — see
+  // precomputeForms). Also flips tiebreaker #4 for this sim's ranking.
+  let correctTopScorer = f.topScorerHit;
+  if ((f.tsMask & kingsMask) !== 0) {
+    total += BONUSES.topScorer;
+    correctTopScorer = true;
+  }
+
   out.formId = f.formId;
   out.totalPoints = total;
   out.exactScoreCount = exact;
   out.outcomeCount = outcome;
   out.correctChampion = correctChampion;
-  out.correctTopScorer = f.topScorerHit;
+  out.correctTopScorer = correctTopScorer;
   return out;
 }

@@ -8,6 +8,7 @@ import { FIFA_RANK_DENSE } from "../data/fifaRanking";
 import { mulberry32, simulateTournament } from "./scenarioSim";
 import { computeCurrentElo } from "./eloModel";
 import { precomputeForms, scoreFormFast } from "./scenarioScore";
+import { TOP_SCORER_CANDIDATES } from "./topScorerRace";
 
 // The lean scorer MUST produce numerically identical results to the canonical
 // calculateFullScore — otherwise the simulation's rankings diverge from the
@@ -113,6 +114,64 @@ function assertEquivalence(results: Record<string, any>, topScorers: string[], s
   return comparisons;
 }
 
+// Sampled golden-boot equivalence: while the real king is UNKNOWN
+// (fixedTopScorers = []), the engines draw a per-sim kings bitmask and pass
+// it to scoreFormFast. For EVERY possible drawn subset, that must score
+// identically to calculateFullScore run against actualBonuses.topScorers =
+// the drawn candidates. Forms cover canonical Hebrew picks, canonical
+// English picks, a non-candidate pick, and no pick at all.
+function assertSampledKingsEquivalence(sims: number) {
+  const results = buildResults("groups");
+  const allPredictions = buildForms();
+  const picks = [
+    "ליאונל מסי",
+    "קיליאן אמבפה",
+    "Erling Haaland",
+    "Harry Kane",
+    "Vinicius Junior", // outside the candidate list — never pays
+    null, // no pick
+  ];
+  picks.forEach((topScorer, i) => {
+    const matches = predictAllMatches(groupMatches, knockoutMatches, calcBracketTeams, {}, rng);
+    allPredictions[`ts_form_${i}`] = {
+      userId: `ts${i}`,
+      formName: `TS${i}`,
+      status: "submitted",
+      matches,
+      ...(topScorer ? { topScorer } : {}),
+    };
+  });
+  const formBracketMap = buildFormBracketMap(allPredictions);
+  const fastForms = precomputeForms(allPredictions, formBracketMap, results, []);
+  const elo = computeCurrentElo(results);
+
+  let comparisons = 0;
+  for (let s = 0; s < sims; s++) {
+    const sim = simulateTournament(rng, results, elo);
+    const simBracket = calcBracketTeams(sim);
+    const actualAdvancing = deriveActualAdvancing(simBracket, sim);
+    const champion = deriveChampion(sim, simBracket);
+    const advSets: Record<string, Set<string>> = {};
+    for (const r of Object.keys(actualAdvancing)) advSets[r] = new Set(actualAdvancing[r]);
+
+    for (let kingsMask = 0; kingsMask < 1 << TOP_SCORER_CANDIDATES.length; kingsMask++) {
+      const drawn = TOP_SCORER_CANDIDATES.filter((_, i) => kingsMask & (1 << i)).map((c) => c.name);
+      for (const f of fastForms) {
+        const fb = formBracketMap[f.formId];
+        const enriched = { ...allPredictions[f.formId], advancing: fb.advancing, champion: fb.champion };
+        const canonical = calculateFullScore(
+          enriched, sim, actualAdvancing, { champion, topScorers: drawn }, fb.predBracket, simBracket,
+        );
+        const fast = scoreFormFast(f, sim, simBracket, advSets, champion, undefined, kingsMask);
+        expect(fast.totalPoints).toBe(canonical.totalPoints);
+        expect(fast.correctTopScorer).toBe(canonical.correctTopScorer);
+        comparisons++;
+      }
+    }
+  }
+  return comparisons;
+}
+
 describe("scoreFormFast equals calculateFullScore", () => {
   it("matches end-of-group-stage, with a top scorer known", () => {
     const n = assertEquivalence(buildResults("groups"), ["Messi"], 20);
@@ -127,5 +186,10 @@ describe("scoreFormFast equals calculateFullScore", () => {
   it("matches when no top scorer is known yet (empty topScorers)", () => {
     const n = assertEquivalence(buildResults("groups"), [], 12);
     expect(n).toBeGreaterThan(300);
+  });
+
+  it("matches for every possible sampled golden-boot subset (kingsMask)", () => {
+    const n = assertSampledKingsEquivalence(4);
+    expect(n).toBeGreaterThan(2000);
   });
 });
