@@ -836,87 +836,6 @@ function refineGroups(
 const KO_ROUND_ORDER = ["R32", "R16", "QF", "SF", "3RD", "F"];
 const koRoundIndex = (stage: string) => KO_ROUND_ORDER.indexOf(stage);
 
-// Gate for the greedy-downstream local search (refineKnockoutGreedy). That
-// pass re-optimises every strictly-downstream match for each candidate of
-// each match, so its cost grows ~quadratically with the number of remaining
-// KO matches (≈37s at 16, untenable at the full 32) — it stays gated to the
-// late, CONSTRAINED rounds (QF onward ≈ 8 matches, a few seconds).
-const MAX_KO_REFINE_GREEDY = 8;
-
-function refineKnockoutGreedy(
-  remKO: any[],
-  workingResults: Record<string, any>,
-  targetId: string,
-  trackedIds: string[],
-  trackedForms: Record<string, any>,
-  formPreds: Record<string, FormPreds>,
-  scoringForms: Record<string, any>,
-  scoringPreds: Record<string, FormPreds>,
-  allIds: string[],
-): Record<string, any> {
-  if (remKO.length === 0 || remKO.length > MAX_KO_REFINE_GREEDY) {
-    return { ...workingResults };
-  }
-
-  let best = { ...workingResults };
-  const bestScores = scoreForms(scoringForms, scoringPreds, best);
-  let bestRank = countAbove(targetId, allIds, bestScores);
-  let bestScore = bestScores[targetId]?.totalPoints ?? 0;
-
-  const ordered = [...remKO].sort(
-    (a, b) => koRoundIndex(a.stage) - koRoundIndex(b.stage),
-  );
-
-  for (let iter = 0; iter < 3; iter++) {
-    let improved = false;
-
-    for (const m of ordered) {
-      // Only matches in strictly later rounds depend on m's outcome; same-round
-      // matches are independent bracket slots, so leave them fixed.
-      const mIdx = koRoundIndex(m.stage);
-      const downstream = remKO.filter((k) => koRoundIndex(k.stage) > mIdx);
-
-      const bracket = calcBracketTeams(best);
-      const actualTeams = bracket[m.id];
-      if (!actualTeams?.home || !actualTeams?.away) continue;
-
-      const candidates = expandKnockoutCandidates(
-        getCandidates(m.id, trackedForms),
-        actualTeams,
-      );
-
-      for (const cand of candidates) {
-        const trial = { ...best, [m.id]: cand };
-        for (const d of downstream) delete trial[d.id];
-        Object.assign(
-          trial,
-          optimizeKnockout(
-            downstream, trial, targetId, trackedIds, trackedForms, formPreds,
-          ),
-        );
-
-        const trialScores = scoreForms(scoringForms, scoringPreds, trial);
-        const trialRank = countAbove(targetId, allIds, trialScores);
-        const trialScore = trialScores[targetId]?.totalPoints ?? 0;
-
-        if (
-          trialRank < bestRank ||
-          (trialRank === bestRank && trialScore > bestScore)
-        ) {
-          bestRank = trialRank;
-          bestScore = trialScore;
-          best = trial;
-          improved = true;
-        }
-      }
-    }
-
-    if (!improved) break;
-  }
-
-  return best;
-}
-
 // Gate for the rollout local search. 20 covers "R16 onward" INCLUDING the
 // tail of R32 (validated on the real production backup: at 13/16 R32 results
 // played = 19 remaining, the rollout finds the rank the user could reach by
@@ -1111,24 +1030,26 @@ export function computeBestCase(
 
   // ── Phase 3b: knockout local search (lookahead over bracket choices) ──
   // The key optimization once the group stage is over and only the bracket is
-  // left to play — refineGroups is a no-op then. Two chained strict
-  // hill-climbs on the same objective, so the result can only match or
-  // improve `refined`:
-  //   1. refineKnockoutGreedy — the exhaustive downstream-re-greedy pass,
-  //      affordable only at ≤8 remaining (QF onward).
-  //   2. refineKnockout — the dream-rollout coordinate descent, cheap enough
-  //      for the R16-onward window (≤16 remaining) where the reported
-  //      "optimizer said 3rd, manual edits reached 1st" bug lived. It also
-  //      runs after (1) so the late-stage window gets both explorers.
-  onProgress?.("refine", 80);
-  const refinedGreedy = refineKnockoutGreedy(
-    remKO, refined,
-    targetFormId, trackedIds, trackedForms, trackedPreds,
-    submittedForms, allFormPreds, allIds,
-  );
-  onProgress?.("refine", 88);
+  // left to play — refineGroups is a no-op then. `refineKnockout` is a strict
+  // hill-climb on the (rank, then target score) objective, so the result can
+  // only match or improve `refined`. It re-completes each candidate's downstream
+  // with the target-dream rollout (one population scoring per candidate), which
+  // is what makes it cheap enough for the whole R16-onward window (≤20 remaining)
+  // — including the state that produced the reported "optimizer said 3rd, manual
+  // edits reached 1st" bug.
+  //
+  // A second, heavier "greedy downstream re-optimise" pass (refineKnockoutGreedy)
+  // used to run BEFORE this one, gated to ≤8 remaining. It was removed: profiling
+  // on the real production backup at the R16-done state (8 remaining, 250 forms)
+  // showed it took 3.5–10 MINUTES per form yet produced the IDENTICAL rank/score
+  // that `refineKnockout` alone reaches in ≈10s — the worker has no timeout, so
+  // that pass is exactly what made "תרחיש מיטבי" appear to hang once all R16
+  // results were entered. Its cost blew up with the form population (which its
+  // ≤8-remaining gate never accounted for), while adding nothing on top of the
+  // dream-rollout search.
+  onProgress?.("refine", 85);
   const refinedKO = refineKnockout(
-    remKO, refinedGreedy,
+    remKO, refined,
     targetFormId, trackedIds, trackedForms, trackedPreds,
     submittedForms, allFormPreds, allIds,
   );

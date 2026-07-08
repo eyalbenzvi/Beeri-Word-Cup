@@ -419,6 +419,48 @@ console.log("--- 8. Static wiring (dream floor, deny candidates, refine gate) --
     "refineKnockout evaluates complete dream-rollout scenarios");
 }
 
+// ── 9. R16-done state does not hang (removed the O(pop²) greedy refine) ──
+// Reported production bug: once every שמינית-הגמר (R16) result was entered — the
+// state with exactly 8 KO matches remaining (QF/SF/3RD/F) — "תרחיש מיטבי" never
+// finished. Cause: refineKnockoutGreedy re-ran the full downstream greedy +
+// scored the WHOLE form population for every candidate of every match, gated
+// only on remaining-match count (≤8). Its cost exploded with the form
+// population (3.5–10 min/form on the real 250-form backup) while producing the
+// IDENTICAL rank/score that refineKnockout alone reaches in ≈10s. It was
+// removed; these guards keep it gone and keep the R16-done state affordable.
+console.log("--- 9. R16-done state stays affordable (no greedy-refine blow-up) ---");
+{
+  const src = readMigratedSrc("src/utils/bestCase.ts");
+  // No definition and no call — a lingering mention inside the explanatory
+  // comment is fine, but the pass itself must be gone from the compute graph.
+  assert(!/function refineKnockoutGreedy\b/.test(src),
+    "the O(population²) refineKnockoutGreedy function is removed");
+  assert(!/^\s*(?:const\s+\w+\s*=\s*)?refineKnockoutGreedy\s*\(/m.test(src),
+    "computeBestCase no longer calls refineKnockoutGreedy");
+  assert(!/\bconst MAX_KO_REFINE_GREEDY\b/.test(src),
+    "the refineKnockoutGreedy gate constant is removed");
+
+  // Behavioural guard: at the exact reported state (8 KO remaining, QF onward)
+  // with a realistic population, a single projection must finish quickly. The
+  // removed pass took minutes here; refineKnockout alone is a few seconds. The
+  // bound is deliberately loose (machine-independent headroom) — it only needs
+  // to fail if the quadratic blow-up ever returns.
+  const forms = genForms(60);
+  const actual = fullResults(allCodes[5], allCodes[22]);
+  const remKO = knockoutMatches.filter((m) => ["QF", "SF", "3RD", "F"].includes(m.stage));
+  const remSet = new Set(remKO.map((m) => m.id));
+  const played = {};
+  for (const id of Object.keys(actual)) if (!remSet.has(id)) played[id] = actual[id];
+
+  const t0 = Date.now();
+  const bc = computeBestCase(Object.keys(forms)[0], forms, played);
+  const elapsedMs = Date.now() - t0;
+  assert(bc && bc.projectedRank >= 1,
+    "computeBestCase returns a result at the R16-done state");
+  assert(elapsedMs < 60000,
+    `R16-done projection finishes promptly (${(elapsedMs / 1000).toFixed(1)}s < 60s)`);
+}
+
 console.log(`\n=== BEST-CASE OPTIMIZER RESULTS: ${passed} passed, ${failed} failed ===`);
 if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  - " + f)); }
 process.exit(failed > 0 ? 1 : 0);
