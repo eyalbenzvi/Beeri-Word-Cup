@@ -46,6 +46,33 @@ COL_HOUSE = "מס' בית"
 COL_LETTER = "אות בית"
 COL_VENUE = "מקום קלפי"
 COL_RAW_ADDR = "כתובת קלפי"
+COL_COMMITTEE = "שם ועדה"
+
+# עוגן גיאוגרפי לכל ועדת בחירות אזורית. משמש להכרעה בין ישובים בעלי אותו
+# שם (יש שתי טייבה, שתי טמרה, שני ג'ת) — נבחר המועמד הקרוב לוועדה.
+# הדיוק אינו קריטי: ההשוואה יחסית בין מועמדים בלבד.
+COMMITTEE_ANCHORS = {
+    "ירושלים": (31.78, 35.22),
+    "יהודה": (31.60, 35.00),
+    "צפת": (32.96, 35.50),
+    "כנרת": (32.79, 35.53),
+    "יזרעאל": (32.61, 35.29),
+    "עכו": (32.93, 35.08),
+    "חיפה": (32.80, 34.99),
+    "קריות": (32.83, 35.07),
+    "חדרה": (32.44, 34.92),
+    "השרון (נתניה)": (32.32, 34.85),
+    "פתח תקווה": (32.09, 34.89),
+    "רמלה-לוד": (31.93, 34.87),
+    "רחובות": (31.89, 34.81),
+    "תל-אביב": (32.08, 34.78),
+    "דן": (32.07, 34.83),
+    "איילון": (32.01, 34.77),
+    "אשקלון": (31.67, 34.57),
+    "באר שבע": (31.25, 34.79),
+    "מרכז-צפון": (32.10, 35.20),
+    "כרמיאל": (32.92, 35.29),
+}
 NEW_COL = "קואורדינטות"
 NEW_COL_SRC = "דיוק קואורדינטות"
 NEW_COL_CONF = "ציון ביטחון"
@@ -87,7 +114,7 @@ POI_TYPES = {
 # מתאים ל'בית ספר יסודי - בית ספר ירושלים' על סמך "בית"+"יסודי" בלבד,
 # בעוד שהמילה המזהה היחידה (צפאפא) נעדרת מהתוצאה.
 VENUE_STOPWORDS = {
-    "בית", "ספר", "ביהס", "בהס", "בי", "יסודי", "יסודית", "תיכון", "תיכונית",
+    "בית", "ספר", "ביהס", "בהס", "ביס", "בי", "יסודי", "יסודית", "תיכון", "תיכונית",
     "ממלכתי", "ממלכתית", "ממד", "דתי", "דתית", "חטיבת", "חטיבה", "ביניים",
     "מקיף", "אזורי", "אזורית", "אולם", "ספורט", "מגרש", "מועדון", "מזכירות",
     "מרכז", "קהילתי", "קהילתית", "מתנס", "גן", "ילדים", "בנים", "בנות",
@@ -154,12 +181,16 @@ def clean(v) -> str:
     return " ".join(s.split())
 
 
-_PUNCT = re.compile(r"[\"'`״׳.,()\[\]{}/\\|;:!?*+_=<>~^&%$#@–—־-]")
+# גרשיים וגרש הם סימנים תוך-מילתיים בעברית ("ג'ת", "בי\"ס") — מסירים אותם
+# בלי לפצל, אחרת 'בית ג'ן' הופך ל"בית ג ן", האותיות הבודדות נזרקות, ונשארת
+# רק המילה הגנרית "בית" (שהתאימה בטעות ל"ספריה בית אברהם אשקלון").
+_QUOTES = re.compile(r"[\"'`״׳]")
+_PUNCT = re.compile(r"[.,()\[\]{}/\\|;:!?*+_=<>~^&%$#@–—־-]")
 
 
 def norm(s: str) -> str:
-    """נרמול להשוואה: מקפים/גרשיים/סוגריים → רווח. מטפל ב'תל אביב – יפו'."""
-    return " ".join(_PUNCT.sub(" ", s or "").split())
+    """נרמול להשוואה: גרשיים נמחקים, שאר הפיסוק → רווח ('תל אביב – יפו')."""
+    return " ".join(_PUNCT.sub(" ", _QUOTES.sub("", s or "")).split())
 
 
 def fold(s: str) -> str:
@@ -173,6 +204,11 @@ def fold(s: str) -> str:
 def toks(s: str) -> set[str]:
     """מילות השוואה — מנורמלות ומקופלות. מילות אות בודדת מושמטות."""
     return {fold(t) for t in norm(s).split() if len(t) > 1}
+
+
+def phrase(s: str) -> str:
+    """מחרוזת מנורמלת ומקופלת להשוואת ביטויים רציפים (שמות ישוב רב-מיליים)."""
+    return " ".join(fold(t) for t in norm(s).split() if len(t) > 1)
 
 
 def counter_toks(s: str) -> collections.Counter:
@@ -211,6 +247,7 @@ def build_query(row) -> dict:
     letter = clean(get(COL_LETTER, ""))
     venue = clean(get(COL_VENUE, ""))
     raw = clean(get(COL_RAW_ADDR, ""))
+    anchor = COMMITTEE_ANCHORS.get(clean(get(COL_COMMITTEE, "")))
 
     variants: list[dict] = []
     seen: set[str] = set()
@@ -264,6 +301,7 @@ def build_query(row) -> dict:
         "house": house,
         "letter": letter,
         "venue": venue,
+        "anchor": anchor,
         "variants": variants,
     }
 
@@ -338,7 +376,7 @@ def base_type(rtype) -> str:
     return "entity" if "|" in t else t
 
 
-def validate_candidate(text, rtype, want, variant):
+def validate_candidate(text, rtype, want, variant, structured=False):
     """
     מחליט אם תוצאת החיפוש באמת מתאימה לכתובת שביקשנו, ובאיזו רמת דיוק.
     מחזיר (ok: bool, tier: int).
@@ -347,6 +385,11 @@ def validate_candidate(text, rtype, want, variant):
       * 'ביה"ס בית יעקב הצפון, ירושלים' → GovMap החזיר 'ביה"ס 203 בית אלפא'.
       * 'מסילות' (קיבוץ בצפון) → החזיר רחוב מסילות באילת.
       * 'מפלסים' (קיבוץ בנגב) → החזיר רחוב מפלסים בפתח תקווה.
+
+    structured=True כשהטקסט הוא תוצאת כתובת של GovMap בתבנית הקבועה
+    "<רחוב> <מספר> <ישוב>" — ואז נאכפת גם התאמת *תפקידים*, לא רק נוכחות
+    מילים: 'ש פת 3, ירושלים' הותאם ל"ירושלים 3 פת" (רחוב ירושלים בפ"ת) —
+    כל המילים נמצאו, אבל הרחוב והישוב התחלפו.
     """
     rtoks = toks(text)
     raw_toks = set(norm(text).split())  # כולל מספרים חד-ספרתיים
@@ -354,10 +397,24 @@ def validate_candidate(text, rtype, want, variant):
     kind = variant["kind"]
 
     # 1) הישוב חייב להתאים — התנאי הקריטי ביותר.
+    #    שם רב-מילי חייב להופיע כביטוי *רציף*: המילים של "בית ג'ן" גנריות
+    #    בנפרד, והתאימו ל"ספריה בית רחל גן חיים" — בית וגן שתיהן שם, אבל
+    #    לא כשם הישוב.
     ctoks = toks(city_core(want["city"]))
+    if len(ctoks) > 1:
+        # GovMap כותב לעיתים את השם הפוך ("תרשיחא-מעלות") — בודקים את הביטוי
+        # הרציף בשני הכיוונים.
+        cwords = phrase(city_core(want["city"])).split()
+        rphrase = f" {phrase(text)} "
+        contains = (
+            f" {' '.join(cwords)} " in rphrase
+            or f" {' '.join(reversed(cwords))} " in rphrase
+        )
+    else:
+        contains = ctoks <= rtoks
     city_ok = (
         not ctoks
-        or ctoks <= rtoks
+        or contains
         # ישובים דו-שמיים / סוגריים ("אבו ג'ווייעד (שבט)") — מקבלים גם הכלה הפוכה.
         or (base == "settlement" and rtoks and rtoks <= ctoks)
     )
@@ -393,6 +450,20 @@ def validate_candidate(text, rtype, want, variant):
                     return False, TIER_NONE
 
         stoks = toks(want["street"]) or toks(variant["text"].split(",")[0])
+
+        # בדיקת תפקידים מבנית לתוצאת כתובת של GovMap: מילות הרחוב חייבות
+        # להופיע *לפני* מספר הבית, ומילות הישוב *אחריו*.
+        if structured and base == "address":
+            words = norm(text).split()
+            nums = [i for i, t in enumerate(words) if t.isdigit()]
+            if nums:
+                street_part = {fold(t) for t in words[: nums[0]] if len(t) > 1}
+                city_part = {fold(t) for t in words[nums[-1] + 1:] if len(t) > 1}
+                if ctoks and city_part and not (ctoks & city_part):
+                    return False, TIER_NONE  # הישוב מופיע רק בתפקיד הרחוב
+                if stoks and street_part and not (stoks & street_part):
+                    return False, TIER_NONE  # הרחוב מופיע רק בתפקיד הישוב
+
         # שם קצר (מילה-שתיים) חייב להתאים במלואו. הקלה של מילה אחת מותרת רק
         # לשמות ארוכים — אחרת 'בית צפפה' עובר על סמך המילה "בית" לבדה.
         if stoks:
@@ -526,20 +597,29 @@ def geocode_govmap(variant, want):
     else:
         raise TransientError(f"govmap failed 3x: {last}")
 
-    best = None
+    cands = []
     for item in (data or {}).get("results") or []:
         pt = parse_shape(item.get("shape"))
         if not pt or not in_israel(*pt):
             continue
-        ok, tier = validate_candidate(item.get("text", ""), item.get("type"), want, variant)
-        if not ok:
-            continue
-        if best is None or tier < best[0]:
-            best = (tier, pt[0], pt[1], item.get("type"), item.get("text", ""))
-        if tier == TIER_EXACT:
-            break
-    if best is None:
+        ok, tier = validate_candidate(
+            item.get("text", ""), item.get("type"), want, variant, structured=True
+        )
+        if ok:
+            cands.append((tier, pt[0], pt[1], item.get("type"), item.get("text", "")))
+    if not cands:
         return None
+
+    # יש ישובים בעלי אותו שם בדיוק (שתי טייבה, שתי טמרה, שני ג'ת) —
+    # מבחינה טקסטואלית המועמדים זהים. ההכרעה: המועמד הקרוב ביותר לעוגן
+    # ועדת הבחירות של השורה, שהיא תמיד אזורית.
+    best_tier = min(c[0] for c in cands)
+    pool = [c for c in cands if c[0] == best_tier]
+    anchor = want.get("anchor")
+    if anchor and len(pool) > 1:
+        best = min(pool, key=lambda c: (c[1] - anchor[0]) ** 2 + (c[2] - anchor[1]) ** 2)
+    else:
+        best = pool[0]
     return {
         "lat": best[1],
         "lon": best[2],
@@ -606,6 +686,12 @@ def geocode_nominatim(variant, want):
             continue
         if not in_israel(lat, lon):
             continue
+        # ישוב הומונימי: תוצאה רחוקה מאוד מעוגן הוועדה איננה הישוב שלנו.
+        anchor = want.get("anchor")
+        if anchor and abs(lat - anchor[0]) + abs(lon - anchor[1]) > 0.9:  # ~100 ק"מ
+            atype0 = str(it.get("addresstype") or "")
+            if atype0 in NOMI_PLACE or str(it.get("type") or "") in NOMI_PLACE:
+                continue
         name = it.get("display_name", "")
         cat = str(it.get("category") or it.get("class") or "")
         ntype = str(it.get("type") or "")
@@ -860,7 +946,7 @@ def verify_google(address: str, key: str):
     return None
 
 
-def city_query(city: str) -> dict:
+def city_query(city: str, anchor=None) -> dict:
     """שאילתת ישוב בלבד — משמשת לשכבת הגיבוי שמבטיחה כיסוי מלא."""
     variants = [{"text": city, "ceiling": TIER_CITY, "kind": "city"}]
     if strip_punct(city) != city:
@@ -875,6 +961,7 @@ def city_query(city: str) -> dict:
         "house": "",
         "letter": "",
         "venue": "",
+        "anchor": anchor,
         "variants": variants,
     }
 
@@ -1170,6 +1257,10 @@ def main() -> int:
         except ValueError:
             pass
 
+    city_anchor = {}
+    for q in queries:
+        if q["city"] and q.get("anchor") and q["city"] not in city_anchor:
+            city_anchor[q["city"]] = q["anchor"]
     need_city = sorted(
         {q["city"] for k, q in zip(keys, queries)
          if q["city"] and not cache.get(k) and q["city"] not in city_cache}
@@ -1181,7 +1272,7 @@ def main() -> int:
 
         def cwork(city):
             try:
-                res = geocode(city_query(city), args.engine)
+                res = geocode(city_query(city, city_anchor.get(city)), args.engine)
             except TransientError:
                 return
             with clock:
