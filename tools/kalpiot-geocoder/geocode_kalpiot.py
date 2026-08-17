@@ -94,7 +94,36 @@ VENUE_STOPWORDS = {
     "ישיבה", "ישיבת", "אולפנה", "סמינר", "תלמוד", "תורה", "מוסד", "מוסדות",
     "קלפי", "מבנה", "צריף", "כיתה", "כיתות", "חדר", "אשכול", "פיס", "היכל",
     "תרבות", "עירייה", "מועצה", "מקומית", "כללי", "חדש", "חדשה", "ותיק",
+    # "אל" היא תווית היידוע הערבית ומתאימה כמעט לכל שם; בלעדיה
+    # 'בי"ס אל עומריה' הותאם ל'אל אנסאר' באותו ישוב.
+    "אל", "בנין", "בניין", "אגף", "בוגרי", "בוגרים", "ליד", "עש", "שם",
 }
+
+# סוגי מוסד. זיהוי ודאי מחייב שגם *סוג* המוסד יתאים: 'בי"ס ממלכתי נוף ים'
+# הותאם ל"גן ילדים נוף ים" — אותה שכונה, מבנה אחר.
+VENUE_TYPES = {
+    "kinder": {"גן", "גנון", "ילדים", "טרום", "טרומי"},
+    "school": {"ביהס", "בהס", "בי", "ספר", "יסודי", "יסודית", "תיכון",
+               "תיכונית", "חטיבה", "חטיבת", "מקיף", "אולפנה", "ישיבה",
+               "ישיבת", "סמינר", "אורט", "עמל"},
+    "library": {"ספריה", "ספרייה"},
+    "center": {"מתנס", "קהילתי", "קהילתית"},
+    "club": {"מועדון", "מזכירות"},
+    "sport": {"אולם", "ספורט", "מגרש", "היכל"},
+}
+# רק תוצאות מסוג מוסד/POI יכולות להיחשב "זיהוי ודאי של המוסד".
+# תוצאת רחוב אינה מזהה מבנה: 'בי"ס דגניה' הותאם ל"דגניה 11א חיפה".
+INSTITUTION_TYPES = {"poi", "institutes", "מוסדות"}
+
+
+def venue_type(s: str) -> str:
+    """מסווג שם מקום לסוג מוסד גס, או '' אם לא זוהה."""
+    t = toks(s)
+    for name, words in VENUE_TYPES.items():
+        if t & words:
+            return name
+    return ""
+
 
 try:
     from pyproj import Transformer
@@ -616,17 +645,18 @@ R_NO_HOUSE = "רחוב ללא מספר בית"
 R_PARTIAL_STREET = "שם רחוב חלקי"
 R_VENUE = "התאמה לפי שם המקום"
 R_CITY = "מרכז ישוב בלבד"
+R_SMALL_CITY = "מרכז ישוב קטן"
 R_CONFLICT = "סתירה בין מקורות"
 R_NOT_FOUND = "לא נמצא"
 REASONS = (
     R_NONE, R_HOUSE_DIFF, R_NO_HOUSE, R_PARTIAL_STREET,
-    R_VENUE, R_CITY, R_CONFLICT, R_NOT_FOUND,
+    R_VENUE, R_SMALL_CITY, R_CITY, R_CONFLICT, R_NOT_FOUND,
 )
 
-# מעל כמה קלפיות ישוב נחשב "גדול". מספר הקלפיות הוא מדד טוב לגודל אוכלוסייה,
-# ולכן גם למרחק האפשרי בין מרכז הישוב לקלפי בפועל.
-BIG_CITY_KALPIOT = 40
-
+# גודל הישוב נמדד במספר הקלפיות בו — מדד טוב לאוכלוסייה, ולכן גם למרחק
+# האפשרי בין מרכז הישוב לקלפי בפועל. בקיבוץ או מושב עם קלפי אחת, מרכז
+# הישוב הוא למעשה מיקום הקלפי.
+CITY_TINY, CITY_SMALL, CITY_MED = 3, 10, 40
 
 def matched_house(text: str) -> str:
     """שולף את מספר הבית מתוך טקסט התוצאה ('נטר 40 ירושלים' → '40')."""
@@ -648,24 +678,44 @@ def confidence(entry, want, city_kalpiot: int):
     kind = entry.get("kind", "")
     eng = entry.get("engine", "")
     matched = entry.get("matched", "")
+    rtoks = toks(matched)
     nomi_penalty = 5 if eng.startswith("nominatim") else 0
 
+    # ---- זיהוי ודאי של המוסד עצמו ----
+    # כשכל המילים המזהות בשם המקום נמצאו בתוצאה, זוהה המבנה שבו הקלפי
+    # יושבת בפועל — מדויק יותר מכתובת רחוב, ואין כאן אי-ודאות.
+    if kind == "venue":
+        dtoks = toks(want.get("venue", "")) - VENUE_STOPWORDS
+        hit = len(dtoks & rtoks)
+        want_t, got_t = venue_type(want.get("venue", "")), venue_type(matched)
+        type_ok = not want_t or not got_t or want_t == got_t
+        if (dtoks and dtoks <= rtoks and type_ok
+                and base_type(eng.split(":", 1)[-1]) in INSTITUTION_TYPES):
+            return 100 - nomi_penalty, R_NONE
+        if "entity" in eng or "statistic" in eng:
+            return max(0, 55 - nomi_penalty), R_VENUE  # שכבת GIS כללית
+        # מוסד מאותו סוג, באותו ישוב, עם מילה מזהה משותפת — כמעט ודאי
+        # אותו מבנה. שם המקום במקור נושא לעיתים תיאור נוסף ("- בנין
+        # בוגרים") שאינו מופיע במאגר, ואין להעניש עליו.
+        if (base_type(eng.split(":", 1)[-1]) in INSTITUTION_TYPES
+                and type_ok and hit >= 1):
+            return max(0, 90 - nomi_penalty), R_VENUE
+        if hit >= 2:
+            return max(0, 82 - nomi_penalty), R_VENUE
+        return max(0, 66 - nomi_penalty), R_VENUE
+
     if tier == TIER_CITY:
-        base = 25 if city_kalpiot >= BIG_CITY_KALPIOT else 45
-        return max(0, base - nomi_penalty), R_CITY
+        # קיבוץ/מושב עם קלפי אחת או שתיים — מרכז הישוב הוא מיקום הקלפי.
+        if city_kalpiot <= CITY_TINY:
+            return max(0, 90 - nomi_penalty), R_SMALL_CITY
+        if city_kalpiot <= CITY_SMALL:
+            return max(0, 74 - nomi_penalty), R_SMALL_CITY
+        if city_kalpiot <= CITY_MED:
+            return max(0, 55 - nomi_penalty), R_CITY
+        return max(0, 32 - nomi_penalty), R_CITY
 
     if tier == TIER_EXACT:
-        return 95 - nomi_penalty, R_NONE
-
-    # ---- רמת רחוב ----
-    if kind == "venue":
-        if "entity" in eng or "statistic" in eng:
-            base = 50  # שכבת GIS כללית — הכי פחות אמין מבין התאמות המקום
-        elif any(t in eng for t in ("poi", "institutes", "מוסדות")):
-            base = 65
-        else:
-            base = 60
-        return max(0, base - nomi_penalty), R_VENUE
+        return 97 - nomi_penalty, R_NONE
 
     # שם הרחוב לא הוכל במלואו בתוצאה (מותר רק לשמות בני 3+ מילים)
     stoks = toks(want.get("street", ""))
@@ -679,10 +729,13 @@ def confidence(entry, want, city_kalpiot: int):
             diff = abs(int(want_h) - int(got_h))
         except ValueError:
             diff = 999
-        base = 78 if diff <= 4 else 68 if diff <= 20 else 58
+        base = 80 if diff <= 4 else 70 if diff <= 20 else 58
         return max(0, base - nomi_penalty), R_HOUSE_DIFF
 
-    return max(0, 72 - nomi_penalty), R_NO_HOUSE
+    # במקור לא היה מספר בית כלל — רמת רחוב היא התשובה הטובה ביותר שקיימת,
+    # ובישוב קטן זה כמעט זהה לכתובת מדויקת.
+    base = 88 if city_kalpiot <= CITY_TINY else 82 if city_kalpiot <= CITY_SMALL else 76
+    return max(0, base - nomi_penalty), R_NO_HOUSE
 
 
 def apply_verification(score: int, reason: str, entry, ver, want=None):
@@ -705,7 +758,7 @@ def apply_verification(score: int, reason: str, entry, ver, want=None):
 
     # הסכמה במרחק קצר היא ראיה בפני עצמה — הקרבה מוכיחה שמדובר באותו מקום.
     if dist <= AGREE_M:
-        return min(98, score + 12), reason, dist, None
+        return min(100, score + 12), reason, dist, None
 
     # אבל כדי *לסתור* אותנו, המאמת חייב להוכיח שענה על אותה שאלה. Photon
     # נופל בדיוק באותה מלכודת כמו GovMap ומחזיר רחוב/מוסד שנקרא על שם
