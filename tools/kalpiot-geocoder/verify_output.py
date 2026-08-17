@@ -22,7 +22,9 @@ import openpyxl
 LAT_MIN, LAT_MAX = 29.3, 33.5
 LON_MIN, LON_MAX = 34.2, 35.95
 COORD_RE = re.compile(r"^-?\d+\.\d{6}, -?\d+\.\d{6}$")
-NEW_COLS = ("קואורדינטות", "דיוק קואורדינטות")
+NEW_COLS = ("קואורדינטות", "דיוק קואורדינטות", "ציון ביטחון", "סיבת אי-ודאות")
+REASONS = ("ללא", "מספר בית שונה", "רחוב ללא מספר בית", "שם רחוב חלקי",
+           "התאמה לפי שם המקום", "מרכז ישוב בלבד", "לא נמצא")
 TIERS = ("כתובת מדויקת", "רחוב", "ישוב בלבד", "לא נמצא")
 
 failures: list[str] = []
@@ -52,7 +54,7 @@ def main() -> int:
     rows_s, cols_s = ws_s.max_row, ws_s.max_column
     rows_o, cols_o = ws_o.max_row, ws_o.max_column
     check(rows_s == rows_o, f"מספר שורות זהה ({rows_s:,})", f"{rows_s} != {rows_o}")
-    check(cols_o == cols_s + 2, f"נוספו בדיוק 2 עמודות ({cols_s} → {cols_o})")
+    check(cols_o == cols_s + 4, f"נוספו בדיוק 4 עמודות ({cols_s} → {cols_o})")
 
     print("\nשלמות הנתונים המקוריים")
     src_rows = ws_s.iter_rows(values_only=True)
@@ -74,11 +76,23 @@ def main() -> int:
 
     print("\nתקינות הקואורדינטות")
     bad_fmt, out_of_range, bad_tier, filled = [], [], [], 0
+    bad_conf, bad_reason, conf_sum = [], [], 0
     for i, row in enumerate(
-        ws_o.iter_rows(min_row=2, min_col=cols_s + 1, max_col=cols_s + 2, values_only=True),
+        ws_o.iter_rows(min_row=2, min_col=cols_s + 1, max_col=cols_s + 4, values_only=True),
         start=2,
     ):
-        coord, prec = row[0], row[1]
+        coord, prec, conf, reason = row[0], row[1], row[2], row[3]
+        if not isinstance(conf, int) or not 0 <= conf <= 100:
+            bad_conf.append(f"שורה {i}: {conf!r}")
+        else:
+            conf_sum += conf
+        if reason not in REASONS:
+            bad_reason.append(f"שורה {i}: {reason!r}")
+        # ציון 0 חייב להתלכד עם "לא נמצא", ולהיפך
+        if (conf == 0) != (reason == "לא נמצא"):
+            bad_conf.append(f"שורה {i}: ציון {conf!r} מול סיבה {reason!r}")
+        if bool(coord) != (reason != "לא נמצא"):
+            bad_reason.append(f"שורה {i}: {coord!r} מול {reason!r}")
         if coord:
             filled += 1
             if not COORD_RE.match(str(coord)):
@@ -100,7 +114,12 @@ def main() -> int:
           f"{len(out_of_range)} חריגות, ראשונה: {out_of_range[0] if out_of_range else ''}")
     check(not bad_tier, "עמודת הדיוק עקבית עם עמודת הקואורדינטות",
           f"{len(bad_tier)} חריגות, ראשונה: {bad_tier[0] if bad_tier else ''}")
+    check(not bad_conf, "ציון ביטחון: מספר שלם 0–100, עקבי עם הסיבה",
+          f"{len(bad_conf)} חריגות, ראשונה: {bad_conf[0] if bad_conf else ''}")
+    check(not bad_reason, f"סיבת אי-ודאות מאוצר מילים סגור ({len(REASONS)} ערכים)",
+          f"{len(bad_reason)} חריגות, ראשונה: {bad_reason[0] if bad_reason else ''}")
     print(f"  → מולאו {filled:,}/{total:,} ({filled / total:.2%})")
+    print(f"  → ציון ביטחון ממוצע: {conf_sum / total:.1f}/100")
 
     print("\n" + "=" * 52)
     if failures:

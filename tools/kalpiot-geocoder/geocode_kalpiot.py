@@ -22,7 +22,9 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import json
+import os
 import random
 import re
 import sys
@@ -46,6 +48,8 @@ COL_VENUE = "מקום קלפי"
 COL_RAW_ADDR = "כתובת קלפי"
 NEW_COL = "קואורדינטות"
 NEW_COL_SRC = "דיוק קואורדינטות"
+NEW_COL_CONF = "ציון ביטחון"
+NEW_COL_REASON = "סיבת אי-ודאות"
 
 CACHE_FILE = "geocode_cache.json"
 
@@ -129,8 +133,34 @@ def norm(s: str) -> str:
     return " ".join(_PUNCT.sub(" ", s or "").split())
 
 
+def fold(s: str) -> str:
+    """
+    מקפל כתיב מלא/חסר לצורך השוואה בלבד: 'סעווה'↔'סעוה', 'אלייה'↔'אליה'.
+    וריאציות כתיב הן מקור עיקרי לאי-התאמות בשמות ישובים ערביים ובדואיים.
+    """
+    return s.replace("וו", "ו").replace("יי", "י")
+
+
 def toks(s: str) -> set[str]:
-    return {t for t in norm(s).split() if len(t) > 1}
+    """מילות השוואה — מנורמלות ומקופלות. מילות אות בודדת מושמטות."""
+    return {fold(t) for t in norm(s).split() if len(t) > 1}
+
+
+def counter_toks(s: str) -> collections.Counter:
+    """כמו toks, אך שומר ריבוי — נדרש כדי לחסר מילות רחוב ממילות התוצאה."""
+    return collections.Counter(fold(t) for t in norm(s).split() if len(t) > 1)
+
+
+_PARENS = re.compile(r"\([^)]*\)")
+
+
+def city_core(city: str) -> str:
+    """
+    שם הישוב בלי הסיווג בסוגריים: 'הוואשלה (שבט)' → 'הוואשלה'.
+    בלי זה, המילה "שבט" נדרשת להופיע בתוצאה ואף מנוע לא מחזיר אותה,
+    כך שכל הפזורה הבדואית נפסלת באימות.
+    """
+    return _PARENS.sub(" ", city or "").strip()
 
 
 def strip_punct(s: str) -> str:
@@ -285,7 +315,7 @@ def validate_candidate(text, rtype, want, variant):
     kind = variant["kind"]
 
     # 1) הישוב חייב להתאים — התנאי הקריטי ביותר.
-    ctoks = toks(want["city"])
+    ctoks = toks(city_core(want["city"]))
     city_ok = (
         not ctoks
         or ctoks <= rtoks
@@ -304,6 +334,18 @@ def validate_candidate(text, rtype, want, variant):
     if kind in ("address", "street"):
         if base not in ("address", "street"):
             return False, TIER_NONE
+
+        # GovMap מחזיר תוצאת רחוב כ"<רחוב> <ישוב>". כששם הרחוב זהה לשם
+        # הישוב המבוקש, בדיקת הישוב הכללית מסתפקת במילת *הרחוב* ומאשרת
+        # תוצאה בעיר אחרת לגמרי: 'מסילות, מסילות' אושר ל"מסילות ELAT",
+        # 330 ק"מ משם. לכן שם הישוב חייב להופיע *מעבר* למילות הרחוב —
+        # השוואת ריבוי (Counter) ולא קבוצות, כדי ש'שדרות ירושלים, ירושלים'
+        # עדיין יעבור.
+        if ctoks:
+            rest = counter_toks(text) - counter_toks(want["street"])
+            if not ctoks <= set(rest):
+                return False, TIER_NONE
+
         stoks = toks(want["street"]) or toks(variant["text"].split(",")[0])
         # שם קצר (מילה-שתיים) חייב להתאים במלואו. הקלה של מילה אחת מותרת רק
         # לשמות ארוכים — אחרת 'בית צפפה' עובר על סמך המילה "בית" לבדה.
@@ -539,6 +581,195 @@ def geocode_nominatim(variant, want):
 # ----------------------------------------------------------------------------
 # תזמור המנועים
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# ציון ביטחון ואפיון אי-ודאות
+# ----------------------------------------------------------------------------
+# אוצר מילים סגור. כל ערך בעמודת `סיבת אי-ודאות` הוא בדיוק אחד מאלה.
+R_NONE = "ללא"
+R_HOUSE_DIFF = "מספר בית שונה"
+R_NO_HOUSE = "רחוב ללא מספר בית"
+R_PARTIAL_STREET = "שם רחוב חלקי"
+R_VENUE = "התאמה לפי שם המקום"
+R_CITY = "מרכז ישוב בלבד"
+R_CONFLICT = "סתירה בין מקורות"
+R_NOT_FOUND = "לא נמצא"
+REASONS = (
+    R_NONE, R_HOUSE_DIFF, R_NO_HOUSE, R_PARTIAL_STREET,
+    R_VENUE, R_CITY, R_CONFLICT, R_NOT_FOUND,
+)
+
+# מעל כמה קלפיות ישוב נחשב "גדול". מספר הקלפיות הוא מדד טוב לגודל אוכלוסייה,
+# ולכן גם למרחק האפשרי בין מרכז הישוב לקלפי בפועל.
+BIG_CITY_KALPIOT = 40
+
+
+def matched_house(text: str) -> str:
+    """שולף את מספר הבית מתוך טקסט התוצאה ('נטר 40 ירושלים' → '40')."""
+    nums = [t for t in norm(text).split() if t.isdigit()]
+    return nums[-1] if nums else ""
+
+
+def confidence(entry, want, city_kalpiot: int):
+    """
+    מחזיר (ציון 0–100, סיבה מאוצר מילים סגור).
+
+    הציון נגזר משרשרת הראיות בפועל — לא מהערכה: איזה מנוע ענה, האם שם
+    הרחוב הוכל במלואו בתוצאה, והאם מספר הבית תאם. כל הורדה מתועדת כאן.
+    """
+    if not entry:
+        return 0, R_NOT_FOUND
+
+    tier = entry.get("tier", TIER_NONE)
+    kind = entry.get("kind", "")
+    eng = entry.get("engine", "")
+    matched = entry.get("matched", "")
+    nomi_penalty = 5 if eng.startswith("nominatim") else 0
+
+    if tier == TIER_CITY:
+        base = 25 if city_kalpiot >= BIG_CITY_KALPIOT else 45
+        return max(0, base - nomi_penalty), R_CITY
+
+    if tier == TIER_EXACT:
+        return 95 - nomi_penalty, R_NONE
+
+    # ---- רמת רחוב ----
+    if kind == "venue":
+        if "entity" in eng or "statistic" in eng:
+            base = 50  # שכבת GIS כללית — הכי פחות אמין מבין התאמות המקום
+        elif any(t in eng for t in ("poi", "institutes", "מוסדות")):
+            base = 65
+        else:
+            base = 60
+        return max(0, base - nomi_penalty), R_VENUE
+
+    # שם הרחוב לא הוכל במלואו בתוצאה (מותר רק לשמות בני 3+ מילים)
+    stoks = toks(want.get("street", ""))
+    if stoks and not stoks <= toks(matched):
+        return max(0, 60 - nomi_penalty), R_PARTIAL_STREET
+
+    want_h = want.get("house", "")
+    got_h = matched_house(matched)
+    if want_h and got_h and want_h != got_h:
+        try:
+            diff = abs(int(want_h) - int(got_h))
+        except ValueError:
+            diff = 999
+        base = 78 if diff <= 4 else 68 if diff <= 20 else 58
+        return max(0, base - nomi_penalty), R_HOUSE_DIFF
+
+    return max(0, 72 - nomi_penalty), R_NO_HOUSE
+
+
+def apply_verification(score: int, reason: str, entry, ver, want=None):
+    """
+    משקלל אימות צולב ממנוע בלתי תלוי לתוך הציון.
+    הסכמה מחזקת, סתירה ממשית מורידה ומסמנת את השורה לבדיקה ידנית.
+
+    מחזיר (ציון, סיבה, מרחק_במטרים, נקודה_מועדפת_או_None).
+    """
+    if not ver or not entry or reason == R_NOT_FOUND:
+        return score, reason, None, None
+    dist = round(haversine_m(entry["lat"], entry["lon"], ver["lat"], ver["lon"]))
+
+    # המנוע הראשי החזיר מספר בית אחר, והמאמת החזיר בדיוק את המספר שביקשנו
+    # ובאותו רחוב — במקרה כזה נקודת המאמת מדויקת יותר, ומאמצים אותה.
+    if reason == R_HOUSE_DIFF and want:
+        same_street = toks(want.get("street", "")) & toks(ver.get("street", ""))
+        if ver.get("house") and ver["house"] == want.get("house") and same_street:
+            return 88, R_NONE, dist, ver
+
+    if dist <= AGREE_M:
+        return min(98, score + 12), reason, dist, None
+    if dist >= CONFLICT_M:
+        return max(10, score - 25), R_CONFLICT, dist, None
+    return score, reason, dist, None
+
+
+# ----------------------------------------------------------------------------
+# אימות צולב מול מנוע בלתי תלוי
+# ----------------------------------------------------------------------------
+VERIFY_CACHE_FILE = "verify_cache.json"
+PHOTON_URL = "https://photon.komoot.io/api"
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+GOOGLE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+WAZE_URL = "https://www.waze.com/live-map/api/autocomplete"
+
+AGREE_M = 250      # עד כאן — המקורות מסכימים, הביטחון עולה
+CONFLICT_M = 1500  # מעל כאן — סתירה ממשית, הביטחון יורד והשורה מסומנת
+
+
+def haversine_m(lat1, lon1, lat2, lon2) -> float:
+    from math import asin, cos, radians, sin, sqrt
+
+    dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 2 * 6371000 * asin(sqrt(a))
+
+
+def verify_photon(address: str):
+    """Photon — מנוע OSM עצמאי. בלתי תלוי בקדסטר הממשלתי של GovMap."""
+    try:
+        r = SESSION.get(
+            PHOTON_URL,
+            params={"q": address, "limit": 5, "bbox": "34.2,29.3,35.95,33.5"},
+            # Photon מחזיר 403 ל-User-Agent של python-requests. אין כאן עקיפת
+            # הגבלה מכוונת — רק כותרת דפדפן רגילה כדי שהבקשה תתקבל.
+            headers={"Content-Type": None, "User-Agent": BROWSER_UA},
+            timeout=25,
+        )
+    except (requests.Timeout, requests.ConnectionError) as exc:
+        raise TransientError(f"photon: {exc}") from exc
+    if r.status_code >= 500 or r.status_code == 429:
+        raise TransientError(f"photon HTTP {r.status_code}")
+    try:
+        feats = (r.json() or {}).get("features") or []
+    except ValueError:
+        return None
+    for f in feats:
+        try:
+            lon, lat = f["geometry"]["coordinates"][:2]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if in_israel(lat, lon):
+            p = f.get("properties") or {}
+            name = ", ".join(
+                str(p[k]) for k in ("name", "street", "housenumber", "city") if p.get(k)
+            )
+            return {"lat": round(lat, 6), "lon": round(lon, 6),
+                    "engine": "photon", "matched": name[:80],
+                    "house": str(p.get("housenumber") or ""),
+                    "street": str(p.get("street") or p.get("name") or ""),
+                    "city": str(p.get("city") or "")}
+    return None
+
+
+def verify_google(address: str, key: str):
+    """Google Geocoding — דורש מפתח API בתשלום (GOOGLE_MAPS_API_KEY)."""
+    try:
+        r = SESSION.get(
+            GOOGLE_URL,
+            params={"address": address, "key": key, "region": "il", "language": "he"},
+            headers={"Content-Type": None},
+            timeout=25,
+        )
+    except (requests.Timeout, requests.ConnectionError) as exc:
+        raise TransientError(f"google: {exc}") from exc
+    try:
+        data = r.json()
+    except ValueError:
+        return None
+    if data.get("status") in ("OVER_QUERY_LIMIT", "UNKNOWN_ERROR"):
+        raise TransientError(f"google {data.get('status')}")
+    for res in data.get("results") or []:
+        loc = ((res.get("geometry") or {}).get("location")) or {}
+        lat, lon = loc.get("lat"), loc.get("lng")
+        if lat is not None and in_israel(lat, lon):
+            return {"lat": round(lat, 6), "lon": round(lon, 6), "engine": "google",
+                    "matched": str(res.get("formatted_address", ""))[:80]}
+    return None
+
+
 def city_query(city: str) -> dict:
     """שאילתת ישוב בלבד — משמשת לשכבת הגיבוי שמבטיחה כיסוי מלא."""
     variants = [{"text": city, "ceiling": TIER_CITY, "kind": "city"}]
@@ -603,28 +834,29 @@ def geocode(want, engine="govmap"):
 # ----------------------------------------------------------------------------
 # כתיבת הפלט — שמירה מוחלטת על החוברת המקורית
 # ----------------------------------------------------------------------------
-def write_output(in_path: Path, out_path: Path, sheet: str, coords, precision):
+def write_output(in_path: Path, out_path: Path, sheet: str, columns):
     """
-    מעתיק את החוברת המקורית ומוסיף שתי עמודות בסוף.
+    מעתיק את החוברת המקורית ומוסיף את העמודות החדשות בסוף.
     לא משתמשים ב-to_excel: הוא ממיר טיפוסים, מאבד עיצוב ומוחק גיליונות אחרים.
+
+    `columns` — רשימת (כותרת, ערכים).
     """
     import openpyxl
 
     wb = openpyxl.load_workbook(in_path)
     ws = wb[sheet]
     ncol = ws.max_column
-    ws.cell(row=1, column=ncol + 1, value=NEW_COL)
-    ws.cell(row=1, column=ncol + 2, value=NEW_COL_SRC)
-    for i, (c, p) in enumerate(zip(coords, precision)):
-        ws.cell(row=i + 2, column=ncol + 1, value=c or None)
-        ws.cell(row=i + 2, column=ncol + 2, value=p)
+    for j, (header, values) in enumerate(columns, start=1):
+        ws.cell(row=1, column=ncol + j, value=header)
+        for i, v in enumerate(values):
+            ws.cell(row=i + 2, column=ncol + j, value=v)
     wb.save(out_path)
 
 
 # ----------------------------------------------------------------------------
 # דוח בקרת איכות
 # ----------------------------------------------------------------------------
-def qa_report(df, details, keys, out_path, n_sample=5):
+def qa_report(df, details, keys, out_path, vdist=(), n_sample=5):
     total = len(df)
     coords = df[NEW_COL]
     ok = int((coords != "").sum())
@@ -634,6 +866,26 @@ def qa_report(df, details, keys, out_path, n_sample=5):
     print("=" * 64)
     print(f"קובץ פלט: {out_path}")
     print(f"שורות: {total:,}  |  עם קואורדינטות: {ok:,} ({ok / total:.1%})")
+
+    print(f"ציון ביטחון ממוצע: {df[NEW_COL_CONF].mean():.1f}/100  "
+          f"(חציון {df[NEW_COL_CONF].median():.0f})")
+
+    print("\nפילוח לפי סיבת אי-ודאות:")
+    for label in REASONS:
+        cnt = int((df[NEW_COL_REASON] == label).sum())
+        if not cnt:
+            continue
+        avg = df.loc[df[NEW_COL_REASON] == label, NEW_COL_CONF].mean()
+        print(f"  {label:<22} {cnt:6,}  ({cnt / total:5.1%})   ציון ממוצע {avg:.0f}")
+
+    ver = [d for d in vdist if d is not None]
+    if ver:
+        agree = sum(1 for d in ver if d <= AGREE_M)
+        conflict = sum(1 for d in ver if d >= CONFLICT_M)
+        print(f"\nאימות צולב: {len(ver):,} שורות נבדקו מול מנוע בלתי תלוי")
+        print(f"  מאשר (עד {AGREE_M} מ'):      {agree:6,}  ({agree / len(ver):5.1%})")
+        print(f"  ביניים:                  {len(ver) - agree - conflict:6,}")
+        print(f"  סותר (מעל {CONFLICT_M} מ'):  {conflict:6,}  ({conflict / len(ver):5.1%})")
 
     print("\nפילוח לפי רמת דיוק:")
     for label, cnt in df[NEW_COL_SRC].value_counts().items():
@@ -726,6 +978,10 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--report-only", action="store_true")
     ap.add_argument("--cache", default=None)
+    ap.add_argument("--verify", action="store_true",
+                    help="אימות צולב מול מנוע בלתי תלוי לשורות בציון נמוך")
+    ap.add_argument("--verify-below", type=int, default=75,
+                    help="סף הציון שמתחתיו מריצים אימות צולב (ברירת מחדל 75)")
     args = ap.parse_args()
 
     if args.selftest:
@@ -876,13 +1132,87 @@ def main() -> int:
     coords = [fmt_coord(k, q) for k, q in zip(keys, queries)]
     precision = [fmt_prec(k, q) for k, q in zip(keys, queries)]
     details = [entry_for(k, q)[0] for k, q in zip(keys, queries)]
+
+    # מספר הקלפיות בישוב — משמש כמדד לגודלו בציון הביטחון של "מרכז ישוב".
+    city_counts = collections.Counter(q["city"] for q in queries)
+    ents = []
+    for (k, q), e in zip(zip(keys, queries), details):
+        ent = dict(e) if e else None
+        if ent and entry_for(k, q)[1]:  # נפתר דרך שכבת גיבוי הישוב
+            ent["tier"], ent["kind"] = TIER_CITY, "city"
+        ents.append(ent)
+    scored = [confidence(e, q, city_counts[q["city"]]) for e, q in zip(ents, queries)]
+
+    # ---- אימות צולב מול מנוע בלתי תלוי, לשורות בעלות ביטחון נמוך ----
+    vpath = cache_path.with_name(VERIFY_CACHE_FILE)
+    vcache = {}
+    if vpath.exists():
+        try:
+            vcache = json.loads(vpath.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+
+    if args.verify:
+        gkey = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+        todo_v = sorted(
+            {k for k, (s, r) in zip(keys, scored)
+             if k and s < args.verify_below and k not in vcache}
+        )
+        print(f"\nאימות צולב ({'google+photon' if gkey else 'photon'}) "
+              f"ל-{len(todo_v):,} כתובות בציון < {args.verify_below}…")
+        vlock, vdone = threading.Lock(), [0]
+
+        def vwork(key):
+            addr = key
+            res = None
+            try:
+                if gkey:
+                    res = verify_google(addr, gkey)
+                if not res:
+                    res = verify_photon(addr)
+            except TransientError:
+                return
+            with vlock:
+                vcache[key] = res
+                vdone[0] += 1
+                if vdone[0] % 50 == 0 or vdone[0] == len(todo_v):
+                    vpath.write_text(json.dumps(vcache, ensure_ascii=False), encoding="utf-8")
+                    print(f"  {vdone[0]:,}/{len(todo_v):,}")
+
+        try:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(vwork, todo_v))
+        finally:
+            vpath.write_text(json.dumps(vcache, ensure_ascii=False), encoding="utf-8")
+
+    conf, reason, vdist, adopted = [], [], [], 0
+    for i, ((s, r), e, k, q) in enumerate(zip(scored, ents, keys, queries)):
+        s2, r2, d, better = apply_verification(s, r, e, vcache.get(k), q)
+        if better:  # נקודת המאמת מדויקת יותר — מחליפים גם את הקואורדינטה
+            coords[i] = f"{better['lat']:.6f}, {better['lon']:.6f}"
+            precision[i] = f"{TIER_LABEL[TIER_EXACT]} ({better['engine']} — אומת)"
+            adopted += 1
+        conf.append(s2)
+        reason.append(r2)
+        vdist.append(d)
+    if adopted:
+        print(f"  {adopted:,} שורות שודרגו לקואורדינטה מדויקת יותר מהמאמת")
+
     df[NEW_COL] = coords
     df[NEW_COL_SRC] = precision
+    df[NEW_COL_CONF] = conf
+    df[NEW_COL_REASON] = reason
 
-    write_output(in_path, out_path, args.sheet, coords, precision)
+    write_output(
+        in_path, out_path, args.sheet,
+        [(NEW_COL, [c or None for c in coords]),
+         (NEW_COL_SRC, precision),
+         (NEW_COL_CONF, conf),
+         (NEW_COL_REASON, reason)],
+    )
     print(f"\nנשמר: {out_path}")
 
-    qa_report(df, details, keys, out_path)
+    qa_report(df, details, keys, out_path, vdist)
     return 0
 
 
