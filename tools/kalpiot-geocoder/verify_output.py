@@ -24,7 +24,7 @@ LON_MIN, LON_MAX = 34.2, 35.95
 COORD_RE = re.compile(r"^-?\d+\.\d{6}, -?\d+\.\d{6}$")
 NEW_COLS = ("קואורדינטות", "דיוק קואורדינטות", "ציון ביטחון", "סיבת אי-ודאות")
 REASONS = ("ללא", "מספר בית שונה", "רחוב ללא מספר בית", "שם רחוב חלקי",
-           "התאמה לפי שם המקום", "מרכז ישוב בלבד", "לא נמצא")
+           "התאמה לפי שם המקום", "מרכז ישוב בלבד", "סתירה בין מקורות", "לא נמצא")
 TIERS = ("כתובת מדויקת", "רחוב", "ישוב בלבד", "לא נמצא")
 
 failures: list[str] = []
@@ -59,16 +59,27 @@ def main() -> int:
     print("\nשלמות הנתונים המקוריים")
     src_rows = ws_s.iter_rows(values_only=True)
     out_rows = ws_o.iter_rows(values_only=True)
-    diffs, n = [], 0
+    # openpyxl מנרמל מחרוזת ריקה לתא ריק בשמירה. השניים שקולים לחלוטין
+    # (אקסל מציג תא ריק, pandas קורא NaN), ולכן נספרים בנפרד ולא כאובדן.
+    def same(a, b):
+        return a == b or (a in ("", None) and b in ("", None))
+
+    diffs, blanks, n = [], 0, 0
     for i, (rs, ro) in enumerate(zip(src_rows, out_rows), start=1):
         n += 1
         if tuple(rs[:cols_s]) != tuple(ro[:cols_s]):
             for j, (a, b) in enumerate(zip(rs[:cols_s], ro[:cols_s])):
-                if a != b:
+                if same(a, b):
+                    if a != b:
+                        blanks += 1
+                elif a != b:
                     diffs.append(f"שורה {i} עמודה {j + 1}: {a!r} != {b!r}")
     check(n == rows_s, f"נסרקו כל {n:,} השורות")
     check(not diffs, f"כל {cols_s} העמודות המקוריות זהות תא-בתא",
           f"{len(diffs)} הבדלים, ראשון: {diffs[0] if diffs else ''}")
+    if blanks:
+        print(f"    (הערה: {blanks:,} תאים ריקים נורמלו מ-'' לתא ריק בשמירת "
+              f"openpyxl — שקול לחלוטין, ללא אובדן נתונים)")
 
     hdr_o = next(ws_o.iter_rows(min_row=1, max_row=1, values_only=True))
     check(tuple(hdr_o[cols_s:]) == NEW_COLS, "כותרות העמודות החדשות",

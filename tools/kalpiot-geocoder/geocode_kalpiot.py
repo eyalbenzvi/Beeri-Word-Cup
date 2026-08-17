@@ -380,6 +380,14 @@ def validate_candidate(text, rtype, want, variant):
     if kind == "venue":
         if base == "settlement":
             return False, TIER_NONE  # וריאציית הישוב תטפל בזה בשלב הבא
+        # אותה מלכודת כמו בתוצאות רחוב: 'ניידת איתנים, איתנים' הותאם ל
+        # "איתנים 1 חיפה" משום ששם הישוב הופיע בתוצאה — אבל כשם הרחוב.
+        # לכן שם הישוב חייב להופיע *מעבר* למילות שם המקום.
+        if ctoks:
+            rest = counter_toks(text) - counter_toks(want["venue"])
+            if not ctoks <= set(rest):
+                return False, TIER_NONE
+
         # ההתאמה חייבת להיות על המילים *המזהות* בשם המקום, לא על מילים
         # גנריות כמו "בית ספר" שמופיעות בכל מוסד בישראל.
         dtoks = toks(want["venue"]) - VENUE_STOPWORDS
@@ -695,8 +703,20 @@ def apply_verification(score: int, reason: str, entry, ver, want=None):
         if ver.get("house") and ver["house"] == want.get("house") and same_street:
             return 88, R_NONE, dist, ver
 
+    # הסכמה במרחק קצר היא ראיה בפני עצמה — הקרבה מוכיחה שמדובר באותו מקום.
     if dist <= AGREE_M:
         return min(98, score + 12), reason, dist, None
+
+    # אבל כדי *לסתור* אותנו, המאמת חייב להוכיח שענה על אותה שאלה. Photon
+    # נופל בדיוק באותה מלכודת כמו GovMap ומחזיר רחוב/מוסד שנקרא על שם
+    # הישוב בעיר אחרת ('בני יהודה' → מתנ"ס בני יהודה ברחובות, 130 ק"מ).
+    # מתוך 677 סתירות, רק 14 היו של מאמת שנמצא בישוב המבוקש.
+    if want:
+        ctoks = toks(city_core(want.get("city", "")))
+        vtoks = toks(f"{ver.get('city', '')} {ver.get('matched', '')}")
+        if ctoks and not ctoks <= vtoks:
+            return score, reason, None, None  # המאמת אינו קביל — מתעלמים
+
     if dist >= CONFLICT_M:
         return max(10, score - 25), R_CONFLICT, dist, None
     return score, reason, dist, None
