@@ -1,0 +1,885 @@
+# -*- coding: utf-8 -*-
+"""
+גיאוקודינג לקובץ הקלפיות של ועדת הבחירות המרכזית.
+
+מוסיף לכל שורה שתי עמודות: `קואורדינטות` (WGS84, "lat, lon") ו-`דיוק קואורדינטות`.
+
+עקרונות מנחים:
+  * לעולם לא להמציא קואורדינטה. תא ריק עדיף על נקודה שגויה.
+    מנוע החיפוש של GovMap הוא fuzzy ומחזיר תוצאות שגויות בביטחון מלא
+    (למשל: חיפוש בי"ס בירושלים החזיר תוצאה ב"בית אלפא"), ולכן כל תוצאה
+    עוברת אימות מול הישוב/הרחוב/מספר הבית שהתבקשו — ראה validate_candidate.
+  * הקובץ המקורי נשמר בדיוק כפי שהוא: הפלט נכתב על עותק של החוברת המקורית
+    דרך openpyxl, ולא ב-read_excel/to_excel שמשנה טיפוסים ומוחק גיליונות.
+  * שגיאת רשת זמנית לעולם לא נשמרת במטמון בתור "לא נמצא".
+
+שימוש:
+    python geocode_kalpiot.py --selftest                 # בדיקת מנועים
+    python geocode_kalpiot.py "קלפיות.xlsx"              # ריצה מלאה
+    python geocode_kalpiot.py "קלפיות.xlsx" --limit 50   # ריצת טעימה
+    python geocode_kalpiot.py "קלפיות.xlsx" --report-only
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import re
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import pandas as pd
+import requests
+
+# ----------------------------------------------------------------------------
+# קבועים
+# ----------------------------------------------------------------------------
+SHEET = "DataSheet"
+COL_CITY = "שם ישוב קלפי"
+COL_STREET = "שם רחוב קלפי"
+COL_HOUSE = "מס' בית"
+COL_LETTER = "אות בית"
+COL_VENUE = "מקום קלפי"
+COL_RAW_ADDR = "כתובת קלפי"
+NEW_COL = "קואורדינטות"
+NEW_COL_SRC = "דיוק קואורדינטות"
+
+CACHE_FILE = "geocode_cache.json"
+
+# גבולות ישראל — כל תוצאה מחוץ לתחום נדחית ואינה נכתבת.
+LAT_MIN, LAT_MAX = 29.3, 33.5
+LON_MIN, LON_MAX = 34.2, 35.95
+
+HEADERS = {
+    "User-Agent": "kalpiot-geocoder/2.0 (research; polling-station mapping)",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
+    "Content-Type": "application/json",
+}
+
+# רמות דיוק — ערך נמוך = מדויק יותר.
+TIER_EXACT, TIER_STREET, TIER_CITY, TIER_NONE = 0, 1, 2, 3
+TIER_LABEL = {
+    TIER_EXACT: "כתובת מדויקת",
+    TIER_STREET: "רחוב",
+    TIER_CITY: "ישוב בלבד",
+    TIER_NONE: "לא נמצא",
+}
+
+# מיפוי סוג התוצאה של GovMap לרמת דיוק.
+# POI/שכונה ממופים בכוונה ל"רחוב" ולא ל"כתובת מדויקת": נקודת מרכז של מוסד
+# מדויקת ברמת הבלוק, ולא נכון להצהיר עליה כדיוק כתובת.
+# סוגי תוצאה שנחשבים "מקום" (בי"ס, מוסד, שכונה, שכבת GIS) — קבילים רק
+# לשאילתת `מקום קלפי`, ורק עם חפיפת שם מספקת. ראה validate_candidate.
+POI_TYPES = {
+    "poi", "מוסדות", "institutes", "neighborhood", "שכונה",
+    "entity", "statistic", "כביש", "צומת/מחלף",
+}
+
+# מילים גנריות בשמות מקומות קלפי. בלי סינון שלהן, 'בי"ס יסודי בית צפאפא'
+# מתאים ל'בית ספר יסודי - בית ספר ירושלים' על סמך "בית"+"יסודי" בלבד,
+# בעוד שהמילה המזהה היחידה (צפאפא) נעדרת מהתוצאה.
+VENUE_STOPWORDS = {
+    "בית", "ספר", "ביהס", "בהס", "בי", "יסודי", "יסודית", "תיכון", "תיכונית",
+    "ממלכתי", "ממלכתית", "ממד", "דתי", "דתית", "חטיבת", "חטיבה", "ביניים",
+    "מקיף", "אזורי", "אזורית", "אולם", "ספורט", "מגרש", "מועדון", "מזכירות",
+    "מרכז", "קהילתי", "קהילתית", "מתנס", "גן", "ילדים", "בנים", "בנות",
+    "ישיבה", "ישיבת", "אולפנה", "סמינר", "תלמוד", "תורה", "מוסד", "מוסדות",
+    "קלפי", "מבנה", "צריף", "כיתה", "כיתות", "חדר", "אשכול", "פיס", "היכל",
+    "תרבות", "עירייה", "מועצה", "מקומית", "כללי", "חדש", "חדשה", "ותיק",
+}
+
+try:
+    from pyproj import Transformer
+
+    ITM2WGS = Transformer.from_crs("EPSG:2039", "EPSG:4326", always_xy=True)
+    MERC2WGS = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+except ImportError:  # pragma: no cover
+    ITM2WGS = MERC2WGS = None
+
+
+class TransientError(Exception):
+    """כשל רשת/שרת זמני — לא נשמר במטמון, יינוסה שוב בריצה הבאה."""
+
+
+# ----------------------------------------------------------------------------
+# ניקוי וטיוב טקסט
+# ----------------------------------------------------------------------------
+def clean(v) -> str:
+    """מנרמל ערך תא לטקסט. מחזיר '' לערכים ריקים למעשה."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    s = str(v).strip()
+    # 0 = "אין מספר בית" בקובץ המקור; '.' מופיע בעמודת אות בית כמציין ריק.
+    if s in {"nan", "NaT", "0", "0.0", ".", "-"}:
+        return ""
+    if re.fullmatch(r"-?\d+\.0", s):
+        s = s[:-2]
+    return " ".join(s.split())
+
+
+_PUNCT = re.compile(r"[\"'`״׳.,()\[\]{}/\\|;:!?*+_=<>~^&%$#@–—־-]")
+
+
+def norm(s: str) -> str:
+    """נרמול להשוואה: מקפים/גרשיים/סוגריים → רווח. מטפל ב'תל אביב – יפו'."""
+    return " ".join(_PUNCT.sub(" ", s or "").split())
+
+
+def toks(s: str) -> set[str]:
+    return {t for t in norm(s).split() if len(t) > 1}
+
+
+def strip_punct(s: str) -> str:
+    return norm(s)
+
+
+# ----------------------------------------------------------------------------
+# בניית סולם וריאציות הכתובת
+# ----------------------------------------------------------------------------
+def build_query(row) -> dict:
+    """
+    בונה תיאור חיפוש לשורה: רכיבי הכתובת + סולם וריאציות מהמדויק לגס.
+    כל וריאציה נושאת `ceiling` — רמת הדיוק המקסימלית שמותר לטעון לה.
+    """
+    get = row.get if hasattr(row, "get") else (lambda k, d="": row[k])
+    city = clean(get(COL_CITY, ""))
+    street = clean(get(COL_STREET, ""))
+    house = clean(get(COL_HOUSE, ""))
+    letter = clean(get(COL_LETTER, ""))
+    venue = clean(get(COL_VENUE, ""))
+    raw = clean(get(COL_RAW_ADDR, ""))
+
+    variants: list[dict] = []
+    seen: set[str] = set()
+
+    def add(text, ceiling, kind):
+        text = " ".join(str(text).split()).strip(" ,")
+        if text and text not in seen:
+            seen.add(text)
+            variants.append({"text": text, "ceiling": ceiling, "kind": kind})
+
+    if street and city:
+        if house:
+            if letter:
+                add(f"{street} {house}{letter}, {city}", TIER_EXACT, "address")
+                add(f"{street} {house} {letter}, {city}", TIER_EXACT, "address")
+            add(f"{street} {house}, {city}", TIER_EXACT, "address")
+            if strip_punct(street) != street:
+                add(f"{strip_punct(street)} {house}, {city}", TIER_EXACT, "address")
+        add(f"{street}, {city}", TIER_STREET, "street")
+        if strip_punct(street) != street:
+            add(f"{strip_punct(street)}, {city}", TIER_STREET, "street")
+
+    # כתובת המקור המשולבת ("רחוב,מספר") — מצילה שורות ללא עמודת רחוב.
+    if raw and city and not street:
+        add(f"{raw.replace(',', ' ')}, {city}", TIER_EXACT, "address")
+
+    # שם המקום (בי"ס וכו') — כשאין רחוב או כשהרחוב לא זוהה.
+    if venue and city:
+        add(f"{venue}, {city}", TIER_STREET, "venue")
+        if strip_punct(venue) != venue:
+            add(f"{strip_punct(venue)}, {city}", TIER_STREET, "venue")
+
+    if city:
+        add(city, TIER_CITY, "city")
+        if strip_punct(city) != city:
+            add(strip_punct(city), TIER_CITY, "city")
+
+    return {
+        "city": city,
+        "street": street,
+        "house": house,
+        "letter": letter,
+        "venue": venue,
+        "variants": variants,
+    }
+
+
+# ----------------------------------------------------------------------------
+# המרת קואורדינטות + אימות תחום
+# ----------------------------------------------------------------------------
+def in_israel(lat, lon) -> bool:
+    return LAT_MIN <= lat <= LAT_MAX and LON_MIN <= lon <= LON_MAX
+
+
+def to_wgs84(a, b):
+    """
+    מקבל זוג מספרים במערכת לא ידועה ומחזיר (lat, lon) ב-WGS84, או None.
+    מזהה אוטומטית WGS84, Web Mercator (EPSG:3857 — מה ש-GovMap מחזיר)
+    ו-ITM (EPSG:2039). בישראל טווחי lat/lon אינם חופפים, אז הסדר חד-משמעי.
+    """
+    try:
+        a, b = float(a), float(b)
+    except (TypeError, ValueError):
+        return None
+    if a != a or b != b:  # NaN
+        return None
+
+    for lon, lat in ((a, b), (b, a)):
+        if in_israel(lat, lon):
+            return round(lat, 6), round(lon, 6)
+
+    if MERC2WGS is not None and max(abs(a), abs(b)) > 1_000_000:
+        for x, y in ((a, b), (b, a)):
+            lon, lat = MERC2WGS.transform(x, y)
+            if in_israel(lat, lon):
+                return round(lat, 6), round(lon, 6)
+
+    if ITM2WGS is not None:
+        for x, y in ((a, b), (b, a)):
+            if 100_000 <= x <= 320_000 and 350_000 <= y <= 820_000:
+                lon, lat = ITM2WGS.transform(x, y)
+                if in_israel(lat, lon):
+                    return round(lat, 6), round(lon, 6)
+
+    return None
+
+
+_WKT = re.compile(r"POINT\s*\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)", re.I)
+
+
+def parse_shape(shape):
+    """מפענח 'POINT(x y)' או dict עם x/y — ומחזיר (lat, lon) ב-WGS84."""
+    if isinstance(shape, str):
+        m = _WKT.search(shape)
+        if m:
+            return to_wgs84(m.group(1), m.group(2))
+        return None
+    if isinstance(shape, dict):
+        low = {str(k).lower(): v for k, v in shape.items()}
+        for ka, kb in (("x", "y"), ("lon", "lat"), ("lng", "lat")):
+            if ka in low and kb in low:
+                return to_wgs84(low[ka], low[kb])
+    return None
+
+
+# ----------------------------------------------------------------------------
+# אימות תוצאה — הלב של "לא להמציא קואורדינטות"
+# ----------------------------------------------------------------------------
+def base_type(rtype) -> str:
+    """
+    מנרמל את שדה ה-type של GovMap. שכבות GIS מגיעות כ'12345|שם שכבה|entity'
+    (תחנות דלק, תחנות הידרומטריות וכו') — כולן מקובצות ל-'entity'.
+    """
+    t = str(rtype or "").strip().lower()
+    return "entity" if "|" in t else t
+
+
+def validate_candidate(text, rtype, want, variant):
+    """
+    מחליט אם תוצאת החיפוש באמת מתאימה לכתובת שביקשנו, ובאיזו רמת דיוק.
+    מחזיר (ok: bool, tier: int).
+
+    בלי הבדיקות כאן היינו כותבים נקודות שגויות בעשרות ומאות ק"מ:
+      * 'ביה"ס בית יעקב הצפון, ירושלים' → GovMap החזיר 'ביה"ס 203 בית אלפא'.
+      * 'מסילות' (קיבוץ בצפון) → החזיר רחוב מסילות באילת.
+      * 'מפלסים' (קיבוץ בנגב) → החזיר רחוב מפלסים בפתח תקווה.
+    """
+    rtoks = toks(text)
+    raw_toks = set(norm(text).split())  # כולל מספרים חד-ספרתיים
+    base = base_type(rtype)
+    kind = variant["kind"]
+
+    # 1) הישוב חייב להתאים — התנאי הקריטי ביותר.
+    ctoks = toks(want["city"])
+    city_ok = (
+        not ctoks
+        or ctoks <= rtoks
+        # ישובים דו-שמיים / סוגריים ("אבו ג'ווייעד (שבט)") — מקבלים גם הכלה הפוכה.
+        or (base == "settlement" and rtoks and rtoks <= ctoks)
+    )
+    if not city_ok:
+        return False, TIER_NONE
+
+    # 2) שאילתת ישוב בלבד — רק תוצאת ישוב מתקבלת.
+    #    רחוב ששמו כשם הישוב, בעיר אחרת, הוא בדיוק המלכודת שהפילה אותנו.
+    if kind == "city":
+        return (True, TIER_CITY) if base == "settlement" else (False, TIER_NONE)
+
+    # 3) שאילתת רחוב/כתובת — רק תוצאת רחוב/כתובת, ורק אם שם הרחוב תואם.
+    if kind in ("address", "street"):
+        if base not in ("address", "street"):
+            return False, TIER_NONE
+        stoks = toks(want["street"]) or toks(variant["text"].split(",")[0])
+        # שם קצר (מילה-שתיים) חייב להתאים במלואו. הקלה של מילה אחת מותרת רק
+        # לשמות ארוכים — אחרת 'בית צפפה' עובר על סמך המילה "בית" לבדה.
+        if stoks:
+            need = stoks <= rtoks if len(stoks) <= 2 else len(stoks & rtoks) >= len(stoks) - 1
+            if not need:
+                return False, TIER_NONE  # ישוב נכון, רחוב אחר
+        house = want["house"]
+        if kind == "address" and base == "address" and house and house in raw_toks:
+            return True, TIER_EXACT
+        return True, TIER_STREET  # מספר בית לא תאם → רק רמת רחוב
+
+    # 4) שאילתת מקום (בי"ס וכו') — דורש חפיפה משמעותית עם שם המקום,
+    #    אחרת זו סתם נקודה כלשהי בישוב הנכון.
+    if kind == "venue":
+        if base == "settlement":
+            return False, TIER_NONE  # וריאציית הישוב תטפל בזה בשלב הבא
+        # ההתאמה חייבת להיות על המילים *המזהות* בשם המקום, לא על מילים
+        # גנריות כמו "בית ספר" שמופיעות בכל מוסד בישראל.
+        dtoks = toks(want["venue"]) - VENUE_STOPWORDS
+        if not dtoks:
+            return False, TIER_NONE  # שם גנרי לחלוטין — לא ניתן לאמת
+        hit = len(dtoks & rtoks)
+        if hit >= 2 or hit >= 0.5 * len(dtoks):
+            return True, TIER_STREET
+        if base in POI_TYPES and hit >= 1:
+            return True, TIER_STREET
+        return False, TIER_NONE
+
+    return False, TIER_NONE
+
+
+# ----------------------------------------------------------------------------
+# מנוע GovMap
+# ----------------------------------------------------------------------------
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
+
+# ה-endpoint הפעיל (אומת אוגוסט 2026). ה-API הישן, es.govmap.gov.il/TldSearch,
+# הוסר ומחזיר דף שגיאה. זהו השירות שאתר govmap עצמו משתמש בו, ללא טוקן.
+GOVMAP_ENDPOINTS = [
+    {
+        "name": "www/search-service/autocomplete",
+        "url": "https://www.govmap.gov.il/api/search-service/autocomplete",
+        "body": lambda q: {
+            "searchText": q,
+            "language": "he",
+            "isAccurate": False,
+            "maxResults": 10,
+        },
+    },
+    {
+        "name": "www/search-service/autocomplete (accurate)",
+        "url": "https://www.govmap.gov.il/api/search-service/autocomplete",
+        "body": lambda q: {
+            "searchText": q,
+            "language": "he",
+            "isAccurate": True,
+            "maxResults": 10,
+        },
+    },
+]
+
+_ACTIVE_GOVMAP: dict | None = None
+_THROTTLE = threading.Semaphore(8)
+
+
+def _post(ep, query, timeout=25):
+    with _THROTTLE:
+        r = SESSION.post(ep["url"], json=ep["body"](query), timeout=timeout)
+    if r.status_code >= 500 or r.status_code in (408, 429):
+        raise TransientError(f"{ep['name']} HTTP {r.status_code}")
+    r.raise_for_status()
+    return r.json()
+
+
+def probe_govmap(verbose=True):
+    """מאתר endpoint חי של GovMap מול כתובת ביקורת ידועה."""
+    global _ACTIVE_GOVMAP
+    if _ACTIVE_GOVMAP is not None:
+        return _ACTIVE_GOVMAP
+    control, exp_lat, exp_lon = "הרצל 1, תל אביב - יפו", 32.0635, 34.7700
+    for ep in GOVMAP_ENDPOINTS:
+        pt, err = None, None
+        # השרת של GovMap מחזיר 502/504 לסירוגין — מנסים כמה פעמים לפני שפוסלים.
+        for attempt in range(4):
+            try:
+                data = _post(ep, control, timeout=25)
+                res = (data or {}).get("results") or []
+                pt = parse_shape(res[0].get("shape")) if res else None
+                if pt:
+                    break
+                err = "הגיב ללא קואורדינטה תקפה"
+            except Exception as exc:
+                err = f"{type(exc).__name__}: {str(exc)[:70]}"
+                time.sleep(1.5 * (2**attempt))
+        if not pt:
+            if verbose:
+                print(f"  ✗ {ep['name']}: {err}")
+            continue
+        dist = abs(pt[0] - exp_lat) + abs(pt[1] - exp_lon)
+        if verbose:
+            print(f"  {'✓' if dist < 0.05 else '~'} {ep['name']}: {pt[0]}, {pt[1]}")
+        if dist < 0.05:
+            _ACTIVE_GOVMAP = ep
+            return ep
+    return None
+
+
+def geocode_govmap(variant, want):
+    ep = probe_govmap(verbose=False)
+    if ep is None:
+        return None
+    last = None
+    for attempt in range(3):
+        try:
+            data = _post(ep, variant["text"])
+            break
+        except (TransientError, requests.Timeout, requests.ConnectionError) as exc:
+            last = exc
+            time.sleep(1.5 * (2**attempt))
+        except Exception:
+            return None  # תשובה תקינה ללא תוצאה
+    else:
+        raise TransientError(f"govmap failed 3x: {last}")
+
+    best = None
+    for item in (data or {}).get("results") or []:
+        pt = parse_shape(item.get("shape"))
+        if not pt or not in_israel(*pt):
+            continue
+        ok, tier = validate_candidate(item.get("text", ""), item.get("type"), want, variant)
+        if not ok:
+            continue
+        if best is None or tier < best[0]:
+            best = (tier, pt[0], pt[1], item.get("type"), item.get("text", ""))
+        if tier == TIER_EXACT:
+            break
+    if best is None:
+        return None
+    return {
+        "lat": best[1],
+        "lon": best[2],
+        "tier": best[0],
+        "engine": f"govmap:{best[3]}",
+        "matched": best[4],
+    }
+
+
+# ----------------------------------------------------------------------------
+# מנוע Nominatim (גיבוי) — מדיניות: בקשה אחת לשנייה, גלובלית
+# ----------------------------------------------------------------------------
+_NOMI_LOCK = threading.Lock()
+_NOMI_LAST = [0.0]
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMI_PLACE = {"city", "town", "village", "municipality", "hamlet", "locality"}
+# display_name כולל נפה/מחוז/מדינה. בלי סינון, תוצאה בקריית ים "עוברת" אימות
+# לחיפה רק בגלל המילים "נפת חיפה" — ולכן מסירים את מקטעי המנהל.
+_NOMI_DROP = ("נפת ", "מחוז ", "ישראל")
+
+
+def nomi_place_text(display_name: str) -> str:
+    segs = [s.strip() for s in (display_name or "").split(",")]
+    keep = [
+        s for s in segs
+        if s and not s.isdigit() and not any(s.startswith(d) for d in _NOMI_DROP)
+    ]
+    return ", ".join(keep)
+
+
+def geocode_nominatim(variant, want):
+    with _NOMI_LOCK:
+        wait = 1.05 - (time.monotonic() - _NOMI_LAST[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            r = SESSION.get(
+                NOMINATIM_URL,
+                params={
+                    "q": variant["text"],
+                    "format": "jsonv2",
+                    "limit": 5,
+                    "countrycodes": "il",
+                },
+                headers={"Content-Type": None},
+                timeout=25,
+            )
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            raise TransientError(f"nominatim: {exc}") from exc
+        finally:
+            _NOMI_LAST[0] = time.monotonic()
+
+    if r.status_code >= 500 or r.status_code == 429:
+        raise TransientError(f"nominatim HTTP {r.status_code}")
+    try:
+        items = r.json()
+    except ValueError:
+        return None
+
+    for it in items or []:
+        try:
+            lat, lon = round(float(it["lat"]), 6), round(float(it["lon"]), 6)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not in_israel(lat, lon):
+            continue
+        name = it.get("display_name", "")
+        cat = str(it.get("category") or it.get("class") or "")
+        ntype = str(it.get("type") or "")
+        atype = str(it.get("addresstype") or "")
+        # Nominatim מסמן בית ב-type='house' (category='place'), לא ב-category.
+        if atype in NOMI_PLACE or ntype in NOMI_PLACE:
+            rtype = "settlement"
+        elif ntype in ("house", "building", "yes", "residential_building"):
+            rtype = "address"
+        elif cat == "highway":
+            rtype = "street"
+        else:
+            rtype = "poi"
+        ok, tier = validate_candidate(nomi_place_text(name), rtype, want, variant)
+        if not ok:
+            continue
+        return {
+            "lat": lat,
+            "lon": lon,
+            "tier": tier,
+            "engine": f"nominatim:{cat or 'result'}",
+            "matched": name[:80],
+        }
+    return None
+
+
+# ----------------------------------------------------------------------------
+# תזמור המנועים
+# ----------------------------------------------------------------------------
+def city_query(city: str) -> dict:
+    """שאילתת ישוב בלבד — משמשת לשכבת הגיבוי שמבטיחה כיסוי מלא."""
+    variants = [{"text": city, "ceiling": TIER_CITY, "kind": "city"}]
+    if strip_punct(city) != city:
+        variants.append({"text": strip_punct(city), "ceiling": TIER_CITY, "kind": "city"})
+    # שם בסוגריים ("אבו קרינאת (יישוב)") — מנסים גם בלי ההסבר בסוגריים.
+    bare = re.sub(r"\([^)]*\)", " ", city).strip()
+    if bare and bare != city:
+        variants.append({"text": bare, "ceiling": TIER_CITY, "kind": "city"})
+    return {
+        "city": city,
+        "street": "",
+        "house": "",
+        "letter": "",
+        "venue": "",
+        "variants": variants,
+    }
+
+
+def geocode(want, engine="govmap"):
+    """
+    מריץ את סולם הוריאציות מול המנועים ומחזיר dict או None.
+    זורק TransientError אם כל הניסיונות כשלו מסיבת רשת, כדי לא לשמור
+    כשל זמני במטמון בתור "לא נמצא".
+    """
+    engines = (
+        [geocode_govmap, geocode_nominatim]
+        if engine == "govmap"
+        else [geocode_nominatim, geocode_govmap]
+    )
+    fine = [v for v in want["variants"] if v["ceiling"] < TIER_CITY]
+    coarse = [v for v in want["variants"] if v["ceiling"] >= TIER_CITY]
+    transient = False
+
+    # סדר מנוע-ראשי: כל וריאציות הרחוב/הכתובת במנוע הראשי, ורק אם כולן
+    # נכשלו — המנוע המשני. אחרת כל כתובת כושלת שולחת 5 בקשות ל-Nominatim
+    # (בקשה לשנייה) והריצה נחנקת. שלב הישוב תמיד אחרון, כדי לא להעדיף
+    # מרכז ישוב על פני כתובת מדויקת שמנוע אחר היה מוצא.
+    for stage in (fine, coarse):
+        for fn in engines:
+            for variant in stage:
+                try:
+                    res = fn(variant, want)
+                except TransientError:
+                    transient = True
+                    continue
+                if res:
+                    res["tier"] = max(res["tier"], variant["ceiling"])
+                    res["query"] = variant["text"]
+                    res["kind"] = variant["kind"]
+                    return res
+    if transient:
+        raise TransientError("all variants failed transiently")
+    return None
+
+
+# ----------------------------------------------------------------------------
+# כתיבת הפלט — שמירה מוחלטת על החוברת המקורית
+# ----------------------------------------------------------------------------
+def write_output(in_path: Path, out_path: Path, sheet: str, coords, precision):
+    """
+    מעתיק את החוברת המקורית ומוסיף שתי עמודות בסוף.
+    לא משתמשים ב-to_excel: הוא ממיר טיפוסים, מאבד עיצוב ומוחק גיליונות אחרים.
+    """
+    import openpyxl
+
+    wb = openpyxl.load_workbook(in_path)
+    ws = wb[sheet]
+    ncol = ws.max_column
+    ws.cell(row=1, column=ncol + 1, value=NEW_COL)
+    ws.cell(row=1, column=ncol + 2, value=NEW_COL_SRC)
+    for i, (c, p) in enumerate(zip(coords, precision)):
+        ws.cell(row=i + 2, column=ncol + 1, value=c or None)
+        ws.cell(row=i + 2, column=ncol + 2, value=p)
+    wb.save(out_path)
+
+
+# ----------------------------------------------------------------------------
+# דוח בקרת איכות
+# ----------------------------------------------------------------------------
+def qa_report(df, details, keys, out_path, n_sample=5):
+    total = len(df)
+    coords = df[NEW_COL]
+    ok = int((coords != "").sum())
+
+    print("\n" + "=" * 64)
+    print("דוח בקרת איכות")
+    print("=" * 64)
+    print(f"קובץ פלט: {out_path}")
+    print(f"שורות: {total:,}  |  עם קואורדינטות: {ok:,} ({ok / total:.1%})")
+
+    print("\nפילוח לפי רמת דיוק:")
+    for label, cnt in df[NEW_COL_SRC].value_counts().items():
+        print(f"  {label:<44} {cnt:6,}  ({cnt / total:5.1%})")
+
+    bad = []
+    for i, c in enumerate(coords):
+        if not c:
+            continue
+        lat, lon = (float(x) for x in c.split(","))
+        if not in_israel(lat, lon):
+            bad.append((i, c))
+    print(f"\nאימות תחום ישראל (lat {LAT_MIN}–{LAT_MAX}, lon {LON_MIN}–{LON_MAX}):")
+    print(f"  חריגות: {len(bad)}" + ("  ✓" if not bad else "  ✗ באג!"))
+    for i, c in bad[:10]:
+        print(f"    שורה {i + 2}: {c}")
+
+    fmt = re.compile(r"^-?\d+\.\d{6}, -?\d+\.\d{6}$")
+    bad_fmt = [c for c in coords if c and not fmt.match(c)]
+    print(f"  פורמט (6 ספרות עשרוניות): {'✓' if not bad_fmt else f'✗ {len(bad_fmt)} חריגות'}")
+
+    have = df[df[NEW_COL] != ""]
+    if len(have):
+        print(f"\nמדגם אקראי ({min(n_sample, len(have))} שורות) לבדיקה ידנית:")
+        rnd = random.Random(20260817)
+        for idx in rnd.sample(list(have.index), min(n_sample, len(have))):
+            r = df.loc[idx]
+            e = details[idx] or {}
+            lat, lon = r[NEW_COL].split(", ")
+            print(f"\n  שורה {idx + 2} | {clean(r[COL_CITY])} | {clean(r[COL_VENUE])}")
+            print(f"    נשלח : {e.get('query', '')}")
+            print(f"    התקבל: {e.get('matched', '')}")
+            print(f"    דיוק : {r[NEW_COL_SRC]}")
+            print(f"    https://www.google.com/maps?q={lat},{lon}")
+
+    missing = sorted({keys[i] for i in df.index if not df.at[i, NEW_COL]})
+    print(f"\nכתובות ייחודיות ללא תוצאה: {len(missing)}")
+    for a in missing[:40]:
+        print(f"    {a}")
+    if len(missing) > 40:
+        print(f"    ... ועוד {len(missing) - 40}")
+    if missing:
+        p = out_path.with_name("כתובות שלא נמצאו.txt")
+        p.write_text("\n".join(missing), encoding="utf-8")
+        print(f"  הרשימה המלאה נשמרה: {p}")
+    print("=" * 64)
+
+
+# ----------------------------------------------------------------------------
+# main
+# ----------------------------------------------------------------------------
+def run_selftest():
+    print("בדיקת מנועי גיאוקודינג\n")
+    print("GovMap — איתור endpoint פעיל:")
+    ep = probe_govmap()
+    print(f"\n  → נבחר: {ep['name'] if ep else 'אין endpoint פעיל'}\n")
+
+    controls = [
+        {COL_CITY: "תל אביב - יפו", COL_STREET: "הרצל", COL_HOUSE: "1", COL_VENUE: ""},
+        {COL_CITY: "ירושלים", COL_STREET: 'מעגלי הרי"ם לוין', COL_HOUSE: "27", COL_VENUE: ""},
+        {COL_CITY: "חיפה", COL_STREET: "שדרות ירושלים", COL_HOUSE: "10", COL_VENUE: ""},
+    ]
+    print("כתובות ביקורת:")
+    for row in controls:
+        want = build_query(row)
+        try:
+            res = geocode(want, "govmap" if ep else "nominatim")
+        except TransientError as exc:
+            print(f"  {want['variants'][0]['text']}: כשל רשת — {exc}")
+            continue
+        head = want["variants"][0]["text"]
+        if not res:
+            print(f"  {head}: לא נמצא")
+            continue
+        print(f"  {head}")
+        print(f"    {res['lat']}, {res['lon']}  [{TIER_LABEL[res['tier']]} / {res['engine']}]")
+        print(f"    התאמה: {res.get('matched', '')}")
+        print(f"    https://www.google.com/maps?q={res['lat']},{res['lon']}")
+    return 0 if ep else 1
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="גיאוקודינג לקובץ הקלפיות")
+    ap.add_argument("input", nargs="?", help="נתיב לקובץ קלפיות.xlsx")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--engine", choices=["govmap", "nominatim"], default="govmap")
+    ap.add_argument("--sheet", default=SHEET)
+    ap.add_argument("--workers", type=int, default=8, help="בקשות במקביל (GovMap בלבד)")
+    ap.add_argument("--limit", type=int, default=0, help="הגבל למספר כתובות ייחודיות")
+    ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--cache", default=None)
+    args = ap.parse_args()
+
+    if args.selftest:
+        return run_selftest()
+    if not args.input:
+        ap.error("חסר נתיב קובץ קלט (או השתמש ב---selftest)")
+
+    in_path = Path(args.input)
+    out_path = (
+        Path(args.out) if args.out
+        else in_path.with_name(in_path.stem + " עם קואורדינטות.xlsx")
+    )
+
+    df = pd.read_excel(in_path, sheet_name=args.sheet)
+    print(f"נטענו {len(df):,} שורות מ-{in_path.name} (גיליון {args.sheet})")
+
+    queries = [build_query(r) for _, r in df.iterrows()]
+    keys = [q["variants"][0]["text"] if q["variants"] else "" for q in queries]
+    uniq: dict[str, dict] = {}
+    for k, q in zip(keys, queries):
+        if k and k not in uniq:
+            uniq[k] = q
+    print(f"{len(uniq):,} כתובות ייחודיות")
+
+    cache_path = Path(args.cache) if args.cache else in_path.parent / CACHE_FILE
+    cache = {}
+    if cache_path.exists():
+        try:
+            cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        except ValueError:
+            print("אזהרה: המטמון פגום, מתחיל מחדש")
+
+    todo = [] if args.report_only else [k for k in uniq if k not in cache]
+    if args.limit:
+        todo = todo[: args.limit]
+
+    if todo:
+        if args.engine == "govmap":
+            print("\nאיתור endpoint פעיל של GovMap:")
+            if probe_govmap() is None:
+                print("  אין endpoint פעיל — עובר ל-Nominatim (~1 שנייה לכתובת)")
+                args.engine, args.workers = "nominatim", 1
+            else:
+                print(f"  → {_ACTIVE_GOVMAP['name']}")
+        if args.engine == "nominatim":
+            args.workers = 1
+
+        print(f"\nמגאוקוד {len(todo):,} כתובות ({args.workers} במקביל)…")
+        lock, done, t0 = threading.Lock(), [0], time.monotonic()
+
+        def work(key):
+            try:
+                res = geocode(uniq[key], args.engine)
+                transient = False
+            except TransientError:
+                res, transient = None, True  # לא נשמר — יינוסה שוב
+            with lock:
+                if not transient:
+                    cache[key] = res
+                done[0] += 1
+                n = done[0]
+                if n % 50 == 0 or n == len(todo):
+                    cache_path.write_text(
+                        json.dumps(cache, ensure_ascii=False), encoding="utf-8"
+                    )
+                    el = time.monotonic() - t0
+                    rate = n / el if el else 0
+                    eta = (len(todo) - n) / rate if rate else 0
+                    print(
+                        f"  {n:,}/{len(todo):,} ({n / len(todo):5.1%})  "
+                        f"{rate:.1f}/שנ'  נותרו ~{eta / 60:.0f} דק'"
+                    )
+
+        try:
+            if args.workers > 1:
+                with ThreadPoolExecutor(max_workers=args.workers) as pool:
+                    list(pool.map(work, todo))
+            else:
+                for k in todo:
+                    work(k)
+        except KeyboardInterrupt:
+            print("\nהופסק — המטמון נשמר, הרץ שוב כדי להמשיך.")
+        finally:
+            cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+
+    # ------------------------------------------------------------------
+    # שכבת גיבוי: כל שורה שהכתובת שלה לא נפתרה מקבלת את מרכז הישוב.
+    # זו נקודה אמיתית ממקור מוסמך — לא הערכה — ומסומנת "ישוב בלבד",
+    # כך שהכיסוי מלא בלי לטעון לדיוק שאין.
+    # ------------------------------------------------------------------
+    city_cache_path = cache_path.with_name("city_cache.json")
+    city_cache = {}
+    if city_cache_path.exists():
+        try:
+            city_cache = json.loads(city_cache_path.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+
+    need_city = sorted(
+        {q["city"] for k, q in zip(keys, queries)
+         if q["city"] and not cache.get(k) and q["city"] not in city_cache}
+    )
+    if need_city and not args.report_only:
+        print(f"\nשכבת גיבוי — מאתר מרכז ישוב עבור {len(need_city):,} ישובים…")
+        clock = threading.Lock()
+        cdone = [0]
+
+        def cwork(city):
+            try:
+                res = geocode(city_query(city), args.engine)
+            except TransientError:
+                return
+            with clock:
+                city_cache[city] = res
+                cdone[0] += 1
+                if cdone[0] % 25 == 0 or cdone[0] == len(need_city):
+                    city_cache_path.write_text(
+                        json.dumps(city_cache, ensure_ascii=False), encoding="utf-8"
+                    )
+                    print(f"  {cdone[0]:,}/{len(need_city):,}")
+
+        try:
+            with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+                list(pool.map(cwork, need_city))
+        finally:
+            city_cache_path.write_text(
+                json.dumps(city_cache, ensure_ascii=False), encoding="utf-8"
+            )
+
+    def entry_for(k, q):
+        e = cache.get(k)
+        if e:
+            return e, False
+        e = city_cache.get(q["city"])
+        return (e, True) if e else (None, False)
+
+    def fmt_coord(k, q):
+        e, _ = entry_for(k, q)
+        return f"{e['lat']:.6f}, {e['lon']:.6f}" if e else ""
+
+    def fmt_prec(k, q):
+        e, fb = entry_for(k, q)
+        if not e:
+            return TIER_LABEL[TIER_NONE]
+        tier = TIER_CITY if fb else e["tier"]
+        return f"{TIER_LABEL[tier]} ({e['engine']}{' — גיבוי ישוב' if fb else ''})"
+
+    coords = [fmt_coord(k, q) for k, q in zip(keys, queries)]
+    precision = [fmt_prec(k, q) for k, q in zip(keys, queries)]
+    details = [entry_for(k, q)[0] for k, q in zip(keys, queries)]
+    df[NEW_COL] = coords
+    df[NEW_COL_SRC] = precision
+
+    write_output(in_path, out_path, args.sheet, coords, precision)
+    print(f"\nנשמר: {out_path}")
+
+    qa_report(df, details, keys, out_path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
