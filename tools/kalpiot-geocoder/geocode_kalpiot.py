@@ -579,7 +579,12 @@ def geocode(want, engine="govmap"):
     # מרכז ישוב על פני כתובת מדויקת שמנוע אחר היה מוצא.
     for stage in (fine, coarse):
         for fn in engines:
-            for variant in stage:
+            # Nominatim מוגבל לבקשה אחת בשנייה, גלובלית, ולכן הוא שולט
+            # בזמן הריצה כולה: כתובת שנופלת עד רמת הישוב שילמה שלוש
+            # קריאות מסודרות לפני שהגיעה לשם. הוא מקבל וריאציה אחת בלבד —
+            # הוא ממילא מנרמל פיסוק ונסוג לרמת רחוב בעצמו.
+            vs = stage[:1] if fn is geocode_nominatim else stage
+            for variant in vs:
                 try:
                     res = fn(variant, want)
                 except TransientError:
