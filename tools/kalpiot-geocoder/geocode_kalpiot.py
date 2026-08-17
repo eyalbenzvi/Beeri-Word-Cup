@@ -186,23 +186,33 @@ def build_query(row) -> dict:
     variants: list[dict] = []
     seen: set[str] = set()
 
-    def add(text, ceiling, kind):
+    def add(text, ceiling, kind, strict_city=False):
         text = " ".join(str(text).split()).strip(" ,")
         if text and text not in seen:
             seen.add(text)
-            variants.append({"text": text, "ceiling": ceiling, "kind": kind})
+            variants.append({"text": text, "ceiling": ceiling, "kind": kind,
+                             "strict_city": strict_city})
 
-    if street and city:
+    # ב-16.8% מהשורות עמודת הרחוב רק חוזרת על שם הישוב — ישובים קטנים ללא
+    # שמות רחובות. חיפוש רחוב כזה מוצא רחוב אמיתי בעל אותו שם בישוב אחר
+    # ('אורה, אורה' → "אורה באר אורה", 228 ק"מ משם), ולכן מדלגים עליו לגמרי
+    # וניגשים ישר לשם המקום ולישוב. רק אם יש מספר בית נשמרת וריאציית כתובת,
+    # שכן בישובים כאלה הכתובת אכן נכתבת "<שם הישוב> <מספר>".
+    street_is_city = bool(street) and fold(norm(street)) == fold(norm(city))
+
+    if street and city and not (street_is_city and not house):
         if house:
+            strict = street_is_city
             if letter:
-                add(f"{street} {house}{letter}, {city}", TIER_EXACT, "address")
-                add(f"{street} {house} {letter}, {city}", TIER_EXACT, "address")
-            add(f"{street} {house}, {city}", TIER_EXACT, "address")
+                add(f"{street} {house}{letter}, {city}", TIER_EXACT, "address", strict)
+                add(f"{street} {house} {letter}, {city}", TIER_EXACT, "address", strict)
+            add(f"{street} {house}, {city}", TIER_EXACT, "address", strict)
             if strip_punct(street) != street:
-                add(f"{strip_punct(street)} {house}, {city}", TIER_EXACT, "address")
-        add(f"{street}, {city}", TIER_STREET, "street")
-        if strip_punct(street) != street:
-            add(f"{strip_punct(street)}, {city}", TIER_STREET, "street")
+                add(f"{strip_punct(street)} {house}, {city}", TIER_EXACT, "address", strict)
+        if not street_is_city:
+            add(f"{street}, {city}", TIER_STREET, "street")
+            if strip_punct(street) != street:
+                add(f"{strip_punct(street)}, {city}", TIER_STREET, "street")
 
     # כתובת המקור המשולבת ("רחוב,מספר") — מצילה שורות ללא עמודת רחוב.
     if raw and city and not street:
@@ -345,6 +355,13 @@ def validate_candidate(text, rtype, want, variant):
             rest = counter_toks(text) - counter_toks(want["street"])
             if not ctoks <= set(rest):
                 return False, TIER_NONE
+            # כששם הרחוב זהה לשם הישוב, ההכלה לבדה אינה מספיקה: "אורה באר
+            # אורה" מכיל "אורה" פעמיים. כאן נדרש שלא תישאר אף מילה לא-מספרית
+            # מעבר לשם הישוב — כלומר שהישוב בתוצאה הוא בדיוק זה שביקשנו.
+            if variant.get("strict_city"):
+                extra = {t for t in rest if not t.isdigit()} - ctoks
+                if extra:
+                    return False, TIER_NONE
 
         stoks = toks(want["street"]) or toks(variant["text"].split(",")[0])
         # שם קצר (מילה-שתיים) חייב להתאים במלואו. הקלה של מילה אחת מותרת רק
